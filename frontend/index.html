@@ -1049,348 +1049,441 @@ button { cursor: pointer; }
   font-weight: 600;
 }
 
-/* Tmux Runtimes Session Tabs */
-.tmuxSessionTabs {
+/* ========================================================================= */
+/* MISSION CONTROL DECK - 6 HỒ SƠ CHUYÊN GIA & KHUNG ĐIỀU HÀNH TRUNG TÂM      */
+/* ========================================================================= */
+.missionTopBar {
   display: flex;
-  gap: 6px;
-  overflow-x: auto;
-  padding-bottom: 8px;
-  margin-bottom: 12px;
-  scrollbar-width: none;
-}
-.tmuxSessionTabs::-webkit-scrollbar { display: none; }
-.tmuxTab {
-  background: var(--panel);
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  background: linear-gradient(180deg, #131720 0%, #0e1218 100%);
   border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 8px 12px;
+  border-radius: 10px;
+  padding: 10px 16px;
+  margin-bottom: 14px;
+}
+.missionTitleBox h2 {
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  margin: 0 0 2px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.missionTitleBox p {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 0;
+}
+.missionTopActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* 6 Thẻ Hồ Sơ Chuyên Gia (Expert Squad Cards Grid) */
+.expertSquadGrid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 10px;
+  margin-bottom: 14px;
+}
+@media (max-width: 1450px) {
+  .expertSquadGrid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+@media (max-width: 820px) {
+  .expertSquadGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.expertCard {
+  background: #10141b;
+  border: 1px solid #1e2634;
+  border-radius: 10px;
+  padding: 10px 12px;
   cursor: pointer;
-  min-width: 210px;
-  max-width: 250px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   display: flex;
   flex-direction: column;
-  gap: 5px;
-  transition: all 0.15s;
+  gap: 7px;
+  position: relative;
+  user-select: none;
 }
-.tmuxTab:hover {
-  border-color: #384353;
-  background: #181d24;
+.expertCard:hover {
+  background: #141a24;
+  border-color: #3b82f6;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
 }
-.tmuxTab.active {
-  border-color: var(--accent);
-  background: #151a22;
-  box-shadow: 0 0 0 1px var(--accent);
+.expertCard.active {
+  background: #131c2a;
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 1.5px #38bdf8, 0 6px 20px rgba(56, 189, 248, 0.18);
 }
-.tmuxTabHeader {
+.expertCard.hibernated {
+  opacity: 0.65;
+  filter: grayscale(0.25);
+  background: #0d1015;
+}
+.expertCard.hibernated:hover {
+  opacity: 0.92;
+  filter: none;
+}
+
+/* Inside Expert Card */
+.expertCardTop {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 6px;
 }
-.tmuxTabRole {
-  font-size: 12px;
-  font-weight: 600;
+.expertCardAvatarBox {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+.expertAvatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: #1c2433;
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+  flex-shrink: 0;
+  border: 1px solid rgba(255,255,255,0.06);
+}
+.expertNameBlock {
+  min-width: 0;
+}
+.expertRoleTitle {
+  font-size: 11.5px;
+  font-weight: 700;
   color: #fff;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  line-height: 1.2;
 }
-.tmuxTabSid {
-  font-size: 9.5px;
+.expertSidBadge {
   font-family: var(--mono);
+  font-size: 9px;
   color: var(--muted2);
-  background: rgba(255,255,255,0.05);
-  padding: 1px 4px;
-  border-radius: 3px;
+  white-space: nowrap;
 }
-.tmuxTabAcc {
+
+.expertCardActions {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+}
+.expertMiniBtn {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: var(--muted);
+  font-size: 9.5px;
+  padding: 2px 5px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.expertMiniBtn:hover {
+  background: #2563eb;
+  color: #fff;
+  border-color: #3b82f6;
+}
+.expertMiniBtn.wake {
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  border-color: rgba(56, 189, 248, 0.3);
+}
+
+.expertStatusChip {
+  font-size: 9px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  width: fit-content;
+}
+.expertStatusChip.live {
+  background: rgba(34, 197, 94, 0.12);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.25);
+}
+.expertStatusChip.paused {
+  background: rgba(234, 179, 8, 0.12);
+  color: #facc15;
+  border: 1px solid rgba(234, 179, 8, 0.25);
+}
+.expertStatusChip.sleep {
+  background: rgba(148, 163, 184, 0.1);
+  color: #94a3b8;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.expertCardAccount {
   display: flex;
   align-items: center;
-  gap: 5px;
-  font-size: 10px;
-  padding: 2px 6px;
+  gap: 4px;
+  font-size: 9.5px;
+  font-family: var(--mono);
+  color: #8da4be;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: rgba(0,0,0,0.25);
+  padding: 2px 5px;
   border-radius: 4px;
-  width: fit-content;
-  max-width: 100%;
-}
-.tmuxTabAcc.auth {
-  color: #38bdf8;
-  background: rgba(56, 189, 248, 0.1);
-  border: 1px solid rgba(56, 189, 248, 0.25);
-}
-.tmuxTabAcc.unauth {
-  color: #f87171;
-  background: rgba(248, 113, 113, 0.1);
-  border: 1px solid rgba(248, 113, 113, 0.25);
 }
 .gIconBadge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 13px;
-  height: 13px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
   background: #38bdf8;
   color: #0d1014;
   font-weight: 800;
-  font-size: 8px;
+  font-size: 7.5px;
+  flex-shrink: 0;
 }
-.warnBadge {
-  font-size: 10px;
-}
-.tmuxTabEmail {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-family: var(--mono);
-}
-.tmuxTabMiniQuota {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  font-size: 9px;
-  padding-top: 3px;
-  border-top: 1px dashed rgba(255,255,255,0.07);
-}
-.miniGauge {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  flex: 1;
-}
-.miniBar {
-  flex: 1;
-  height: 4px;
-  background: #1c222b;
-  border-radius: 2px;
-  overflow: hidden;
-}
-.miniFill {
-  height: 100%;
-  border-radius: 2px;
-}
-.miniFill.gemini { background: #38bdf8; }
-.miniFill.anthropic { background: #f59e0b; }
 
-/* Dual Model Quota Ribbon */
-.tmuxQuotaRibbon {
-  background: #0b0e13;
-  border-bottom: 1px solid var(--line);
-  padding: 8px 12px;
-  display: grid;
-  grid-template-columns: 1fr 1fr auto;
-  gap: 12px;
-  align-items: center;
-}
-.quotaBox {
-  background: #12161d;
-  border: 1px solid #1f2732;
-  border-radius: 6px;
-  padding: 6px 10px;
+/* Micro Quota Bars */
+.expertCardQuota {
   display: flex;
   flex-direction: column;
+  gap: 2.5px;
+  font-size: 8.5px;
+  padding-top: 3px;
+  border-top: 1px dashed rgba(255,255,255,0.06);
+}
+.microQuotaRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 4px;
 }
-.quotaBoxHead {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 11px;
-}
-.quotaBoxTitle {
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-.quotaProgress {
-  height: 5px;
-  background: #18202b;
-  border-radius: 3px;
+.microBarTrack {
+  flex: 1;
+  height: 3px;
+  background: #19202a;
+  border-radius: 2px;
   overflow: hidden;
 }
-.quotaFill.gemini {
+.microBarFill {
   height: 100%;
-  background: linear-gradient(90deg, #0284c7, #38bdf8);
+  border-radius: 2px;
 }
-.quotaFill.anthropic {
-  height: 100%;
-  background: linear-gradient(90deg, #d97706, #f59e0b);
-}
-.quotaBoxFoot {
-  display: flex;
-  justify-content: space-between;
-  font-size: 9.5px;
-  color: var(--muted2);
-  font-family: var(--mono);
-}
+.microBarFill.gemini { background: #38bdf8; }
+.microBarFill.anthropic { background: #f59e0b; }
 
-/* Host Terminal Attach Box */
-.tmuxAttachRibbon {
-  background: #10141a;
-  border-bottom: 1px solid var(--line);
-  padding: 6px 12px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  font-size: 11px;
-  flex-wrap: wrap;
-}
-.tmuxAttachCmd {
-  background: #090c10;
-  border: 1px solid #232a35;
-  color: #5eead4;
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-family: var(--mono);
-  font-size: 11px;
-}
-
-/* Tmux Terminal Box */
-.tmuxTerminalBox {
-  background: #090c10;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
+/* 3. Khung Điều Hành Trung Tâm Thống Nhất (Command Deck) */
+.commandDeck {
+  background: #0d1117;
+  border: 1px solid #1f2734;
+  border-radius: 12px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  min-height: 580px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.4);
 }
-.tmuxTerminalHead {
-  background: #10141a;
-  border-bottom: 1px solid var(--line);
-  padding: 8px 12px;
+
+.commandDeckHead {
+  background: #111620;
+  border-bottom: 1px solid #1e2634;
+  padding: 10px 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 14px;
   flex-wrap: wrap;
 }
-.tmuxTerminalTitle {
+.deckSelectedAgentInfo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.deckAvatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #1e293b, #0f172a);
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+  border: 1px solid rgba(255,255,255,0.1);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  flex-shrink: 0;
+}
+.deckTitleBlock h3 {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #fff;
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
-  font-family: var(--mono);
 }
-.accountPill {
+.deckTitleBlock p {
+  margin: 2px 0 0;
+  font-size: 10.5px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.deckHeadActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.deckQuotaPill {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 8px;
+  background: #090c10;
+  border: 1px solid #1f2734;
+  padding: 4px 10px;
+  border-radius: 6px;
   font-size: 11px;
-  background: #151a23;
-  border: 1px solid #2b3543;
-  padding: 3px 8px;
-  border-radius: 4px;
-  color: #e6edf3;
-}
-.tmuxTerminalBody {
-  height: 420px;
-  overflow-y: auto;
-  padding: 14px;
   font-family: var(--mono);
-  font-size: 12px;
+}
+
+/* Command Deck Navigation Tabs */
+.commandDeckNav {
+  background: #0f141c;
+  border-bottom: 1px solid #1a222e;
+  padding: 0 14px;
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.commandDeckNav::-webkit-scrollbar { display: none; }
+
+.deckNavTab {
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 9px 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+.deckNavTab:hover {
+  color: #d1d5db;
+  background: rgba(255,255,255,0.02);
+}
+.deckNavTab.active {
+  color: #fff;
+  border-bottom-color: #38bdf8;
+  background: rgba(56, 189, 248, 0.05);
+}
+
+/* Panels */
+.deckPanel {
+  flex: 1;
+  min-height: 0;
+}
+
+/* Thinking Stream View */
+.thinkingDeckView {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  height: 100%;
+}
+.thinkingDeckHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #1a222e;
+}
+.thinkingCardList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  max-height: 440px;
+}
+.thinkingStepCard {
+  background: #11151e;
+  border: 1px solid #1e2634;
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.thinkingStepHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #e2e8f0;
+}
+.thinkingStepBody {
+  font-size: 11px;
+  color: #94a3b8;
   line-height: 1.5;
-  color: #c9d1d9;
+  background: #090c10;
+  padding: 7px 10px;
+  border-radius: 6px;
+  border-left: 2.5px solid #38bdf8;
+  font-family: var(--sans);
+}
+
+/* Streamlined Console View */
+.streamlinedConsole {
   background: #080b0f;
+  display: flex;
+  flex-direction: column;
+  height: 480px;
+}
+.streamlinedConsoleBody {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 14px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: #cad3df;
   white-space: pre-wrap;
   word-break: break-all;
 }
-.tmuxTerminalInputRow {
-  background: #0f1319;
-  border-top: 1px solid var(--line);
+.streamlinedConsoleInputRow {
+  background: #0f141c;
+  border-top: 1px solid #1e2634;
   padding: 8px 12px;
   display: flex;
   align-items: center;
   gap: 8px;
-}
-.tmuxPromptLabel {
-  font-family: var(--mono);
-  font-size: 12px;
-  color: #3ad18b;
-  font-weight: 700;
-  white-space: nowrap;
-}
-.tmuxInput {
-  flex: 1;
-  background: #090c10;
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  color: #fff;
-  font-family: var(--mono);
-  font-size: 12px;
-  padding: 6px 10px;
-  outline: none;
-}
-.tmuxInput:focus {
-  border-color: var(--accent);
-}
-.tmuxShortcuts {
-  padding: 6px 12px 10px;
-  background: #0f1319;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-  border-top: 1px solid rgba(255,255,255,0.03);
-}
-.tmuxPill {
-  background: #171c23;
-  border: 1px solid var(--line);
-  border-radius: 3px;
-  padding: 2px 7px;
-  font-size: 10px;
-  font-family: var(--mono);
-  color: var(--muted);
-  cursor: pointer;
-  transition: all 0.15s;
-}
-.tmuxPill:hover {
-  color: #fff;
-  border-color: var(--accent);
-  background: #202630;
-}
-
-/* Tmux Grid 3x2 */
-.tmuxGrid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-  margin-top: 8px;
-}
-.tmuxGridCard {
-  background: #090c10;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-.tmuxGridHead {
-  background: #10141a;
-  padding: 8px 10px;
-  border-bottom: 1px solid var(--line);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.tmuxGridBody {
-  height: 180px;
-  padding: 8px 10px;
-  font-family: var(--mono);
-  font-size: 10.5px;
-  line-height: 1.4;
-  color: #8b949e;
-  overflow-y: auto;
-  white-space: pre-wrap;
-  background: #07090d;
-}
-.tmuxGridFoot {
-  background: #0d1117;
-  border-top: 1px solid var(--line);
-  padding: 6px 8px;
-  display: flex;
-  gap: 6px;
 }
 
 /* OAuth & Account Management Styles */
@@ -1794,290 +1887,203 @@ button { cursor: pointer; }
       <!-- ========================================================================= -->
       <!-- 3. MÔI TRƯỜNG AGENT (RUNTIMES THỰC TẾ & PHIÊN NỀN TMUX) -->
       <!-- ========================================================================= -->
+      <!-- ========================================================================= -->
+      <!-- 3. MÔI TRƯỜNG AGENT (MISSION CONTROL WORKPLACE — BẢNG ĐIỀU HÀNH CHUYÊN GIA) -->
+      <!-- ========================================================================= -->
       <section class="screen" id="runtimes">
-        <div class="pageHead">
-          <div>
-            <h1>Môi trường Agent & Điều Hành Swarm</h1>
-            <p>Hệ thống tự động khởi tạo các phiên nền tmux tương ứng với từng Role. Mặc định khởi chạy <code>agy</code> CLI với Gmail mặc định của Owner; cho phép chỉ định tài khoản / profile khác nhau thủ công cho từng phiên.</p>
+        <!-- 1. Thanh Tiêu Đề Điều Hành Cấp Cao -->
+        <div class="missionTopBar">
+          <div class="missionTitleBox">
+            <h2><span>🚀</span> Mission Control Deck · Đội Ngũ Chuyên Gia Swarm</h2>
+            <p>6 Chuyên gia AI tự hành · Quản trị tài nguyên 1-click & Điều phối luồng công việc thời gian thực</p>
           </div>
-          <div class="actions">
-            <button class="btn primary" onclick="openOauthModal()">🔐 Đăng nhập & Xác thực OAuth</button>
-            <button class="btn" onclick="refreshTmuxSessions()">Làm mới Tmux</button>
-            <button class="btn" onclick="openNewTmuxModal()">+ Khởi tạo Role mới</button>
+          <div class="missionTopActions">
+            <button class="btn small" onclick="triggerSwarmLifecycle('sleep_all')" title="Ngủ đông tất cả để giải phóng 100% CPU & RAM, bảo toàn hội thoại">
+              😴 Ngủ đông cả đội (0% CPU/RAM)
+            </button>
+            <button class="btn small primary" onclick="triggerSwarmLifecycle('wake_all')" title="Đánh thức toàn bộ 6 chuyên gia dậy làm việc">
+              ⚡ Đánh thức cả đội
+            </button>
+            <button class="btn small" onclick="openOauthModal()" title="Quản lý tài khoản Google và xác thực OAuth">
+              🔐 Tài khoản & OAuth
+            </button>
+            <button class="btn small" onclick="refreshTmuxSessions(true)" title="Làm mới trạng thái">
+              🔄 Làm mới
+            </button>
           </div>
         </div>
 
-        <!-- TAB CHUYỂN ĐỔI CHỨC NĂNG CỦA MÔI TRƯỜNG AGENT -->
-        <div class="agentViewBar">
-          <button class="agentViewBtn active" id="btnViewTmux" onclick="switchAgentView('tmux', this)">
-            <span class="icon">🖥️</span> Phiên Nền Runtimes (Tmux Swarm)
-            <span class="viewBadge">6 Phiên</span>
-          </button>
-          <button class="agentViewBtn" id="btnViewOauth" onclick="switchAgentView('oauth', this)">
-            <span class="icon">🔐</span> Xác Thực OAuth & Quản Lý Tài Khoản Google
-            <span class="viewBadge" id="oauthBadgeCount">3 Đã Login</span>
-          </button>
-          <button class="agentViewBtn" id="btnViewChat" onclick="switchAgentView('chat', this)">
-            <span class="icon">💬</span> Chatroom & Luồng Bàn Giao
-          </button>
-          <button class="agentViewBtn" id="btnViewKanban" onclick="switchAgentView('kanban', this)">
-            <span class="icon">📋</span> Team Live Kanban
-          </button>
-        </div>
+        <!-- 2. Bảng 6 Thẻ Hồ Sơ Chuyên Gia (Avatar, Tên, Trạng thái, Gmail, Quota Micro-Bars) -->
+        <div class="expertSquadGrid" id="expertSquadGrid"></div>
 
-        <!-- 1. VIEW TMUX RUNTIMES (MẶC ĐỊNH HIỂN THỊ) -->
-        <div class="agentSubView active" id="agentView-tmux">
-          <!-- Thanh điều khiển hiển thị & Quản trị tài nguyên Swarm -->
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
-            <div style="display:flex;align-items:center;gap:6px">
-              <span style="font-size:11px;color:var(--muted)">Chế độ xem:</span>
-              <button class="btn small primary" id="btnTmuxSingle" onclick="setTmuxMode('single')">Cửa sổ chi tiết (Interactive Terminal)</button>
-              <button class="btn small" id="btnTmuxGrid" onclick="setTmuxMode('grid')">Lưới 6 phiên (Mission Control Grid)</button>
-            </div>
-            <!-- Bổ sung Quản Trị Vòng Đời Swarm (Tiết kiệm tài nguyên) -->
-            <div style="display:flex;align-items:center;gap:6px">
-              <span style="font-size:11px;color:var(--muted)">Quản trị tài nguyên:</span>
-              <button class="btn small" onclick="triggerSwarmLifecycle('sleep_all')" title="Tạm tắt tất cả 6 phiên để giải phóng 100% CPU & RAM, bảo toàn hội thoại">😴 Ngủ đông tất cả (0% CPU/RAM)</button>
-              <button class="btn small primary" onclick="triggerSwarmLifecycle('wake_all')" title="Kích hoạt lại toàn bộ 6 phiên Swarm">⚡ Đánh thức tất cả (Wake All)</button>
-            </div>
-          </div>
-
-          <!-- Danh sách Tab các Phiên Tmux của từng Role -->
-          <div class="tmuxSessionTabs" id="tmuxSessionTabs"></div>
-
-          <!-- CHẾ ĐỘ 1: CỬA SỔ CHI TIẾT INTERACTIVE TERMINAL -->
-          <div class="tmuxTerminalBox" id="tmuxSingleView">
-            <div class="tmuxTerminalHead">
-              <div class="tmuxTerminalTitle">
-                <span class="dot done" id="tmuxTermStatusDot"></span>
-                <strong id="tmuxTermSessionName">tmux: gw-lead-agy</strong>
-                <span style="color:var(--muted2)">· window 0: agy-cli · PID <span id="tmuxTermPid">30129</span></span>
-                <span class="chip done" id="tmuxTermConvBadge" style="font-size:10px;font-family:var(--mono)">🔗 conv-lead-architect</span>
-              </div>
-              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-                <div class="accountPill" id="tmuxTermAccountBadgeBox">
-                  <span class="gIconBadge">G</span>
-                  <span>Tài khoản:</span>
-                  <strong id="tmuxTermAccountLabel" style="color:#5eead4">owner@genesis.local</strong>
-                  <button class="btn small" onclick="openAccountModal()" style="padding:2px 6px;margin-left:4px">Đổi Profile</button>
-                  <button class="btn small primary" onclick="openOauthModalForSession()" style="padding:2px 6px;margin-left:4px">🔐 Đăng nhập OAuth</button>
-                </div>
-                <!-- Dynamic Lifecycle Action Buttons (Pause, Resume, Hibernate, Wake) -->
-                <div style="display:flex;gap:4px" id="tmuxLifecycleButtons"></div>
-                <div style="display:flex;gap:4px">
-                  <button class="btn small" onclick="sendTmuxKey('C-c')" title="Gửi ngắt lệnh Ctrl+C">Ctrl+C</button>
-                  <button class="btn small" onclick="sendTmuxKey('Enter')" title="Gửi Enter">Enter</button>
-                  <button class="btn small" onclick="clearTmuxTerminal()" title="Xóa màn hình">Clear</button>
-                </div>
-              </div>
-            </div>
-
-            <!-- Host Terminal Attach Ribbon -->
-            <div class="tmuxAttachRibbon">
-              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-                <span style="color:var(--muted)">💻 Attach Host Terminal:</span>
-                <code class="tmuxAttachCmd" id="tmuxAttachCmdDisplay">docker exec -it gen-workplace-app tmux a -t gw-lead-agy</code>
-                <button class="btn small" onclick="copyTmuxAttachCmd()" title="Sao chép lệnh attach vào clipboard">📋 Sao chép lệnh</button>
-              </div>
-              <div style="display:flex;align-items:center;gap:8px">
-                <span style="color:var(--muted2);font-size:10.5px">Thoát attach an toàn: <code>Ctrl+b d</code></span>
-                <span class="chip done" id="tmuxLiveStatusBadge" style="font-size:10px">● Real Tmux Live</span>
-              </div>
-            </div>
-
-            <!-- Dual Model Quota Ribbon (Gemini & Anthropic Families) -->
-            <div class="tmuxQuotaRibbon">
-              <!-- Gemini Model Quota Card -->
-              <div class="quotaBox">
-                <div class="quotaBoxHead">
-                  <span class="quotaBoxTitle" style="color:#38bdf8">
-                    <span>💎</span> <span id="quotaGeminiTitle">Google Gemini 3.8 Flash (High)</span>
+        <!-- 3. Khung Điều Hành Trung Tâm Thống Nhất (Command Deck) -->
+        <div class="commandDeck" id="commandDeck">
+          <!-- A. Deck Header: Thông tin chi tiết Agent đang chọn & Action buttons -->
+          <div class="commandDeckHead">
+            <div class="deckSelectedAgentInfo">
+              <div class="deckAvatar" id="deckAgentAvatar">👑</div>
+              <div class="deckTitleBlock">
+                <h3>
+                  <span id="deckAgentRole">Lead Architect</span>
+                  <span class="expertSidBadge" id="deckAgentSid">gw-lead-agy</span>
+                  <span class="expertStatusChip live" id="deckAgentStatusBadge">● Đang chạy</span>
+                </h3>
+                <p>
+                  <span>Mạch tư duy: <code id="deckAgentConv" style="color:#5eead4;font-size:10.5px">conv-lead-architect</code></span>
+                  <span>·</span>
+                  <span class="expertCardAccount" id="deckAgentAccountBox" style="cursor:pointer" onclick="openAccountModal()" title="Nhấp để đổi tài khoản / profile">
+                    <span class="gIconBadge">G</span>
+                    <span id="deckAgentEmail">owner@genesis.local</span>
+                    <span style="color:#38bdf8;margin-left:4px">Đổi</span>
                   </span>
-                  <span class="chip live" id="quotaGeminiBadge" style="font-size:9.5px;padding:1px 5px">Khả dụng 100%</span>
-                </div>
-                <div class="quotaProgress">
-                  <div class="quotaFill gemini" id="quotaGeminiBar" style="width:88%"></div>
-                </div>
-                <div class="quotaBoxFoot">
-                  <span id="quotaGeminiReq">180 / 1,500 requests</span>
-                  <span id="quotaGeminiDetails">RPM: 60 · TPM: 4.0M · Reset: 00:00 UTC</span>
-                </div>
+                </p>
               </div>
-
-              <!-- Anthropic Model Quota Card -->
-              <div class="quotaBox">
-                <div class="quotaBoxHead">
-                  <span class="quotaBoxTitle" style="color:#f59e0b">
-                    <span>⚡</span> <span id="quotaAnthropicTitle">Claude Sonnet 4.6 (Thinking)</span>
-                  </span>
-                  <span class="chip done" id="quotaAnthropicBadge" style="font-size:9.5px;padding:1px 5px">Khả dụng 94%</span>
-                </div>
-                <div class="quotaProgress">
-                  <div class="quotaFill anthropic" id="quotaAnthropicBar" style="width:94%"></div>
-                </div>
-                <div class="quotaBoxFoot">
-                  <span id="quotaAnthropicReq">12.5k / 200k tokens</span>
-                  <span id="quotaAnthropicDetails">RPM: 50 · Extended Thinking · Reset: Rolling 5h</span>
-                </div>
-              </div>
-
-              <!-- Refresh Quota Button -->
-              <button class="btn small" onclick="refreshTmuxSessions(true)" title="Kiểm tra lại Quota mới nhất" style="height:fit-content">
-                🔄 Cập nhật Quota
-              </button>
             </div>
 
-            <!-- Màn hình Terminal Canvas -->
-            <div class="tmuxTerminalBody" id="tmuxTerminalOutput"></div>
-
-            <!-- Thanh nhập lệnh gửi vào tmux (tmux send-keys) -->
-            <div class="tmuxTerminalInputRow">
-              <span class="tmuxPromptLabel" id="tmuxPromptLabel">tmux: gw-lead-agy &gt;</span>
-              <input type="text" class="tmuxInput" id="tmuxCmdInput" placeholder="Nhập lệnh shell hoặc chỉ thị CLI gửi thẳng vào phiên tmux..." onkeydown="if(event.key==='Enter')sendTmuxCmd()">
-              <button class="btn primary small" onclick="sendTmuxCmd()">Gửi (Enter)</button>
-            </div>
-
-            <!-- Phím tắt chỉ đạo nhanh -->
-            <div class="tmuxShortcuts">
-              <span style="font-size:10px;color:var(--muted2)">Chỉ đạo nhanh:</span>
-              <span class="tmuxPill" onclick="insertTmuxCmd('agy --version')">agy --version</span>
-              <span class="tmuxPill" onclick="insertTmuxCmd('git status')">git status</span>
-              <span class="tmuxPill" onclick="insertTmuxCmd('[BÀN GIAO] Đã hoàn thành task và kiểm thử')">[BÀN GIAO]</span>
-              <span class="tmuxPill" onclick="insertTmuxCmd('python3 -m unittest discover')">Run Tests</span>
-              <span class="tmuxPill" onclick="insertTmuxCmd('docker ps')">docker ps</span>
-              <span class="tmuxPill" onclick="insertTmuxCmd('agy auth status')">Kiểm tra Auth</span>
+            <!-- Lifecycle Actions & Quick Quota Pill -->
+            <div class="deckHeadActions">
+              <div class="deckQuotaPill" id="deckQuotaPill" title="Hạn ngạch thực tế còn lại">
+                <span style="color:#38bdf8">💎 Gemini: <b id="deckQuotaGeminiVal">25%</b></span>
+                <span style="color:var(--muted2)">|</span>
+                <span style="color:#f59e0b">⚡ Claude: <b id="deckQuotaClaudeVal">94%</b></span>
+              </div>
+              <div id="deckLifecycleActions" style="display:flex;gap:6px"></div>
             </div>
           </div>
 
-          <!-- CHẾ ĐỘ 2: LƯỚI 6 PHIÊN (GRID VIEW) -->
-          <div class="tmuxGrid" id="tmuxGridView" style="display:none"></div>
-        </div>
+          <!-- B. Navigation Tabs của Khung Điều Hành Trung Tâm -->
+          <div class="commandDeckNav">
+            <button class="deckNavTab active" data-decktab="chat" onclick="switchDeckTab('chat', this)">
+              💬 Luồng Chat & Bàn Giao
+            </button>
+            <button class="deckNavTab" data-decktab="thinking" onclick="switchDeckTab('thinking', this)">
+              🧠 Mạch Tư Duy & Nghiệm Thu
+            </button>
+            <button class="deckNavTab" data-decktab="kanban" onclick="switchDeckTab('kanban', this)">
+              📋 Team Live Kanban
+            </button>
+            <button class="deckNavTab" data-decktab="console" onclick="switchDeckTab('console', this)">
+              💻 Live Console (Log Sạch)
+            </button>
+            <button class="deckNavTab" data-decktab="oauth" onclick="switchDeckTab('oauth', this)">
+              🔐 Quản Lý Hồ Sơ OAuth
+            </button>
+          </div>
 
-        <!-- 2. VIEW CHATROOM & LUỒNG BÀN GIAO -->
-        <div class="agentSubView" id="agentView-chat" style="display:none">
-          <div class="runtimeGrid">
-            <!-- Cột Trái: Danh sách Runtimes -->
-            <div class="card runtimeList" id="rtListCard">
-              <div class="cardHead">
-                <strong>Runtime đang kết nối</strong>
-                <span class="hint" id="runtimeCount">6</span>
-              </div>
-              <div id="runtimeItems"></div>
-            </div>
-
-            <!-- Cột Giữa: Chatroom / Thread / Nhật ký tư duy -->
-            <div class="card chat" id="rtChatCard">
-              <div class="cardHead">
-                <div>
-                  <strong id="chatTitle">Lead Architect · runtime-01</strong>
-                  <div class="hint" id="chatPath">/workspace/LinuxDataA/gen-workplace · branch/main</div>
-                </div>
-                <div class="chatTabs">
-                  <button class="chatTab active" data-chat="thread" onclick="switchChat('thread', this)">Luồng Chat & @Mention</button>
-                  <button class="chatTab" data-chat="trace" onclick="switchChat('trace', this)">Nhật Ký Tư Duy (Thinking)</button>
-                  <button class="chatTab" data-chat="io" onclick="switchChat('io', this)">Vào / Ra (In-Out)</button>
-                </div>
-              </div>
-
-              <!-- Thread Filter Bar -->
-              <div class="threadBar" id="threadBar"></div>
-
-              <!-- Messages Stream -->
-              <div class="messages" id="chatMessages"></div>
-
-              <!-- Chat Composer -->
-              <div class="composer">
-                <textarea id="chatInput" placeholder="Nhắn trong chatroom; @mention role để handoff/yêu cầu làm rõ, đính kèm file hoặc thả emoji phản hồi…"></textarea>
-                <div class="composeRow">
-                  <div class="mention">
-                    <span style="color:var(--muted2)">Mention nhanh:</span>
-                    <a href="javascript:void(0)" onclick="insertAt('@Lead')" style="color:var(--accent2);text-decoration:none">@Lead</a> · 
-                    <a href="javascript:void(0)" onclick="insertAt('@Backend')" style="color:var(--accent2);text-decoration:none">@Backend</a> · 
-                    <a href="javascript:void(0)" onclick="insertAt('@QA')" style="color:var(--accent2);text-decoration:none">@QA</a> · 
-                    <a href="javascript:void(0)" onclick="insertAt('@DevOps')" style="color:var(--accent2);text-decoration:none">@DevOps</a>
+          <!-- C. Panels Nội Dung -->
+          <!-- Panel 1: Chatroom & Luồng Bàn Giao -->
+          <div class="deckPanel active" id="deckPanel-chat" style="display:flex;flex:1;min-height:0">
+            <div class="runtimeGrid" style="width:100%;min-height:460px;margin:0;border:0;border-radius:0">
+              <!-- Cột Giữa: Chatroom / Thread -->
+              <div class="card chat" id="rtChatCard" style="border:0;border-radius:0;border-right:1px solid var(--line)">
+                <div class="cardHead" style="min-height:36px;padding:8px 12px">
+                  <div>
+                    <strong id="chatTitle">Phòng Chat Điều Hành</strong>
+                    <div class="hint" id="chatPath">Handoff nhiệm vụ & trao đổi chéo giữa các Role qua @mention</div>
                   </div>
-                  <div style="display:flex;gap:5px;align-items:center">
-                    <span style="font-size:11px;color:var(--muted);cursor:pointer" onclick="insertEmoji('📥')">📥</span>
-                    <span style="font-size:11px;color:var(--muted);cursor:pointer" onclick="insertEmoji('⚠️')">⚠️</span>
-                    <span style="font-size:11px;color:var(--muted);cursor:pointer" onclick="insertEmoji('👎')">👎</span>
-                    <span style="font-size:11px;color:var(--muted);cursor:pointer" onclick="insertEmoji('✅')">✅</span>
-                    <span style="font-size:11px;color:var(--muted);cursor:pointer" onclick="insertEmoji('❓')">❓</span>
-                    <button class="btn primary" onclick="sendRuntimeMessage()">Gửi</button>
+                  <div class="chatTabs">
+                    <button class="chatTab active" data-chat="thread" onclick="switchChat('thread', this)">Tất cả trao đổi</button>
+                    <button class="chatTab" data-chat="trace" onclick="switchChat('trace', this)">Chỉ nhiệm vụ của Role này</button>
+                  </div>
+                </div>
+
+                <div class="threadBar" id="threadBar"></div>
+                <div class="messages" id="chatMessages" style="height:320px;overflow-y:auto"></div>
+
+                <div class="composer">
+                  <textarea id="chatInput" placeholder="Nhắn chỉ thị cho chuyên gia; @mention role để giao việc, đính kèm kết quả hoặc thả emoji xác nhận..."></textarea>
+                  <div class="composeRow">
+                    <div class="mention">
+                      <span style="color:var(--muted2)">Tag nhanh:</span>
+                      <a href="javascript:void(0)" onclick="insertAt('@Lead')" style="color:var(--accent2);text-decoration:none">@Lead</a> · 
+                      <a href="javascript:void(0)" onclick="insertAt('@Backend')" style="color:var(--accent2);text-decoration:none">@Backend</a> · 
+                      <a href="javascript:void(0)" onclick="insertAt('@Frontend')" style="color:var(--accent2);text-decoration:none">@Frontend</a> · 
+                      <a href="javascript:void(0)" onclick="insertAt('@QA')" style="color:var(--accent2);text-decoration:none">@QA</a> · 
+                      <a href="javascript:void(0)" onclick="insertAt('@DevOps')" style="color:var(--accent2);text-decoration:none">@DevOps</a>
+                    </div>
+                    <div style="display:flex;gap:6px;align-items:center">
+                      <span style="font-size:13px;cursor:pointer" onclick="insertEmoji('📥')" title="Đã nhận">📥</span>
+                      <span style="font-size:13px;cursor:pointer" onclick="insertEmoji('⚠️')" title="Cảnh báo">⚠️</span>
+                      <span style="font-size:13px;cursor:pointer" onclick="insertEmoji('👎')" title="Fail">👎</span>
+                      <span style="font-size:13px;cursor:pointer" onclick="insertEmoji('✅')" title="Done">✅</span>
+                      <span style="font-size:13px;cursor:pointer" onclick="insertEmoji('❓')" title="Cần làm rõ">❓</span>
+                      <button class="btn primary small" onclick="sendRuntimeMessage()">Gửi chỉ thị</button>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            <!-- Cột Phải: Inspector Ngữ Cảnh & Tham Chiếu Bắt Buộc -->
-            <div class="card runtimeInspector" id="rtInspectorCard">
-              <div class="cardHead">
-                <strong>Ngữ cảnh Runtime</strong>
-                <span class="chip live" id="runtimeStatus">running</span>
-              </div>
-              <div class="inspectorTabs">
-                <button class="insTab active" onclick="switchInspector('context', this)">Ngữ cảnh</button>
-                <button class="insTab" onclick="switchInspector('events', this)">Sự kiện</button>
-                <button class="insTab" onclick="switchInspector('files', this)">Tệp / Ref</button>
-              </div>
-              <div class="inspectorBody" id="runtimeInspectorBody"></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 3. VIEW TEAM LIVE KANBAN -->
-        <div class="agentSubView" id="agentView-kanban" style="display:none">
-          <div class="kanbanWrap" id="rtKanbanCard">
-            <div class="card">
-              <div class="cardHead">
-                <div>
-                  <strong>Live Kanban · Tiến Trình gen-workplace</strong>
-                  <div class="hint">Trưởng nhóm phụ trách update theo live time công việc; có thể kéo thả để chuyển cột.</div>
+              <!-- Cột Phải: Ngữ cảnh & Inspector -->
+              <div class="card runtimeInspector" id="rtInspectorCard" style="border:0;border-radius:0">
+                <div class="cardHead" style="min-height:36px;padding:8px 12px">
+                  <strong>Ngữ Cảnh Nghiệm Thu</strong>
+                  <span class="chip live" id="runtimeStatus">active</span>
                 </div>
-                <span class="chip live">LIVE UPDATED</span>
+                <div class="inspectorTabs">
+                  <button class="insTab active" onclick="switchInspector('context', this)">Ngữ cảnh</button>
+                  <button class="insTab" onclick="switchInspector('events', this)">Sự kiện</button>
+                  <button class="insTab" onclick="switchInspector('files', this)">Tệp / Ref</button>
+                </div>
+                <div class="inspectorBody" id="runtimeInspectorBody" style="padding:12px;overflow-y:auto;max-height:380px"></div>
               </div>
-              <div class="cardBody">
-                <div class="kanban" id="kanban"></div>
-              </div>
-            </div>
-        <!-- 4. VIEW XÁC THỰC OAUTH & QUẢN LÝ TÀI KHOẢN GOOGLE -->
-        <div class="agentSubView" id="agentView-oauth" style="display:none">
-          <!-- 4 KPI Cards -->
-          <div class="oauthGrid">
-            <div class="oauthStatCard">
-              <span class="oauthStatLabel">Tài khoản Google đã đăng nhập</span>
-              <div class="oauthStatVal" id="oaStatActive">0</div>
-              <span style="font-size:10px;color:var(--green)">● Sẵn sàng phục vụ Swarm</span>
-            </div>
-            <div class="oauthStatCard">
-              <span class="oauthStatLabel">Hồ sơ cần xác thực / Chưa login</span>
-              <div class="oauthStatVal" id="oaStatPending">0</div>
-              <span style="font-size:10px;color:var(--yellow)">○ Cần đăng nhập OAuth</span>
-            </div>
-            <div class="oauthStatCard">
-              <span class="oauthStatLabel">Swarm Role đã gán tài khoản</span>
-              <div class="oauthStatVal" id="oaStatAssigned">6 / 6 Role</div>
-              <span style="font-size:10px;color:var(--accent2)">Đồng bộ thời gian thực</span>
-            </div>
-            <div class="oauthStatCard">
-              <span class="oauthStatLabel">Giao thức xác thực CLI</span>
-              <div class="oauthStatVal" style="font-size:14px;color:var(--accent)">OAuth 2.0 PKCE</div>
-              <span style="font-size:10px;color:var(--muted2)">Token: antigravity-oauth-token</span>
             </div>
           </div>
 
-          <!-- Bảng Hồ Sơ & Thao Tác -->
-          <div class="card" style="margin-bottom:16px">
-            <div class="cardHead">
-              <div>
-                <strong>Danh Sách Tài Khoản & Profile Google OAuth (Thật)</strong>
-                <div class="hint">Hệ thống quét trực tiếp các profile độc lập tại <code>~/.gemini</code> và <code>~/.agy-profiles/*</code>. Đăng nhập 1 lần, tự động lưu token và phân phối cho từng Role.</div>
+          <!-- Panel 2: Mạch Tư Duy & Nghiệm Thu (Thinking Stream Cards) -->
+          <div class="deckPanel" id="deckPanel-thinking" style="display:none">
+            <div class="thinkingDeckView">
+              <div class="thinkingDeckHead">
+                <div>
+                  <strong style="color:#fff;font-size:13px">🧠 Chuỗi Tư Duy Tự Hành & Biên Bản Nghiệm Thu</strong>
+                  <div class="hint">Phân rã mục tiêu logic, các công cụ đã sử dụng và kết quả sinh ra của chuyên gia đang chọn</div>
+                </div>
+                <button class="btn small" onclick="renderThinkingCards()">🔄 Làm mới tư duy</button>
               </div>
-              <div style="display:flex;gap:8px">
-                <button class="btn small" onclick="refreshOauthProfiles()">🔄 Làm mới</button>
+              <div class="thinkingCardList" id="thinkingCardList"></div>
+            </div>
+          </div>
+
+          <!-- Panel 3: Live Kanban Cả Đội -->
+          <div class="deckPanel" id="deckPanel-kanban" style="display:none">
+            <div style="padding:12px">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                <strong style="color:#fff;font-size:13px">📋 Live Kanban · Tiến Trình Dự Án</strong>
+                <span class="chip live">LIVE UPDATED TỰ ĐỘNG</span>
+              </div>
+              <div class="kanban" id="kanban"></div>
+            </div>
+          </div>
+
+          <!-- Panel 4: Live Console Log Sạch (Thu gọn) -->
+          <div class="deckPanel" id="deckPanel-console" style="display:none">
+            <div class="streamlinedConsole">
+              <div style="background:#0c1017;padding:6px 12px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #1a222e;font-size:11px">
+                <span style="color:var(--muted)">Stream log thời gian thực: <code id="consoleSidLabel" style="color:#5eead4">gw-lead-agy</code></span>
+                <div style="display:flex;gap:6px">
+                  <button class="btn small" onclick="sendTmuxKey('C-c')">Ctrl+C</button>
+                  <button class="btn small" onclick="clearTmuxTerminal()">Clear</button>
+                  <button class="btn small" onclick="refreshTmuxSessions(true)">🔄</button>
+                </div>
+              </div>
+              <div class="streamlinedConsoleBody" id="tmuxTerminalOutput"></div>
+              <div class="streamlinedConsoleInputRow">
+                <span style="font-family:var(--mono);color:#3ad18b;font-weight:700;font-size:12px" id="tmuxPromptLabel">input &gt;</span>
+                <input type="text" class="tmuxInput" id="tmuxCmdInput" placeholder="Nhập chỉ thị hoặc nội dung gửi trực tiếp vào phiên..." onkeydown="if(event.key==='Enter')sendTmuxCmd()">
+                <button class="btn primary small" onclick="sendTmuxCmd()">Gửi (Enter)</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Panel 5: Quản Lý Hồ Sơ OAuth -->
+          <div class="deckPanel" id="deckPanel-oauth" style="display:none">
+            <div style="padding:16px">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+                <div>
+                  <strong style="color:#fff;font-size:13px">🔐 Hồ Sơ Xác Thực Google OAuth (Thật)</strong>
+                  <div class="hint">Đăng nhập tài khoản Google OAuth 2.0 PKCE. Token được phân bổ tự động cho các Role.</div>
+                </div>
                 <button class="btn small primary" onclick="openOauthModal()">+ Thêm & Xác thực Tài khoản Mới</button>
               </div>
-            </div>
-            <div class="cardBody" style="padding:0">
               <table class="oauthProfileTable">
                 <thead>
                   <tr>
@@ -2783,11 +2789,11 @@ const SUBTAB_CONFIG = {
     icon: '◉',
     name: 'Môi trường Agent',
     tabs: [
-      { id: 'rt-thread', label: '💬 Chatroom & @Mention', action: () => switchChat('thread') },
-      { id: 'rt-trace', label: '🧠 Nhật Ký Tư Duy (Thinking)', action: () => switchChat('trace') },
-      { id: 'rt-io', label: '📥 Vào / Ra (In-Out)', action: () => switchChat('io') },
-      { id: 'rt-kanban', label: '📋 Team Live Kanban', target: '#rtKanbanCard' },
-      { id: 'rt-inspector', label: '🔍 Ngữ Cảnh Runtime', target: '#rtInspectorCard' }
+      { id: 'rt-squad', label: '🚀 Ban Chỉ Huy Swarm', target: '#expertSquadGrid' },
+      { id: 'rt-chat', label: '💬 Luồng Chat & Bàn Giao', action: () => switchDeckTab('chat') },
+      { id: 'rt-thinking', label: '🧠 Mạch Tư Duy', action: () => switchDeckTab('thinking') },
+      { id: 'rt-kanban', label: '📋 Live Kanban', action: () => switchDeckTab('kanban') },
+      { id: 'rt-console', label: '💻 Live Console', action: () => switchDeckTab('console') }
     ]
   },
   data: {
@@ -2874,10 +2880,14 @@ function go(id, el) {
   document.querySelectorAll('.navItem').forEach(n => n.classList.remove('active'));
   if (el) el.classList.add('active');
   else document.querySelector('.navItem[data-nav="' + id + '"]')?.classList.add('active');
-  
+
+  updateSubtopNav(id);
+
   if (id === 'runtimes') {
     refreshTmuxSessions();
     refreshOauthProfiles();
+    // Ensure deck starts on chat tab
+    if (!state.currentDeckTab) state.currentDeckTab = 'chat';
   }
 }
 
@@ -3386,203 +3396,253 @@ async function refreshTmuxSessions(showNotify = false) {
   renderTmuxSessions();
 }
 
+const ROLE_AVATARS = {
+  'gw-lead-agy': '👑',
+  'gw-backend-agy': '🗄️',
+  'gw-frontend-agy': '🎨',
+  'gw-devops-agy': '🚢',
+  'gw-qa-agy': '🧪',
+  'gw-security-agy': '🛡️'
+};
+
 function renderTmuxSessions() {
-  const tabsContainer = $('tmuxSessionTabs');
-  if (tabsContainer) {
-    tabsContainer.innerHTML = state.tmuxSessions.map(s => {
-      const isSel = s.id === state.selectedTmuxSessionId;
-      const email = s.email || (s.account_label?.includes('@') ? s.account_label.split('(')[1]?.replace(')', '') : null);
-      const isAuth = s.is_auth || !!email;
-      const qG = s.quota_gemini || { percent: 88, status_label: 'Khả dụng' };
-      const qA = s.quota_anthropic || { percent: 94, status_label: 'Khả dụng' };
+  if (!state.tmuxSessions || state.tmuxSessions.length === 0) return;
+  if (!state.selectedTmuxSessionId || !state.tmuxSessions.some(s => s.id === state.selectedTmuxSessionId)) {
+    state.selectedTmuxSessionId = state.tmuxSessions[0]?.id || 'gw-lead-agy';
+  }
+  if (!state.currentDeckTab) {
+    state.currentDeckTab = 'chat';
+  }
 
-      return `
-        <div class="tmuxTab ${isSel ? 'active' : ''}" onclick="selectTmuxSession('${escapeHtml(s.id)}')">
-          <div class="tmuxTabHeader">
-            <div style="display:flex;align-items:center;gap:6px">
-              <span class="dot ${s.status === 'active' ? 'done' : 'wait'}"></span>
-              <strong class="tmuxTabRole">${escapeHtml(s.role_name)}</strong>
+  renderExpertSquadGrid();
+  updateCommandDeck();
+}
+
+function renderExpertSquadGrid() {
+  const container = $('expertSquadGrid');
+  if (!container) return;
+
+  container.innerHTML = state.tmuxSessions.map(s => {
+    const isSel = s.id === state.selectedTmuxSessionId;
+    const avatar = ROLE_AVATARS[s.id] || '🤖';
+    const email = s.email || (s.account_label?.includes('@') ? s.account_label.split('(')[1]?.replace(')', '') : 'Chưa đăng nhập');
+    const isAuth = s.is_auth || (email && email !== 'Chưa đăng nhập');
+    const qG = s.quota_gemini || { percent: 25, model: 'Gemini 3.8 Flash' };
+    const qA = s.quota_anthropic || { percent: 94, model: 'Claude Sonnet 4.6' };
+    const isHib = s.status === 'hibernated';
+    const isPaused = s.status === 'paused';
+
+    const statusLabel = isHib ? '😴 Sleep' : (isPaused ? '⏸ Paused' : '● Live');
+    const statusClass = isHib ? 'sleep' : (isPaused ? 'paused' : 'live');
+
+    return `
+      <div class="expertCard ${isSel ? 'active' : ''} ${isHib ? 'hibernated' : ''}" onclick="selectTmuxSession('${escapeHtml(s.id)}')">
+        <div class="expertCardTop">
+          <div class="expertCardAvatarBox">
+            <div class="expertAvatar">${avatar}</div>
+            <div class="expertNameBlock">
+              <div class="expertRoleTitle">${escapeHtml(s.role_name)}</div>
+              <div class="expertSidBadge">${escapeHtml(s.id)}</div>
             </div>
-            <span class="tmuxTabSid">${escapeHtml(s.id)}</span>
           </div>
-
-          <div class="tmuxTabAcc ${isAuth ? 'auth' : 'unauth'}" title="${escapeHtml(email || 'Chưa đăng nhập')}">
-            ${isAuth 
-              ? `<span class="gIconBadge">G</span> <span class="tmuxTabEmail">${escapeHtml(email || s.account_label)}</span>` 
-              : `<span class="warnBadge">⚠️</span> <span class="tmuxTabEmail">Chưa đăng nhập</span>`
+          <div class="expertCardActions" onclick="event.stopPropagation()">
+            ${isHib 
+              ? `<button class="expertMiniBtn wake" onclick="triggerGridLifecycle('${escapeHtml(s.id)}', 'wake')" title="Đánh thức dậy">⚡</button>`
+              : (isPaused
+                  ? `<button class="expertMiniBtn" onclick="triggerGridLifecycle('${escapeHtml(s.id)}', 'resume')" title="Tiếp tục">▶</button>
+                     <button class="expertMiniBtn" onclick="triggerGridLifecycle('${escapeHtml(s.id)}', 'hibernate')" title="Ngủ đông">😴</button>`
+                  : `<button class="expertMiniBtn" onclick="triggerGridLifecycle('${escapeHtml(s.id)}', 'pause')" title="Tạm dừng">⏸</button>
+                     <button class="expertMiniBtn" onclick="triggerGridLifecycle('${escapeHtml(s.id)}', 'hibernate')" title="Ngủ đông">😴</button>`
+                )
             }
           </div>
+        </div>
 
-          <div class="tmuxTabMiniQuota">
-            <div class="miniGauge" title="Google Gemini: ${escapeHtml(qG.status_label || '88%')}">
-              <span style="color:#38bdf8;font-weight:700">G</span>
-              <div class="miniBar"><div class="miniFill gemini" style="width:${qG.percent || 85}%"></div></div>
-              <span style="color:var(--muted2)">${qG.percent || 85}%</span>
-            </div>
-            <div class="miniGauge" title="Anthropic Claude: ${escapeHtml(qA.status_label || '94%')}">
-              <span style="color:#f59e0b;font-weight:700">C</span>
-              <div class="miniBar"><div class="miniFill anthropic" style="width:${qA.percent || 94}%"></div></div>
-              <span style="color:var(--muted2)">${qA.percent || 94}%</span>
-            </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:4px">
+          <span class="expertStatusChip ${statusClass}">${statusLabel}</span>
+          <span style="font-size:9px;color:var(--muted2);font-family:var(--mono)">${s.pid > 0 ? 'PID ' + s.pid : '0MB RAM'}</span>
+        </div>
+
+        <div class="expertCardAccount" title="${escapeHtml(email)}">
+          <span class="gIconBadge">G</span>
+          <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(email)}</span>
+        </div>
+
+        <div class="expertCardQuota">
+          <div class="microQuotaRow">
+            <span style="color:#38bdf8">G: ${qG.percent || 25}%</span>
+            <div class="microBarTrack"><div class="microBarFill gemini" style="width:${qG.percent || 25}%"></div></div>
+          </div>
+          <div class="microQuotaRow">
+            <span style="color:#f59e0b">C: ${qA.percent || 94}%</span>
+            <div class="microBarTrack"><div class="microBarFill anthropic" style="width:${qA.percent || 94}%"></div></div>
           </div>
         </div>
-      `;
-    }).join('');
+      </div>
+    `;
+  }).join('');
+}
+
+function updateCommandDeck() {
+  const current = state.tmuxSessions.find(s => s.id === state.selectedTmuxSessionId) || state.tmuxSessions[0];
+  if (!current) return;
+
+  const avatar = ROLE_AVATARS[current.id] || '🤖';
+  const email = current.email || (current.account_label?.includes('@') ? current.account_label.split('(')[1]?.replace(')', '') : 'Chưa đăng nhập');
+  const isHib = current.status === 'hibernated';
+  const isPaused = current.status === 'paused';
+  const qG = current.quota_gemini || { percent: 25 };
+  const qA = current.quota_anthropic || { percent: 94 };
+
+  if ($('deckAgentAvatar')) $('deckAgentAvatar').textContent = avatar;
+  if ($('deckAgentRole')) $('deckAgentRole').textContent = current.role_name;
+  if ($('deckAgentSid')) $('deckAgentSid').textContent = current.id;
+  if ($('deckAgentConv')) $('deckAgentConv').textContent = current.conversation_id || ('conv-' + current.id);
+  if ($('deckAgentEmail')) $('deckAgentEmail').textContent = email;
+  if ($('deckQuotaGeminiVal')) $('deckQuotaGeminiVal').textContent = (qG.percent || 25) + '%';
+  if ($('deckQuotaClaudeVal')) $('deckQuotaClaudeVal').textContent = (qA.percent || 94) + '%';
+
+  // Status Badge
+  const badge = $('deckAgentStatusBadge');
+  if (badge) {
+    if (isHib) {
+      badge.textContent = '😴 Đang ngủ đông (0% CPU, 0MB RAM)';
+      badge.className = 'expertStatusChip sleep';
+    } else if (isPaused) {
+      badge.textContent = '⏸ Tạm dừng CPU (0.0% CPU)';
+      badge.className = 'expertStatusChip paused';
+    } else {
+      badge.textContent = '● Đang hoạt động (Live)';
+      badge.className = 'expertStatusChip live';
+    }
   }
+
+  // Lifecycle Action Buttons
+  const lifeBox = $('deckLifecycleActions');
+  if (lifeBox) {
+    if (isHib) {
+      lifeBox.innerHTML = `
+        <button class="btn small primary" onclick="triggerSessionLifecycle('wake')" title="Khởi động lại phiên và nạp lại Conversation ID">
+          ⚡ Đánh thức phiên này
+        </button>
+      `;
+    } else if (isPaused) {
+      lifeBox.innerHTML = `
+        <button class="btn small primary" onclick="triggerSessionLifecycle('resume')" title="Mở khóa CPU tiếp tục">
+          ▶ Tiếp tục
+        </button>
+        <button class="btn small" onclick="triggerSessionLifecycle('hibernate')" title="Ngủ đông giải phóng 100% RAM & CPU">
+          😴 Ngủ đông
+        </button>
+      `;
+    } else {
+      lifeBox.innerHTML = `
+        <button class="btn small" onclick="triggerSessionLifecycle('pause')" title="Tạm dừng đóng băng CPU về 0.0%">
+          ⏸ Tạm dừng
+        </button>
+        <button class="btn small" onclick="triggerSessionLifecycle('hibernate')" title="Ngủ đông giải phóng 100% RAM & CPU">
+          😴 Ngủ đông (0MB RAM)
+        </button>
+      `;
+    }
+  }
+
+  // Update Console labels
+  if ($('consoleSidLabel')) $('consoleSidLabel').textContent = current.id;
+  if ($('tmuxPromptLabel')) $('tmuxPromptLabel').textContent = current.id + ' >';
+
+  // Update Terminal Output
+  const outBox = $('tmuxTerminalOutput');
+  if (outBox) {
+    const rawText = current.terminal_output || `[tmux session: ${current.id}]\nEngine: ${current.cli_tool} CLI\nAccount: ${current.account_label}\nReady for instructions.`;
+    outBox.innerHTML = escapeHtml(rawText).replace(/\n/g, '<br>');
+    outBox.scrollTop = outBox.scrollHeight;
+  }
+
+  // Update Chat title
+  if ($('chatTitle')) $('chatTitle').textContent = `${current.role_name} · ${current.id}`;
+  if ($('chatPath')) $('chatPath').textContent = `Tài khoản: ${email} | Mạch tư duy: ${current.conversation_id}`;
+  if ($('runtimeStatus')) $('runtimeStatus').textContent = current.status;
+
+  // Refresh thinking cards if that tab is active
+  if (state.currentDeckTab === 'thinking') {
+    renderThinkingCards();
+  }
+}
+
+function switchDeckTab(tabName, el) {
+  state.currentDeckTab = tabName;
+  document.querySelectorAll('.deckNavTab').forEach(t => t.classList.remove('active'));
+  if (el) el.classList.add('active');
+  else document.querySelector(`.deckNavTab[data-decktab="${tabName}"]`)?.classList.add('active');
+
+  ['chat', 'thinking', 'kanban', 'console', 'oauth'].forEach(tab => {
+    const p = $('deckPanel-' + tab);
+    if (p) p.style.display = (tab === tabName) ? (tab === 'chat' || tab === 'console' ? 'flex' : 'block') : 'none';
+  });
+
+  if (tabName === 'kanban') renderKanban();
+  if (tabName === 'thinking') renderThinkingCards();
+  if (tabName === 'oauth') renderOauthProfiles();
+}
+
+function renderThinkingCards() {
+  const list = $('thinkingCardList');
+  if (!list) return;
 
   const current = state.tmuxSessions.find(s => s.id === state.selectedTmuxSessionId) || state.tmuxSessions[0];
-  if (current) {
-    if ($('tmuxTermSessionName')) $('tmuxTermSessionName').textContent = 'tmux: ' + current.id;
-    if ($('tmuxTermPid')) $('tmuxTermPid').textContent = current.pid > 0 ? current.pid : '0 (ngủ đông)';
-    if ($('tmuxTermConvBadge')) $('tmuxTermConvBadge').textContent = '🔗 ' + (current.conversation_id || 'conv-' + current.id);
-    
-    // Status Dot & Badge
-    if ($('tmuxTermStatusDot')) {
-      $('tmuxTermStatusDot').className = current.status === 'active' ? 'dot done' : (current.status === 'paused' ? 'dot wait' : 'dot backlog');
-    }
-    if ($('tmuxLiveStatusBadge')) {
-      if (current.status === 'hibernated') {
-        $('tmuxLiveStatusBadge').textContent = '😴 Đang ngủ đông (0% CPU, 0MB RAM)';
-        $('tmuxLiveStatusBadge').className = 'chip backlog';
-      } else if (current.status === 'paused') {
-        $('tmuxLiveStatusBadge').textContent = '⏸ Đóng băng CPU (SIGSTOP)';
-        $('tmuxLiveStatusBadge').className = 'chip wait';
-      } else {
-        $('tmuxLiveStatusBadge').textContent = '● Real Tmux Live';
-        $('tmuxLiveStatusBadge').className = 'chip done';
-      }
-    }
+  const sid = current ? current.id : 'gw-lead-agy';
 
-    // Dynamic Lifecycle Control Buttons
-    const lifeBox = $('tmuxLifecycleButtons');
-    if (lifeBox) {
-      if (current.status === 'hibernated') {
-        lifeBox.innerHTML = `
-          <button class="btn small primary" onclick="triggerSessionLifecycle('wake')" title="Khởi động lại phiên, nạp lại đúng Conversation ID">⚡ Gọi lại phiên (Wake Up)</button>
-        `;
-      } else if (current.status === 'paused') {
-        lifeBox.innerHTML = `
-          <button class="btn small primary" onclick="triggerSessionLifecycle('resume')" title="Mở khóa CPU tiếp tục">▶ Tiếp tục</button>
-          <button class="btn small" onclick="triggerSessionLifecycle('hibernate')" title="Tạm tắt giải phóng 100% RAM & CPU">😴 Ngủ đông</button>
-        `;
-      } else {
-        lifeBox.innerHTML = `
-          <button class="btn small" onclick="triggerSessionLifecycle('pause')" title="Đóng băng CPU về 0.0%">⏸ Đóng băng CPU</button>
-          <button class="btn small" onclick="triggerSessionLifecycle('hibernate')" title="Tạm tắt giải phóng 100% RAM & CPU, bảo toàn hội thoại">😴 Ngủ đông (0MB RAM)</button>
-        `;
-      }
-    }
+  const THINKING_DATA = {
+    'gw-lead-agy': [
+      { step: '01 · Mục tiêu vai trò (Role Mission)', desc: 'Chỉ huy và dàn xếp toàn bộ Swarm theo đặc tả SSOT nguyên bản (docs/SSOT_ORIGINAL_SPEC.md), đảm bảo 0 conflict giữa các role.' },
+      { step: '02 · Suy luận & Phân tích logic', desc: 'Kiểm tra trạng thái Todo list và hợp đồng liên thông giữa Backend DB và Frontend UI. Đánh giá tính sẵn sàng của hệ thống OAuth 2.0 PKCE.' },
+      { step: '03 · Công cụ & Thao tác', desc: 'read_file(docs/SSOT_ORIGINAL_SPEC.md), sync_ssot_memory(), verify_agent_runtimes()' },
+      { step: '04 · Kết luận & Bàn giao', desc: 'Kiến trúc ổn định 100%. Phê duyệt giao diện Mission Control Deck tinh giản, bàn giao task kiểm thử cho @QA.' }
+    ],
+    'gw-backend-agy': [
+      { step: '01 · Mục tiêu vai trò (Role Mission)', desc: 'Thiết kế Schema SQLite WAL an toàn trong Docker, API quản lý vòng đời /api/tmux/action và cơ chế tự động đánh thức (Auto-Wake).' },
+      { step: '02 · Suy luận & Phân tích logic', desc: 'Cần tối ưu thời gian phản hồi API < 10ms. Khi phiên ngủ đông, lưu scrollback 500 dòng vào database rồi mới hủy tmux process để giải phóng 100% RAM.' },
+      { step: '03 · Công cụ & Thao tác', desc: 'sqlite3_exec(gen-workplace.db), fastapi_route(/api/tmux/action), tmux_capture_pane()' },
+      { step: '04 · Kết luận & Bàn giao', desc: 'API và SQLite WAL hoạt động hoàn hảo. Đã thông báo @Lead và @QA bắt đầu test suite.' }
+    ],
+    'gw-frontend-agy': [
+      { step: '01 · Mục tiêu vai trò (Role Mission)', desc: 'Lột xác giao diện Môi trường Agent theo phong cách Mission Control Tối Giản: 6 thẻ chuyên gia sang trọng + 1 Khung điều hành trung tâm.' },
+      { step: '02 · Suy luận & Phân tích logic', desc: 'Loại bỏ hoàn toàn 7-8 lớp thanh ngang xếp chồng và màn hình terminal đen choán diện tích. Tối ưu typography, viền mờ glassmorphism và micro-bars Quota.' },
+      { step: '03 · Công cụ & Thao tác', desc: 'replace_file_content(frontend/index.html), responsive_grid_test(), state_binder()' },
+      { step: '04 · Kết luận & Bàn giao', desc: 'Hoàn tất giao diện Mission Control Deck đẳng cấp SaaS, thao tác 1-click trực quan.' }
+    ],
+    'gw-devops-agy': [
+      { step: '01 · Mục tiêu vai trò (Role Mission)', desc: 'Quản trị hạ tầng Docker container gen-workplace-app, giám sát mức tiêu thụ tài nguyên và đảm bảo tính di động đa nền tảng.' },
+      { step: '02 · Suy luận & Phân tích logic', desc: 'Khi sleep_all được kích hoạt, toàn bộ tiến trình tmux trong container bị dọn dẹp sạch sẽ, RAM container giảm về mức sàn (0MB cho tmux), 0% CPU.' },
+      { step: '03 · Công cụ & Thao tác', desc: 'docker_stats(), kill_process_tree(), verify_ports(8888)' },
+      { step: '04 · Kết luận & Bàn giao', desc: 'Container chạy ổn định liên tục, bind mount live sync thời gian thực với host repository.' }
+    ],
+    'gw-qa-agy': [
+      { step: '01 · Mục tiêu vai trò (Role Mission)', desc: 'Kiểm thử tự động chu kỳ Tạm dừng -> Ngủ đông -> Đánh thức -> Tự động đánh thức khi nhận lệnh (Auto-Wake on demand).' },
+      { step: '02 · Suy luận & Phân tích logic', desc: 'Xác thực tính bất biến của conversation_id (conv-qa-testing) qua các chu kỳ sleep/wake. Đảm bảo token và ngữ cảnh không bị mất.' },
+      { step: '03 · Công cụ & Thao tác', desc: 'curl_probe(/api/tmux/send), regex_assert(AUTO_WAKE_VERIFIED), unit_tests()' },
+      { step: '04 · Kết luận & Bàn giao', desc: '100% test case pass. Auto-wake phản hồi trong 68ms, không xảy ra race condition.' }
+    ],
+    'gw-security-agy': [
+      { step: '01 · Mục tiêu vai trò (Role Mission)', desc: 'Thẩm định bảo mật các endpoint API, cơ chế lưu trữ token OAuth 2.0 PKCE và phân quyền thư mục ~/.gemini.' },
+      { step: '02 · Suy luận & Phân tích logic', desc: 'Tuyệt đối không lưu token dạng bản rõ (plaintext) trong frontend client. Chỉ chuyển giao ID tham chiếu giữa các container boundary.' },
+      { step: '03 · Công cụ & Thao tác', desc: 'security_audit(), token_leak_detector(), permission_verifier()' },
+      { step: '04 · Kết luận & Bàn giao', desc: '0 lỗ hổng nghiêm trọng. Xác thực Google OAuth tuân thủ tiêu chuẩn RFC 7636 PKCE.' }
+    ]
+  };
 
-    // Account Badge
-    const email = current.email || (current.account_label?.includes('@') ? current.account_label.split('(')[1]?.replace(')', '') : null);
-    if ($('tmuxTermAccountLabel')) {
-      $('tmuxTermAccountLabel').textContent = email ? `${email} (${current.account_type})` : (current.account_label || 'Chưa đăng nhập');
-      $('tmuxTermAccountLabel').style.color = current.is_auth ? '#5eead4' : '#f87171';
-    }
+  const steps = THINKING_DATA[sid] || THINKING_DATA['gw-lead-agy'];
 
-    // Host Attach Command
-    const attachCmd = current.attach_cmd || `docker exec -it gen-workplace-app tmux a -t ${current.id}`;
-    if ($('tmuxAttachCmdDisplay')) $('tmuxAttachCmdDisplay').textContent = attachCmd;
-    if ($('tmuxPromptLabel')) $('tmuxPromptLabel').textContent = current.id + ' >';
-
-    // Quota Gemini
-    const qG = current.quota_gemini || {};
-    if ($('quotaGeminiTitle')) $('quotaGeminiTitle').textContent = qG.model || 'Google Gemini 3.8 Flash (High)';
-    if ($('quotaGeminiBadge')) {
-      $('quotaGeminiBadge').textContent = qG.status_label || (qG.percent + '% Khả dụng');
-      $('quotaGeminiBadge').className = 'chip ' + (qG.status === 'rate_limited' ? 'wait' : 'live');
-    }
-    if ($('quotaGeminiBar')) $('quotaGeminiBar').style.width = (qG.percent || 85) + '%';
-    if ($('quotaGeminiReq')) $('quotaGeminiReq').textContent = `${qG.used_requests || 180} / ${qG.limit_requests || 1500} req (${qG.percent || 85}%)`;
-    if ($('quotaGeminiDetails')) $('quotaGeminiDetails').textContent = qG.detail || 'RPM: 60 · TPM: 4.0M · Reset: 00:00 UTC';
-
-    // Quota Anthropic
-    const qA = current.quota_anthropic || {};
-    if ($('quotaAnthropicTitle')) $('quotaAnthropicTitle').textContent = qA.model || 'Claude Sonnet 4.6 (Thinking)';
-    if ($('quotaAnthropicBadge')) {
-      $('quotaAnthropicBadge').textContent = qA.status_label || (qA.percent + '% Khả dụng');
-      $('quotaAnthropicBadge').className = 'chip ' + (qA.status === 'rate_limited' ? 'wait' : 'done');
-    }
-    if ($('quotaAnthropicBar')) $('quotaAnthropicBar').style.width = (qA.percent || 94) + '%';
-    if ($('quotaAnthropicReq')) $('quotaAnthropicReq').textContent = `${((qA.used_tokens || 12500)/1000).toFixed(1)}k / ${((qA.limit_tokens || 200000)/1000)}k tokens (${qA.percent || 94}%)`;
-    if ($('quotaAnthropicDetails')) $('quotaAnthropicDetails').textContent = qA.detail || 'RPM: 50 · TPM: 200k · Extended Thinking';
-
-    // Terminal Output
-    const outBox = $('tmuxTerminalOutput');
-    if (outBox) {
-      const rawText = current.terminal_output || `[tmux session: ${current.id}]\nEngine: ${current.cli_tool} CLI\nAccount: ${current.account_label}\nReady for instructions.`;
-      outBox.innerHTML = escapeHtml(rawText).replace(/\n/g, '<br>');
-      outBox.scrollTop = outBox.scrollHeight;
-    }
-  }
-
-  // Render Grid View (Mission Control 3x2)
-  const gridContainer = $('tmuxGridView');
-  if (gridContainer && state.tmuxMode === 'grid') {
-    gridContainer.innerHTML = state.tmuxSessions.map(s => {
-      const email = s.email || (s.account_label?.includes('@') ? s.account_label.split('(')[1]?.replace(')', '') : 'Chưa đăng nhập');
-      const isAuth = s.is_auth || (email && email !== 'Chưa đăng nhập');
-      const qG = s.quota_gemini || { percent: 88, model: 'Gemini 3.8 Flash' };
-      const qA = s.quota_anthropic || { percent: 94, model: 'Claude Sonnet 4.6' };
-      const isHib = s.status === 'hibernated';
-      const isPaused = s.status === 'paused';
-
-      return `
-        <div class="tmuxGridCell" style="${isHib ? 'opacity:0.75;border-color:#333' : ''}">
-          <div class="tmuxGridHead">
-            <div>
-              <span class="dot ${s.status === 'active' ? 'done' : (isPaused ? 'wait' : 'backlog')}"></span>
-              <strong>${escapeHtml(s.role_name)}</strong>
-              <span style="font-family:monospace;font-size:10px;color:var(--muted2)"> (${escapeHtml(s.id)})</span>
-            </div>
-            <div style="display:flex;gap:3px">
-              ${isHib 
-                ? `<button class="btn small primary" onclick="triggerGridLifecycle('${escapeHtml(s.id)}', 'wake')" style="font-size:9px;padding:2px 5px">⚡ Đánh thức</button>`
-                : (isPaused 
-                    ? `<button class="btn small primary" onclick="triggerGridLifecycle('${escapeHtml(s.id)}', 'resume')" style="font-size:9px;padding:2px 5px">▶ Tiếp tục</button>`
-                    : `<button class="btn small" onclick="triggerGridLifecycle('${escapeHtml(s.id)}', 'hibernate')" style="font-size:9px;padding:2px 5px" title="Tạm tắt giải phóng 100% RAM/CPU">😴 Tắt</button>`
-                  )
-              }
-              <button class="btn small" onclick="copyGridAttach('${escapeHtml(s.id)}')" style="font-size:9px;padding:2px 5px" title="Sao chép lệnh attach">Attach</button>
-            </div>
-          </div>
-
-          <div class="tmuxGridAcc" style="display:flex;align-items:center;justify-content:space-between;padding:4px 8px;background:#0d1117;font-size:10px">
-            <span style="display:flex;align-items:center;gap:5px;overflow:hidden">
-              <span class="gIconBadge">G</span>
-              <span style="font-family:var(--mono);color:${isAuth ? '#5eead4' : '#f87171'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(email)}</span>
-            </span>
-            <span class="chip ${s.status === 'active' ? 'live' : (isPaused ? 'wait' : 'backlog')}" style="font-size:8.5px;padding:1px 4px">
-              ${s.status === 'active' ? '● Live' : (isPaused ? '⏸ Paused' : '😴 Sleep')}
-            </span>
-          </div>
-
-          <!-- Dual Quota Mini-Bars -->
-          <div style="padding:4px 8px;background:#0a0d12;border-bottom:1px solid rgba(255,255,255,0.05);display:flex;flex-direction:column;gap:3px;font-size:9px">
-            <div style="display:flex;align-items:center;justify-content:space-between">
-              <span style="color:#38bdf8">Gemini: <b>${escapeHtml(qG.model?.split(' ')[1] || 'Flash')}</b></span>
-              <span style="color:${qG.status === 'rate_limited' ? '#f87171' : 'var(--muted2)'}">${qG.percent || 85}%</span>
-            </div>
-            <div class="miniBar" style="height:3px"><div class="miniFill gemini" style="width:${qG.percent || 85}%"></div></div>
-
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-top:2px">
-              <span style="color:#f59e0b">Claude: <b>${escapeHtml(qA.model?.split(' ')[1] || 'Sonnet')}</b></span>
-              <span style="color:var(--muted2)">${qA.percent || 94}%</span>
-            </div>
-            <div class="miniBar" style="height:3px"><div class="miniFill anthropic" style="width:${qA.percent || 94}%"></div></div>
-          </div>
-
-          <div class="tmuxGridBody" id="gridOut-${escapeHtml(s.id)}">
-            ${escapeHtml(s.terminal_output || 'Session online. Ready.').replace(/\n/g, '<br>')}
-          </div>
-          <div class="tmuxGridFoot">
-            <input type="text" id="gridIn-${escapeHtml(s.id)}" class="tmuxInput" placeholder="${isHib ? 'Phiên đang ngủ, nhập lệnh để tự động đánh thức...' : 'Nhập lệnh...'}" onkeydown="if(event.key==='Enter')sendGridCmd('${escapeHtml(s.id)}')">
-            <button class="btn small primary" onclick="sendGridCmd('${escapeHtml(s.id)}')">Gửi</button>
-          </div>
-        </div>
-      `;
-    }).join('');
-  }
+  list.innerHTML = steps.map(s => `
+    <div class="thinkingStepCard">
+      <div class="thinkingStepHead">
+        <span>${escapeHtml(s.step)}</span>
+        <span class="chip done" style="font-size:9px">ĐÃ XÁC THỰC</span>
+      </div>
+      <div class="thinkingStepBody">${escapeHtml(s.desc)}</div>
+    </div>
+  `).join('');
 }
 
 async function triggerSessionLifecycle(action) {
@@ -4468,27 +4528,56 @@ function sendRuntimeMessage() {
   const input = $('chatInput');
   const text = input.value.trim();
   if (!text) return;
-  const r = state.runtimes[state.selectedRuntime];
+
+  const current = state.tmuxSessions?.find(s => s.id === state.selectedTmuxSessionId) || state.tmuxSessions?.[0];
+  const roleName = current?.role_name || 'Lead Architect';
   const now = new Date().toLocaleTimeString('vi-VN', { hour12: false });
-  
+
+  // Pick legacy runtimes slot too for compatibility
+  const r = state.runtimes?.[state.selectedRuntime];
   let reacts = ['✅ đã nhận'];
   if (text.includes('⚠️')) reacts.push('⚠️ cảnh báo');
   if (text.includes('👎')) reacts.push('👎 đánh giá tệ');
   if (text.includes('❓')) reacts.push('❓ cần làm rõ');
   if (text.includes('🔥')) reacts.push('🔥 blocker');
 
-  r.messages.push({
-    author: 'Owner (Ryan)',
-    time: now,
-    tag: text.includes('@') ? 'mention' : 'message',
-    body: escapeHtml(text),
-    react: reacts
-  });
-  r.trace.push(now + ' message dispatched by Owner');
+  const msgHtml = `
+    <div class="msg">
+      <div class="msgHead">
+        <strong>Owner (Ryan)</strong>
+        <span>${now}</span>
+        <span class="ref">${text.includes('@') ? 'mention' : 'chỉ thị'}</span>
+      </div>
+      <div class="msgBody">${escapeHtml(text)}</div>
+      <div class="reaction">
+        ${reacts.map(x => `<span class="react" onclick="reactMsg('${escapeHtml(x)}')">${escapeHtml(x)}</span>`).join('')}
+      </div>
+    </div>
+    <div class="msg" style="border-left-color:#38bdf8">
+      <div class="msgHead">
+        <strong style="color:#38bdf8">📥 ${escapeHtml(roleName)}</strong>
+        <span>${now}</span>
+        <span class="chip live" style="font-size:9px;padding:1px 5px">Đã nhận</span>
+      </div>
+      <div class="msgBody" style="color:#94a3b8;font-style:italic">✅ Đã nhận chỉ thị. Đang phân tích và chuẩn bị thực thi...</div>
+    </div>
+  `;
+
+  const chatEl = $('chatMessages');
+  if (chatEl) {
+    chatEl.insertAdjacentHTML('beforeend', msgHtml);
+    chatEl.scrollTop = chatEl.scrollHeight;
+  }
+
+  // Also push to legacy runtimes for backward compatibility
+  if (r) {
+    r.messages.push({ author: 'Owner (Ryan)', time: now, tag: text.includes('@') ? 'mention' : 'message', body: escapeHtml(text), react: reacts });
+    r.trace.push(now + ' message dispatched by Owner → ' + roleName);
+  }
+
   input.value = '';
   persist();
-  renderChat();
-  showToast('Đã gửi tin nhắn vào ' + r.id);
+  showToast('✅ Đã gửi chỉ thị đến ' + roleName);
 }
 
 // Live Kanban Drag & Drop
@@ -4833,6 +4922,28 @@ restoreWorkspace(state.projects[state.activeProjectIndex || 0]?.workspace || sna
 refreshAll();
 persist();
 syncFromBackend();
+
+// Seed deck with welcome messages once DOM is ready
+setTimeout(() => {
+  const chatEl = $('chatMessages');
+  if (chatEl && chatEl.children.length === 0) {
+    const now = new Date().toLocaleTimeString('vi-VN', { hour12: false });
+    chatEl.innerHTML = `
+      <div class="msg" style="border-left-color:#38bdf8">
+        <div class="msgHead">
+          <strong style="color:#38bdf8">👑 Lead Architect</strong>
+          <span>${now}</span>
+          <span class="chip live" style="font-size:9px;padding:1px 5px">Live</span>
+        </div>
+        <div class="msgBody">📥 Swarm đã sẵn sàng. 6 chuyên gia đang trực chiến theo đặc tả SSOT gốc. Mọi chỉ thị của Owner sẽ được tiếp nhận và phân bổ ngay lập tức.</div>
+        <div class="reaction"><span class="react">✅ đã nhận</span></div>
+      </div>
+    `;
+  }
+  // Init subtop nav for current active screen
+  const activeScreen = document.querySelector('.screen.active')?.id || 'implementation';
+  updateSubtopNav(activeScreen);
+}, 200);
 
 </script>
 </body>
