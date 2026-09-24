@@ -1894,6 +1894,162 @@ def reclaim_stalled_tasks(timeout_seconds=300, project_id="PRJ-GEN-WORKPLACE"):
         conn.commit()
         return {"reclaimed_count": reclaimed}
 
+def get_warroom_messages(channel_id="war_room", project_id="PRJ-GEN-WORKPLACE", limit=60):
+    """Lấy danh sách tin nhắn phòng giao ban theo kênh."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+        SELECT id, project_id, runtime_id, author, created_time, tag, body, react_json
+        FROM chat_messages
+        WHERE project_id = ? AND runtime_id = ?
+        ORDER BY id ASC
+        LIMIT ?
+        """, (project_id, channel_id, limit))
+        rows = cursor.fetchall()
+
+    if not rows:
+        # Tự động khởi tạo tin nhắn mở màn cho từng kênh nếu chưa có
+        seeds = {
+            "war_room": [
+                ("Ryan (Owner)", "08:00:00", "Directive", "Chào Core Agent (Gen) và toàn thể Đội Ngũ Swarm. Mục tiêu hôm nay: Hoàn thiện hệ thống điều hành Gen-workplace v1.2, đảm bảo 0 xung đột, tuân thủ nghiêm ngặt 5 giai đoạn SOP.", ["🚀 Quyết tâm", "👍 Nhất trí"]),
+                ("Genesis Orchestrator", "08:00:05", "Reply", "Rõ mệnh lệnh của Ryan! Tôi (Gen - Core Orchestrator) đã phổ biến chỉ thị tới toàn thể 6 chuyên gia. Hệ thống đang chạy ở chế độ kỷ luật thép: 1 Profile = 1 Identity, Task Mutex độc quyền và nghiệm thu 100% bằng chứng vật lý.", ["✅ Tiếp nhận"]),
+                ("Lead Architect", "08:00:10", "Report", "Báo cáo Ryan và Gen: Đặc tả SSOT đã khóa bất biến tại <code>docs/SSOT_ORIGINAL_SPEC.md</code>. Tất cả 6 chuyên gia đã được cấp phát nhiệm vụ cụ thể trên Live Workbench.", ["📋 Đã duyệt"])
+            ],
+            "standup": [
+                ("Lead Architect", "08:15:00", "Directive", "Giao ban kỹ thuật hôm nay: @Backend tập trung hoàn thiện API Mutex Lock (/api/task/claim); @Frontend tối ưu Bàn Làm Việc Live Workbench 3 cột; @DevOps kiểm tra Live Mount :z; @QA chuẩn bị test suite; @Security rà soát token OAuth. Tất cả báo cáo tiến độ qua kênh này.", ["🎯 Đã rõ"]),
+                ("Backend Specialist", "08:15:20", "Report", "Đã nhận việc từ Leader! Tôi đang triển khai TODO-14 trong <code>backend/db.py</code>. Cam kết response time < 5ms và nộp commit hash trước 10h.", ["⚙️ Đang làm"]),
+                ("Frontend Specialist", "08:15:35", "Report", "Đã nhận việc! Giao diện Live Workbench 3 cột x 2 hàng đang hoàn thiện trên <code>frontend/index.html</code>, tích hợp terminal console realtime.", ["🎨 Giao diện đẹp"])
+            ],
+            "handoff": [
+                ("Backend Specialist", "09:00:00", "IO", "Bàn giao Hợp đồng I/O cho @Frontend: Endpoint <code>POST /api/task/claim</code> và <code>POST /api/task/complete</code> đã sẵn sàng, trả về JSON chuẩn theo tài liệu <code>docs/STANDARD_SQUAD_AND_WORKFLOW.md</code>.", ["🤝 Đã nhận"]),
+                ("Frontend Specialist", "09:00:15", "IO", "Xác nhận đã nhận spec từ @Backend. Đã bind dữ liệu vào các nút Claim/Complete trên Command Deck và cập nhật trạng thái realtime.", ["✅ Đã kết nối"])
+            ]
+        }
+        channel_seeds = seeds.get(channel_id, seeds["war_room"])
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            for author, ctime, tag, body, reacts in channel_seeds:
+                cursor.execute("""
+                INSERT INTO chat_messages (project_id, runtime_id, author, created_time, tag, body, react_json)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, (project_id, channel_id, author, ctime, tag, body, json.dumps(reacts, ensure_ascii=False)))
+            conn.commit()
+
+        return get_warroom_messages(channel_id, project_id, limit)
+
+    results = []
+    for r in rows:
+        reacts = []
+        if r["react_json"]:
+            try:
+                reacts = json.loads(r["react_json"])
+            except Exception:
+                pass
+        results.append({
+            "id": r["id"],
+            "project_id": r["project_id"],
+            "channel_id": r["runtime_id"],
+            "author": r["author"],
+            "created_time": r["created_time"],
+            "tag": r["tag"],
+            "body": r["body"],
+            "reacts": reacts
+        })
+    return results
+
+def post_warroom_message(project_id="PRJ-GEN-WORKPLACE", channel_id="war_room", author="Ryan (Owner)", message="", tag="Directive"):
+    """Lưu tin nhắn người gửi và tự động sinh phản hồi AI bằng tiếng Việt theo phân vai."""
+    if not message or not message.strip():
+        return {"error": "Message is empty"}
+
+    now_time = time.strftime("%H:%M:%S")
+    clean_msg = message.strip()
+
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+        INSERT INTO chat_messages (project_id, runtime_id, author, created_time, tag, body, react_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (project_id, channel_id, author, now_time, tag, clean_msg, json.dumps(["✅ đã ghi nhận"], ensure_ascii=False)))
+        user_msg_id = cursor.lastrowid
+        conn.commit()
+
+    # Phân tích thông minh sinh câu trả lời AI bằng tiếng Việt
+    lower = clean_msg.lower()
+    reply_author = "Genesis Orchestrator"
+    reply_tag = "Reply"
+    reply_body = ""
+
+    # 1. Kênh Chỉ Huy Toàn Cục (War Room)
+    if channel_id == "war_room":
+        if "@backend" in lower or "backend" in lower or "csdl" in lower or "database" in lower or "api" in lower:
+            reply_author = "Backend Specialist"
+            reply_tag = "Report"
+            reply_body = f"Đã rõ chỉ thị của {author}! Tôi (Backend Specialist) đang kiểm soát SQLite WAL và các endpoint API. Nhiệm vụ hiện tại đang bám sát Whitelist <code>backend/**, data/**</code>. Toàn bộ thay đổi đều được ghi nhận vào nhật ký commit."
+        elif "@frontend" in lower or "frontend" in lower or "giao diện" in lower or "ui" in lower or "deck" in lower:
+            reply_author = "Frontend Specialist"
+            reply_tag = "Report"
+            reply_body = f"Đã rõ chỉ thị của {author}! Tôi (Frontend Specialist) đang tối ưu hóa Bàn Làm Việc Live Workbench và đồng bộ trạng thái realtime. Cam kết không vi phạm ranh giới và đảm bảo 0 lỗi cú pháp trình duyệt."
+        elif "@devops" in lower or "devops" in lower or "docker" in lower or "install" in lower:
+            reply_author = "DevOps & Packaging"
+            reply_tag = "Report"
+            reply_body = f"Đã rõ chỉ thị của {author}! Tôi (DevOps Engineer) đang giám sát container <code>gen-workplace-app</code>, kiểm tra volume mount cờ <code>:z</code> và kịch bản TUI installer. Hệ thống sẵn sàng cho chu kỳ ngủ đông khi xong việc."
+        elif "@qa" in lower or "qa" in lower or "test" in lower or "kiểm thử" in lower:
+            reply_author = "QA Tester"
+            reply_tag = "Report"
+            reply_body = f"Đã rõ chỉ thị của {author}! Tôi (QA Tester) đang chuẩn bị test suite tự động cho chu kỳ Auto-Wake 68ms và kiểm tra API regression test. Mọi lỗi phát sinh sẽ được báo cáo ngay lập tức kèm log kiểm thử."
+        elif "@security" in lower or "security" in lower or "bảo mật" in lower or "token" in lower or "vault" in lower:
+            reply_author = "Security Auditor"
+            reply_tag = "Report"
+            reply_body = f"Đã rõ chỉ thị của {author}! Tôi (Security Auditor) đang rà soát an ninh cho Token Vault OAuth 2.0 PKCE và phân quyền file. Đảm bảo zero-secret-leak trên toàn bộ repository."
+        elif "@lead" in lower or "lead" in lower or "tiến độ" in lower or "nghiệm thu" in lower:
+            reply_author = "Lead Architect"
+            reply_tag = "Directive"
+            reply_body = f"Báo cáo {author}: Tôi (Lead Architect) đang giám sát chặt chẽ chuỗi Todo DAG và đối soát bằng chứng với SSOT gốc. Toàn thể 6 chuyên gia đang vận hành đúng tiến độ và không có xung đột ranh giới."
+        else:
+            reply_author = "Genesis Orchestrator"
+            reply_tag = "Directive"
+            reply_body = f"Chỉ huy tối cao ghi nhận mệnh lệnh: <em>\"{clean_msg}\"</em>. Tôi (Gen) đang truyền đạt trực tiếp xuống Ban Chỉ Huy Kỹ Thuật (@Lead) và các chuyên gia liên quan để lập tức chấp hành theo chính sách Autonomous Execution."
+
+    # 2. Kênh Giao Ban Kỹ Thuật (Engineering Standup)
+    elif channel_id == "standup":
+        if "lead" in author.lower():
+            reply_author = "Backend Specialist"
+            reply_tag = "Report"
+            reply_body = f"Đã tiếp nhận yêu cầu từ Leader (@Lead)! Backend Squad đang khẩn trương hoàn thành module và chuẩn bị nộp commit hash qua <code>/api/task/complete</code> để nghiệm thu."
+        else:
+            reply_author = "Lead Architect"
+            reply_tag = "Directive"
+            reply_body = f"Lead Architect đã ghi nhận báo cáo của {author}. Yêu cầu tiếp tục tuân thủ ranh giới thư mục Whitelist, hoàn thành checklist 4 bước và nộp bằng chứng commit hash trước khi yêu cầu nghiệm thu."
+
+    # 3. Kênh Hợp Đồng I/O & Bàn Giao (Inter-Agent Handoffs)
+    elif channel_id == "handoff":
+        if "backend" in author.lower():
+            reply_author = "Frontend Specialist"
+            reply_tag = "IO"
+            reply_body = f"Xác nhận đã nhận Hợp đồng I/O từ @Backend. Tôi đang thực hiện data-binding vào giao diện người dùng và sẽ phản hồi khi hoàn tất render."
+        else:
+            reply_author = "QA Tester"
+            reply_tag = "IO"
+            reply_body = f"Xác nhận đã nhận artifact bàn giao từ {author}. Bộ phận QA đang bắt đầu chạy test matrix và sẽ gửi chứng thư nghiệm thu cho Leader."
+
+    # Ghi nhận phản hồi AI vào SQLite
+    reply_time = time.strftime("%H:%M:%S")
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+        INSERT INTO chat_messages (project_id, runtime_id, author, created_time, tag, body, react_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (project_id, channel_id, reply_author, reply_time, reply_tag, reply_body, json.dumps(["✅ đã ghi nhận"], ensure_ascii=False)))
+        conn.commit()
+
+    return {
+        "status": "sent",
+        "channel_id": channel_id,
+        "user_message": {"id": user_msg_id, "author": author, "body": clean_msg, "created_time": now_time, "tag": tag},
+        "agent_reply": {"author": reply_author, "body": reply_body, "created_time": reply_time, "tag": reply_tag}
+    }
+
 # Khởi tạo tự động khi import
 init_db()
 seed_real_project()

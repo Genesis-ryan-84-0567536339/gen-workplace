@@ -1964,6 +1964,330 @@ button { cursor: pointer; }
   .roles { overflow-x: auto; }
   .kanban { grid-template-columns: repeat(4, 210px); overflow-x: auto; }
 }
+
+/* ========================================================================= */
+/* WAR ROOM / PHÒNG GIAO BAN SWARM STYLE */
+/* ========================================================================= */
+.warroomContainer {
+  display: grid;
+  grid-template-columns: 310px minmax(0, 1fr);
+  gap: 14px;
+  height: calc(100vh - 130px);
+  min-height: 540px;
+}
+.warroomSidebar {
+  background: #11151b;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.warroomChannels {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+}
+.warroomChannelItem {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: #141921;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: left;
+}
+.warroomChannelItem:hover {
+  background: #1a212b;
+  border-color: var(--line2);
+}
+.warroomChannelItem.active {
+  background: #182538;
+  border-color: #38bdf8;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.12);
+}
+.wrChanHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 600;
+  font-size: 12px;
+  color: #eff6ff;
+}
+.wrChanBadge {
+  font-size: 9px;
+  padding: 2px 6px;
+  border-radius: 99px;
+  background: #1e293b;
+  color: #94a3b8;
+  font-weight: 500;
+}
+.warroomChannelItem.active .wrChanBadge {
+  background: #0284c7;
+  color: #fff;
+}
+.wrChanDesc {
+  font-size: 10.5px;
+  color: var(--muted);
+  line-height: 1.35;
+}
+.warroomMembersPane {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.wrSectionTitle {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--muted2);
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.wrMemberCard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 9px;
+  background: #141920;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  font-size: 11px;
+}
+.wrMemberInfo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.wrMemberAvatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  background: #1e293b;
+}
+.wrMentionBtn {
+  font-size: 10px;
+  padding: 2px 6px;
+  border: 1px solid var(--line2);
+  background: #18202a;
+  border-radius: 4px;
+  color: #38bdf8;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.wrMentionBtn:hover {
+  background: #1e293b;
+  color: #7dd3fc;
+  border-color: #38bdf8;
+}
+
+/* Chat Main Pane */
+.warroomChatPane {
+  background: #11151b;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  height: 100%;
+}
+.wrChatHeader {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #141922;
+}
+.wrChatTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: #f1f5f9;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.wrChatDesc {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.wrChatActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.wrMessageList {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.wrMsgItem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 94%;
+  animation: fadeIn 0.2s ease-in-out;
+}
+.wrMsgItem.owner {
+  align-self: flex-start;
+}
+.wrMsgHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+}
+.wrAuthor {
+  font-weight: 700;
+  color: #e2e8f0;
+}
+.wrTag {
+  font-size: 9.5px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.wrTag.Directive { background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); }
+.wrTag.Assignment { background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); }
+.wrTag.Report { background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); }
+.wrTag.IO { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
+.wrTag.Evidence { background: rgba(14, 165, 233, 0.15); color: #7dd3fc; border: 1px solid rgba(14, 165, 233, 0.3); }
+.wrTag.Reply { background: rgba(100, 116, 139, 0.15); color: #cbd5e1; border: 1px solid rgba(100, 116, 139, 0.3); }
+
+.wrTime {
+  color: var(--muted2);
+  font-size: 10px;
+  font-family: var(--mono);
+}
+.wrBubble {
+  background: #161b24;
+  border: 1px solid var(--line2);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.wrBubble code {
+  background: #0d1117;
+  color: #38bdf8;
+  padding: 2px 5px;
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 11px;
+}
+.wrReacts {
+  display: flex;
+  gap: 5px;
+  margin-top: 4px;
+}
+.wrReactItem {
+  font-size: 10px;
+  background: #1e2633;
+  color: #94a3b8;
+  padding: 2px 7px;
+  border-radius: 99px;
+  border: 1px solid #283344;
+}
+
+/* Composer */
+.wrComposer {
+  background: #141922;
+  border-top: 1px solid var(--line);
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.wrToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.wrToolbarLeft, .wrToolbarRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.wrSelect {
+  background: #10141b;
+  border: 1px solid var(--line2);
+  color: #cbd5e1;
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 5px;
+  outline: none;
+}
+.wrSelect:focus {
+  border-color: #38bdf8;
+}
+.wrInputBox {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+.wrTextarea {
+  flex: 1;
+  min-height: 64px;
+  max-height: 140px;
+  background: #0d1015;
+  border: 1px solid var(--line2);
+  border-radius: 6px;
+  padding: 9px 12px;
+  color: #f1f5f9;
+  font-size: 12px;
+  line-height: 1.45;
+  outline: none;
+  resize: vertical;
+}
+.wrTextarea:focus {
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.2);
+}
+.wrSendBtn {
+  background: #0284c7;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  padding: 0 18px;
+  height: 64px;
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+}
+.wrSendBtn:hover {
+  background: #0369a1;
+}
+.wrSendBtn:active {
+  transform: scale(0.98);
+}
 </style>
 </head>
 <body>
@@ -2020,6 +2344,10 @@ button { cursor: pointer; }
         <button class="navItem" data-nav="runtimes" onclick="go('runtimes', this)">
           <span class="navIcon">◉</span>
           <span>Swarm Chuyên Gia</span>
+        </button>
+        <button class="navItem" data-nav="warroom" onclick="go('warroom', this)">
+          <span class="navIcon">📡</span>
+          <span>Phòng Giao Ban Swarm</span>
         </button>
         <button class="navItem" data-nav="data" onclick="go('data', this)">
           <span class="navIcon">▦</span>
@@ -2647,6 +2975,213 @@ button { cursor: pointer; }
           </div><!-- /swarmBody -->
 
       </section><!-- /runtimes -->
+
+      <!-- ========================================================================= -->
+      <!-- PHÒNG GIAO BAN SWARM (WAR ROOM) - MỆNH LỆNH VÀ ĐIỀU PHỐI BẰNG TIẾNG VIỆT -->
+      <!-- ========================================================================= -->
+      <section class="screen" id="warroom">
+        <div class="pageHead">
+          <div>
+            <h1>📡 Phòng Giao Ban Swarm (War Room)</h1>
+            <p>Kênh chỉ huy tác chiến tập trung: Truyền đạt mệnh lệnh chiến lược từ Ryan & Core Agent (Gen) xuống ban kỹ thuật và trao đổi chuyên môn giữa các vai trò bằng 100% tiếng Việt.</p>
+          </div>
+          <div class="actions">
+            <span class="badge" style="background:#1e293b;color:#38bdf8;border:1px solid #0284c7;">⚡ Auto-Response AI Engine Active</span>
+            <button class="btn" onclick="loadWarRoomMessages(true)">↻ Làm mới kênh</button>
+          </div>
+        </div>
+
+        <div class="warroomContainer">
+          <!-- Cột trái: Kênh chỉ huy & Danh bạ thành viên -->
+          <div class="warroomSidebar">
+            <div style="padding:10px 12px;border-bottom:1px solid var(--line);background:#141920;">
+              <span class="wrSectionTitle">Kênh Giao Ban Điều Hành</span>
+            </div>
+            <div class="warroomChannels">
+              <button class="warroomChannelItem active" id="wrChan-war_room" onclick="switchWarRoomChannel('war_room')">
+                <div class="wrChanHeader">
+                  <span>🌐 Core Gen ↔ Toàn Đội</span>
+                  <span class="wrChanBadge">Kênh 1</span>
+                </div>
+                <div class="wrChanDesc">Ryan & Gen phát lệnh chiến lược vĩ mô, chỉ đạo kiến trúc toàn cục.</div>
+              </button>
+
+              <button class="warroomChannelItem" id="wrChan-standup" onclick="switchWarRoomChannel('standup')">
+                <div class="wrChanHeader">
+                  <span>👑 Leader ↔ Nhân Viên</span>
+                  <span class="wrChanBadge">Kênh 2</span>
+                </div>
+                <div class="wrChanDesc">Giao ban kỹ thuật, giao việc cụ thể, duyệt bằng chứng commit hash.</div>
+              </button>
+
+              <button class="warroomChannelItem" id="wrChan-handoff" onclick="switchWarRoomChannel('handoff')">
+                <div class="wrChanHeader">
+                  <span>🔀 Hợp Đồng I/O & Bàn Giao</span>
+                  <span class="wrChanBadge">Kênh 3</span>
+                </div>
+                <div class="wrChanDesc">Bàn giao schema API, artifact, test log và nghiệm thu liên vai trò.</div>
+              </button>
+            </div>
+
+            <!-- Danh bạ thành viên & Nhắc tên nhanh -->
+            <div class="warroomMembersPane">
+              <span class="wrSectionTitle">Thành viên Ban Chỉ Huy & Swarm</span>
+              
+              <div class="wrMemberCard">
+                <div class="wrMemberInfo">
+                  <div class="wrMemberAvatar">🧠</div>
+                  <div>
+                    <strong style="color:#f8fafc">Core Gen</strong>
+                    <div style="font-size:10px;color:var(--muted)">Tổng Chỉ Huy Tác Chiến</div>
+                  </div>
+                </div>
+                <button class="wrMentionBtn" onclick="insertWarRoomAt('@Gen ')">@Gen</button>
+              </div>
+
+              <div class="wrMemberCard">
+                <div class="wrMemberInfo">
+                  <div class="wrMemberAvatar">👑</div>
+                  <div>
+                    <strong style="color:#f8fafc">Lead Architect</strong>
+                    <div style="font-size:10px;color:var(--muted)">Kiến Trúc Sư Trưởng</div>
+                  </div>
+                </div>
+                <button class="wrMentionBtn" onclick="insertWarRoomAt('@Lead ')">@Lead</button>
+              </div>
+
+              <div class="wrMemberCard">
+                <div class="wrMemberInfo">
+                  <div class="wrMemberAvatar">⚙️</div>
+                  <div>
+                    <strong style="color:#f8fafc">Backend Specialist</strong>
+                    <div style="font-size:10px;color:var(--muted)">SQLite WAL & REST API</div>
+                  </div>
+                </div>
+                <button class="wrMentionBtn" onclick="insertWarRoomAt('@Backend ')">@Backend</button>
+              </div>
+
+              <div class="wrMemberCard">
+                <div class="wrMemberInfo">
+                  <div class="wrMemberAvatar">🎨</div>
+                  <div>
+                    <strong style="color:#f8fafc">Frontend Specialist</strong>
+                    <div style="font-size:10px;color:var(--muted)">Giao Diện & Live Workbench</div>
+                  </div>
+                </div>
+                <button class="wrMentionBtn" onclick="insertWarRoomAt('@Frontend ')">@Frontend</button>
+              </div>
+
+              <div class="wrMemberCard">
+                <div class="wrMemberInfo">
+                  <div class="wrMemberAvatar">📦</div>
+                  <div>
+                    <strong style="color:#f8fafc">DevOps Engineer</strong>
+                    <div style="font-size:10px;color:var(--muted)">Docker, Volume & Tmux</div>
+                  </div>
+                </div>
+                <button class="wrMentionBtn" onclick="insertWarRoomAt('@DevOps ')">@DevOps</button>
+              </div>
+
+              <div class="wrMemberCard">
+                <div class="wrMemberInfo">
+                  <div class="wrMemberAvatar">🧪</div>
+                  <div>
+                    <strong style="color:#f8fafc">QA Tester</strong>
+                    <div style="font-size:10px;color:var(--muted)">Auto-Wake & Test Suite</div>
+                  </div>
+                </div>
+                <button class="wrMentionBtn" onclick="insertWarRoomAt('@QA ')">@QA</button>
+              </div>
+
+              <div class="wrMemberCard">
+                <div class="wrMemberInfo">
+                  <div class="wrMemberAvatar">🛡️</div>
+                  <div>
+                    <strong style="color:#f8fafc">Security Auditor</strong>
+                    <div style="font-size:10px;color:var(--muted)">OAuth PKCE & Vault</div>
+                  </div>
+                </div>
+                <button class="wrMentionBtn" onclick="insertWarRoomAt('@Security ')">@Security</button>
+              </div>
+
+              <div class="wrMemberCard" style="border-style:dashed">
+                <div class="wrMemberInfo">
+                  <div class="wrMemberAvatar">📢</div>
+                  <div>
+                    <strong style="color:#38bdf8">Toàn Bộ Swarm</strong>
+                    <div style="font-size:10px;color:var(--muted)">Broadcast lệnh chung</div>
+                  </div>
+                </div>
+                <button class="wrMentionBtn" onclick="insertWarRoomAt('@Toàn Đội ')">@Toàn Đội</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Cột phải: Dòng tin nhắn & Khung soạn thảo lệnh -->
+          <div class="warroomChatPane">
+            <!-- Header Kênh -->
+            <div class="wrChatHeader">
+              <div>
+                <div class="wrChatTitle" id="wrCurrentTitle">🌐 Core Gen ↔ Toàn Đội Dự Án</div>
+                <div class="wrChatDesc" id="wrCurrentDesc">Ryan và Core Agent (Gen) truyền đạt mệnh lệnh chiến lược, định hướng kiến trúc bằng tiếng Việt cho toàn thể đội ngũ.</div>
+              </div>
+              <div class="wrChatActions">
+                <span class="badge" id="wrMsgCountBadge">0 tin nhắn</span>
+                <label style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px;cursor:pointer;">
+                  <input type="checkbox" id="wrAutoScrollCheck" checked> Tự cuộn
+                </label>
+              </div>
+            </div>
+
+            <!-- Dòng tin nhắn -->
+            <div class="wrMessageList" id="wrMessageContainer">
+              <div style="text-align:center;padding:30px;color:var(--muted)">Đang tải tin nhắn phòng giao ban...</div>
+            </div>
+
+            <!-- Khung soạn thảo lệnh và giao tiếp -->
+            <div class="wrComposer">
+              <div class="wrToolbar">
+                <div class="wrToolbarLeft">
+                  <span style="font-size:11px;color:var(--muted)">Gửi với tư cách:</span>
+                  <select class="wrSelect" id="wrSenderSelect">
+                    <option value="Ryan (Owner)" selected>👤 Ryan (Owner / Tác Giả)</option>
+                    <option value="Genesis Orchestrator">🧠 Genesis Orchestrator (Core Gen)</option>
+                    <option value="Lead Architect">👑 Lead Architect (Trưởng Nhóm)</option>
+                    <option value="Backend Specialist">⚙️ Backend Specialist</option>
+                    <option value="Frontend Specialist">🎨 Frontend Specialist</option>
+                    <option value="DevOps & Packaging">📦 DevOps Engineer</option>
+                    <option value="QA Tester">🧪 QA Tester</option>
+                    <option value="Security Auditor">🛡️ Security Auditor</option>
+                  </select>
+
+                  <span style="font-size:11px;color:var(--muted);margin-left:8px">Loại lệnh / Phân loại:</span>
+                  <select class="wrSelect" id="wrTagSelect">
+                    <option value="Directive" selected>📌 Mệnh Lệnh (Directive)</option>
+                    <option value="Assignment">📋 Giao Việc (Assignment)</option>
+                    <option value="Report">📊 Báo Cáo (Report)</option>
+                    <option value="IO">🔀 Hợp Đồng I/O (IO Contract)</option>
+                    <option value="Evidence">✅ Nghiệm Thu (Evidence)</option>
+                  </select>
+                </div>
+
+                <div class="wrToolbarRight">
+                  <button class="btn small" onclick="insertWarRoomAt('【Chỉ thị】: ')">📌 Mệnh lệnh</button>
+                  <button class="btn small" onclick="insertWarRoomAt('【Yêu cầu nộp bằng chứng commit】')">📑 Bằng chứng</button>
+                  <button class="btn small" onclick="insertWarRoomAt('【Hợp đồng I/O API】')">🔀 I/O</button>
+                </div>
+              </div>
+
+              <div class="wrInputBox">
+                <textarea id="wrMessageInput" class="wrTextarea" placeholder="Nhập mệnh lệnh hoặc thảo luận bằng tiếng Việt... (Nhấn Enter để gửi, Shift+Enter xuống dòng. Gõ @Backend, @Frontend, @DevOps, @QA để chuyên gia phản hồi tức thì)" onkeydown="handleWarRoomKeydown(event)"></textarea>
+                <button class="wrSendBtn" id="wrSendBtn" onclick="sendWarRoomMessage()">
+                  <span>🚀</span>
+                  <span>Phát Lệnh</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <!-- ========================================================================= -->
       <!-- 4. TRUNG TÂM DỮ LIỆU (DỮ LIỆU THẬT CỦA REPO GEN-WORKPLACE) -->
@@ -3353,6 +3888,15 @@ const SUBTAB_CONFIG = {
       { id: 'rt-console', label: '💻 Live Console', action: () => switchDeckTab('console') }
     ]
   },
+  warroom: {
+    icon: '📡',
+    name: 'Phòng Giao Ban Swarm',
+    tabs: [
+      { id: 'wr-warroom', label: '🌐 Core Gen ↔ Toàn Đội', action: () => switchWarRoomChannel('war_room') },
+      { id: 'wr-standup', label: '👑 Leader ↔ Nhân Viên', action: () => switchWarRoomChannel('standup') },
+      { id: 'wr-handoff', label: '🔀 Hợp Đồng I/O & Bàn Giao', action: () => switchWarRoomChannel('handoff') }
+    ]
+  },
   data: {
     icon: '▦',
     name: 'Trung tâm dữ liệu',
@@ -3449,6 +3993,8 @@ function go(id, el) {
     refreshOauthProfiles();
     // Ensure deck starts on chat tab
     if (!state.currentDeckTab) state.currentDeckTab = 'chat';
+  } else if (id === 'warroom') {
+    loadWarRoomMessages(true);
   }
 }
 
@@ -6300,6 +6846,201 @@ async function syncFromBackend() {
     }
   } catch (err) {
     console.warn('[Sync] Fallback to local storage:', err);
+  }
+}
+
+// =========================================================================
+// WAR ROOM / PHÒNG GIAO BAN SWARM JAVASCRIPT LOGIC
+// =========================================================================
+let currentWarRoomChannel = 'war_room';
+let warRoomPollTimer = null;
+
+const WARROOM_CHANNEL_META = {
+  war_room: {
+    title: '🌐 Core Gen ↔ Toàn Đội Dự Án',
+    desc: 'Ryan và Core Agent (Gen) truyền đạt mệnh lệnh chiến lược, định hướng kiến trúc bằng tiếng Việt cho toàn thể đội ngũ.',
+    defaultTag: 'Directive'
+  },
+  standup: {
+    title: '👑 Leader ↔ Các Nhân Viên Kỹ Thuật',
+    desc: 'Kênh giao ban kỹ thuật: Lead Architect giao việc chi tiết, kiểm soát ranh giới Whitelist và duyệt bằng chứng commit hash.',
+    defaultTag: 'Assignment'
+  },
+  handoff: {
+    title: '🔀 Hợp Đồng I/O & Bàn Giao Liên Vai Trò',
+    desc: 'Bàn giao hợp đồng schema API, mock data, artifact và test log giữa Backend, Frontend, QA và Security.',
+    defaultTag: 'IO'
+  }
+};
+
+function switchWarRoomChannel(channelId) {
+  currentWarRoomChannel = channelId;
+  document.querySelectorAll('.warroomChannelItem').forEach(el => el.classList.remove('active'));
+  $(`wrChan-${channelId}`)?.classList.add('active');
+
+  const meta = WARROOM_CHANNEL_META[channelId] || WARROOM_CHANNEL_META.war_room;
+  if ($('wrCurrentTitle')) $('wrCurrentTitle').textContent = meta.title;
+  if ($('wrCurrentDesc')) $('wrCurrentDesc').textContent = meta.desc;
+  if ($('wrTagSelect')) $('wrTagSelect').value = meta.defaultTag;
+
+  // Cập nhật active subtab trên subtopNav nếu đang ở warroom
+  if (currentScreen === 'warroom') {
+    const subTabId = 'wr-' + channelId;
+    document.querySelectorAll('.subTab').forEach(b => {
+      b.classList.toggle('active', b.dataset.sub === subTabId);
+    });
+  }
+
+  loadWarRoomMessages(true);
+}
+
+function insertWarRoomAt(text) {
+  const input = $('wrMessageInput');
+  if (!input) return;
+  const start = input.selectionStart || 0;
+  const end = input.selectionEnd || 0;
+  const val = input.value || '';
+  input.value = val.substring(0, start) + text + val.substring(end);
+  input.focus();
+  input.setSelectionRange(start + text.length, start + text.length);
+}
+
+function handleWarRoomKeydown(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendWarRoomMessage();
+  }
+}
+
+async function loadWarRoomMessages(silent = false) {
+  const container = $('wrMessageContainer');
+  if (!container) return;
+
+  try {
+    const res = await fetch(`/api/warroom/messages?channel=${currentWarRoomChannel}&project=PRJ-GEN-WORKPLACE`);
+    if (!res.ok) return;
+    const data = await res.json();
+    renderWarRoomMessages(data.messages || []);
+  } catch (err) {
+    console.error("Lỗi tải tin nhắn war room:", err);
+  }
+}
+
+function renderWarRoomMessages(messages) {
+  const container = $('wrMessageContainer');
+  if (!container) return;
+
+  if ($('wrMsgCountBadge')) $('wrMsgCountBadge').textContent = `${messages.length} tin nhắn`;
+
+  if (messages.length === 0) {
+    container.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted)">Chưa có tin nhắn nào trong kênh này. Hãy phát lệnh đầu tiên!</div>';
+    return;
+  }
+
+  container.innerHTML = messages.map(m => {
+    let authorClass = 'specialist';
+    let authorIcon = '⚙️';
+    const a = m.author || '';
+
+    if (a.includes('Ryan') || a.includes('Owner')) {
+      authorClass = 'owner';
+      authorIcon = '👤';
+    } else if (a.includes('Genesis') || a.includes('Gen')) {
+      authorClass = 'orchestrator';
+      authorIcon = '🧠';
+    } else if (a.includes('Lead')) {
+      authorClass = 'orchestrator';
+      authorIcon = '👑';
+    } else if (a.includes('Frontend')) {
+      authorIcon = '🎨';
+    } else if (a.includes('Backend')) {
+      authorIcon = '⚙️';
+    } else if (a.includes('DevOps')) {
+      authorIcon = '📦';
+    } else if (a.includes('QA')) {
+      authorIcon = '🧪';
+    } else if (a.includes('Security')) {
+      authorIcon = '🛡️';
+    }
+
+    const tagClass = m.tag || 'Directive';
+    const tagLabel = {
+      Directive: '📌 Mệnh Lệnh',
+      Assignment: '📋 Giao Việc',
+      Report: '📊 Báo Cáo',
+      IO: '🔀 I/O Contract',
+      Evidence: '✅ Nghiệm Thu',
+      Reply: '💬 Phản Hồi'
+    }[tagClass] || tagClass;
+
+    const reactsHtml = (m.reacts && m.reacts.length > 0)
+      ? `<div class="wrReacts">${m.reacts.map(r => `<span class="wrReactItem">${escapeHtml(r)}</span>`).join('')}</div>`
+      : '';
+
+    return `
+      <div class="wrMsgItem ${authorClass}">
+        <div class="wrMsgHeader">
+          <span>${authorIcon}</span>
+          <span class="wrAuthor">${escapeHtml(m.author)}</span>
+          <span class="wrTag ${tagClass}">${tagLabel}</span>
+          <span class="wrTime">${escapeHtml(m.created_time || '')}</span>
+        </div>
+        <div class="wrBubble">
+          ${m.body}
+          ${reactsHtml}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  if ($('wrAutoScrollCheck')?.checked) {
+    container.scrollTop = container.scrollHeight;
+  }
+}
+
+async function sendWarRoomMessage() {
+  const input = $('wrMessageInput');
+  if (!input) return;
+  const msg = input.value.trim();
+  if (!msg) return;
+
+  const author = $('wrSenderSelect')?.value || 'Ryan (Owner)';
+  const tag = $('wrTagSelect')?.value || 'Directive';
+  const btn = $('wrSendBtn');
+
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span>⏳</span><span>Đang phát...</span>';
+  }
+
+  try {
+    const res = await fetch('/api/warroom/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        project_id: 'PRJ-GEN-WORKPLACE',
+        channel_id: currentWarRoomChannel,
+        author: author,
+        tag: tag,
+        message: msg
+      })
+    });
+
+    if (res.ok) {
+      input.value = '';
+      await loadWarRoomMessages(true);
+      showToast('Đã phát lệnh thành công!');
+    } else {
+      showToast('Không thể gửi lệnh!');
+    }
+  } catch (err) {
+    showToast('Lỗi mạng khi phát lệnh!');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<span>🚀</span><span>Phát Lệnh</span>';
+    }
+    input.focus();
   }
 }
 

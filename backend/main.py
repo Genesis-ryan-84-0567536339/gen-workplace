@@ -125,6 +125,15 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             self._send_json(200, {"messages": messages})
             return
 
+        # 7. API Tin nhắn War Room / Phòng Giao Ban Swarm
+        if path == "/api/warroom/messages":
+            channel_id = query.get("channel", ["war_room"])[0]
+            prj_id = query.get("project", ["PRJ-GEN-WORKPLACE"])[0]
+            limit = int(query.get("limit", [50])[0])
+            messages = db.get_warroom_messages(channel_id, prj_id, limit)
+            self._send_json(200, {"messages": messages, "channel_id": channel_id})
+            return
+
         return super().do_GET()
 
     def do_POST(self):
@@ -376,6 +385,18 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             project_id = data.get("project_id", "PRJ-GEN-WORKPLACE")
             res = db.reclaim_stalled_tasks(timeout, project_id)
             self._send_json(200, res)
+            return
+
+        # 17. Gửi tin nhắn vào War Room / Phòng Giao Ban Swarm (tự động phản hồi AI theo vai trò)
+        if path == "/api/warroom/send":
+            channel_id = data.get("channel_id", "war_room")
+            prj_id = data.get("project_id", "PRJ-GEN-WORKPLACE")
+            author = data.get("author", "Ryan (Owner)")
+            msg = data.get("message", "")
+            tag = data.get("tag", "Directive")
+            res = db.post_warroom_message(prj_id, channel_id, author, msg, tag)
+            status_code = 400 if "error" in res else 200
+            self._send_json(status_code, res)
             return
 
         self.send_response(404)
