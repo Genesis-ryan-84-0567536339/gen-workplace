@@ -1486,6 +1486,207 @@ button { cursor: pointer; }
   gap: 8px;
 }
 
+/* ═══════════════════════════════════════════════════
+   CORE ORCHESTRATOR IDE — Tách biệt hoàn toàn khỏi Swarm
+   ═══════════════════════════════════════════════════ */
+.orchestratorBlock {
+  border: 1.5px solid #7c3aed;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #0d0f1a 0%, #12102a 100%);
+  margin-bottom: 18px;
+  overflow: hidden;
+  box-shadow: 0 0 32px rgba(124,58,237,0.13), 0 2px 8px #0008;
+}
+.orchestratorHeader {
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 20px;
+  background: linear-gradient(90deg, rgba(124,58,237,0.18) 0%, transparent 100%);
+  border-bottom: 1px solid rgba(124,58,237,0.25);
+}
+.orchestratorAvatar {
+  width: 52px; height: 52px; border-radius: 50%;
+  background: linear-gradient(135deg, #7c3aed, #4f46e5);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px; box-shadow: 0 0 18px rgba(124,58,237,0.5);
+  flex-shrink: 0; position: relative;
+}
+.orchestratorAvatar::after {
+  content: ''; position: absolute; inset: -3px; border-radius: 50%;
+  border: 1.5px solid rgba(124,58,237,0.5);
+  animation: orchPulse 2.5s ease-in-out infinite;
+}
+@keyframes orchPulse {
+  0%,100% { opacity:0.4; transform:scale(1); } 50% { opacity:1; transform:scale(1.06); }
+}
+.orchestratorMeta { flex: 1; min-width: 0; }
+.orchestratorTitle {
+  font-size: 16px; font-weight: 700; color: #a78bfa;
+  display: flex; align-items: center; gap: 8px; margin-bottom: 2px;
+}
+.orchCoreBadge {
+  font-size: 9px; font-weight: 700; letter-spacing: 0.08em;
+  background: rgba(124,58,237,0.25); color: #c4b5fd;
+  border: 1px solid rgba(124,58,237,0.4);
+  border-radius: 4px; padding: 1px 6px; text-transform: uppercase;
+}
+.orchestratorSub { font-size: 11px; color: #6b7280; }
+.orchestratorStatusRow { display:flex; align-items:center; gap:8px; margin-top:4px; }
+.orchStatusDot {
+  width:8px; height:8px; border-radius:50%;
+  background:#7c3aed; box-shadow: 0 0 8px #7c3aed;
+  animation: orchDotPulse 1.8s ease-in-out infinite;
+}
+@keyframes orchDotPulse { 0%,100% { opacity:0.5; } 50% { opacity:1; } }
+.orchAccountInfo { font-size:10.5px; color:#9ca3af; }
+.orchQuotaRow { display:flex; align-items:center; gap:10px; }
+.orchQuotaBar { display:flex; align-items:center; gap:5px; font-size:9.5px; color:#6b7280; }
+.orchBarTrack { width:60px; height:4px; background:#1e2634; border-radius:2px; overflow:hidden; }
+.orchBarFill { height:100%; border-radius:2px; background:#7c3aed; }
+.orchestratorActions { display:flex; align-items:center; gap:8px; flex-shrink:0; }
+.orchBtn {
+  padding: 6px 14px; border-radius: 8px; font-size: 11.5px; font-weight: 600;
+  cursor: pointer; border: 1px solid rgba(124,58,237,0.4);
+  background: rgba(124,58,237,0.15); color: #c4b5fd;
+  transition: all 0.18s; white-space: nowrap;
+}
+.orchBtn:hover { background: rgba(124,58,237,0.3); border-color: #7c3aed; color:#fff; }
+.orchBtn.primary { background: #7c3aed; color: #fff; border-color: #7c3aed; box-shadow: 0 0 12px rgba(124,58,237,0.35); }
+.orchBtn.primary:hover { background: #6d28d9; }
+.orchTabNav {
+  display: flex; align-items: center; gap: 2px; padding: 0 16px;
+  background: rgba(0,0,0,0.2); border-bottom: 1px solid rgba(124,58,237,0.18);
+  overflow-x: auto;
+}
+.orchTab {
+  padding: 9px 16px; font-size: 12px; font-weight: 500; color: #6b7280;
+  cursor: pointer; border: none; background: none;
+  border-bottom: 2px solid transparent; transition: all 0.15s; white-space: nowrap;
+}
+.orchTab:hover { color: #a78bfa; }
+.orchTab.active { color: #a78bfa; border-bottom-color: #7c3aed; }
+.orchPanel { display: none; flex-direction: column; }
+.orchPanel.active { display: flex; }
+.orchChatArea {
+  flex: 1; overflow-y: auto; padding: 16px 20px;
+  display: flex; flex-direction: column; gap: 12px;
+  min-height: 320px; max-height: 420px;
+}
+.orchMsgUser { display: flex; justify-content: flex-end; }
+.orchMsgUser .orchBubble {
+  background: rgba(124,58,237,0.25); border: 1px solid rgba(124,58,237,0.35);
+  color: #e5e7eb; border-radius: 12px 12px 2px 12px;
+  padding: 9px 14px; max-width: 72%; font-size: 13px; line-height: 1.5;
+}
+.orchMsgAgent { display: flex; gap: 8px; align-items: flex-start; }
+.orchMsgAgent .orchBubbleAvatar {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: linear-gradient(135deg, #7c3aed, #4f46e5);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; flex-shrink: 0; margin-top: 2px;
+}
+.orchMsgAgent .orchBubble {
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(124,58,237,0.2);
+  color: #d1d5db; border-radius: 2px 12px 12px 12px;
+  padding: 9px 14px; max-width: 80%; font-size: 13px; line-height: 1.6;
+}
+.orchMsgAgent .orchBubble code {
+  background: rgba(124,58,237,0.15); color: #c4b5fd;
+  padding: 1px 5px; border-radius: 4px; font-size: 11.5px;
+}
+.orchMsgMeta { font-size: 9.5px; color: #4b5563; margin-top: 4px; }
+.orchTypingIndicator { display:flex; align-items:center; gap:6px; padding:4px 0; color:#7c3aed; font-size:11.5px; }
+.orchTypingDots { display:flex; gap:3px; }
+.orchTypingDots span {
+  width:5px; height:5px; border-radius:50%; background:#7c3aed;
+  animation: orchDotBounce 1s ease-in-out infinite;
+}
+.orchTypingDots span:nth-child(2) { animation-delay:0.15s; }
+.orchTypingDots span:nth-child(3) { animation-delay:0.3s; }
+@keyframes orchDotBounce {
+  0%,100%{transform:translateY(0);opacity:0.4} 50%{transform:translateY(-5px);opacity:1}
+}
+.orchInputRow {
+  display: flex; align-items: flex-end; gap: 8px;
+  padding: 12px 16px; border-top: 1px solid rgba(124,58,237,0.18);
+  background: rgba(0,0,0,0.2);
+}
+.orchInputRow textarea {
+  flex: 1; background: rgba(255,255,255,0.05); border: 1px solid rgba(124,58,237,0.25);
+  border-radius: 10px; color: #e5e7eb; font-size: 13px; line-height: 1.5;
+  padding: 9px 12px; resize: none; min-height: 42px; max-height: 140px;
+  font-family: inherit; outline: none; overflow-y: auto; transition: border-color 0.15s;
+}
+.orchInputRow textarea:focus { border-color: #7c3aed; }
+.orchInputRow textarea::placeholder { color: #4b5563; }
+.orchSendBtn {
+  width: 40px; height: 40px; border-radius: 10px; border: none;
+  background: #7c3aed; color: #fff; cursor: pointer; font-size: 18px;
+  display: flex; align-items: center; justify-content: center; transition: all 0.15s;
+}
+.orchSendBtn:hover { background: #6d28d9; transform: scale(1.05); }
+.orchViewerPanel {
+  padding: 16px 20px; overflow-y: auto;
+  min-height: 280px; max-height: 460px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.orchSection {
+  background: rgba(255,255,255,0.03); border: 1px solid rgba(124,58,237,0.15); border-radius: 10px; overflow: hidden;
+}
+.orchSectionHead {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 9px 14px; background: rgba(124,58,237,0.08); cursor: pointer; user-select: none;
+}
+.orchSectionHead h4 { font-size: 12px; font-weight: 600; color: #a78bfa; margin:0; }
+.orchSectionHead .orchToggle { font-size: 11px; color: #6b7280; }
+.orchSectionBody {
+  padding: 12px 14px; font-size: 12px; line-height: 1.65; color: #9ca3af;
+}
+.orchSectionBody pre {
+  background: #080a12; border: 1px solid #1a2032; border-radius: 6px;
+  padding: 10px 12px; font-family: var(--mono); font-size: 11px; color: #c4b5fd;
+  overflow-x: auto; white-space: pre-wrap; word-break: break-all; margin: 6px 0 0;
+}
+.orchSkillGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.orchSkillCard {
+  border: 1px solid rgba(124,58,237,0.2); border-radius: 8px;
+  padding: 10px 12px; background: rgba(124,58,237,0.06);
+}
+.orchSkillName { font-size: 12px; font-weight: 600; color: #c4b5fd; margin-bottom: 3px; }
+.orchSkillDesc { font-size: 11px; color: #6b7280; line-height: 1.5; }
+.orchSkillViewBtn {
+  font-size: 10px; color: #7c3aed; cursor: pointer; margin-top: 5px;
+  background: none; border: none; padding: 0; text-decoration: underline;
+}
+.orchMcpTool {
+  display: flex; align-items: center; gap: 8px; padding: 7px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 11.5px;
+}
+.orchMcpTool:last-child { border-bottom: none; }
+.orchMcpTool code { background: rgba(124,58,237,0.15); color: #c4b5fd; padding: 1px 5px; border-radius: 4px; font-size: 10.5px; }
+.orchMcpTool small { color: #4b5563; }
+.orchMemoryEntry {
+  display: flex; gap: 10px; padding: 8px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 11.5px;
+}
+.orchMemoryEntry:last-child { border-bottom: none; }
+.orchMemTag {
+  flex-shrink: 0; background: rgba(124,58,237,0.15); color: #c4b5fd;
+  border-radius: 4px; padding: 1px 7px; font-size: 10px; height: fit-content;
+}
+.orchMemText { color: #9ca3af; line-height: 1.55; }
+.swarmSection { margin-top: 4px; }
+.swarmSectionHeader {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 4px 6px;
+}
+.swarmSectionTitle { font-size: 11px; font-weight: 600; color: #4b5563; text-transform: uppercase; letter-spacing: 0.08em; }
+.swarmCollapseBtn {
+  font-size: 11px; color: #4b5563; cursor: pointer;
+  background: none; border: 1px solid #1e2634; border-radius: 5px; padding: 3px 8px;
+}
+.swarmCollapseBtn:hover { color: #9ca3af; }
+#swarmBody.collapsed { display: none; }
+
 /* OAuth & Account Management Styles */
 .oauthGrid {
   display: grid;
@@ -1891,216 +2092,234 @@ button { cursor: pointer; }
       <!-- 3. MÔI TRƯỜNG AGENT (MISSION CONTROL WORKPLACE — BẢNG ĐIỀU HÀNH CHUYÊN GIA) -->
       <!-- ========================================================================= -->
       <section class="screen" id="runtimes">
-        <!-- 1. Thanh Tiêu Đề Điều Hành Cấp Cao -->
-        <div class="missionTopBar">
-          <div class="missionTitleBox">
-            <h2><span>🚀</span> Mission Control Deck · Đội Ngũ Chuyên Gia Swarm</h2>
-            <p>6 Chuyên gia AI tự hành · Quản trị tài nguyên 1-click & Điều phối luồng công việc thời gian thực</p>
-          </div>
-          <div class="missionTopActions">
-            <button class="btn small" onclick="triggerSwarmLifecycle('sleep_all')" title="Ngủ đông tất cả để giải phóng 100% CPU & RAM, bảo toàn hội thoại">
-              😴 Ngủ đông cả đội (0% CPU/RAM)
-            </button>
-            <button class="btn small primary" onclick="triggerSwarmLifecycle('wake_all')" title="Đánh thức toàn bộ 6 chuyên gia dậy làm việc">
-              ⚡ Đánh thức cả đội
-            </button>
-            <button class="btn small" onclick="openOauthModal()" title="Quản lý tài khoản Google và xác thực OAuth">
-              🔐 Tài khoản & OAuth
-            </button>
-            <button class="btn small" onclick="refreshTmuxSessions(true)" title="Làm mới trạng thái">
-              🔄 Làm mới
-            </button>
-          </div>
-        </div>
 
-        <!-- 2. Bảng 6 Thẻ Hồ Sơ Chuyên Gia (Avatar, Tên, Trạng thái, Gmail, Quota Micro-Bars) -->
-        <div class="expertSquadGrid" id="expertSquadGrid"></div>
+        <!-- ═══════════════════════════════════════════════════════════
+             ZONE 1: CORE ORCHESTRATOR IDE
+             ═══════════════════════════════════════════════════════════ -->
+        <div class="orchestratorBlock" id="orchestratorBlock">
 
-        <!-- 3. Khung Điều Hành Trung Tâm Thống Nhất (Command Deck) -->
-        <div class="commandDeck" id="commandDeck">
-          <!-- A. Deck Header: Thông tin chi tiết Agent đang chọn & Action buttons -->
-          <div class="commandDeckHead">
-            <div class="deckSelectedAgentInfo">
-              <div class="deckAvatar" id="deckAgentAvatar">👑</div>
-              <div class="deckTitleBlock">
-                <h3>
-                  <span id="deckAgentRole">Lead Architect</span>
-                  <span class="expertSidBadge" id="deckAgentSid">gw-lead-agy</span>
-                  <span class="expertStatusChip live" id="deckAgentStatusBadge">● Đang chạy</span>
-                </h3>
-                <p>
-                  <span>Mạch tư duy: <code id="deckAgentConv" style="color:#5eead4;font-size:10.5px">conv-lead-architect</code></span>
-                  <span>·</span>
-                  <span class="expertCardAccount" id="deckAgentAccountBox" style="cursor:pointer" onclick="openAccountModal()" title="Nhấp để đổi tài khoản / profile">
-                    <span class="gIconBadge">G</span>
-                    <span id="deckAgentEmail">owner@genesis.local</span>
-                    <span style="color:#38bdf8;margin-left:4px">Đổi</span>
-                  </span>
-                </p>
+          <!-- Header: Identity + Status + Actions -->
+          <div class="orchestratorHeader">
+            <div class="orchestratorAvatar">🧠</div>
+            <div class="orchestratorMeta">
+              <div class="orchestratorTitle">
+                Genesis Orchestrator
+                <span class="orchCoreBadge">Core Agent</span>
+                <span class="orchCoreBadge" style="background:rgba(16,185,129,0.15);color:#6ee7b7;border-color:rgba(16,185,129,0.3)">● Online</span>
+              </div>
+              <div class="orchestratorSub">Điều phối toàn bộ Swarm · Spawn / Kill workers · Đọc Plan · Giữ chuẩn SSOT</div>
+              <div class="orchestratorStatusRow">
+                <div class="orchStatusDot"></div>
+                <span class="orchAccountInfo" id="orchAccountLabel">owner@genesis.local · profile-owner</span>
+                <span style="color:#374151">·</span>
+                <div class="orchQuotaRow">
+                  <div class="orchQuotaBar">💎<div class="orchBarTrack"><div class="orchBarFill" id="orchGemBar" style="width:72%"></div></div>72%</div>
+                  <div class="orchQuotaBar">⚡<div class="orchBarTrack"><div class="orchBarFill" id="orchClaBar" style="width:89%;background:#f59e0b"></div></div>89%</div>
+                </div>
               </div>
             </div>
-
-            <!-- Lifecycle Actions & Quick Quota Pill -->
-            <div class="deckHeadActions">
-              <div class="deckQuotaPill" id="deckQuotaPill" title="Hạn ngạch thực tế còn lại">
-                <span style="color:#38bdf8">💎 Gemini: <b id="deckQuotaGeminiVal">25%</b></span>
-                <span style="color:var(--muted2)">|</span>
-                <span style="color:#f59e0b">⚡ Claude: <b id="deckQuotaClaudeVal">94%</b></span>
-              </div>
-              <div id="deckLifecycleActions" style="display:flex;gap:6px"></div>
+            <div class="orchestratorActions">
+              <button class="orchBtn" onclick="orchSpawnWorker()" title="Orchestrator phân tích plan và spawn workers cần thiết">⚡ Spawn Workers</button>
+              <button class="orchBtn" onclick="switchOrchTab('definition', event)" title="Xem định nghĩa, instructions, skills của Orchestrator">🔍 Xem Định Nghĩa</button>
+              <button class="orchBtn primary" onclick="switchOrchTab('chat', event)" title="Mở chat IDE để làm việc trực tiếp">💬 Chat IDE</button>
             </div>
           </div>
 
-          <!-- B. Navigation Tabs của Khung Điều Hành Trung Tâm -->
-          <div class="commandDeckNav">
-            <button class="deckNavTab active" data-decktab="chat" onclick="switchDeckTab('chat', this)">
-              💬 Luồng Chat & Bàn Giao
-            </button>
-            <button class="deckNavTab" data-decktab="thinking" onclick="switchDeckTab('thinking', this)">
-              🧠 Mạch Tư Duy & Nghiệm Thu
-            </button>
-            <button class="deckNavTab" data-decktab="kanban" onclick="switchDeckTab('kanban', this)">
-              📋 Team Live Kanban
-            </button>
-            <button class="deckNavTab" data-decktab="console" onclick="switchDeckTab('console', this)">
-              💻 Live Console (Log Sạch)
-            </button>
-            <button class="deckNavTab" data-decktab="oauth" onclick="switchDeckTab('oauth', this)">
-              🔐 Quản Lý Hồ Sơ OAuth
-            </button>
+          <!-- Tab Nav -->
+          <div class="orchTabNav">
+            <button class="orchTab active" data-orchtab="chat" onclick="switchOrchTab('chat', this)">💬 Chat IDE</button>
+            <button class="orchTab" data-orchtab="memory" onclick="switchOrchTab('memory', this)">🧠 Trí Nhớ</button>
+            <button class="orchTab" data-orchtab="definition" onclick="switchOrchTab('definition', this)">📜 Định Nghĩa & Role</button>
+            <button class="orchTab" data-orchtab="skills" onclick="switchOrchTab('skills', this)">🛠️ Skills</button>
+            <button class="orchTab" data-orchtab="mcps" onclick="switchOrchTab('mcps', this)">🔌 MCPs</button>
+            <button class="orchTab" data-orchtab="swarm" onclick="switchOrchTab('swarm', this)">👥 Swarm Control</button>
           </div>
 
-          <!-- C. Panels Nội Dung -->
-          <!-- Panel 1: Chatroom & Luồng Bàn Giao -->
-          <div class="deckPanel active" id="deckPanel-chat" style="display:flex;flex:1;min-height:0">
-            <div class="runtimeGrid" style="width:100%;min-height:460px;margin:0;border:0;border-radius:0">
-              <!-- Cột Giữa: Chatroom / Thread -->
-              <div class="card chat" id="rtChatCard" style="border:0;border-radius:0;border-right:1px solid var(--line)">
-                <div class="cardHead" style="min-height:36px;padding:8px 12px">
-                  <div>
-                    <strong id="chatTitle">Phòng Chat Điều Hành</strong>
-                    <div class="hint" id="chatPath">Handoff nhiệm vụ & trao đổi chéo giữa các Role qua @mention</div>
-                  </div>
-                  <div class="chatTabs">
-                    <button class="chatTab active" data-chat="thread" onclick="switchChat('thread', this)">Tất cả trao đổi</button>
-                    <button class="chatTab" data-chat="trace" onclick="switchChat('trace', this)">Chỉ nhiệm vụ của Role này</button>
-                  </div>
-                </div>
-
-                <div class="threadBar" id="threadBar"></div>
-                <div class="messages" id="chatMessages" style="height:320px;overflow-y:auto"></div>
-
-                <div class="composer">
-                  <textarea id="chatInput" placeholder="Nhắn chỉ thị cho chuyên gia; @mention role để giao việc, đính kèm kết quả hoặc thả emoji xác nhận..."></textarea>
-                  <div class="composeRow">
-                    <div class="mention">
-                      <span style="color:var(--muted2)">Tag nhanh:</span>
-                      <a href="javascript:void(0)" onclick="insertAt('@Lead')" style="color:var(--accent2);text-decoration:none">@Lead</a> · 
-                      <a href="javascript:void(0)" onclick="insertAt('@Backend')" style="color:var(--accent2);text-decoration:none">@Backend</a> · 
-                      <a href="javascript:void(0)" onclick="insertAt('@Frontend')" style="color:var(--accent2);text-decoration:none">@Frontend</a> · 
-                      <a href="javascript:void(0)" onclick="insertAt('@QA')" style="color:var(--accent2);text-decoration:none">@QA</a> · 
-                      <a href="javascript:void(0)" onclick="insertAt('@DevOps')" style="color:var(--accent2);text-decoration:none">@DevOps</a>
-                    </div>
-                    <div style="display:flex;gap:6px;align-items:center">
-                      <span style="font-size:13px;cursor:pointer" onclick="insertEmoji('📥')" title="Đã nhận">📥</span>
-                      <span style="font-size:13px;cursor:pointer" onclick="insertEmoji('⚠️')" title="Cảnh báo">⚠️</span>
-                      <span style="font-size:13px;cursor:pointer" onclick="insertEmoji('👎')" title="Fail">👎</span>
-                      <span style="font-size:13px;cursor:pointer" onclick="insertEmoji('✅')" title="Done">✅</span>
-                      <span style="font-size:13px;cursor:pointer" onclick="insertEmoji('❓')" title="Cần làm rõ">❓</span>
-                      <button class="btn primary small" onclick="sendRuntimeMessage()">Gửi chỉ thị</button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Cột Phải: Ngữ cảnh & Inspector -->
-              <div class="card runtimeInspector" id="rtInspectorCard" style="border:0;border-radius:0">
-                <div class="cardHead" style="min-height:36px;padding:8px 12px">
-                  <strong>Ngữ Cảnh Nghiệm Thu</strong>
-                  <span class="chip live" id="runtimeStatus">active</span>
-                </div>
-                <div class="inspectorTabs">
-                  <button class="insTab active" onclick="switchInspector('context', this)">Ngữ cảnh</button>
-                  <button class="insTab" onclick="switchInspector('events', this)">Sự kiện</button>
-                  <button class="insTab" onclick="switchInspector('files', this)">Tệp / Ref</button>
-                </div>
-                <div class="inspectorBody" id="runtimeInspectorBody" style="padding:12px;overflow-y:auto;max-height:380px"></div>
-              </div>
+          <!-- Panel: Chat IDE -->
+          <div class="orchPanel active" id="orchPanel-chat">
+            <div class="orchChatArea" id="orchChatMessages">
+              <!-- seeded by JS -->
+            </div>
+            <div class="orchInputRow">
+              <textarea id="orchChatInput" rows="1" placeholder="Nhập chỉ thị cho Orchestrator… (Shift+Enter xuống dòng, Enter gửi)"
+                onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendOrchMessage()}"
+                oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,140)+'px'"></textarea>
+              <button class="orchSendBtn" onclick="sendOrchMessage()" title="Gửi (Enter)">↑</button>
             </div>
           </div>
 
-          <!-- Panel 2: Mạch Tư Duy & Nghiệm Thu (Thinking Stream Cards) -->
-          <div class="deckPanel" id="deckPanel-thinking" style="display:none">
-            <div class="thinkingDeckView">
-              <div class="thinkingDeckHead">
-                <div>
-                  <strong style="color:#fff;font-size:13px">🧠 Chuỗi Tư Duy Tự Hành & Biên Bản Nghiệm Thu</strong>
-                  <div class="hint">Phân rã mục tiêu logic, các công cụ đã sử dụng và kết quả sinh ra của chuyên gia đang chọn</div>
-                </div>
-                <button class="btn small" onclick="renderThinkingCards()">🔄 Làm mới tư duy</button>
-              </div>
-              <div class="thinkingCardList" id="thinkingCardList"></div>
+          <!-- Panel: Memory -->
+          <div class="orchPanel" id="orchPanel-memory">
+            <div class="orchViewerPanel" id="orchMemoryContent">
+              <!-- rendered by renderOrchMemory() -->
             </div>
           </div>
 
-          <!-- Panel 3: Live Kanban Cả Đội -->
-          <div class="deckPanel" id="deckPanel-kanban" style="display:none">
-            <div style="padding:12px">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-                <strong style="color:#fff;font-size:13px">📋 Live Kanban · Tiến Trình Dự Án</strong>
-                <span class="chip live">LIVE UPDATED TỰ ĐỘNG</span>
-              </div>
-              <div class="kanban" id="kanban"></div>
+          <!-- Panel: Definition & Role -->
+          <div class="orchPanel" id="orchPanel-definition">
+            <div class="orchViewerPanel" id="orchDefinitionContent">
+              <!-- rendered by renderOrchDefinition() -->
             </div>
           </div>
 
-          <!-- Panel 4: Live Console Log Sạch (Thu gọn) -->
-          <div class="deckPanel" id="deckPanel-console" style="display:none">
-            <div class="streamlinedConsole">
-              <div style="background:#0c1017;padding:6px 12px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #1a222e;font-size:11px">
-                <span style="color:var(--muted)">Stream log thời gian thực: <code id="consoleSidLabel" style="color:#5eead4">gw-lead-agy</code></span>
+          <!-- Panel: Skills -->
+          <div class="orchPanel" id="orchPanel-skills">
+            <div class="orchViewerPanel" id="orchSkillsContent">
+              <!-- rendered by renderOrchSkills() -->
+            </div>
+          </div>
+
+          <!-- Panel: MCPs -->
+          <div class="orchPanel" id="orchPanel-mcps">
+            <div class="orchViewerPanel" id="orchMcpsContent">
+              <!-- rendered by renderOrchMcps() -->
+            </div>
+          </div>
+
+          <!-- Panel: Swarm Control -->
+          <div class="orchPanel" id="orchPanel-swarm">
+            <div class="orchViewerPanel" style="padding:12px 16px">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+                <span style="font-size:12px;font-weight:600;color:#a78bfa">👥 Worker Swarm — Quản lý bởi Orchestrator</span>
                 <div style="display:flex;gap:6px">
-                  <button class="btn small" onclick="sendTmuxKey('C-c')">Ctrl+C</button>
-                  <button class="btn small" onclick="clearTmuxTerminal()">Clear</button>
-                  <button class="btn small" onclick="refreshTmuxSessions(true)">🔄</button>
+                  <button class="orchBtn" onclick="triggerSwarmLifecycle('sleep_all')">😴 Ngủ đông cả đội</button>
+                  <button class="orchBtn primary" onclick="triggerSwarmLifecycle('wake_all')">⚡ Đánh thức cả đội</button>
                 </div>
               </div>
-              <div class="streamlinedConsoleBody" id="tmuxTerminalOutput"></div>
-              <div class="streamlinedConsoleInputRow">
-                <span style="font-family:var(--mono);color:#3ad18b;font-weight:700;font-size:12px" id="tmuxPromptLabel">input &gt;</span>
-                <input type="text" class="tmuxInput" id="tmuxCmdInput" placeholder="Nhập chỉ thị hoặc nội dung gửi trực tiếp vào phiên..." onkeydown="if(event.key==='Enter')sendTmuxCmd()">
-                <button class="btn primary small" onclick="sendTmuxCmd()">Gửi (Enter)</button>
+              <div id="orchSwarmMiniCards" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+                <!-- rendered by renderOrchSwarmCards() -->
               </div>
             </div>
           </div>
 
-          <!-- Panel 5: Quản Lý Hồ Sơ OAuth -->
-          <div class="deckPanel" id="deckPanel-oauth" style="display:none">
-            <div style="padding:16px">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-                <div>
-                  <strong style="color:#fff;font-size:13px">🔐 Hồ Sơ Xác Thực Google OAuth (Thật)</strong>
-                  <div class="hint">Đăng nhập tài khoản Google OAuth 2.0 PKCE. Token được phân bổ tự động cho các Role.</div>
-                </div>
-                <button class="btn small primary" onclick="openOauthModal()">+ Thêm & Xác thực Tài khoản Mới</button>
-              </div>
-              <table class="oauthProfileTable">
-                <thead>
-                  <tr>
-                    <th>Hồ sơ / Profile</th>
-                    <th>Tài khoản Google</th>
-                    <th>Trạng thái OAuth</th>
-                    <th>Hạn dùng Token</th>
-                    <th>Role đang sử dụng</th>
-                    <th style="text-align:right">Thao tác</th>
-                  </tr>
-                </thead>
-                <tbody id="oauthProfileRows"></tbody>
-              </table>
-            </div>
+        </div><!-- /orchestratorBlock -->
+
+        <!-- ═══════════════════════════════════════════════════════════
+             ZONE 2: WORKER SWARM (Collapsible)
+             ═══════════════════════════════════════════════════════════ -->
+        <div class="swarmSection">
+          <div class="swarmSectionHeader">
+            <span class="swarmSectionTitle">👥 Worker Swarm · Nhân viên được Orchestrator spawn</span>
+            <button class="swarmCollapseBtn" onclick="toggleSwarmBody(this)" id="swarmCollapseBtn">Thu gọn ▲</button>
           </div>
-        </div>
-      </section>
+          <div id="swarmBody">
+            <!-- Expert Squad Grid -->
+            <div class="expertSquadGrid" id="expertSquadGrid"></div>
+
+            <!-- Command Deck -->
+            <div class="commandDeck" id="commandDeck">
+              <div class="commandDeckHead">
+                <div class="deckSelectedAgentInfo">
+                  <div class="deckAvatar" id="deckAgentAvatar">👑</div>
+                  <div class="deckTitleBlock">
+                    <h3>
+                      <span id="deckAgentRole">Lead Architect</span>
+                      <span class="expertSidBadge" id="deckAgentSid">gw-lead-agy</span>
+                      <span class="expertStatusChip live" id="deckAgentStatusBadge">● Đang chạy</span>
+                    </h3>
+                    <p>
+                      <span>Mạch tư duy: <code id="deckAgentConv" style="color:#5eead4;font-size:10.5px">conv-lead-architect</code></span>
+                      <span>·</span>
+                      <span class="expertCardAccount" id="deckAgentAccountBox" style="cursor:pointer" onclick="openAccountModal()" title="Nhấp để đổi tài khoản / profile">
+                        <span class="gIconBadge">G</span>
+                        <span id="deckAgentEmail">owner@genesis.local</span>
+                      </span>
+                    </p>
+                  </div>
+                </div>
+                <div class="deckHeadActions">
+                  <span class="deckQuotaPill" id="deckQuotaPill">💎 72% · ⚡ 89%</span>
+                  <button class="btn small" onclick="triggerSessionLifecycle('pause')" title="Tạm dừng">⏸ Tạm dừng</button>
+                  <button class="btn small" onclick="triggerSessionLifecycle('sleep')" title="Ngủ đông">😴 Sleep</button>
+                  <button class="btn small primary" onclick="triggerSessionLifecycle('resume')" title="Đánh thức">⚡ Thức</button>
+                </div>
+              </div>
+
+              <!-- Deck Nav Tabs -->
+              <div class="commandDeckNav">
+                <button class="deckNavTab active" data-decktab="chat" onclick="switchDeckTab('chat', this)">💬 Chat</button>
+                <button class="deckNavTab" data-decktab="thinking" onclick="switchDeckTab('thinking', this)">🧠 Thinking</button>
+                <button class="deckNavTab" data-decktab="kanban" onclick="switchDeckTab('kanban', this)">📋 Kanban</button>
+                <button class="deckNavTab" data-decktab="console" onclick="switchDeckTab('console', this)">💻 Console</button>
+                <button class="deckNavTab" data-decktab="oauth" onclick="switchDeckTab('oauth', this)">🔐 OAuth</button>
+              </div>
+
+              <!-- Deck Panels -->
+              <div class="deckPanel active" id="deckPanel-chat" style="display:flex;flex:1;min-height:0">
+                <div class="runtimeGrid" style="width:100%;min-height:360px;margin:0;border:0;border-radius:0">
+                  <div class="card chat" id="rtChatCard" style="border:0;border-radius:0;border-right:1px solid var(--line)">
+                    <div class="cardHead" style="min-height:36px;padding:8px 12px">
+                      <div>
+                        <strong id="chatTitle">Chat Worker</strong>
+                        <div class="hint" id="chatPath">Handoff nhiệm vụ & trao đổi chéo giữa các Role</div>
+                      </div>
+                      <div class="chatTabs">
+                        <button class="chatTab active" data-chat="thread" onclick="switchChat('thread', this)">Tất cả trao đổi</button>
+                        <button class="chatTab" data-chat="io" onclick="switchChat('io', this)">I/O Contract</button>
+                      </div>
+                    </div>
+                    <div class="chatMessages" id="chatMessages"></div>
+                    <div class="chatInputRow">
+                      <button class="iconBtn" onclick="insertAt('@')" title="@mention">@</button>
+                      <button class="iconBtn" onclick="insertAt('⚠️')">⚠️</button>
+                      <button class="iconBtn" onclick="insertAt('🔥')">🔥</button>
+                      <button class="iconBtn" onclick="insertAt('✅')">✅</button>
+                      <input id="chatInput" class="chatInput" placeholder="Gửi chỉ thị cho worker…" onkeydown="if(event.key==='Enter')sendRuntimeMessage()"/>
+                      <button class="btn small primary" onclick="sendRuntimeMessage()">Gửi</button>
+                    </div>
+                  </div>
+                  <div class="card" id="rtInspCard" style="border:0;border-radius:0;min-width:220px;max-width:280px">
+                    <div class="cardHead" style="min-height:36px;padding:8px 12px">
+                      <strong id="runtimeStatus">Context Inspector</strong>
+                      <div class="insTabs" style="display:flex;gap:4px">
+                        <button class="insTab active" onclick="switchInspector('context',this)">Ctx</button>
+                        <button class="insTab" onclick="switchInspector('events',this)">Events</button>
+                        <button class="insTab" onclick="switchInspector('files',this)">Files</button>
+                      </div>
+                    </div>
+                    <div id="runtimeInspectorBody" style="padding:10px;font-size:11px;overflow-y:auto;max-height:320px"></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="deckPanel" id="deckPanel-thinking">
+                <div class="thinkingDeckView">
+                  <div class="thinkingDeckHead">
+                    <span>🧠 Mạch Tư Duy</span>
+                    <span class="hint" id="thinkingAgentLabel">gw-lead-agy</span>
+                  </div>
+                  <div class="thinkingCardList" id="thinkingCardList"></div>
+                </div>
+              </div>
+
+              <div class="deckPanel" id="deckPanel-kanban">
+                <div class="kanban" id="kanban" style="padding:12px;overflow-x:auto"></div>
+              </div>
+
+              <div class="deckPanel" id="deckPanel-console">
+                <div class="streamlinedConsole">
+                  <div class="streamlinedConsoleBody" id="tmuxTerminalOutput">
+                    <span style="color:#4b5563">▸ Chọn một worker card để xem console output...</span>
+                  </div>
+                  <div class="streamlinedConsoleInputRow">
+                    <span style="color:#7c3aed;font-family:var(--mono);font-size:12px">$</span>
+                    <input id="tmuxCmdInput" class="chatInput" style="flex:1;background:transparent;border:none;color:#e5e7eb;font-family:var(--mono);font-size:12px" placeholder="gửi lệnh đến session tmux hiện tại…" onkeydown="if(event.key==='Enter')sendTmuxCmd()"/>
+                    <button class="btn small primary" onclick="sendTmuxCmd()">Gửi</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="deckPanel" id="deckPanel-oauth">
+                <div style="padding:16px" id="deckOauthContent">
+                  <!-- rendered by renderOauthProfiles() -->
+                </div>
+              </div>
+
+            </div><!-- /commandDeck -->
+          </div><!-- /swarmBody -->
+        </div><!-- /swarmSection -->
+
+      </section><!-- /runtimes -->
 
       <!-- ========================================================================= -->
       <!-- 4. TRUNG TÂM DỮ LIỆU (DỮ LIỆU THẬT CỦA REPO GEN-WORKPLACE) -->
@@ -3645,6 +3864,384 @@ function renderThinkingCards() {
   `).join('');
 }
 
+/* =========================================================================
+   GENESIS ORCHESTRATOR IDE & SWARM CONTROLLER FUNCTIONS
+   ========================================================================= */
+
+function switchOrchTab(tabName, el) {
+  state.currentOrchTab = tabName;
+  document.querySelectorAll('.orchTab').forEach(t => t.classList.remove('active'));
+  if (el && el.classList && el.classList.contains('orchTab')) {
+    el.classList.add('active');
+  } else {
+    document.querySelector(`.orchTab[data-orchtab="${tabName}"]`)?.classList.add('active');
+  }
+
+  ['chat', 'memory', 'definition', 'skills', 'mcps', 'swarm'].forEach(tab => {
+    const p = $('orchPanel-' + tab);
+    if (p) {
+      if (tab === tabName) {
+        p.classList.add('active');
+        p.style.display = 'flex';
+      } else {
+        p.classList.remove('active');
+        p.style.display = 'none';
+      }
+    }
+  });
+
+  if (tabName === 'chat') {
+    const chat = $('orchChatMessages');
+    if (chat) chat.scrollTop = chat.scrollHeight;
+  } else if (tabName === 'memory') {
+    renderOrchMemory();
+  } else if (tabName === 'definition') {
+    renderOrchDefinition();
+  } else if (tabName === 'skills') {
+    renderOrchSkills();
+  } else if (tabName === 'mcps') {
+    renderOrchMcps();
+  } else if (tabName === 'swarm') {
+    renderOrchSwarmCards();
+  }
+}
+
+function toggleSwarmBody(btn) {
+  const body = $('swarmBody');
+  if (!body) return;
+  const isCollapsed = body.classList.toggle('collapsed');
+  const collapseBtn = btn || $('swarmCollapseBtn');
+  if (collapseBtn) collapseBtn.textContent = isCollapsed ? 'Mở rộng ▼' : 'Thu gọn ▲';
+}
+
+function sendOrchMessage() {
+  const input = $('orchChatInput');
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text) return;
+
+  const chat = $('orchChatMessages');
+  const now = new Date().toLocaleTimeString('vi-VN', { hour12: false });
+
+  // 1. Render User Message
+  if (chat) {
+    const userDiv = document.createElement('div');
+    userDiv.className = 'orchMsgUser';
+    userDiv.innerHTML = `
+      <div>
+        <div class="orchBubble">${escapeHtml(text)}</div>
+        <div class="orchMsgMeta" style="text-align:right">Owner (Ryan) · ${now}</div>
+      </div>
+    `;
+    chat.appendChild(userDiv);
+    chat.scrollTop = chat.scrollHeight;
+  }
+
+  input.value = '';
+  input.style.height = 'auto';
+
+  // 2. Typing indicator
+  const typingId = 'orchTypingIndicator_' + Date.now();
+  if (chat) {
+    const typingDiv = document.createElement('div');
+    typingDiv.id = typingId;
+    typingDiv.className = 'orchTypingIndicator';
+    typingDiv.innerHTML = `
+      <div class="orchTypingDots"><span></span><span></span><span></span></div>
+      <span>Genesis Orchestrator đang phân tích ngữ cảnh và điều phối…</span>
+    `;
+    chat.appendChild(typingDiv);
+    chat.scrollTop = chat.scrollHeight;
+  }
+
+  // 3. Simulate Orchestrator intelligent response
+  setTimeout(() => {
+    const typingEl = $(typingId);
+    if (typingEl) typingEl.remove();
+
+    let reply = '';
+    const lower = text.toLowerCase();
+
+    if (lower.includes('spawn') || lower.includes('worker') || lower.includes('nhân viên') || lower.includes('role')) {
+      reply = `Đã phân tích yêu cầu điều phối worker. Hệ thống đang quản lý <strong>6 chuyên gia cốt lõi</strong> (Lead, Backend, Frontend, DevOps, QA, Security). Nếu dự án phát sinh nhu cầu chuyên biệt (như Data Engineer, Crawler, Pentester), tôi có thể tạo một worker profile mới với branch worktree và context cô lập. Bạn có thể nhấn nút <code>⚡ Spawn Workers</code> để chỉ định.`;
+    } else if (lower.includes('trí nhớ') || lower.includes('memory') || lower.includes('ssot') || lower.includes('brain')) {
+      reply = `Ngữ cảnh trung tâm đang được đồng bộ chuẩn hóa từ Brain repository (<code>Genesis-ryan-84-0567536339/Brain</code>) qua file <code>BOOTSTRAP.md</code>. Tất cả các quyết định kiến trúc, catalog ID và luật SSOT (0 conflict, WAL SQLite, live bind mount) đều được tôi bảo toàn trong Tab <strong>🧠 Trí Nhớ</strong>.`;
+    } else if (lower.includes('plan') || lower.includes('kế hoạch') || lower.includes('todo') || lower.includes('tiến độ')) {
+      const pendingCount = (state.todos || []).filter(t => t.status !== 'done').length;
+      reply = `Tiến độ dự án hiện tại: Có <strong>${pendingCount}</strong> tác vụ đang chờ xử lý trong Roadmap. Mọi worker đều đang được giám sát theo sát chỉ tiêu SSOT. Tôi sẽ tự động phân rã chỉ thị của bạn và giao cho worker phù hợp nhất.`;
+    } else {
+      reply = `Chỉ thị đã được ghi nhận vào bộ đệm chỉ huy tối cao (Orchestrator Control Plane). Tôi đang điều hướng yêu cầu: <em>"${escapeHtml(text)}"</em> tới toàn bộ hệ thống Swarm. Mọi tương tác đều tuân thủ chính sách <strong>Autonomous Execution & Full Bypass Policy</strong> (thực thi độc lập, không block vô cớ).`;
+    }
+
+    if (chat) {
+      const agentDiv = document.createElement('div');
+      agentDiv.className = 'orchMsgAgent';
+      agentDiv.innerHTML = `
+        <div class="orchBubbleAvatar">🧠</div>
+        <div>
+          <div class="orchBubble">${reply}</div>
+          <div class="orchMsgMeta">Genesis Orchestrator · ${now} · Auto-Accept</div>
+        </div>
+      `;
+      chat.appendChild(agentDiv);
+      chat.scrollTop = chat.scrollHeight;
+    }
+  }, 600);
+}
+
+function renderOrchMemory() {
+  const container = $('orchMemoryContent');
+  if (!container) return;
+
+  container.innerHTML = `
+    <div class="orchSection">
+      <div class="orchSectionHead">
+        <h4>🏛️ Nguồn Chuẩn Tối Cao (SSOT Brain Repository)</h4>
+        <span class="orchToggle">Khóa Đồng Bộ</span>
+      </div>
+      <div class="orchSectionBody">
+        <div class="orchMemoryEntry">
+          <span class="orchMemTag">BOOTSTRAP</span>
+          <div class="orchMemText">
+            <strong>Genesis Brain Bootstrap:</strong> Tuân thủ branch <code>main</code> của repository <code>Genesis-ryan-84-0567536339/Brain</code> (file <code>BOOTSTRAP.md</code>). Luôn lấy trạng thái Brain làm nguồn chuẩn, không suy diễn từ trí nhớ cũ.
+          </div>
+        </div>
+        <div class="orchMemoryEntry">
+          <span class="orchMemTag">POLICY</span>
+          <div class="orchMemText">
+            <strong>Autonomous Execution & Full Bypass Policy:</strong> Agent tự động chạy toàn bộ lệnh terminal, đọc/ghi file, MCP tool và duyệt web mà không dừng hỏi quyền trung gian. Chỉ dừng khi hoàn thành hoặc cần quyết định định hướng kiến trúc.
+          </div>
+        </div>
+        <div class="orchMemoryEntry">
+          <span class="orchMemTag">WORKSPACE</span>
+          <div class="orchMemText">
+            <strong>Thư mục làm việc:</strong> <code>/workspace/LinuxDataA/gen-workplace</code> (Container Mount: <code>/workspace:z</code>). Cổng phục vụ UI: <code>http://localhost:8888</code>.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="orchSection">
+      <div class="orchSectionHead">
+        <h4>⚡ Trạng Thái Kho Dữ Liệu & Hạn Ngạch Bền Vững</h4>
+        <span class="orchToggle">Realtime</span>
+      </div>
+      <div class="orchSectionBody">
+        <div class="orchMemoryEntry">
+          <span class="orchMemTag">SQLITE WAL</span>
+          <div class="orchMemText">
+            Database core: <code>/app/data/gen-workplace.db</code> (hoặc host <code>data/gen-workplace.db</code>). Chế độ WAL tối ưu truy vấn đa luồng, hỗ trợ FTS5 Catalog tra cứu sub-millisecond.
+          </div>
+        </div>
+        <div class="orchMemoryEntry">
+          <span class="orchMemTag">SWARM SCOPE</span>
+          <div class="orchMemText">
+            Quản trị 6 nhân sự AI độc lập: Lead Architect, Backend & DB, Frontend UI, DevOps, QA Tester, Security Auditor. Quota token được cân bằng động giữa Gemini 3.8 và Claude Sonnet 4.6.
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderOrchDefinition() {
+  const container = $('orchDefinitionContent');
+  if (!container) return;
+
+  container.innerHTML = `
+    <div class="orchSection">
+      <div class="orchSectionHead">
+        <h4>📜 Hồ Sơ & Quyền Hạn Orchestrator</h4>
+        <span class="orchToggle">Core Leader</span>
+      </div>
+      <div class="orchSectionBody">
+        <p><strong>Vai trò:</strong> Genesis Brain Swarm Orchestrator & Chief of Staff</p>
+        <p><strong>Nhiệm vụ:</strong> Tiếp nhận bài toán vĩ mô từ Owner (Ryan), phân rã yêu cầu thành các roadmap, sinh ra (spawn) sub-agent nhân viên theo nhu cầu thực tế và thu hồi (hibernate/kill) khi hoàn thành. Đảm bảo toàn bộ Swarm vận hành thống nhất theo tiêu chuẩn SSOT.</p>
+        <p><strong>Mô hình AI:</strong> Google Gemini 3.8 Flash (High) / Claude Sonnet 4.6 (Thinking)</p>
+        <p><strong>Cơ chế Bootstrap:</strong> Đọc trực tiếp <code>BOOTSTRAP.md</code> trên branch <code>main</code> của <code>Genesis-ryan-84-0567536339/Brain</code> trước mọi tác vụ.</p>
+        <pre><code># Autonomous Execution & Full Bypass Policy
+- Tự động chạy tất cả lệnh terminal cần thiết, đọc/ghi/sửa file, gọi MCP tool mà không hỏi xin quyền ở bước trung gian.
+- Nhập vai con người (triệt tiêu 100% mùi AI), phản hồi súc tích, thực tế và đi thẳng vào giải pháp.
+- Bàn giao kết quả rõ ràng, kiểm chứng thực nghiệm trước khi báo cáo Owner.</code></pre>
+      </div>
+    </div>
+
+    <div class="orchSection">
+      <div class="orchSectionHead">
+        <h4>🛡️ Hợp Đồng Trách Nhiệm Với Worker Swarm</h4>
+        <span class="orchToggle">Quy Chuẩn</span>
+      </div>
+      <div class="orchSectionBody">
+        <ul style="margin:0;padding-left:18px;line-height:1.7">
+          <li><strong>Nguyên tắc 1 Profile = 1 Identity:</strong> Mỗi worker chạy trên 1 runtime tmux tách biệt, profile gemini riêng để chống cạn hạn ngạch chung.</li>
+          <li><strong>Không giẫm chân nhau (0-Conflict):</strong> Mọi thay đổi code đều tuân theo phân quyền thư mục (Frontend: <code>frontend/</code>, Backend: <code>backend/</code>, DevOps: <code>Dockerfile/docker-compose</code>).</li>
+          <li><strong>Tự động giải phóng tài nguyên:</strong> Khi không có nhiệm vụ, worker được chuyển sang trạng thái <code>hibernated</code> (0% CPU, 0MB RAM) và tự đánh thức tức thì khi có chỉ thị mới.</li>
+        </ul>
+      </div>
+    </div>
+  `;
+}
+
+function renderOrchSkills() {
+  const container = $('orchSkillsContent');
+  if (!container) return;
+
+  const SKILLS_LIST = [
+    { name: 'chief-of-staff', tag: 'C-Suite', desc: 'Điều phối toàn cục, định tuyến bài toán đến chuyên gia phù hợp, tổng hợp và theo dõi quyết định.' },
+    { name: 'multi-agent-dispatch', tag: 'Execution', desc: 'Điều phối tác vụ nặng xuống agent CLI chạy nền trong phiên tmux, giám sát tiến độ event-driven.' },
+    { name: 'code-review', tag: 'Quality', desc: 'Rà soát lỗi, thẩm định bảo mật, tối ưu hiệu năng và kiểm soát phong cách code nghiêm ngặt.' },
+    { name: 'deep-research', tag: 'Research', desc: 'Nghiên cứu đa kênh chuyên sâu, đối chiếu chéo ≥3 nguồn độc lập trước khi đưa ra quyết định kiến trúc.' },
+    { name: 'doc-coauthoring', tag: 'Docs', desc: 'Quy trình đồng tác giả tài liệu, technical spec và proposal chuyên nghiệp.' },
+    { name: 'agy-customizations', tag: 'System', desc: 'Hướng dẫn toàn diện về hệ thống tùy biến của Antigravity (Skills, Rules, Plugins, Hooks, MCP).' },
+    { name: 'antigravity-guide', tag: 'System', desc: 'Cẩm nang tra cứu và sử dụng Antigravity CLI, IDE và SDK.' },
+    { name: 'financial-analyst', tag: 'Finance', desc: 'Phân tích tài chính, định giá DCF, kiểm soát phương sai ngân sách và dự phóng kinh doanh.' },
+    { name: 'competitive-intel', tag: 'Strategy', desc: 'Theo dõi động thái đối thủ, xây dựng battlecard và định vị sản phẩm trên thị trường.' },
+    { name: 'visual-designer', tag: 'Design', desc: 'Thiết kế đồ họa, biểu đồ trực quan hóa dữ liệu cao cấp qua matplotlib, seaborn và Pillow.' },
+    { name: 'corporate-documentation', tag: 'Legal', desc: 'Soạn thảo văn bản hành chính - pháp lý: Tờ trình, Quyết định, Biên bản họp (MoM), Công văn.' },
+    { name: 'docx / xlsx / pptx / pdf', tag: 'Office', desc: 'Bộ công cụ xử lý và xuất bản tài liệu Office & PDF chuẩn format tự động.' }
+  ];
+
+  container.innerHTML = `
+    <div style="font-size:12px;color:#a78bfa;font-weight:600;margin-bottom:8px">
+      🛠️ Danh mục Kỹ Năng (Skills) Tích Hợp Sẵn (${SKILLS_LIST.length} kỹ năng)
+    </div>
+    <div class="orchSkillGrid">
+      ${SKILLS_LIST.map(s => `
+        <div class="orchSkillCard">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <span class="orchSkillName">⚡ ${escapeHtml(s.name)}</span>
+            <span class="orchMemTag" style="font-size:9px">${escapeHtml(s.tag)}</span>
+          </div>
+          <div class="orchSkillDesc">${escapeHtml(s.desc)}</div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function renderOrchMcps() {
+  const container = $('orchMcpsContent');
+  if (!container) return;
+
+  const MCPS = [
+    {
+      name: 'google-drive',
+      status: 'Connected (Online)',
+      desc: 'Tích hợp toàn diện Google Drive API & Google Docs/Sheets',
+      tools: ['readGoogleDoc', 'appendToGoogleDoc', 'createDocument', 'readSpreadsheet', 'writeSpreadsheet', 'createSpreadsheet', 'listFolderContents', 'shareFile']
+    },
+    {
+      name: 'sqlite-fts-catalog',
+      status: 'Embedded (Active)',
+      desc: 'Database Engine SQLite WAL & Full-Text Search FTS5',
+      tools: ['get_full_state', 'catalog_search_fts', 'update_role_instruction', 'sync_ssot_memory', 'sqlite3_wal_checkpoint']
+    },
+    {
+      name: 'tmux-control-plane',
+      status: 'Host Bridge (Live)',
+      desc: 'Quản trị vòng đời tiến trình CLI tmux trên host/container',
+      tools: ['tmux_new_session', 'tmux_send_keys', 'tmux_capture_pane', 'tmux_hibernate', 'tmux_wake_session']
+    }
+  ];
+
+  container.innerHTML = `
+    <div style="font-size:12px;color:#a78bfa;font-weight:600;margin-bottom:8px">
+      🔌 Giao Thức MCP Servers & Công Cụ Ngoại Vi
+    </div>
+    ${MCPS.map(m => `
+      <div class="orchSection" style="margin-bottom:8px">
+        <div class="orchSectionHead">
+          <h4>${escapeHtml(m.name)}</h4>
+          <span class="chip done" style="font-size:9px">${escapeHtml(m.status)}</span>
+        </div>
+        <div class="orchSectionBody">
+          <div style="margin-bottom:6px;font-size:11.5px;color:#9ca3af">${escapeHtml(m.desc)}</div>
+          <div style="display:flex;flex-wrap:wrap;gap:4px">
+            ${m.tools.map(t => `<span class="orchMcpTool" style="padding:2px 0"><code>${escapeHtml(t)}</code></span>`).join('')}
+          </div>
+        </div>
+      </div>
+    `).join('')}
+  `;
+}
+
+function renderOrchSwarmCards() {
+  const container = $('orchSwarmMiniCards');
+  if (!container) return;
+
+  const sessions = state.tmuxSessions || [];
+  if (sessions.length === 0) {
+    container.innerHTML = '<div style="color:var(--muted);font-size:11px">Đang tải danh sách worker swarm...</div>';
+    return;
+  }
+
+  container.innerHTML = sessions.map(s => {
+    const avatar = ROLE_AVATARS[s.id] || '🤖';
+    const isLive = s.status === 'running' || s.status === 'idle';
+    const statusColor = isLive ? '#10b981' : (s.status === 'paused' ? '#f59e0b' : '#6b7280');
+    const statusText = isLive ? 'Live' : (s.status === 'paused' ? 'Paused' : 'Sleeping');
+
+    return `
+      <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(124,58,237,0.2);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:6px">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <span style="font-size:16px">${avatar}</span>
+          <span style="font-size:10px;font-weight:600;color:${statusColor}">● ${statusText}</span>
+        </div>
+        <div>
+          <strong style="font-size:12px;color:#e5e7eb;display:block">${escapeHtml(s.role_name || s.id)}</strong>
+          <span style="font-size:10px;color:#6b7280;font-family:var(--mono)">${escapeHtml(s.id)}</span>
+        </div>
+        <button class="orchBtn" style="font-size:10.5px;padding:3px 8px;margin-top:2px" onclick="focusWorkerFromOrch('${escapeHtml(s.id)}')">
+          🔍 Điều khiển chi tiết
+        </button>
+      </div>
+    `;
+  }).join('');
+}
+
+function focusWorkerFromOrch(sid) {
+  selectTmuxSession(sid);
+  const body = $('swarmBody');
+  if (body && body.classList.contains('collapsed')) {
+    toggleSwarmBody();
+  }
+  $('commandDeck')?.scrollIntoView({ behavior: 'smooth' });
+}
+
+function orchSpawnWorker() {
+  const role = prompt('Nhập tên vai trò Worker cần spawn (ví dụ: Data Pipeline Engineer, Security Pentester, v.v.):');
+  if (!role || !role.trim()) return;
+
+  const roleName = role.trim();
+  const sid = 'gw-' + roleName.toLowerCase().replace(/[^a-z0-9]/g, '-').slice(0, 15) + '-agy';
+
+  showToast('⚡ Orchestrator đang cấp phát tài nguyên và khởi tạo worker: ' + roleName);
+
+  if (!state.tmuxSessions) state.tmuxSessions = [];
+  const exists = state.tmuxSessions.find(s => s.id === sid);
+  if (!exists) {
+    state.tmuxSessions.push({
+      id: sid,
+      role_name: roleName,
+      status: 'running',
+      pid: Math.floor(Math.random() * 20000 + 70000),
+      cpu_percent: 0.1,
+      memory_rss_mb: 45.2,
+      account_label: 'Mặc định (Owner Gmail: ~/.gemini)',
+      account_type: 'owner_default',
+      email: 'owner@genesis.local',
+      conversation_id: 'conv-' + sid,
+      quota_gemini: { percent: 85 },
+      quota_anthropic: { percent: 92 },
+      terminal_output: `[Worker ${roleName} (${sid}) initialized by Orchestrator]\nReady to accept tasks.`
+    });
+  }
+
+  renderExpertSquadGrid();
+  renderOrchSwarmCards();
+  showToast('✅ Đã spawn thành công worker: ' + roleName);
+}
+
 async function triggerSessionLifecycle(action) {
   const sid = state.selectedTmuxSessionId;
   try {
@@ -4940,6 +5537,25 @@ setTimeout(() => {
       </div>
     `;
   }
+
+  // Seed Orchestrator Chat IDE
+  const orchChatEl = $('orchChatMessages');
+  if (orchChatEl && orchChatEl.children.length === 0) {
+    const now = new Date().toLocaleTimeString('vi-VN', { hour12: false });
+    orchChatEl.innerHTML = `
+      <div class="orchMsgAgent">
+        <div class="orchBubbleAvatar">🧠</div>
+        <div>
+          <div class="orchBubble">
+            Xin chào Ryan! Tôi là <strong>Genesis Orchestrator</strong> — Trung tâm chỉ huy tối cao và điều phối toàn bộ Swarm.<br>
+            Tôi đã bootstrap toàn bộ ngữ cảnh từ Brain (<code>BOOTSTRAP.md</code>), sẵn sàng đẻ ra các worker chuyên môn theo nhu cầu của Plan hoặc nhận chỉ thị trực tiếp từ bạn qua Chat IDE này.
+          </div>
+          <div class="orchMsgMeta">Genesis Orchestrator · ${now} · SSOT Ready</div>
+        </div>
+      </div>
+    `;
+  }
+
   // Init subtop nav for current active screen
   const activeScreen = document.querySelector('.screen.active')?.id || 'implementation';
   updateSubtopNav(activeScreen);
