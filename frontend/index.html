@@ -3952,6 +3952,7 @@ function updateCommandDeck() {
   if ($('deckAgentEmail')) $('deckAgentEmail').textContent = email;
   if ($('deckQuotaGeminiVal')) $('deckQuotaGeminiVal').textContent = (qG.percent || 25) + '%';
   if ($('deckQuotaClaudeVal')) $('deckQuotaClaudeVal').textContent = (qA.percent || 94) + '%';
+  if ($('deckQuotaPill')) $('deckQuotaPill').textContent = `💎 ${(qG.percent || 25)}% · ⚡ ${(qA.percent || 94)}%`;
 
   // Status Badge
   const badge = $('deckAgentStatusBadge');
