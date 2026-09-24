@@ -2586,12 +2586,29 @@ function selectSSOT(i) {
   document.querySelectorAll('.ssotItem').forEach((x, j) => x.classList.toggle('selected', j === i));
   showToast('Đang xem ' + state.ssot[i].id);
 }
-function filterRefs(q) {
-  q = q.toLowerCase();
+async function filterRefs(q) {
+  const cleanQ = (q || '').trim().toLowerCase();
+  if (cleanQ.length >= 2) {
+    try {
+      const res = await fetch('/api/catalog?q=' + encodeURIComponent(cleanQ));
+      if (res.ok) {
+        const json = await res.json();
+        if (json.results && json.results.length > 0) {
+          const matchedIds = new Set(json.results.map(r => r.id));
+          document.querySelectorAll('#refRows tr').forEach(r => {
+            const firstCol = r.children[0]?.textContent.trim();
+            r.style.display = matchedIds.has(firstCol) || r.textContent.toLowerCase().includes(cleanQ) ? '' : 'none';
+          });
+          return;
+        }
+      }
+    } catch (e) {}
+  }
   document.querySelectorAll('#refRows tr').forEach(r => {
-    r.style.display = r.textContent.toLowerCase().includes(q) ? '' : 'none';
+    r.style.display = r.textContent.toLowerCase().includes(cleanQ) ? '' : 'none';
   });
 }
+
 
 function verifyEvent(i) {
   const e = state.events[i];
@@ -2743,12 +2760,31 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') closeModal();
 });
 
+async function syncFromBackend() {
+  try {
+    const res = await fetch('/api/state');
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.project && data.project.name === 'gen-workplace') {
+        Object.assign(state, data);
+        ensureProjectWorkspaces();
+        refreshAll();
+        console.log('[SQLite WAL DB] State successfully synchronized from backend');
+      }
+    }
+  } catch (err) {
+    console.warn('[Sync] Fallback to local storage:', err);
+  }
+}
+
 // Initial boot
 loadPersisted();
 ensureProjectWorkspaces();
 restoreWorkspace(state.projects[state.activeProjectIndex || 0]?.workspace || snapshotWorkspace());
 refreshAll();
 persist();
+syncFromBackend();
 </script>
 </body>
 </html>
+
