@@ -211,22 +211,71 @@ button { cursor: pointer; }
   display: flex;
   align-items: center;
   border-bottom: 1px solid var(--line);
-  padding: 0 13px;
-  gap: 4px;
+  padding: 0 14px;
+  gap: 8px;
   background: #101318;
+  position: sticky;
+  top: 0;
+  z-index: 20;
 }
-.tab {
+.subtopBreadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-right: 12px;
+  border-right: 1px solid var(--line);
+  flex-shrink: 0;
+}
+.subtopDomainIcon {
+  color: var(--accent);
+  font-size: 13px;
+}
+.subtopDomainText {
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 0.2px;
+}
+.subtopSep {
+  color: var(--muted2);
+  font-size: 11px;
+}
+.subtopTabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.subtopTabs::-webkit-scrollbar { display: none; }
+.subTab {
   border: 0;
   background: transparent;
   border-bottom: 2px solid transparent;
   height: 40px;
-  padding: 0 12px;
+  padding: 0 11px;
   color: var(--muted);
   font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   transition: all 0.15s;
 }
-.tab:hover { color: #d0d7de; }
-.tab.active { color: #f3f5f7; border-bottom-color: var(--accent); font-weight: 500; }
+.subTab:hover { color: #d0d7de; background: rgba(255,255,255,0.02); }
+.subTab.active { color: #fff; border-bottom-color: var(--accent); font-weight: 600; }
+.subtopRight {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
 .content { padding: 14px; overflow: auto; min-height: 0; flex: 1; }
 .screen { display: none; }
 .screen.active { display: block; }
@@ -1058,13 +1107,19 @@ button { cursor: pointer; }
 
   <!-- MAIN VIEWPORT -->
   <main class="main">
-    <!-- Subtop Tabs (Đồng bộ với Sidebar) -->
-    <div class="subtop">
-      <button class="tab" data-screen="dashboard" onclick="go('dashboard')">Dashboard</button>
-      <button class="tab active" data-screen="implementation" onclick="go('implementation')">Implementation</button>
-      <button class="tab" data-screen="runtimes" onclick="go('runtimes')">Môi trường Agent</button>
-      <button class="tab" data-screen="data" onclick="go('data')">Trung tâm dữ liệu</button>
-      <button class="tab" data-screen="memory" onclick="go('memory')">Nơi làm việc / SSOT</button>
+    <!-- Subtop Contextual Navigation (Tab con thiết thực theo từng phân khu) -->
+    <div class="subtop" id="subtopNav">
+      <div class="subtopBreadcrumb" id="subtopBreadcrumb">
+        <span class="subtopDomainIcon" id="subtopDomainIcon">◈</span>
+        <strong class="subtopDomainText" id="subtopDomainText">Implementation</strong>
+        <span class="subtopSep">›</span>
+      </div>
+      <div class="subtopTabs" id="subtopTabs">
+        <!-- Rendered dynamically by updateSubtopNav(screenId) -->
+      </div>
+      <div class="subtopRight" id="subtopRight">
+        <span class="chip live" id="subtopStatusChip">Docker Live · SQLite WAL</span>
+      </div>
     </div>
 
     <div class="content">
@@ -1085,14 +1140,14 @@ button { cursor: pointer; }
         </div>
 
         <!-- 4 Stats Cards -->
-        <div class="overviewStats">
+        <div class="overviewStats" id="dashStatsCard">
           <div class="stat"><b id="ovProjects">1</b><span>Dự án chính thức</span></div>
           <div class="stat"><b id="ovRoadmap">5</b><span>Mục Roadmap</span></div>
           <div class="stat"><b id="ovTodo">13</b><span>Todo tasks</span></div>
           <div class="stat"><b id="ovActive">6</b><span>Runtimes online</span></div>
         </div>
 
-        <div class="projectDashboard">
+        <div class="projectDashboard" id="dashProjectsCard">
           <div class="card">
             <div class="cardHead">
               <strong>Các project đang quản trị</strong>
@@ -1113,7 +1168,7 @@ button { cursor: pointer; }
           </div>
         </div>
 
-        <div class="overviewMain">
+        <div class="overviewMain" id="dashProgressCard">
           <div class="card">
             <div class="cardHead">
               <strong>Tiến trình thực thi Swarm</strong>
@@ -1156,7 +1211,7 @@ button { cursor: pointer; }
         </div>
 
         <!-- HÀNG 01: 1 HÀNG 3 CỘT -->
-        <div class="implTop">
+        <div class="implTop" id="impRow1">
           <!-- Cột 1: Input + File Plan & Master Chat Steering -->
           <div class="card">
             <div class="cardHead">
@@ -1197,7 +1252,7 @@ button { cursor: pointer; }
         </div>
 
         <!-- HÀNG 02: LIST AGENT ROLES & CLI ENGINE SELECTOR -->
-        <div class="card sectionCard roles">
+        <div class="card sectionCard roles" id="impRow2">
           <div class="cardHead">
             <div>
               <strong>04 · Danh Sách Agent Roles & Lựa Chọn CLI Engine</strong>
@@ -1223,7 +1278,7 @@ button { cursor: pointer; }
         </div>
 
         <!-- HÀNG 03: SƠ ĐỒ LIVE WORKFLOW TỪNG NODE -->
-        <div class="card sectionCard workflow">
+        <div class="card sectionCard workflow" id="impRow3">
           <div class="cardHead">
             <div>
               <strong>05 · Live Workflow Sơ Đồ Tiến Trình Step-by-Step</strong>
@@ -1267,7 +1322,7 @@ button { cursor: pointer; }
 
         <div class="runtimeGrid">
           <!-- Cột Trái: Danh sách Runtimes -->
-          <div class="card runtimeList">
+          <div class="card runtimeList" id="rtListCard">
             <div class="cardHead">
               <strong>Runtime đang kết nối</strong>
               <span class="hint" id="runtimeCount">6</span>
@@ -1276,7 +1331,7 @@ button { cursor: pointer; }
           </div>
 
           <!-- Cột Giữa: Chatroom / Thread / Nhật ký tư duy -->
-          <div class="card chat">
+          <div class="card chat" id="rtChatCard">
             <div class="cardHead">
               <div>
                 <strong id="chatTitle">Lead Architect · runtime-01</strong>
@@ -1319,7 +1374,7 @@ button { cursor: pointer; }
           </div>
 
           <!-- Cột Phải: Inspector Ngữ Cảnh & Tham Chiếu Bắt Buộc -->
-          <div class="card runtimeInspector">
+          <div class="card runtimeInspector" id="rtInspectorCard">
             <div class="cardHead">
               <strong>Ngữ cảnh Runtime</strong>
               <span class="chip live" id="runtimeStatus">running</span>
@@ -1334,7 +1389,7 @@ button { cursor: pointer; }
         </div>
 
         <!-- HÀNG KANBAN TIẾN TRÌNH CẢ TEAM DO TRƯỞNG NHÓM PHỤ TRÁCH -->
-        <div class="kanbanWrap">
+        <div class="kanbanWrap" id="rtKanbanCard">
           <div class="card">
             <div class="cardHead">
               <div>
@@ -1532,7 +1587,7 @@ button { cursor: pointer; }
           </div>
         </div>
 
-        <div class="memoryGrid">
+        <div class="memoryGrid" id="memGridCard">
           <!-- Cột 1: Memory Tổng (SSOT Toàn Dự Án) -->
           <div class="card">
             <div class="cardHead">
@@ -1563,7 +1618,7 @@ button { cursor: pointer; }
           </div>
 
           <!-- Bảng Catalog Tra Cứu Nhanh ID Toàn Cục (Không cần audit toàn cục) -->
-          <div class="card memoryIndex">
+          <div class="card memoryIndex" id="memCatalogCard">
             <div class="cardHead">
               <div>
                 <strong>Catalog Tra Cứu Nhanh ID Dữ Kiện (Quick ID Lookup Database)</strong>
@@ -1591,7 +1646,7 @@ button { cursor: pointer; }
         </div>
 
         <!-- Event Register: Nơi Lead thẩm định sự kiện đã xác thực -->
-        <div class="card sectionCard">
+        <div class="card sectionCard" id="memEventCard">
           <div class="cardHead">
             <div>
               <strong>Event Register · Bảng Xác Thực Sự Kiện</strong>
@@ -1833,6 +1888,115 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
 }
 
+// Cấu hình Sub-Tabs theo từng Phân khu chức năng (Loại bỏ trùng lặp với Sidebar)
+const SUBTAB_CONFIG = {
+  dashboard: {
+    icon: '⌂',
+    name: 'Dashboard',
+    tabs: [
+      { id: 'dash-overview', label: '📊 Tổng quan & Chỉ số', target: '#dashStatsCard' },
+      { id: 'dash-projects', label: '📁 Quản trị Workspace', target: '#dashProjectsCard' },
+      { id: 'dash-progress', label: '🚀 Tiến trình Swarm & Roles', target: '#dashProgressCard' }
+    ]
+  },
+  implementation: {
+    icon: '◈',
+    name: 'Implementation',
+    tabs: [
+      { id: 'imp-all', label: '◈ Toàn bộ quy trình', target: '#implementation' },
+      { id: 'imp-row1', label: '📋 Hàng 1: Input & Roadmap & Todo', target: '#impRow1' },
+      { id: 'imp-row2', label: '⚙️ Hàng 2: Role CLI Selector', target: '#impRow2' },
+      { id: 'imp-row3', label: '🔀 Hàng 3: Live Workflow Graph', target: '#impRow3' }
+    ]
+  },
+  runtimes: {
+    icon: '◉',
+    name: 'Môi trường Agent',
+    tabs: [
+      { id: 'rt-thread', label: '💬 Chatroom & @Mention', action: () => switchChat('thread') },
+      { id: 'rt-trace', label: '🧠 Nhật Ký Tư Duy (Thinking)', action: () => switchChat('trace') },
+      { id: 'rt-io', label: '📥 Vào / Ra (In-Out)', action: () => switchChat('io') },
+      { id: 'rt-kanban', label: '📋 Team Live Kanban', target: '#rtKanbanCard' },
+      { id: 'rt-inspector', label: '🔍 Ngữ Cảnh Runtime', target: '#rtInspectorCard' }
+    ]
+  },
+  data: {
+    icon: '▦',
+    name: 'Trung tâm dữ liệu',
+    tabs: [
+      { id: 'data-repo', label: '🌿 Git Repo & Commits', action: () => switchData('repo') },
+      { id: 'data-db', label: '🗄️ SQLite 3 Database & Schemas', action: () => switchData('db') },
+      { id: 'data-vault', label: '🔐 Vault & Secrets Ref', action: () => switchData('vault') },
+      { id: 'data-files', label: '📁 File Manager & Artifacts', action: () => switchData('files') }
+    ]
+  },
+  memory: {
+    icon: '◌',
+    name: 'Nơi làm việc / SSOT',
+    tabs: [
+      { id: 'mem-dual', label: '🧠 2 Cột Memory (Master SSOT vs Role)', target: '#memGridCard' },
+      { id: 'mem-catalog', label: '⚡ Fast ID Catalog (FTS5)', action: () => { scrollToTarget('#memCatalogCard'); document.querySelector('.indexToolbar .searchBox')?.focus(); } },
+      { id: 'mem-events', label: '📝 Sự Kiện Chờ Thẩm Định', target: '#memEventCard' }
+    ]
+  }
+};
+
+let currentScreen = 'implementation';
+let activeSubTabs = {};
+
+function scrollToTarget(selector) {
+  const el = document.querySelector(selector);
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
+function updateSubtopNav(screenId) {
+  currentScreen = screenId;
+  const cfg = SUBTAB_CONFIG[screenId];
+  if (!cfg) return;
+
+  const iconEl = $('subtopDomainIcon');
+  const textEl = $('subtopDomainText');
+  const tabsContainer = $('subtopTabs');
+
+  if (iconEl) iconEl.textContent = cfg.icon;
+  if (textEl) textEl.textContent = cfg.name;
+
+  if (!tabsContainer) return;
+
+  const activeTabId = activeSubTabs[screenId] || cfg.tabs[0]?.id;
+
+  tabsContainer.innerHTML = cfg.tabs.map(tab => {
+    const isActive = tab.id === activeTabId;
+    return `
+      <button class="subTab ${isActive ? 'active' : ''}" 
+              data-sub="${tab.id}" 
+              onclick="onSubTabClick('${screenId}', '${tab.id}')">
+        ${tab.label}
+      </button>
+    `;
+  }).join('');
+}
+
+function onSubTabClick(screenId, tabId) {
+  activeSubTabs[screenId] = tabId;
+  document.querySelectorAll('.subTab').forEach(b => {
+    b.classList.toggle('active', b.dataset.sub === tabId);
+  });
+
+  const cfg = SUBTAB_CONFIG[screenId];
+  if (!cfg) return;
+  const tab = cfg.tabs.find(t => t.id === tabId);
+  if (!tab) return;
+
+  if (tab.action) {
+    tab.action();
+  } else if (tab.target) {
+    scrollToTarget(tab.target);
+  }
+}
+
 // Navigation Screen Switching
 function go(id, el) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -1840,8 +2004,11 @@ function go(id, el) {
   document.querySelectorAll('.navItem').forEach(n => n.classList.remove('active'));
   if (el) el.classList.add('active');
   else document.querySelector('.navItem[data-nav="' + id + '"]')?.classList.add('active');
-  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.screen === id));
+  
+  // Cập nhật Subtop Navigation theo phân khu đang chọn
+  updateSubtopNav(id);
 }
+
 
 // Toast
 function showToast(msg) {
@@ -2299,9 +2466,17 @@ function selectRuntime(i) {
 function switchChat(mode, el) {
   state.chatMode = mode;
   document.querySelectorAll('.chatTab').forEach(x => x.classList.remove('active'));
-  el.classList.add('active');
+  if (el) el.classList.add('active');
+  else document.querySelector(`.chatTab[data-chat="${mode}"]`)?.classList.add('active');
+  
+  if (currentScreen === 'runtimes') {
+    const subId = 'rt-' + mode;
+    activeSubTabs['runtimes'] = subId;
+    document.querySelectorAll('.subTab').forEach(b => b.classList.toggle('active', b.dataset.sub === subId));
+  }
   renderChat();
 }
+
 
 function renderThreadBar() {
   const threads = ['all', 'Repo Init', 'Live Mount', 'Installer', 'Database'];
@@ -2499,10 +2674,18 @@ function dropKanban(e, target) {
 // Data Center Handlers
 function switchData(id, el) {
   document.querySelectorAll('.dataPane').forEach(x => x.classList.remove('active'));
-  $('data-' + id).classList.add('active');
+  $('data-' + id)?.classList.add('active');
   document.querySelectorAll('.dataTab').forEach(x => x.classList.remove('active'));
-  el.classList.add('active');
+  if (el) el.classList.add('active');
+  else document.querySelector(`.dataTab[onclick*="'${id}'"]`)?.classList.add('active');
+
+  if (currentScreen === 'data') {
+    const subId = 'data-' + id;
+    activeSubTabs['data'] = subId;
+    document.querySelectorAll('.subTab').forEach(b => b.classList.toggle('active', b.dataset.sub === subId));
+  }
 }
+
 function refreshData() { showToast('Reference index đã đồng bộ với git repo gen-workplace'); }
 function filterTable(id, q) {
   q = q.toLowerCase();
@@ -2782,8 +2965,10 @@ loadPersisted();
 ensureProjectWorkspaces();
 restoreWorkspace(state.projects[state.activeProjectIndex || 0]?.workspace || snapshotWorkspace());
 refreshAll();
+updateSubtopNav('implementation');
 persist();
 syncFromBackend();
+
 </script>
 </body>
 </html>
