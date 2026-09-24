@@ -2288,6 +2288,65 @@ button { cursor: pointer; }
 .wrSendBtn:active {
   transform: scale(0.98);
 }
+
+/* ========================================================================= */
+/* IMPLEMENTATION 2-COLUMN SPLIT LAYOUT */
+/* ========================================================================= */
+.implSplitLayout {
+  display: grid;
+  grid-template-columns: 460px minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+.implPlanPane {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.implExecPane {
+  background: #11151b;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.implExecTabs {
+  display: flex;
+  background: #141922;
+  border-bottom: 1px solid var(--line);
+  padding: 0 10px;
+  gap: 4px;
+}
+.implExecTabBtn {
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  font-size: 11px;
+  padding: 10px 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.implExecTabBtn:hover { color: #edf1f5; }
+.implExecTabBtn.active {
+  color: #38bdf8;
+  border-bottom-color: #38bdf8;
+  font-weight: 600;
+}
+.implExecTabContent {
+  display: none;
+  padding: 14px;
+}
+.implExecTabContent.active {
+  display: block;
+}
+@media (max-width: 1200px) {
+  .implSplitLayout {
+    grid-template-columns: 1fr;
+  }
+}
 </style>
 </head>
 <body>
@@ -2323,6 +2382,7 @@ button { cursor: pointer; }
   <!-- SIDEBAR NAVIGATION -->
   <aside class="sidebar">
     <nav class="nav">
+      <!-- TẦNG 1: TỔNG CHỈ HUY TOÀN CỤC -->
       <div class="navGroup">
         <div class="navLabel">Tổng Chỉ Huy Toàn Cục</div>
         <button class="navItem" data-nav="orchestrator" onclick="go('orchestrator', this)">
@@ -2331,36 +2391,43 @@ button { cursor: pointer; }
         </button>
       </div>
 
+      <!-- TẦNG 2: TÁC CHIẾN DỰ ÁN (gen-workplace) -->
       <div class="navGroup">
-        <div class="navLabel">Dự Án: gen-workplace</div>
-        <button class="navItem" data-nav="dashboard" onclick="go('dashboard', this)">
-          <span class="navIcon">⌂</span>
-          <span>Dashboard</span>
-        </button>
-        <button class="navItem active" data-nav="implementation" onclick="go('implementation', this)">
-          <span class="navIcon">◈</span>
-          <span>Implementation</span>
+        <div class="navLabel">Tác Chiến Dự Án</div>
+        <button class="navItem active" data-nav="warroom" onclick="go('warroom', this)">
+          <span class="navIcon">📡</span>
+          <span>Phòng Giao Ban Swarm</span>
         </button>
         <button class="navItem" data-nav="runtimes" onclick="go('runtimes', this)">
           <span class="navIcon">◉</span>
           <span>Swarm Chuyên Gia</span>
         </button>
-        <button class="navItem" data-nav="warroom" onclick="go('warroom', this)">
-          <span class="navIcon">📡</span>
-          <span>Phòng Giao Ban Swarm</span>
+        <button class="navItem" data-nav="implementation" onclick="go('implementation', this)">
+          <span class="navIcon">◈</span>
+          <span>Kế Hoạch & Tiến Độ</span>
         </button>
-        <button class="navItem" data-nav="data" onclick="go('data', this)">
-          <span class="navIcon">▦</span>
-          <span>Trung tâm dữ liệu</span>
-        </button>
-        <button class="navItem" data-nav="memory" onclick="go('memory', this)">
-          <span class="navIcon">◌</span>
-          <span>Nơi làm việc / SSOT</span>
+        <button class="navItem" data-nav="dashboard" onclick="go('dashboard', this)">
+          <span class="navIcon">⌂</span>
+          <span>Tổng Quan Dashboard</span>
         </button>
       </div>
 
+      <!-- TẦNG 3: TRI THỨC & DỮ LIỆU SSOT -->
       <div class="navGroup">
-        <div class="navLabel">Dự Án Đang Có</div>
+        <div class="navLabel">Tri Thức & Dữ Liệu</div>
+        <button class="navItem" data-nav="memory" onclick="go('memory', this)">
+          <span class="navIcon">◌</span>
+          <span>Bộ Nhớ SSOT</span>
+        </button>
+        <button class="navItem" data-nav="data" onclick="go('data', this)">
+          <span class="navIcon">▦</span>
+          <span>Trung Tâm Dữ Liệu</span>
+        </button>
+      </div>
+
+      <!-- TẦNG 4: DANH SÁCH DỰ ÁN -->
+      <div class="navGroup">
+        <div class="navLabel">Dự Án Đang Quản Trị</div>
         <div class="projectList" id="projectList"></div>
       </div>
     </nav>
@@ -2548,182 +2615,208 @@ button { cursor: pointer; }
       </section><!-- /orchestrator -->
 
       <!-- ========================================================================= -->
-      <!-- 1. DASHBOARD: QUẢN LÝ DỰ ÁN THẬT -->
+      <!-- PHÒNG GIAO BAN SWARM (WAR ROOM) - MỆNH LỆNH VÀ ĐIỀU PHỐI BẰNG TIẾNG VIỆT -->
       <!-- ========================================================================= -->
-      <section class="screen" id="dashboard">
+      <section class="screen active" id="warroom">
         <div class="pageHead">
           <div>
-            <h1>Dashboard dự án</h1>
-            <p>Theo dõi và khởi tạo các dự án điều phối đa tác nhân (Multi-Agent Swarm Workbench).</p>
+            <h1>📡 Phòng Giao Ban Swarm (War Room)</h1>
+            <p>Kênh chỉ huy tác chiến tập trung: Truyền đạt mệnh lệnh chiến lược từ Ryan & Core Agent (Gen) xuống ban kỹ thuật và trao đổi chuyên môn giữa các vai trò bằng 100% tiếng Việt.</p>
           </div>
           <div class="actions">
-            <button class="btn" onclick="showToast('Đã đồng bộ trạng thái git repo')">Làm mới Git</button>
-            <button class="btn primary" onclick="openModal()">+ Tạo dự án</button>
+            <span class="badge" style="background:#1e293b;color:#38bdf8;border:1px solid #0284c7;">⚡ Auto-Response AI Engine Active</span>
+            <button class="btn" onclick="loadWarRoomMessages(true)">↻ Làm mới kênh</button>
           </div>
         </div>
 
-        <!-- 4 Stats Cards -->
-        <div class="overviewStats" id="dashStatsCard">
-          <div class="stat"><b id="ovProjects">1</b><span>Dự án chính thức</span></div>
-          <div class="stat"><b id="ovRoadmap">5</b><span>Mục Roadmap</span></div>
-          <div class="stat"><b id="ovTodo">13</b><span>Todo tasks</span></div>
-          <div class="stat"><b id="ovActive">6</b><span>Runtimes online</span></div>
-        </div>
-
-        <div class="projectDashboard" id="dashProjectsCard">
-          <div class="card">
-            <div class="cardHead">
-              <strong>Các project đang quản trị</strong>
-              <span class="hint">chọn project để nạp workspace riêng</span>
+        <div class="warroomContainer">
+          <!-- Cột trái: Kênh chỉ huy & Danh bạ thành viên -->
+          <div class="warroomSidebar">
+            <div style="padding:10px 12px;border-bottom:1px solid var(--line);background:#141920;">
+              <span class="wrSectionTitle">Kênh Giao Ban Điều Hành</span>
             </div>
-            <div class="cardBody" id="dashboardProjectList"></div>
+            <div class="warroomChannels">
+              <button class="warroomChannelItem active" id="wrChan-war_room" onclick="switchWarRoomChannel('war_room')">
+                <div class="wrChanHeader">
+                  <span>🌐 Core Gen ↔ Toàn Đội</span>
+                  <span class="wrChanBadge">Kênh 1</span>
+                </div>
+                <div class="wrChanDesc">Ryan & Gen phát lệnh chiến lược vĩ mô, chỉ đạo kiến trúc toàn cục.</div>
+              </button>
+
+              <button class="warroomChannelItem" id="wrChan-standup" onclick="switchWarRoomChannel('standup')">
+                <div class="wrChanHeader">
+                  <span>👑 Leader ↔ Nhân Viên</span>
+                  <span class="wrChanBadge">Kênh 2</span>
+                </div>
+                <div class="wrChanDesc">Giao ban kỹ thuật, giao việc cụ thể, duyệt bằng chứng commit hash.</div>
+              </button>
+
+              <button class="warroomChannelItem" id="wrChan-handoff" onclick="switchWarRoomChannel('handoff')">
+                <div class="wrChanHeader">
+                  <span>🔀 Hợp Đồng I/O & Bàn Giao</span>
+                  <span class="wrChanBadge">Kênh 3</span>
+                </div>
+                <div class="wrChanDesc">Bàn giao schema API, artifact, test log và nghiệm thu liên vai trò.</div>
+              </button>
+            </div>
+
+            <!-- Danh bạ thành viên & Nhắc tên nhanh -->
+            <div class="warroomMembersPane">
+              <span class="wrSectionTitle">Thành viên Ban Chỉ Huy & Swarm</span>
+              
+              <div class="wrMemberCard">
+                <div class="wrMemberInfo">
+                  <div class="wrMemberAvatar">🧠</div>
+                  <div>
+                    <strong style="color:#f8fafc">Core Gen</strong>
+                    <div style="font-size:10px;color:var(--muted)">Tổng Chỉ Huy Tác Chiến</div>
+                  </div>
+                </div>
+                <button class="wrMentionBtn" onclick="insertWarRoomAt('@Gen ')">@Gen</button>
+              </div>
+
+              <div class="wrMemberCard">
+                <div class="wrMemberInfo">
+                  <div class="wrMemberAvatar">👑</div>
+                  <div>
+                    <strong style="color:#f8fafc">Lead Architect</strong>
+                    <div style="font-size:10px;color:var(--muted)">Kiến Trúc Sư Trưởng</div>
+                  </div>
+                </div>
+                <button class="wrMentionBtn" onclick="insertWarRoomAt('@Lead ')">@Lead</button>
+              </div>
+
+              <div class="wrMemberCard">
+                <div class="wrMemberInfo">
+                  <div class="wrMemberAvatar">⚙️</div>
+                  <div>
+                    <strong style="color:#f8fafc">Backend Specialist</strong>
+                    <div style="font-size:10px;color:var(--muted)">SQLite WAL & REST API</div>
+                  </div>
+                </div>
+                <button class="wrMentionBtn" onclick="insertWarRoomAt('@Backend ')">@Backend</button>
+              </div>
+
+              <div class="wrMemberCard">
+                <div class="wrMemberInfo">
+                  <div class="wrMemberAvatar">🎨</div>
+                  <div>
+                    <strong style="color:#f8fafc">Frontend Specialist</strong>
+                    <div style="font-size:10px;color:var(--muted)">Giao Diện & Live Workbench</div>
+                  </div>
+                </div>
+                <button class="wrMentionBtn" onclick="insertWarRoomAt('@Frontend ')">@Frontend</button>
+              </div>
+
+              <div class="wrMemberCard">
+                <div class="wrMemberInfo">
+                  <div class="wrMemberAvatar">📦</div>
+                  <div>
+                    <strong style="color:#f8fafc">DevOps Engineer</strong>
+                    <div style="font-size:10px;color:var(--muted)">Docker, Volume & Tmux</div>
+                  </div>
+                </div>
+                <button class="wrMentionBtn" onclick="insertWarRoomAt('@DevOps ')">@DevOps</button>
+              </div>
+
+              <div class="wrMemberCard">
+                <div class="wrMemberInfo">
+                  <div class="wrMemberAvatar">🧪</div>
+                  <div>
+                    <strong style="color:#f8fafc">QA Tester</strong>
+                    <div style="font-size:10px;color:var(--muted)">Auto-Wake & Test Suite</div>
+                  </div>
+                </div>
+                <button class="wrMentionBtn" onclick="insertWarRoomAt('@QA ')">@QA</button>
+              </div>
+
+              <div class="wrMemberCard">
+                <div class="wrMemberInfo">
+                  <div class="wrMemberAvatar">🛡️</div>
+                  <div>
+                    <strong style="color:#f8fafc">Security Auditor</strong>
+                    <div style="font-size:10px;color:var(--muted)">OAuth PKCE & Vault</div>
+                  </div>
+                </div>
+                <button class="wrMentionBtn" onclick="insertWarRoomAt('@Security ')">@Security</button>
+              </div>
+
+              <div class="wrMemberCard" style="border-style:dashed">
+                <div class="wrMemberInfo">
+                  <div class="wrMemberAvatar">📢</div>
+                  <div>
+                    <strong style="color:#38bdf8">Toàn Bộ Swarm</strong>
+                    <div style="font-size:10px;color:var(--muted)">Broadcast lệnh chung</div>
+                  </div>
+                </div>
+                <button class="wrMentionBtn" onclick="insertWarRoomAt('@Toàn Đội ')">@Toàn Đội</button>
+              </div>
+            </div>
           </div>
 
-          <div class="card">
-            <div class="cardHead">
+          <!-- Cột phải: Dòng tin nhắn & Khung soạn thảo lệnh -->
+          <div class="warroomChatPane">
+            <!-- Header Kênh -->
+            <div class="wrChatHeader">
               <div>
-                <strong>Project đang chọn</strong>
-                <div class="hint" id="dashboardSelectedMeta">/workspace/LinuxDataA/gen-workplace</div>
+                <div class="wrChatTitle" id="wrCurrentTitle">🌐 Core Gen ↔ Toàn Đội Dự Án</div>
+                <div class="wrChatDesc" id="wrCurrentDesc">Ryan và Core Agent (Gen) truyền đạt mệnh lệnh chiến lược, định hướng kiến trúc bằng tiếng Việt cho toàn thể đội ngũ.</div>
               </div>
-              <span class="chip live">LIVE REPO</span>
-            </div>
-            <div class="cardBody" id="dashboardSelected"></div>
-          </div>
-        </div>
-
-        <div class="overviewMain" id="dashProgressCard">
-          <div class="card">
-            <div class="cardHead">
-              <strong>Tiến trình thực thi Swarm</strong>
-              <span class="chip live">TRỰC TIẾP</span>
-            </div>
-            <div class="cardBody" id="overviewSteps"></div>
-          </div>
-          <div class="card">
-            <div class="cardHead">
-              <strong>Agent Roles đang giữ việc</strong>
-              <span class="hint">theo runtime</span>
-            </div>
-            <div class="cardBody" id="overviewAgents"></div>
-          </div>
-        </div>
-      </section>
-
-      <!-- ========================================================================= -->
-      <!-- 2. IMPLEMENTATION (3 HÀNG CHUẨN SPEC THỰC TẾ) -->
-      <!-- ========================================================================= -->
-      <section class="screen active" id="implementation">
-        <div class="pageHead">
-          <div>
-            <h1>Implementation</h1>
-            <p>Input tổng + Plan → Roadmap → Todo → Lựa chọn CLI Engine cho Role → Live Workflow từng node.</p>
-          </div>
-          <div class="actions">
-            <span class="chip done" id="sourceState">Nguồn đồng bộ SSOT</span>
-            <button class="btn" onclick="saveSource()">Lưu nguồn</button>
-            <button class="btn primary" onclick="generateFromSource()">AI sinh cấu trúc</button>
-          </div>
-        </div>
-
-        <div class="genBar">
-          <div class="genPill done">01 · Input & Chat tổng</div>
-          <div class="genPill done">02 · File Plan: docs/SSOT_ORIGINAL_SPEC.md</div>
-          <div class="genPill done">03 · Roadmap đã phân rã</div>
-          <div class="genPill live">04 · Todo & Runtimes</div>
-          <div class="genPill live">05 · Workflow live nodes</div>
-        </div>
-
-        <!-- HÀNG 01: 1 HÀNG 3 CỘT -->
-        <div class="implTop" id="impRow1">
-          <!-- Cột 1: Input + File Plan & Master Chat Steering -->
-          <div class="card">
-            <div class="cardHead">
-              <strong>01 · Input + File Plan</strong>
-              <span class="hint">nguồn duy nhất để sinh cấu trúc</span>
-            </div>
-            <div class="cardBody">
-              <textarea class="sourceText" id="sourceInput" oninput="sourceChanged()" placeholder="Nhập chỉ thị tổng thể / PRD tại đây..."></textarea>
-              <div class="sourceMeta">
-                <span class="fileTag">📎 SSOT_ORIGINAL_SPEC.md · 8.4 KB</span>
-                <button class="btn" onclick="attachPlan()">+ File</button>
-                <span class="sourceLock">🔒 Instruction Role chỉ sửa từ Input tổng</span>
+              <div class="wrChatActions">
+                <span class="badge" id="wrMsgCountBadge">0 tin nhắn</span>
+                <label style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px;cursor:pointer;">
+                  <input type="checkbox" id="wrAutoScrollCheck" checked> Tự cuộn
+                </label>
               </div>
             </div>
-          </div>
 
-          <!-- Cột 2: AI Sinh ra Roadmap -->
-          <div class="card">
-            <div class="cardHead">
-              <strong>02 · Roadmap gen-workplace</strong>
-              <span class="hint" id="roadmapSourceState">5 giai đoạn thực tế</span>
+            <!-- Dòng tin nhắn -->
+            <div class="wrMessageList" id="wrMessageContainer">
+              <div style="text-align:center;padding:30px;color:var(--muted)">Đang tải tin nhắn phòng giao ban...</div>
             </div>
-            <div class="cardBody">
-              <div class="roadmapList" id="roadmapList"></div>
-            </div>
-          </div>
 
-          <!-- Cột 3: Todo List theo từng mục Roadmap -->
-          <div class="card">
-            <div class="cardHead">
-              <strong>03 · Todo theo Roadmap</strong>
-              <span class="hint" id="selectedRoadmapTitle">Roadmap 3 · TUI Installer</span>
-            </div>
-            <div class="cardBody">
-              <div class="todoList" id="todoList"></div>
-            </div>
-          </div>
-        </div>
+            <!-- Khung soạn thảo lệnh và giao tiếp -->
+            <div class="wrComposer">
+              <div class="wrToolbar">
+                <div class="wrToolbarLeft">
+                  <span style="font-size:11px;color:var(--muted)">Gửi với tư cách:</span>
+                  <select class="wrSelect" id="wrSenderSelect">
+                    <option value="Ryan (Owner)" selected>👤 Ryan (Owner / Tác Giả)</option>
+                    <option value="Genesis Orchestrator">🧠 Genesis Orchestrator (Core Gen)</option>
+                    <option value="Lead Architect">👑 Lead Architect (Trưởng Nhóm)</option>
+                    <option value="Backend Specialist">⚙️ Backend Specialist</option>
+                    <option value="Frontend Specialist">🎨 Frontend Specialist</option>
+                    <option value="DevOps & Packaging">📦 DevOps Engineer</option>
+                    <option value="QA Tester">🧪 QA Tester</option>
+                    <option value="Security Auditor">🛡️ Security Auditor</option>
+                  </select>
 
-        <!-- HÀNG 02: LIST AGENT ROLES & CLI ENGINE SELECTOR -->
-        <div class="card sectionCard roles" id="impRow2">
-          <div class="cardHead">
-            <div>
-              <strong>04 · Danh Sách Agent Roles & Lựa Chọn CLI Engine</strong>
-              <div class="hint">Owner lựa chọn loại CLI phù hợp cho từng Role. Instruction khóa theo Input tổng để thống nhất.</div>
-            </div>
-            <button class="btn" onclick="openRoleSource()">Sửa từ Input tổng</button>
-          </div>
-          <div style="overflow-x: auto">
-            <table class="roleTable">
-              <thead>
-                <tr>
-                  <th>Role</th>
-                  <th>CLI runtime engine</th>
-                  <th>Phạm vi nhiệm vụ</th>
-                  <th>Instruction sinh từ Input tổng</th>
-                  <th>Trạng thái</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody id="roleRows"></tbody>
-            </table>
-          </div>
-        </div>
+                  <span style="font-size:11px;color:var(--muted);margin-left:8px">Loại lệnh / Phân loại:</span>
+                  <select class="wrSelect" id="wrTagSelect">
+                    <option value="Directive" selected>📌 Mệnh Lệnh (Directive)</option>
+                    <option value="Assignment">📋 Giao Việc (Assignment)</option>
+                    <option value="Report">📊 Báo Cáo (Report)</option>
+                    <option value="IO">🔀 Hợp Đồng I/O (IO Contract)</option>
+                    <option value="Evidence">✅ Nghiệm Thu (Evidence)</option>
+                  </select>
+                </div>
 
-        <!-- HÀNG 03: SƠ ĐỒ LIVE WORKFLOW TỪNG NODE -->
-        <div class="card sectionCard workflow" id="impRow3">
-          <div class="cardHead">
-            <div>
-              <strong>05 · Live Workflow Sơ Đồ Tiến Trình Step-by-Step</strong>
-              <div class="hint">Node thể hiện thứ tự, Role, checklist In - Output, checkpoint và handoff.</div>
+                <div class="wrToolbarRight">
+                  <button class="btn small" onclick="insertWarRoomAt('【Chỉ thị】: ')">📌 Mệnh lệnh</button>
+                  <button class="btn small" onclick="insertWarRoomAt('【Yêu cầu nộp bằng chứng commit】')">📑 Bằng chứng</button>
+                  <button class="btn small" onclick="insertWarRoomAt('【Hợp đồng I/O API】')">🔀 I/O</button>
+                </div>
+              </div>
+
+              <div class="wrInputBox">
+                <textarea id="wrMessageInput" class="wrTextarea" placeholder="Nhập mệnh lệnh hoặc thảo luận bằng tiếng Việt... (Nhấn Enter để gửi, Shift+Enter xuống dòng. Gõ @Backend, @Frontend, @DevOps, @QA để chuyên gia phản hồi tức thì)" onkeydown="handleWarRoomKeydown(event)"></textarea>
+                <button class="wrSendBtn" id="wrSendBtn" onclick="sendWarRoomMessage()">
+                  <span>🚀</span>
+                  <span>Phát Lệnh</span>
+                </button>
+              </div>
             </div>
-            <div class="wfToolbar">
-              <span class="chip live" id="wfRunStatus">ĐANG CHẠY</span>
-              <button class="btn" onclick="resetWorkflow()">Đặt lại</button>
-              <button class="btn primary" onclick="advanceWorkflow()">Bước tiếp →</button>
-            </div>
-          </div>
-          <div class="wfWrap">
-            <div class="wfScroll">
-              <div class="wf" id="workflowCanvas"></div>
-            </div>
-            <div class="wfLegend">
-              <span>● hoàn thành</span>
-              <span>● đang chạy</span>
-              <span>● chờ dependency</span>
-              <span>● blocked</span>
-            </div>
-            <div class="nodeDetail" id="nodeDetail"></div>
           </div>
         </div>
       </section>
@@ -2977,208 +3070,301 @@ button { cursor: pointer; }
       </section><!-- /runtimes -->
 
       <!-- ========================================================================= -->
-      <!-- PHÒNG GIAO BAN SWARM (WAR ROOM) - MỆNH LỆNH VÀ ĐIỀU PHỐI BẰNG TIẾNG VIỆT -->
       <!-- ========================================================================= -->
-      <section class="screen" id="warroom">
+      <!-- 2. IMPLEMENTATION (KẾ HOẠCH & TIẾN ĐỘ) -->
+      <!-- ========================================================================= -->
+      <section class="screen" id="implementation">
         <div class="pageHead">
           <div>
-            <h1>📡 Phòng Giao Ban Swarm (War Room)</h1>
-            <p>Kênh chỉ huy tác chiến tập trung: Truyền đạt mệnh lệnh chiến lược từ Ryan & Core Agent (Gen) xuống ban kỹ thuật và trao đổi chuyên môn giữa các vai trò bằng 100% tiếng Việt.</p>
+            <h1>◈ Kế Hoạch & Quy Trình Thực Thi</h1>
+            <p>Chuyển hóa Input tổng + File Plan thành Roadmap, phân rã Todo DAG, định tuyến CLI Engine và giám sát đồ thị Workflow 5 giai đoạn.</p>
           </div>
           <div class="actions">
-            <span class="badge" style="background:#1e293b;color:#38bdf8;border:1px solid #0284c7;">⚡ Auto-Response AI Engine Active</span>
-            <button class="btn" onclick="loadWarRoomMessages(true)">↻ Làm mới kênh</button>
+            <span class="chip done" id="sourceState">Nguồn đồng bộ SSOT</span>
+            <button class="btn" onclick="saveSource()">Lưu nguồn</button>
+            <button class="btn primary" onclick="generateFromSource()">AI sinh cấu trúc</button>
           </div>
         </div>
 
-        <div class="warroomContainer">
-          <!-- Cột trái: Kênh chỉ huy & Danh bạ thành viên -->
-          <div class="warroomSidebar">
-            <div style="padding:10px 12px;border-bottom:1px solid var(--line);background:#141920;">
-              <span class="wrSectionTitle">Kênh Giao Ban Điều Hành</span>
-            </div>
-            <div class="warroomChannels">
-              <button class="warroomChannelItem active" id="wrChan-war_room" onclick="switchWarRoomChannel('war_room')">
-                <div class="wrChanHeader">
-                  <span>🌐 Core Gen ↔ Toàn Đội</span>
-                  <span class="wrChanBadge">Kênh 1</span>
-                </div>
-                <div class="wrChanDesc">Ryan & Gen phát lệnh chiến lược vĩ mô, chỉ đạo kiến trúc toàn cục.</div>
-              </button>
+        <div class="genBar">
+          <div class="genPill done">01 · Input & Chat tổng</div>
+          <div class="genPill done">02 · File Plan: docs/SSOT_ORIGINAL_SPEC.md</div>
+          <div class="genPill done">03 · Roadmap đã phân rã</div>
+          <div class="genPill live">04 · Todo & Runtimes</div>
+          <div class="genPill live">05 · Workflow live nodes</div>
+        </div>
 
-              <button class="warroomChannelItem" id="wrChan-standup" onclick="switchWarRoomChannel('standup')">
-                <div class="wrChanHeader">
-                  <span>👑 Leader ↔ Nhân Viên</span>
-                  <span class="wrChanBadge">Kênh 2</span>
+        <!-- BỐ CỤC 2 CỘT LIST + DETAIL & TAB CHUẨN MỰC -->
+        <div class="implSplitLayout">
+          <!-- CỘT TRÁI (460px): Kế hoạch, Roadmap & Todo DAG -->
+          <div class="implPlanPane">
+            <!-- 01. Input + File Plan -->
+            <div class="card" id="impRow1">
+              <div class="cardHead">
+                <strong>01 · Input + File Plan Gốc</strong>
+                <span class="hint">SSOT sinh cấu trúc</span>
+              </div>
+              <div class="cardBody">
+                <textarea class="sourceText" id="sourceInput" oninput="sourceChanged()" placeholder="Nhập chỉ thị tổng thể / PRD tại đây..."></textarea>
+                <div class="sourceMeta">
+                  <span class="fileTag">📎 SSOT_ORIGINAL_SPEC.md · 8.4 KB</span>
+                  <button class="btn small" onclick="attachPlan()">+ File</button>
+                  <span class="sourceLock">🔒 Instruction Role khóa theo Input</span>
                 </div>
-                <div class="wrChanDesc">Giao ban kỹ thuật, giao việc cụ thể, duyệt bằng chứng commit hash.</div>
-              </button>
-
-              <button class="warroomChannelItem" id="wrChan-handoff" onclick="switchWarRoomChannel('handoff')">
-                <div class="wrChanHeader">
-                  <span>🔀 Hợp Đồng I/O & Bàn Giao</span>
-                  <span class="wrChanBadge">Kênh 3</span>
-                </div>
-                <div class="wrChanDesc">Bàn giao schema API, artifact, test log và nghiệm thu liên vai trò.</div>
-              </button>
+              </div>
             </div>
 
-            <!-- Danh bạ thành viên & Nhắc tên nhanh -->
-            <div class="warroomMembersPane">
-              <span class="wrSectionTitle">Thành viên Ban Chỉ Huy & Swarm</span>
-              
-              <div class="wrMemberCard">
-                <div class="wrMemberInfo">
-                  <div class="wrMemberAvatar">🧠</div>
-                  <div>
-                    <strong style="color:#f8fafc">Core Gen</strong>
-                    <div style="font-size:10px;color:var(--muted)">Tổng Chỉ Huy Tác Chiến</div>
-                  </div>
-                </div>
-                <button class="wrMentionBtn" onclick="insertWarRoomAt('@Gen ')">@Gen</button>
+            <!-- 02. Roadmap 5 Giai Đoạn -->
+            <div class="card">
+              <div class="cardHead">
+                <strong>02 · Lộ Trình Roadmap (5 Phase)</strong>
+                <span class="hint" id="roadmapSourceState">5 giai đoạn thực tế</span>
               </div>
-
-              <div class="wrMemberCard">
-                <div class="wrMemberInfo">
-                  <div class="wrMemberAvatar">👑</div>
-                  <div>
-                    <strong style="color:#f8fafc">Lead Architect</strong>
-                    <div style="font-size:10px;color:var(--muted)">Kiến Trúc Sư Trưởng</div>
-                  </div>
-                </div>
-                <button class="wrMentionBtn" onclick="insertWarRoomAt('@Lead ')">@Lead</button>
+              <div class="cardBody">
+                <div class="roadmapList" id="roadmapList"></div>
               </div>
+            </div>
 
-              <div class="wrMemberCard">
-                <div class="wrMemberInfo">
-                  <div class="wrMemberAvatar">⚙️</div>
-                  <div>
-                    <strong style="color:#f8fafc">Backend Specialist</strong>
-                    <div style="font-size:10px;color:var(--muted)">SQLite WAL & REST API</div>
-                  </div>
-                </div>
-                <button class="wrMentionBtn" onclick="insertWarRoomAt('@Backend ')">@Backend</button>
+            <!-- 03. Todo DAG Tasks -->
+            <div class="card">
+              <div class="cardHead">
+                <strong>03 · Todo DAG Tasks</strong>
+                <span class="hint" id="selectedRoadmapTitle">Roadmap 3 · TUI Installer</span>
               </div>
-
-              <div class="wrMemberCard">
-                <div class="wrMemberInfo">
-                  <div class="wrMemberAvatar">🎨</div>
-                  <div>
-                    <strong style="color:#f8fafc">Frontend Specialist</strong>
-                    <div style="font-size:10px;color:var(--muted)">Giao Diện & Live Workbench</div>
-                  </div>
-                </div>
-                <button class="wrMentionBtn" onclick="insertWarRoomAt('@Frontend ')">@Frontend</button>
-              </div>
-
-              <div class="wrMemberCard">
-                <div class="wrMemberInfo">
-                  <div class="wrMemberAvatar">📦</div>
-                  <div>
-                    <strong style="color:#f8fafc">DevOps Engineer</strong>
-                    <div style="font-size:10px;color:var(--muted)">Docker, Volume & Tmux</div>
-                  </div>
-                </div>
-                <button class="wrMentionBtn" onclick="insertWarRoomAt('@DevOps ')">@DevOps</button>
-              </div>
-
-              <div class="wrMemberCard">
-                <div class="wrMemberInfo">
-                  <div class="wrMemberAvatar">🧪</div>
-                  <div>
-                    <strong style="color:#f8fafc">QA Tester</strong>
-                    <div style="font-size:10px;color:var(--muted)">Auto-Wake & Test Suite</div>
-                  </div>
-                </div>
-                <button class="wrMentionBtn" onclick="insertWarRoomAt('@QA ')">@QA</button>
-              </div>
-
-              <div class="wrMemberCard">
-                <div class="wrMemberInfo">
-                  <div class="wrMemberAvatar">🛡️</div>
-                  <div>
-                    <strong style="color:#f8fafc">Security Auditor</strong>
-                    <div style="font-size:10px;color:var(--muted)">OAuth PKCE & Vault</div>
-                  </div>
-                </div>
-                <button class="wrMentionBtn" onclick="insertWarRoomAt('@Security ')">@Security</button>
-              </div>
-
-              <div class="wrMemberCard" style="border-style:dashed">
-                <div class="wrMemberInfo">
-                  <div class="wrMemberAvatar">📢</div>
-                  <div>
-                    <strong style="color:#38bdf8">Toàn Bộ Swarm</strong>
-                    <div style="font-size:10px;color:var(--muted)">Broadcast lệnh chung</div>
-                  </div>
-                </div>
-                <button class="wrMentionBtn" onclick="insertWarRoomAt('@Toàn Đội ')">@Toàn Đội</button>
+              <div class="cardBody">
+                <div class="todoList" id="todoList"></div>
               </div>
             </div>
           </div>
 
-          <!-- Cột phải: Dòng tin nhắn & Khung soạn thảo lệnh -->
-          <div class="warroomChatPane">
-            <!-- Header Kênh -->
-            <div class="wrChatHeader">
+          <!-- CỘT PHẢI (Flex 1): Không Gian Thực Thi & Điều Phối Tabs -->
+          <div class="implExecPane">
+            <div class="implExecTabs">
+              <button class="implExecTabBtn active" id="implTabBtn-workflow" onclick="switchImplTab('workflow', this)">
+                🔀 Sơ Đồ Live Workflow (DAG Graph)
+              </button>
+              <button class="implExecTabBtn" id="implTabBtn-roles" onclick="switchImplTab('roles', this)">
+                ⚙️ Ma Trận Phân Quyền & CLI Engine
+              </button>
+            </div>
+
+            <!-- Tab 1: Live Workflow SVG Canvas -->
+            <div class="implExecTabContent active" id="implTabPane-workflow">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+                <div>
+                  <strong style="font-size:12px;color:#f1f5f9">Đồ Thị Tiến Trình Step-by-Step</strong>
+                  <div class="hint">Kiểm soát ranh giới Input/Output và checkpoint handoff từng node.</div>
+                </div>
+                <div class="wfToolbar">
+                  <span class="chip live" id="wfRunStatus">ĐANG CHẠY</span>
+                  <button class="btn small" onclick="resetWorkflow()">Đặt lại</button>
+                  <button class="btn small primary" onclick="advanceWorkflow()">Bước tiếp →</button>
+                </div>
+              </div>
+
+              <div class="wfWrap" style="padding:0">
+                <div class="wfScroll">
+                  <div class="wf" id="workflowCanvas"></div>
+                </div>
+                <div class="wfLegend" style="margin-top:8px">
+                  <span>● hoàn thành</span>
+                  <span>● đang chạy</span>
+                  <span>● chờ dependency</span>
+                  <span>● blocked</span>
+                </div>
+                <div class="nodeDetail" id="nodeDetail" style="margin-top:10px"></div>
+              </div>
+            </div>
+
+            <!-- Tab 2: Role Engine & CLI Runtime Selector -->
+            <div class="implExecTabContent" id="implTabPane-roles">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+                <div>
+                  <strong style="font-size:12px;color:#f1f5f9">Danh Sách Agent Roles & Lựa Chọn CLI Engine</strong>
+                  <div class="hint">Chỉ huy lựa chọn loại CLI phù hợp cho từng vai trò chuyên môn. Instruction khóa bất biến.</div>
+                </div>
+                <button class="btn small" onclick="openRoleSource()">Sửa từ Input tổng</button>
+              </div>
+
+              <div style="overflow-x: auto">
+                <table class="roleTable">
+                  <thead>
+                    <tr>
+                      <th>Role</th>
+                      <th>CLI runtime engine</th>
+                      <th>Phạm vi nhiệm vụ</th>
+                      <th>Instruction sinh từ Input tổng</th>
+                      <th>Trạng thái</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="roleRows"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================================================= -->
+      <!-- 1. DASHBOARD: QUẢN LÝ DỰ ÁN THẬT -->
+      <!-- ========================================================================= -->
+      <section class="screen" id="dashboard">
+        <div class="pageHead">
+          <div>
+            <h1>Dashboard dự án</h1>
+            <p>Theo dõi và khởi tạo các dự án điều phối đa tác nhân (Multi-Agent Swarm Workbench).</p>
+          </div>
+          <div class="actions">
+            <button class="btn" onclick="showToast('Đã đồng bộ trạng thái git repo')">Làm mới Git</button>
+            <button class="btn primary" onclick="openModal()">+ Tạo dự án</button>
+          </div>
+        </div>
+
+        <!-- 4 Stats Cards -->
+        <div class="overviewStats" id="dashStatsCard">
+          <div class="stat"><b id="ovProjects">1</b><span>Dự án chính thức</span></div>
+          <div class="stat"><b id="ovRoadmap">5</b><span>Mục Roadmap</span></div>
+          <div class="stat"><b id="ovTodo">13</b><span>Todo tasks</span></div>
+          <div class="stat"><b id="ovActive">6</b><span>Runtimes online</span></div>
+        </div>
+
+        <div class="projectDashboard" id="dashProjectsCard">
+          <div class="card">
+            <div class="cardHead">
+              <strong>Các project đang quản trị</strong>
+              <span class="hint">chọn project để nạp workspace riêng</span>
+            </div>
+            <div class="cardBody" id="dashboardProjectList"></div>
+          </div>
+
+          <div class="card">
+            <div class="cardHead">
               <div>
-                <div class="wrChatTitle" id="wrCurrentTitle">🌐 Core Gen ↔ Toàn Đội Dự Án</div>
-                <div class="wrChatDesc" id="wrCurrentDesc">Ryan và Core Agent (Gen) truyền đạt mệnh lệnh chiến lược, định hướng kiến trúc bằng tiếng Việt cho toàn thể đội ngũ.</div>
+                <strong>Project đang chọn</strong>
+                <div class="hint" id="dashboardSelectedMeta">/workspace/LinuxDataA/gen-workplace</div>
               </div>
-              <div class="wrChatActions">
-                <span class="badge" id="wrMsgCountBadge">0 tin nhắn</span>
-                <label style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px;cursor:pointer;">
-                  <input type="checkbox" id="wrAutoScrollCheck" checked> Tự cuộn
-                </label>
-              </div>
+              <span class="chip live">LIVE REPO</span>
             </div>
+            <div class="cardBody" id="dashboardSelected"></div>
+          </div>
+        </div>
 
-            <!-- Dòng tin nhắn -->
-            <div class="wrMessageList" id="wrMessageContainer">
-              <div style="text-align:center;padding:30px;color:var(--muted)">Đang tải tin nhắn phòng giao ban...</div>
+        <div class="overviewMain" id="dashProgressCard">
+          <div class="card">
+            <div class="cardHead">
+              <strong>Tiến trình thực thi Swarm</strong>
+              <span class="chip live">TRỰC TIẾP</span>
             </div>
-
-            <!-- Khung soạn thảo lệnh và giao tiếp -->
-            <div class="wrComposer">
-              <div class="wrToolbar">
-                <div class="wrToolbarLeft">
-                  <span style="font-size:11px;color:var(--muted)">Gửi với tư cách:</span>
-                  <select class="wrSelect" id="wrSenderSelect">
-                    <option value="Ryan (Owner)" selected>👤 Ryan (Owner / Tác Giả)</option>
-                    <option value="Genesis Orchestrator">🧠 Genesis Orchestrator (Core Gen)</option>
-                    <option value="Lead Architect">👑 Lead Architect (Trưởng Nhóm)</option>
-                    <option value="Backend Specialist">⚙️ Backend Specialist</option>
-                    <option value="Frontend Specialist">🎨 Frontend Specialist</option>
-                    <option value="DevOps & Packaging">📦 DevOps Engineer</option>
-                    <option value="QA Tester">🧪 QA Tester</option>
-                    <option value="Security Auditor">🛡️ Security Auditor</option>
-                  </select>
-
-                  <span style="font-size:11px;color:var(--muted);margin-left:8px">Loại lệnh / Phân loại:</span>
-                  <select class="wrSelect" id="wrTagSelect">
-                    <option value="Directive" selected>📌 Mệnh Lệnh (Directive)</option>
-                    <option value="Assignment">📋 Giao Việc (Assignment)</option>
-                    <option value="Report">📊 Báo Cáo (Report)</option>
-                    <option value="IO">🔀 Hợp Đồng I/O (IO Contract)</option>
-                    <option value="Evidence">✅ Nghiệm Thu (Evidence)</option>
-                  </select>
-                </div>
-
-                <div class="wrToolbarRight">
-                  <button class="btn small" onclick="insertWarRoomAt('【Chỉ thị】: ')">📌 Mệnh lệnh</button>
-                  <button class="btn small" onclick="insertWarRoomAt('【Yêu cầu nộp bằng chứng commit】')">📑 Bằng chứng</button>
-                  <button class="btn small" onclick="insertWarRoomAt('【Hợp đồng I/O API】')">🔀 I/O</button>
-                </div>
-              </div>
-
-              <div class="wrInputBox">
-                <textarea id="wrMessageInput" class="wrTextarea" placeholder="Nhập mệnh lệnh hoặc thảo luận bằng tiếng Việt... (Nhấn Enter để gửi, Shift+Enter xuống dòng. Gõ @Backend, @Frontend, @DevOps, @QA để chuyên gia phản hồi tức thì)" onkeydown="handleWarRoomKeydown(event)"></textarea>
-                <button class="wrSendBtn" id="wrSendBtn" onclick="sendWarRoomMessage()">
-                  <span>🚀</span>
-                  <span>Phát Lệnh</span>
-                </button>
-              </div>
+            <div class="cardBody" id="overviewSteps"></div>
+          </div>
+          <div class="card">
+            <div class="cardHead">
+              <strong>Agent Roles đang giữ việc</strong>
+              <span class="hint">theo runtime</span>
             </div>
+            <div class="cardBody" id="overviewAgents"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================================================= -->
+      <!-- 5. NƠI LÀM VIỆC: 2 CỘT MEMORY & CATALOG TRA CỨU THẬT -->
+      <!-- ========================================================================= -->
+      <section class="screen" id="memory">
+        <div class="pageHead">
+          <div>
+            <h1>Nơi làm việc / Memory SSOT & Catalog Tra Cứu</h1>
+            <p>Memory từng Role được sync; Trưởng nhóm thẩm định và nâng sự kiện thành SSOT bắt buộc; Catalog ID tra cứu nhanh không cần audit toàn cục.</p>
+          </div>
+          <div class="actions">
+            <span class="chip done" id="memorySyncState">đã sync SSOT</span>
+            <button class="btn" onclick="syncMemories()">Sync memory</button>
+            <button class="btn primary" onclick="openEventModal()">+ Ghi event</button>
+          </div>
+        </div>
+
+        <div class="memoryGrid" id="memGridCard">
+          <!-- Cột 1: Memory Tổng (SSOT Toàn Dự Án) -->
+          <div class="card">
+            <div class="cardHead">
+              <div>
+                <strong>Memory Tổng · Master SSOT Toàn Dự Án</strong>
+                <div class="hint">nguồn tham chiếu bắt buộc của mọi runtime trong tiến trình công việc</div>
+              </div>
+              <span class="chip done" id="ssotCount">4 verified</span>
+            </div>
+            <div class="cardBody">
+              <div class="ssotList" id="ssotList"></div>
+            </div>
+          </div>
+
+          <!-- Cột 2: Memory Từng Role (Sync Realtime) -->
+          <div class="card">
+            <div class="cardHead">
+              <div>
+                <strong>Memory Từng Role</strong>
+                <div class="hint">sync từ memory của từng role runtime đang chạy</div>
+              </div>
+              <span class="hint">6 roles</span>
+            </div>
+            <div class="cardBody">
+              <div class="memoryList" id="roleMemoryList"></div>
+              <div class="memoryDetail" id="memoryDetail"></div>
+            </div>
+          </div>
+
+          <!-- Bảng Catalog Tra Cứu Nhanh ID Toàn Cục (Không cần audit toàn cục) -->
+          <div class="card memoryIndex" id="memCatalogCard">
+            <div class="cardHead">
+              <div>
+                <strong>Catalog Tra Cứu Nhanh ID Dữ Kiện (Quick ID Lookup Database)</strong>
+                <div class="hint">Nơi agent tra nhanh ID để lấy dữ kiện database / mã nguồn mà không cần audit toàn cục mỗi phiên</div>
+              </div>
+              <span class="hint">Event · Vault · MCP · Tool · Credential · File · DB</span>
+            </div>
+            <div class="cardBody">
+              <div class="indexToolbar">
+                <input class="searchBox" placeholder="Tìm mã ID, tên sự kiện, vault, mcp tool, file..." oninput="filterRefs(this.value)">
+              </div>
+              <table class="eventTable">
+                <thead>
+                  <tr>
+                    <th>Mã ID</th>
+                    <th>Phân loại</th>
+                    <th>Đối tượng / Khóa Target</th>
+                    <th>Mô tả ngắn & Dữ kiện trọng yếu</th>
+                  </tr>
+                </thead>
+                <tbody id="refRows"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Event Register: Nơi Lead thẩm định sự kiện đã xác thực -->
+        <div class="card sectionCard" id="memEventCard">
+          <div class="cardHead">
+            <div>
+              <strong>Event Register · Bảng Xác Thực Sự Kiện</strong>
+              <div class="hint">Trưởng nhóm thẩm định evidence: xác thực nâng thành SSOT hoặc yêu cầu Role làm rõ.</div>
+            </div>
+            <span class="hint">nguồn sự thật trước khi commit vào Master Memory</span>
+          </div>
+          <div class="cardBody">
+            <table class="eventTable">
+              <thead>
+                <tr>
+                  <th>Event ID</th>
+                  <th>Runtime / Role</th>
+                  <th>Yêu cầu / Kết luận</th>
+                  <th>Evidence</th>
+                  <th>Trạng thái</th>
+                  <th>Hành động</th>
+                </tr>
+              </thead>
+              <tbody id="eventRows"></tbody>
+            </table>
           </div>
         </div>
       </section>
@@ -3345,107 +3531,6 @@ button { cursor: pointer; }
 └── FILE-03      installer_tui.py</div>
               </div>
             </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- ========================================================================= -->
-      <!-- 5. NƠI LÀM VIỆC: 2 CỘT MEMORY & CATALOG TRA CỨU THẬT -->
-      <!-- ========================================================================= -->
-      <section class="screen" id="memory">
-        <div class="pageHead">
-          <div>
-            <h1>Nơi làm việc / Memory SSOT & Catalog Tra Cứu</h1>
-            <p>Memory từng Role được sync; Trưởng nhóm thẩm định và nâng sự kiện thành SSOT bắt buộc; Catalog ID tra cứu nhanh không cần audit toàn cục.</p>
-          </div>
-          <div class="actions">
-            <span class="chip done" id="memorySyncState">đã sync SSOT</span>
-            <button class="btn" onclick="syncMemories()">Sync memory</button>
-            <button class="btn primary" onclick="openEventModal()">+ Ghi event</button>
-          </div>
-        </div>
-
-        <div class="memoryGrid" id="memGridCard">
-          <!-- Cột 1: Memory Tổng (SSOT Toàn Dự Án) -->
-          <div class="card">
-            <div class="cardHead">
-              <div>
-                <strong>Memory Tổng · Master SSOT Toàn Dự Án</strong>
-                <div class="hint">nguồn tham chiếu bắt buộc của mọi runtime trong tiến trình công việc</div>
-              </div>
-              <span class="chip done" id="ssotCount">4 verified</span>
-            </div>
-            <div class="cardBody">
-              <div class="ssotList" id="ssotList"></div>
-            </div>
-          </div>
-
-          <!-- Cột 2: Memory Từng Role (Sync Realtime) -->
-          <div class="card">
-            <div class="cardHead">
-              <div>
-                <strong>Memory Từng Role</strong>
-                <div class="hint">sync từ memory của từng role runtime đang chạy</div>
-              </div>
-              <span class="hint">6 roles</span>
-            </div>
-            <div class="cardBody">
-              <div class="memoryList" id="roleMemoryList"></div>
-              <div class="memoryDetail" id="memoryDetail"></div>
-            </div>
-          </div>
-
-          <!-- Bảng Catalog Tra Cứu Nhanh ID Toàn Cục (Không cần audit toàn cục) -->
-          <div class="card memoryIndex" id="memCatalogCard">
-            <div class="cardHead">
-              <div>
-                <strong>Catalog Tra Cứu Nhanh ID Dữ Kiện (Quick ID Lookup Database)</strong>
-                <div class="hint">Nơi agent tra nhanh ID để lấy dữ kiện database / mã nguồn mà không cần audit toàn cục mỗi phiên</div>
-              </div>
-              <span class="hint">Event · Vault · MCP · Tool · Credential · File · DB</span>
-            </div>
-            <div class="cardBody">
-              <div class="indexToolbar">
-                <input class="searchBox" placeholder="Tìm mã ID, tên sự kiện, vault, mcp tool, file..." oninput="filterRefs(this.value)">
-              </div>
-              <table class="eventTable">
-                <thead>
-                  <tr>
-                    <th>Mã ID</th>
-                    <th>Phân loại</th>
-                    <th>Đối tượng / Khóa Target</th>
-                    <th>Mô tả ngắn & Dữ kiện trọng yếu</th>
-                  </tr>
-                </thead>
-                <tbody id="refRows"></tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
-        <!-- Event Register: Nơi Lead thẩm định sự kiện đã xác thực -->
-        <div class="card sectionCard" id="memEventCard">
-          <div class="cardHead">
-            <div>
-              <strong>Event Register · Bảng Xác Thực Sự Kiện</strong>
-              <div class="hint">Trưởng nhóm thẩm định evidence: xác thực nâng thành SSOT hoặc yêu cầu Role làm rõ.</div>
-            </div>
-            <span class="hint">nguồn sự thật trước khi commit vào Master Memory</span>
-          </div>
-          <div class="cardBody">
-            <table class="eventTable">
-              <thead>
-                <tr>
-                  <th>Event ID</th>
-                  <th>Runtime / Role</th>
-                  <th>Yêu cầu / Kết luận</th>
-                  <th>Evidence</th>
-                  <th>Trạng thái</th>
-                  <th>Hành động</th>
-                </tr>
-              </thead>
-              <tbody id="eventRows"></tbody>
-            </table>
           </div>
         </div>
       </section>
@@ -3858,36 +3943,6 @@ const SUBTAB_CONFIG = {
       { id: 'orch-swarm', label: '👥 Swarm Directory', action: () => switchOrchTab('swarm') }
     ]
   },
-  dashboard: {
-    icon: '⌂',
-    name: 'Dashboard',
-    tabs: [
-      { id: 'dash-overview', label: '📊 Tổng quan & Chỉ số', target: '#dashStatsCard' },
-      { id: 'dash-projects', label: '📁 Quản trị Workspace', target: '#dashProjectsCard' },
-      { id: 'dash-progress', label: '🚀 Tiến trình Swarm & Roles', target: '#dashProgressCard' }
-    ]
-  },
-  implementation: {
-    icon: '◈',
-    name: 'Implementation',
-    tabs: [
-      { id: 'imp-all', label: '◈ Toàn bộ quy trình', target: '#implementation' },
-      { id: 'imp-row1', label: '📋 Hàng 1: Input & Roadmap & Todo', target: '#impRow1' },
-      { id: 'imp-row2', label: '⚙️ Hàng 2: Role CLI Selector', target: '#impRow2' },
-      { id: 'imp-row3', label: '🔀 Hàng 3: Live Workflow Graph', target: '#impRow3' }
-    ]
-  },
-  runtimes: {
-    icon: '◉',
-    name: 'Môi trường Agent',
-    tabs: [
-      { id: 'rt-squad', label: '🚀 Ban Chỉ Huy Swarm', target: '#expertSquadGrid' },
-      { id: 'rt-chat', label: '💬 Luồng Chat & Bàn Giao', action: () => switchDeckTab('chat') },
-      { id: 'rt-thinking', label: '🧠 Mạch Tư Duy', action: () => switchDeckTab('thinking') },
-      { id: 'rt-kanban', label: '📋 Live Kanban', action: () => switchDeckTab('kanban') },
-      { id: 'rt-console', label: '💻 Live Console', action: () => switchDeckTab('console') }
-    ]
-  },
   warroom: {
     icon: '📡',
     name: 'Phòng Giao Ban Swarm',
@@ -3897,28 +3952,57 @@ const SUBTAB_CONFIG = {
       { id: 'wr-handoff', label: '🔀 Hợp Đồng I/O & Bàn Giao', action: () => switchWarRoomChannel('handoff') }
     ]
   },
+  runtimes: {
+    icon: '◉',
+    name: 'Swarm Chuyên Gia',
+    tabs: [
+      { id: 'rt-squad', label: '🚀 Ban Chỉ Huy Swarm', target: '#expertSquadGrid' },
+      { id: 'rt-chat', label: '💬 Luồng Chat & Bàn Giao', action: () => switchDeckTab('chat') },
+      { id: 'rt-thinking', label: '🧠 Mạch Tư Duy', action: () => switchDeckTab('thinking') },
+      { id: 'rt-kanban', label: '📋 Live Kanban', action: () => switchDeckTab('kanban') },
+      { id: 'rt-console', label: '💻 Live Console', action: () => switchDeckTab('console') }
+    ]
+  },
+  implementation: {
+    icon: '◈',
+    name: 'Kế Hoạch & Tiến Độ',
+    tabs: [
+      { id: 'imp-plan', label: '📋 Input & Roadmap & Todo', target: '#impRow1' },
+      { id: 'imp-wf', label: '🔀 Sơ Đồ Live Workflow', action: () => switchImplTab('workflow') },
+      { id: 'imp-roles', label: '⚙️ Ma Trận Role Engine', action: () => switchImplTab('roles') }
+    ]
+  },
+  dashboard: {
+    icon: '⌂',
+    name: 'Tổng Quan Dashboard',
+    tabs: [
+      { id: 'dash-overview', label: '📊 Tổng quan & Chỉ số', target: '#dashStatsCard' },
+      { id: 'dash-projects', label: '📁 Quản trị Workspace', target: '#dashProjectsCard' },
+      { id: 'dash-progress', label: '🚀 Tiến trình Swarm & Roles', target: '#dashProgressCard' }
+    ]
+  },
+  memory: {
+    icon: '◌',
+    name: 'Bộ Nhớ SSOT',
+    tabs: [
+      { id: 'mem-dual', label: '🧠 2 Cột Memory (Master SSOT vs Role)', target: '#memGridCard' },
+      { id: 'mem-catalog', label: '⚡ Fast ID Catalog (FTS5)', action: () => { scrollToTarget('#memCatalogCard'); document.querySelector('.indexToolbar .searchBox')?.focus(); } },
+      { id: 'mem-events', label: '📝 Sự Kiện Chờ Thẩm Định', target: '#memEventCard' }
+    ]
+  },
   data: {
     icon: '▦',
-    name: 'Trung tâm dữ liệu',
+    name: 'Trung Tâm Dữ Liệu',
     tabs: [
       { id: 'data-repo', label: '🌿 Git Repo & Commits', action: () => switchData('repo') },
       { id: 'data-db', label: '🗄️ SQLite 3 Database & Schemas', action: () => switchData('db') },
       { id: 'data-vault', label: '🔐 Vault & Secrets Ref', action: () => switchData('vault') },
       { id: 'data-files', label: '📁 File Manager & Artifacts', action: () => switchData('files') }
     ]
-  },
-  memory: {
-    icon: '◌',
-    name: 'Nơi làm việc / SSOT',
-    tabs: [
-      { id: 'mem-dual', label: '🧠 2 Cột Memory (Master SSOT vs Role)', target: '#memGridCard' },
-      { id: 'mem-catalog', label: '⚡ Fast ID Catalog (FTS5)', action: () => { scrollToTarget('#memCatalogCard'); document.querySelector('.indexToolbar .searchBox')?.focus(); } },
-      { id: 'mem-events', label: '📝 Sự Kiện Chờ Thẩm Định', target: '#memEventCard' }
-    ]
   }
 };
 
-let currentScreen = 'implementation';
+let currentScreen = 'warroom';
 let activeSubTabs = {};
 
 function scrollToTarget(selector) {
@@ -4117,7 +4201,19 @@ function renderProjectList() {
   `).join('');
 }
 
-// Implementation Handlers
+// Implementation Handlers & Tab Switching
+function switchImplTab(tabKey, el) {
+  document.querySelectorAll('.implExecTabBtn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.implExecTabContent').forEach(c => c.classList.remove('active'));
+  if (el) el.classList.add('active');
+  else $(`implTabBtn-${tabKey}`)?.classList.add('active');
+  $(`implTabPane-${tabKey}`)?.classList.add('active');
+  
+  if (tabKey === 'workflow') {
+    renderWorkflow();
+  }
+}
+
 function sourceChanged() {
   state.sourceText = $('sourceInput').value;
   state.sourceSaved = false;
@@ -7070,11 +7166,12 @@ setTimeout(() => {
     `;
   }
 
-  // Load & Seed Orchestrator Chat IDE
+  // Load & Seed Orchestrator Chat IDE & War Room
   loadOrchChatMessages();
+  loadWarRoomMessages(true);
 
   // Init subtop nav for current active screen
-  const activeScreen = document.querySelector('.screen.active')?.id || 'implementation';
+  const activeScreen = document.querySelector('.screen.active')?.id || 'warroom';
   updateSubtopNav(activeScreen);
 }, 200);
 
