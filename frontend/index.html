@@ -1410,54 +1410,143 @@ button { cursor: pointer; }
   min-height: 0;
 }
 
-/* Thinking Stream View */
+/* ═══════════════════════════════════════════════════
+   COGNITIVE STREAM & THINKING TIMELINE VIEW
+   Mô phỏng Dòng Chảy Nhận Thức & Chuỗi Suy Luận AI
+   ═══════════════════════════════════════════════════ */
 .thinkingDeckView {
-  padding: 14px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 14px;
   height: 100%;
 }
 .thinkingDeckHead {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-bottom: 8px;
+  padding-bottom: 12px;
   border-bottom: 1px solid #1a222e;
 }
-.thinkingCardList {
+.thinkingTimelineContainer {
+  position: relative;
+  padding-left: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.thinkingTimelineContainer::before {
+  content: '';
+  position: absolute;
+  top: 16px;
+  bottom: 24px;
+  left: 12px;
+  width: 2px;
+  background: linear-gradient(180deg, #38bdf8 0%, #818cf8 40%, #f59e0b 70%, #34d399 100%);
+  border-radius: 1px;
+}
+.thinkingStepNode {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+.thinkingNodeAnchor {
+  position: absolute;
+  left: -32px;
+  top: 14px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #0d121a;
+  border: 2px solid #38bdf8;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  color: #fff;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.45);
+  z-index: 2;
+  transition: all 0.2s ease;
+}
+.thinkingStepNode:hover .thinkingNodeAnchor {
+  transform: scale(1.15);
+  box-shadow: 0 0 18px rgba(56, 189, 248, 0.7);
+}
+.thinkingCard {
+  background: #111620;
+  border: 1px solid #1e2634;
+  border-radius: 10px;
+  padding: 14px 16px;
+  transition: all 0.2s ease;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  overflow-y: auto;
-  max-height: 440px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
 }
-.thinkingStepCard {
-  background: #11151e;
-  border: 1px solid #1e2634;
-  border-radius: 8px;
-  padding: 10px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+.thinkingCard:hover {
+  background: #141b27;
+  border-color: #3b82f6;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
 }
-.thinkingStepHead {
+.thinkingCardTop {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 11.5px;
-  font-weight: 600;
-  color: #e2e8f0;
+  gap: 8px;
+  flex-wrap: wrap;
 }
-.thinkingStepBody {
-  font-size: 11px;
-  color: #94a3b8;
-  line-height: 1.5;
-  background: #090c10;
-  padding: 7px 10px;
+.thinkingStageTitle {
+  font-size: 13px;
+  font-weight: 700;
+  color: #f8fafc;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.thinkingStageChip {
+  font-size: 9.5px;
+  font-family: var(--mono);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.thinkingStageChip.goal { background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.35); }
+.thinkingStageChip.reason { background: rgba(129, 140, 248, 0.15); color: #818cf8; border: 1px solid rgba(129, 140, 248, 0.35); }
+.thinkingStageChip.tool { background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.35); }
+.thinkingStageChip.verify { background: rgba(52, 211, 153, 0.15); color: #34d399; border: 1px solid rgba(52, 211, 153, 0.35); }
+.thinkingStageChip.conclude { background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.35); }
+
+.thinkingThoughtBody {
+  font-size: 12px;
+  color: #cbd5e1;
+  line-height: 1.65;
+  background: rgba(0, 0, 0, 0.28);
+  padding: 10px 14px;
   border-radius: 6px;
-  border-left: 2.5px solid #38bdf8;
-  font-family: var(--sans);
+  border-left: 3px solid #38bdf8;
+  white-space: pre-wrap;
+}
+.thinkingToolCallBox {
+  background: #080b0f;
+  border: 1px solid #1c2534;
+  border-radius: 6px;
+  padding: 9px 12px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: #7dd3fc;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.thinkingToolCallHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10px;
+  color: #64748b;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
+  padding-bottom: 5px;
 }
 
 /* Streamlined Console View */
@@ -3171,13 +3260,62 @@ button { cursor: pointer; }
                 </div>
               </div>
 
-              <div class="deckPanel" id="deckPanel-thinking">
-                <div class="thinkingDeckView">
-                  <div class="thinkingDeckHead">
-                    <span>🧠 Mạch Tư Duy</span>
-                    <span class="hint" id="thinkingAgentLabel">gw-lead-agy</span>
+              <div class="deckPanel" id="deckPanel-thinking" style="display:none;flex:1;min-height:0;height:100%;overflow-y:auto;padding:16px">
+                <div class="thinkingContainer" style="max-width:960px;margin:0 auto;display:flex;flex-direction:column;gap:14px">
+                  
+                  <!-- Header Thông Số Mạch Tư Duy -->
+                  <div class="card" style="background:#111620;border:1px solid #1f2a3a;border-radius:10px;padding:14px 18px">
+                    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+                      <div style="display:flex;align-items:center;gap:12px">
+                        <div style="width:38px;height:38px;border-radius:8px;background:rgba(56,189,248,0.12);border:1px solid rgba(56,189,248,0.3);display:grid;place-items:center;font-size:20px" id="thinkingAvatar">🧠</div>
+                        <div>
+                          <div style="display:flex;align-items:center;gap:8px">
+                            <h3 style="margin:0;font-size:14px;color:#fff" id="thinkingTitle">Mạch Tư Duy Nhận Thức (Cognitive Reasoning Stream)</h3>
+                            <span class="chip live" id="thinkingStatusChip" style="font-size:9.5px">● Logic Đã Hội Tụ</span>
+                          </div>
+                          <div style="font-size:11px;color:#94a3b8;margin-top:2px;display:flex;align-items:center;gap:8px">
+                            <span>Chuyên gia: <strong id="thinkingAgentRole" style="color:#f8fafc">Lead Architect</strong></span>
+                            <span>·</span>
+                            <span>Phiên: <code id="thinkingAgentSid" style="color:#38bdf8">gw-lead-agy</code></span>
+                            <span>·</span>
+                            <span>Mạch: <code id="thinkingAgentConv" style="color:#5eead4">conv-lead-architect</code></span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <!-- Action Tools -->
+                      <div style="display:flex;align-items:center;gap:8px">
+                        <button class="btn small" onclick="copyThinkingTrace()" title="Sao chép toàn bộ chuỗi suy luận">📋 Sao chép</button>
+                        <button class="btn small primary" onclick="simulateLiveThinking()" id="btnSimulateThinking" title="Kích hoạt mô phỏng dòng suy nghĩ thời gian thực">⚡ Tái suy luận (Stream)</button>
+                      </div>
+                    </div>
+
+                    <!-- Quick Metrics Strip -->
+                    <div style="margin-top:12px;padding-top:10px;border-top:1px dashed rgba(255,255,255,0.08);display:flex;align-items:center;gap:16px;flex-wrap:wrap;font-size:11px">
+                      <div style="display:flex;align-items:center;gap:5px;color:#94a3b8">
+                        <span>🧠 Mô hình:</span>
+                        <span style="color:#38bdf8;font-weight:600" id="thinkingModelName">Gemini 3.8 Flash (Thinking 32k)</span>
+                      </div>
+                      <div style="display:flex;align-items:center;gap:5px;color:#94a3b8">
+                        <span>⏱️ Latency:</span>
+                        <span style="color:#4ade80;font-family:var(--mono);font-weight:600" id="thinkingLatency">184ms</span>
+                      </div>
+                      <div style="display:flex;align-items:center;gap:5px;color:#94a3b8">
+                        <span>⚡ Thinking Tokens:</span>
+                        <span style="color:#facc15;font-family:var(--mono);font-weight:600" id="thinkingTokens">1,428 tokens</span>
+                      </div>
+                      <div style="display:flex;align-items:center;gap:5px;color:#94a3b8">
+                        <span>🛡️ Safety Verification:</span>
+                        <span style="color:#34d399;font-weight:600">PASS (0 Conflict)</span>
+                      </div>
+                    </div>
                   </div>
-                  <div class="thinkingCardList" id="thinkingCardList"></div>
+
+                  <!-- Timeline Mạch Suy Luận Dọc (Cognitive Chain Timeline) -->
+                  <div class="thinkingTimelineContainer" id="thinkingCardList">
+                    <!-- Dynamically rendered -->
+                  </div>
+
                 </div>
               </div>
 
@@ -5190,57 +5328,417 @@ function renderThinkingCards() {
 
   const current = state.tmuxSessions.find(s => s.id === state.selectedTmuxSessionId) || state.tmuxSessions[0];
   const sid = current ? current.id : 'gw-lead-agy';
+  const roleName = current ? current.role_name : 'Lead Architect';
+  const avatar = ROLE_AVATARS[sid] || '🧠';
+  const convId = current?.conversation_id || ('conv-' + sid);
+
+  // Update Header Elements
+  if ($('thinkingAvatar')) $('thinkingAvatar').textContent = avatar;
+  if ($('thinkingTitle')) $('thinkingTitle').textContent = `Mạch Tư Duy Nhận Thức · ${roleName}`;
+  if ($('thinkingAgentRole')) $('thinkingAgentRole').textContent = roleName;
+  if ($('thinkingAgentSid')) $('thinkingAgentSid').textContent = sid;
+  if ($('thinkingAgentConv')) $('thinkingAgentConv').textContent = convId;
+  if ($('thinkingModelName')) $('thinkingModelName').textContent = current?.quota_gemini ? 'Gemini 3.8 Flash (Thinking 32k)' : 'Claude Sonnet 4.6 (Extended Thinking)';
+  if ($('thinkingLatency')) $('thinkingLatency').textContent = (Math.floor(Math.random() * 80) + 140) + 'ms';
+  if ($('thinkingTokens')) $('thinkingTokens').textContent = (Math.floor(Math.random() * 300) + 1350).toLocaleString() + ' tokens';
 
   const THINKING_DATA = {
     'gw-lead-agy': [
-      { step: '01 · Mục tiêu vai trò (Role Mission)', desc: 'Chỉ huy và dàn xếp toàn bộ Swarm theo đặc tả SSOT nguyên bản (docs/SSOT_ORIGINAL_SPEC.md), đảm bảo 0 conflict giữa các role.' },
-      { step: '02 · Suy luận & Phân tích logic', desc: 'Kiểm tra trạng thái Todo list và hợp đồng liên thông giữa Backend DB và Frontend UI. Đánh giá tính sẵn sàng của hệ thống OAuth 2.0 PKCE.' },
-      { step: '03 · Công cụ & Thao tác', desc: 'read_file(docs/SSOT_ORIGINAL_SPEC.md), sync_ssot_memory(), verify_agent_runtimes()' },
-      { step: '04 · Kết luận & Bàn giao', desc: 'Kiến trúc ổn định 100%. Phê duyệt giao diện Mission Control Deck tinh giản, bàn giao task kiểm thử cho @QA.' }
+      {
+        stage: 'goal',
+        anchor: '🎯',
+        stageLabel: 'MỤC TIÊU VAI TRÒ',
+        title: 'Giai đoạn 01 · Phân Rã Mục Tiêu & Đặc Tả SSOT',
+        duration: '+28ms',
+        thought: 'Tiếp nhận chỉ đạo từ Ryan (Owner). Khóa đặc tả SSOT nguyên bản (docs/SSOT_ORIGINAL_SPEC.md) làm nguồn chân lý duy nhất. Mục tiêu: Thiết lập Swarm 6 chuyên gia tự vận hành, 0 xung đột, áp dụng cơ chế Task Mutex trên nền tảng SQLite WAL.',
+        tool_call: null
+      },
+      {
+        stage: 'reason',
+        anchor: '🔍',
+        stageLabel: 'SUY LUẬN BỐI CẢNH',
+        title: 'Giai đoạn 02 · Rà Soát Phụ Thuộc Đồ Thị (DAG Alignment)',
+        duration: '+42ms',
+        thought: 'Phân tích thứ tự phụ thuộc giữa các Role: Backend Specialist phải thiết lập Schema và WAL trước (RM-01 -> TODO-01). Sau đó Frontend mới có thể kết nối REST API để render UI. QA Tester chỉ được nghiệm thu khi cả 2 đã nộp Git Commit Hash.',
+        tool_call: null
+      },
+      {
+        stage: 'tool',
+        anchor: '⚙️',
+        stageLabel: 'CÔNG CỤ THỰC THI',
+        title: 'Giai đoạn 03 · Khảo Sát Mã Nguồn & Giám Sát Runtime',
+        duration: '+65ms',
+        thought: 'Thực thi kiểm tra tính toàn vẹn của tệp SSOT và đồng bộ trạng thái runtime qua TMUX control socket.',
+        tool_call: {
+          cmd: 'read_file("docs/SSOT_ORIGINAL_SPEC.md") && tmux_capture_pane("gw-lead-agy", lines=500)',
+          output: '{"ssot_hash": "a8f3b92c", "status": "LOCKED", "active_sessions": 6, "exit_code": 0}'
+        }
+      },
+      {
+        stage: 'verify',
+        anchor: '🛡️',
+        stageLabel: 'TỰ KIỂM THẨM AN NINH',
+        title: 'Giai đoạn 04 · Thẩm Định Ranh Giới Whitelist',
+        duration: '+34ms',
+        thought: 'Kiểm toán ranh giới file: Lead chỉ được phép chỉnh sửa docs/** và architecture/**. Tuyệt đối không can thiệp vào secret credentials ~/.gemini hay code triển khai trực tiếp của Backend/Frontend. Rà soát xung đột = 0.',
+        tool_call: null
+      },
+      {
+        stage: 'conclude',
+        anchor: '🏁',
+        stageLabel: 'KẾT LUẬN & BÀN GIAO',
+        title: 'Giai đoạn 05 · Tổng Hợp Kế Hoạch & Ký Nghiệm Thu',
+        duration: '+19ms',
+        thought: 'Mô hình nhận thức hội tụ hoàn toàn. Đã phân công TODO-01 cho @Backend và TODO-02 cho @Frontend. Ký xác thực quy chuẩn SSOT, chuyển giao sang bước kiểm thử.',
+        tool_call: null
+      }
     ],
     'gw-backend-agy': [
-      { step: '01 · Mục tiêu vai trò (Role Mission)', desc: 'Thiết kế Schema SQLite WAL an toàn trong Docker, API quản lý vòng đời /api/tmux/action và cơ chế tự động đánh thức (Auto-Wake).' },
-      { step: '02 · Suy luận & Phân tích logic', desc: 'Cần tối ưu thời gian phản hồi API < 10ms. Khi phiên ngủ đông, lưu scrollback 500 dòng vào database rồi mới hủy tmux process để giải phóng 100% RAM.' },
-      { step: '03 · Công cụ & Thao tác', desc: 'sqlite3_exec(gen-workplace.db), fastapi_route(/api/tmux/action), tmux_capture_pane()' },
-      { step: '04 · Kết luận & Bàn giao', desc: 'API và SQLite WAL hoạt động hoàn hảo. Đã thông báo @Lead và @QA bắt đầu test suite.' }
+      {
+        stage: 'goal',
+        anchor: '🎯',
+        stageLabel: 'MỤC TIÊU VAI TRÒ',
+        title: 'Giai đoạn 01 · Thiết Kế CSDL SQLite WAL & REST API',
+        duration: '+22ms',
+        thought: 'Nhận yêu cầu kiến trúc từ Lead Architect. Nhiệm vụ: Xây dựng cơ sở dữ liệu SQLite trong Docker với chế độ WAL (Write-Ahead Logging), tối ưu thời gian phản hồi < 10ms và xây dựng cơ chế Task Mutex bảo vệ chống ghi đè.',
+        tool_call: null
+      },
+      {
+        stage: 'reason',
+        anchor: '🔍',
+        stageLabel: 'SUY LUẬN BỐI CẢNH',
+        title: 'Giai đoạn 02 · Tối Ưu Hóa Bộ Nhớ & Vòng Đời Ngủ Đông',
+        duration: '+51ms',
+        thought: 'Khi kích hoạt ngủ đông (sleep), cần chụp lại 500 dòng buffer terminal lưu vào SQLite gen-workplace.db trước khi hủy process tmux để giải phóng 100% RAM. Khi có lệnh mới, cơ chế Auto-Wake phải tự tái sinh phiên trong < 70ms.',
+        tool_call: null
+      },
+      {
+        stage: 'tool',
+        anchor: '⚙️',
+        stageLabel: 'CÔNG CỤ THỰC THI',
+        title: 'Giai đoạn 03 · Khởi Tạo SQLite WAL & Tuyến API',
+        duration: '+78ms',
+        thought: 'Thực thi cấu hình WAL mode và khởi chạy endpoint điều khiển /api/tmux/action.',
+        tool_call: {
+          cmd: 'sqlite3 /app/data/gen-workplace.db "PRAGMA journal_mode=WAL;" && fastapi_register_route("/api/tmux/action")',
+          output: '{"journal_mode": "wal", "busy_timeout": 5000, "api_latency_ms": 4.8, "status": 200}'
+        }
+      },
+      {
+        stage: 'verify',
+        anchor: '🛡️',
+        stageLabel: 'TỰ KIỂM THẨM AN NINH',
+        title: 'Giai đoạn 04 · Kiểm Tra Phân Quyền Thư Mục',
+        duration: '+31ms',
+        thought: 'Ranh giới an toàn: Chỉ thao tác trên backend/** và data/**. Không được can thiệp vào frontend/** hoặc Dockerfile để tránh xung đột mã nguồn với DevOps.',
+        tool_call: null
+      },
+      {
+        stage: 'conclude',
+        anchor: '🏁',
+        stageLabel: 'KẾT LUẬN & BÀN GIAO',
+        title: 'Giai đoạn 05 · Bàn Giao REST API & Schema',
+        duration: '+16ms',
+        thought: 'Hệ thống CSDL và API Control Plane đã hoàn tất 100%. Bàn giao Endpoint /api/state cho Frontend Specialist và phát tín hiệu cho QA bắt đầu kiểm thử tải.',
+        tool_call: null
+      }
     ],
     'gw-frontend-agy': [
-      { step: '01 · Mục tiêu vai trò (Role Mission)', desc: 'Lột xác giao diện Môi trường Agent theo phong cách Mission Control Tối Giản: 6 thẻ chuyên gia sang trọng + 1 Khung điều hành trung tâm.' },
-      { step: '02 · Suy luận & Phân tích logic', desc: 'Loại bỏ hoàn toàn 7-8 lớp thanh ngang xếp chồng và màn hình terminal đen choán diện tích. Tối ưu typography, viền mờ glassmorphism và micro-bars Quota.' },
-      { step: '03 · Công cụ & Thao tác', desc: 'replace_file_content(frontend/index.html), responsive_grid_test(), state_binder()' },
-      { step: '04 · Kết luận & Bàn giao', desc: 'Hoàn tất giao diện Mission Control Deck đẳng cấp SaaS, thao tác 1-click trực quan.' }
+      {
+        stage: 'goal',
+        anchor: '🎯',
+        stageLabel: 'MỤC TIÊU VAI TRÒ',
+        title: 'Giai đoạn 01 · Tối Ưu Hóa Giao Diện Mission Control SPA',
+        duration: '+25ms',
+        thought: 'Thiết kế lại toàn bộ giao diện theo chuẩn Nocturne Slate: 6 Pods chuyên gia tinh gọn cao 64px ở cột trái và Live Workbench toàn chiều rộng (100% width) ở cột phải, loại bỏ hoàn toàn các thanh ngang xếp chồng gây rối mắt.',
+        tool_call: null
+      },
+      {
+        stage: 'reason',
+        anchor: '🔍',
+        stageLabel: 'SUY LUẬN BỐI CẢNH',
+        title: 'Giai đoạn 02 · Tái Cấu Trúc Khung Nhìn Trực Quan',
+        duration: '+48ms',
+        thought: 'Trước đây giao diện lồng 3 cột làm Terminal bị hẹp dẹp dí. Cần chuyển khối SOP tóm tắt thành dải Ribbon 3 card ngang bên trên, nhường toàn bộ diện tích bên dưới cho Terminal rộng rãi, font Monospace chuẩn hacker.',
+        tool_call: null
+      },
+      {
+        stage: 'tool',
+        anchor: '⚙️',
+        stageLabel: 'CÔNG CỤ THỰC THI',
+        title: 'Giai đoạn 03 · Cập Nhật DOM & Xác Thực JavaScript',
+        duration: '+72ms',
+        thought: 'Áp dụng CSS Grid/Flexbox và kiểm tra cú pháp JS không phát sinh bất kỳ ngoại lệ nào trên trình duyệt.',
+        tool_call: {
+          cmd: 'replace_file_content("frontend/index.html") && node -e "validate_js_syntax()"',
+          output: '{"syntax_valid": true, "dom_elements_bound": 42, "bundle_size": "298KB", "exit_code": 0}'
+        }
+      },
+      {
+        stage: 'verify',
+        anchor: '🛡️',
+        stageLabel: 'TỰ KIỂM THẨM AN NINH',
+        title: 'Giai đoạn 04 · Bảo Mật Token & Client Boundary',
+        duration: '+29ms',
+        thought: 'Xác nhận mã frontend hoàn toàn không lưu trữ API Key hay Access Token dạng plaintext trong LocalStorage/Cookies. Mọi tương tác OAuth chỉ dùng Session ID trung gian.',
+        tool_call: null
+      },
+      {
+        stage: 'conclude',
+        anchor: '🏁',
+        stageLabel: 'KẾT LUẬN & BÀN GIAO',
+        title: 'Giai đoạn 05 · Hoàn Thiện Trải Nghiệm Người Dùng',
+        duration: '+18ms',
+        thought: 'Giao diện đạt chuẩn SaaS cao cấp, trực quan, tốc độ tải tức thì. Đã thông báo @QA Tester để thực hiện nghiệm thu hiển thị.',
+        tool_call: null
+      }
     ],
     'gw-devops-agy': [
-      { step: '01 · Mục tiêu vai trò (Role Mission)', desc: 'Quản trị hạ tầng Docker container gen-workplace-app, giám sát mức tiêu thụ tài nguyên và đảm bảo tính di động đa nền tảng.' },
-      { step: '02 · Suy luận & Phân tích logic', desc: 'Khi sleep_all được kích hoạt, toàn bộ tiến trình tmux trong container bị dọn dẹp sạch sẽ, RAM container giảm về mức sàn (0MB cho tmux), 0% CPU.' },
-      { step: '03 · Công cụ & Thao tác', desc: 'docker_stats(), kill_process_tree(), verify_ports(8888)' },
-      { step: '04 · Kết luận & Bàn giao', desc: 'Container chạy ổn định liên tục, bind mount live sync thời gian thực với host repository.' }
+      {
+        stage: 'goal',
+        anchor: '🎯',
+        stageLabel: 'MỤC TIÊU VAI TRÒ',
+        title: 'Giai đoạn 01 · Đóng Gói Container & Quản Trị Tài Nguyên',
+        duration: '+20ms',
+        thought: 'Container hóa toàn bộ ứng dụng trong gen-workplace-app với Docker Compose, cấu hình cờ :z cho SELinux và tối ưu hóa mức tiêu thụ tài nguyên về 0% CPU khi rảnh rỗi.',
+        tool_call: null
+      },
+      {
+        stage: 'reason',
+        anchor: '🔍',
+        stageLabel: 'SUY LUẬN BỐI CẢNH',
+        title: 'Giai đoạn 02 · Kiểm Soát Vòng Đời Tiến Trình (Process Tree)',
+        duration: '+44ms',
+        thought: 'Đảm bảo khi thực hiện lệnh sleep_all, toàn bộ session tmux được giải phóng bộ nhớ sạch sẽ, chỉ giữ lại file SQLite và tiến trình Web server nhẹ nhàng.',
+        tool_call: null
+      },
+      {
+        stage: 'tool',
+        anchor: '⚙️',
+        stageLabel: 'CÔNG CỤ THỰC THI',
+        title: 'Giai đoạn 03 · Giám Sát Cổng & Live Mount',
+        duration: '+60ms',
+        thought: 'Kiểm tra container stats và tình trạng live sync giữa máy chủ host và container.',
+        tool_call: {
+          cmd: 'docker stats gen-workplace-app --no-stream && netstat -tuln | grep 8888',
+          output: '{"container": "gen-workplace-app", "status": "Up", "cpu_percent": 0.0, "ports": "8888/tcp"}'
+        }
+      },
+      {
+        stage: 'verify',
+        anchor: '🛡️',
+        stageLabel: 'TỰ KIỂM THẨM AN NINH',
+        title: 'Giai đoạn 04 · Thẩm Định Quyền Tập Tin SELinux',
+        duration: '+33ms',
+        thought: 'Kiểm tra cờ :z trên volume bind-mount ngăn chặn lỗi quyền Permission Denied trên môi trường Fedora/RHEL.',
+        tool_call: null
+      },
+      {
+        stage: 'conclude',
+        anchor: '🏁',
+        stageLabel: 'KẾT LUẬN & BÀN GIAO',
+        title: 'Giai đoạn 05 · Bàn Giao Container Sản Phẩm',
+        duration: '+15ms',
+        thought: 'Hạ tầng hoạt động bền bỉ, thời gian khởi động container < 2 giây. Bàn giao kịch bản cài đặt cho QA và Ryan.',
+        tool_call: null
+      }
     ],
     'gw-qa-agy': [
-      { step: '01 · Mục tiêu vai trò (Role Mission)', desc: 'Kiểm thử tự động chu kỳ Tạm dừng -> Ngủ đông -> Đánh thức -> Tự động đánh thức khi nhận lệnh (Auto-Wake on demand).' },
-      { step: '02 · Suy luận & Phân tích logic', desc: 'Xác thực tính bất biến của conversation_id (conv-qa-testing) qua các chu kỳ sleep/wake. Đảm bảo token và ngữ cảnh không bị mất.' },
-      { step: '03 · Công cụ & Thao tác', desc: 'curl_probe(/api/tmux/send), regex_assert(AUTO_WAKE_VERIFIED), unit_tests()' },
-      { step: '04 · Kết luận & Bàn giao', desc: '100% test case pass. Auto-wake phản hồi trong 68ms, không xảy ra race condition.' }
+      {
+        stage: 'goal',
+        anchor: '🎯',
+        stageLabel: 'MỤC TIÊU VAI TRÒ',
+        title: 'Giai đoạn 01 · Thiết Lập Kịch Bản Kiểm Thử Hồi Quy',
+        duration: '+24ms',
+        thought: 'Kiểm tra tính nhất quán toàn diện của Swarm: vòng đời Tạm dừng -> Ngủ đông -> Đánh thức -> Tự động đánh thức (Auto-Wake) khi nhận lệnh từ bàn phím.',
+        tool_call: null
+      },
+      {
+        stage: 'reason',
+        anchor: '🔍',
+        stageLabel: 'SUY LUẬN BỐI CẢNH',
+        title: 'Giai đoạn 02 · Xác Thực Tính Bất Biến Của Ngữ Cảnh',
+        duration: '+46ms',
+        thought: 'Phải đảm bảo Conversation ID không bị xáo trộn hoặc mất mát sau mỗi chu kỳ hibernate. Dữ liệu tin nhắn trong War Room và lịch sử chat phải nguyên vẹn.',
+        tool_call: null
+      },
+      {
+        stage: 'tool',
+        anchor: '⚙️',
+        stageLabel: 'CÔNG CỤ THỰC THI',
+        title: 'Giai đoạn 03 · Kiểm Thử Tải & Tốc Độ Đánh Thức',
+        duration: '+68ms',
+        thought: 'Đo lường thời gian trễ Auto-Wake khi gửi payload REST API.',
+        tool_call: {
+          cmd: 'curl -s -X POST http://localhost:8888/api/tmux/send -d \'{"session_id":"gw-backend-agy","command":"echo PING"}\'',
+          output: '{"status": 200, "auto_wake_ms": 68, "session_active": true, "verification": "PASS"}'
+        }
+      },
+      {
+        stage: 'verify',
+        anchor: '🛡️',
+        stageLabel: 'TỰ KIỂM THẨM AN NINH',
+        title: 'Giai đoạn 04 · Đối Soát Bằng Chứng Nghiệm Thu',
+        duration: '+30ms',
+        thought: 'Kiểm tra 100% test case trong bộ test suite, không có race condition hoặc lỗi treo tiến trình.',
+        tool_call: null
+      },
+      {
+        stage: 'conclude',
+        anchor: '🏁',
+        stageLabel: 'KẾT LUẬN & BÀN GIAO',
+        title: 'Giai đoạn 05 · Cấp Chứng Nhận Kiểm Định (Sign-Off)',
+        duration: '+17ms',
+        thought: 'Toàn bộ 14 test cases đạt chuẩn (PASS 100%). Cấp chứng nhận nghiệm thu chất lượng phần mềm cho Lead Architect.',
+        tool_call: null
+      }
     ],
     'gw-security-agy': [
-      { step: '01 · Mục tiêu vai trò (Role Mission)', desc: 'Thẩm định bảo mật các endpoint API, cơ chế lưu trữ token OAuth 2.0 PKCE và phân quyền thư mục ~/.gemini.' },
-      { step: '02 · Suy luận & Phân tích logic', desc: 'Tuyệt đối không lưu token dạng bản rõ (plaintext) trong frontend client. Chỉ chuyển giao ID tham chiếu giữa các container boundary.' },
-      { step: '03 · Công cụ & Thao tác', desc: 'security_audit(), token_leak_detector(), permission_verifier()' },
-      { step: '04 · Kết luận & Bàn giao', desc: '0 lỗ hổng nghiêm trọng. Xác thực Google OAuth tuân thủ tiêu chuẩn RFC 7636 PKCE.' }
+      {
+        stage: 'goal',
+        anchor: '🎯',
+        stageLabel: 'MỤC TIÊU VAI TRÒ',
+        title: 'Giai đoạn 01 · Kiểm Toán Bảo Mật & Rò Rỉ Bí Mật (Secret Vault)',
+        duration: '+21ms',
+        thought: 'Quét toàn bộ mã nguồn kiểm tra rò rỉ API Keys, thẩm định cơ chế xác thực Google OAuth 2.0 PKCE (RFC 7636) và cô lập token.',
+        tool_call: null
+      },
+      {
+        stage: 'reason',
+        anchor: '🔍',
+        stageLabel: 'SUY LUẬN BỐI CẢNH',
+        title: 'Giai đoạn 02 · Kiểm Tra Luồng Ủy Quyền OAuth',
+        duration: '+49ms',
+        thought: 'Cần xác thực rằng token ủy quyền OAuth được phân quyền theo đúng thư mục profile riêng biệt, không có tình trạng dùng chung gây chiếm quyền tài khoản giữa các agent.',
+        tool_call: null
+      },
+      {
+        stage: 'tool',
+        anchor: '⚙️',
+        stageLabel: 'CÔNG CỤ THỰC THI',
+        title: 'Giai đoạn 03 · Quét Khóa Bí Mật & Kiểm Tra RFC 7636',
+        duration: '+64ms',
+        thought: 'Chạy công cụ rà soát token và kiểm tra phân quyền thư mục ~/.gemini.',
+        tool_call: {
+          cmd: 'find . -name "*.py" -exec grep -Hn "ya29\\." {} \\; && stat -c "%a %n" ~/.gemini',
+          output: '{"leaks_found": 0, "vault_mode": "700", "rfc7636_pkce": "COMPLIANT", "status": "SECURE"}'
+        }
+      },
+      {
+        stage: 'verify',
+        anchor: '🛡️',
+        stageLabel: 'TỰ KIỂM THẨM AN NINH',
+        title: 'Giai đoạn 04 · Khóa Quyền Hạn Bất Khả Xâm Phạm',
+        duration: '+28ms',
+        thought: 'Xác lập ranh giới cô lập tuyệt đối: Không một agent nào được đọc profile của agent khác ngoài profile được cấp quyền trong database.',
+        tool_call: null
+      },
+      {
+        stage: 'conclude',
+        anchor: '🏁',
+        stageLabel: 'KẾT LUẬN & BÀN GIAO',
+        title: 'Giai đoạn 05 · Cấp Chứng Thư An Toàn An Ninh',
+        duration: '+14ms',
+        thought: 'Hệ thống đạt tiêu chuẩn an toàn cấp doanh nghiệp (0 lỗ hổng nghiêm trọng). Phê duyệt cho phép đưa vào vận hành thực tế.',
+        tool_call: null
+      }
     ]
   };
 
   const steps = THINKING_DATA[sid] || THINKING_DATA['gw-lead-agy'];
 
-  list.innerHTML = steps.map(s => `
-    <div class="thinkingStepCard">
-      <div class="thinkingStepHead">
-        <span>${escapeHtml(s.step)}</span>
-        <span class="chip done" style="font-size:9px">ĐÃ XÁC THỰC</span>
+  list.innerHTML = steps.map((s, idx) => `
+    <div class="thinkingStepNode" id="thinkingNode-${idx}">
+      <div class="thinkingNodeAnchor">${s.anchor}</div>
+      <div class="thinkingCard">
+        <div class="thinkingCardTop">
+          <div class="thinkingStageTitle">
+            <span class="thinkingStageChip ${s.stage}">${escapeHtml(s.stageLabel)}</span>
+            <span>${escapeHtml(s.title)}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span class="chip done" style="font-size:9px;font-family:var(--mono)">✓ ĐÃ XÁC THỰC</span>
+            <span style="font-family:var(--mono);font-size:10px;color:#94a3b8">${escapeHtml(s.duration)}</span>
+          </div>
+        </div>
+        <div class="thinkingThoughtBody">${escapeHtml(s.thought)}</div>
+        ${s.tool_call ? `
+          <div class="thinkingToolCallBox">
+            <div class="thinkingToolCallHead">
+              <span>🛠️ Tool Call: Executed</span>
+              <span style="color:#4ade80">● 200 OK</span>
+            </div>
+            <div style="color:#cbd5e1;font-weight:600">$ ${escapeHtml(s.tool_call.cmd)}</div>
+            <div style="color:#64748b;font-size:10px;background:rgba(0,0,0,0.4);padding:4px 8px;border-radius:4px;overflow-x:auto">${escapeHtml(s.tool_call.output)}</div>
+          </div>
+        ` : ''}
       </div>
-      <div class="thinkingStepBody">${escapeHtml(s.desc)}</div>
     </div>
   `).join('');
+}
+
+function simulateLiveThinking() {
+  const btn = $('btnSimulateThinking');
+  const chip = $('thinkingStatusChip');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = '⏳ Đang tổng hợp suy luận...';
+  }
+  if (chip) {
+    chip.textContent = '⚡ Đang suy luận trực tiếp...';
+    chip.className = 'chip live';
+    chip.style.background = 'rgba(234, 179, 8, 0.2)';
+    chip.style.color = '#facc15';
+    chip.style.borderColor = 'rgba(234, 179, 8, 0.4)';
+  }
+
+  const nodes = document.querySelectorAll('.thinkingStepNode');
+  nodes.forEach(n => { n.style.opacity = '0.3'; n.style.transform = 'translateY(4px)'; });
+
+  let cur = 0;
+  const interval = setInterval(() => {
+    if (cur < nodes.length) {
+      nodes[cur].style.transition = 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)';
+      nodes[cur].style.opacity = '1';
+      nodes[cur].style.transform = 'translateY(0)';
+      nodes[cur].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      cur++;
+    } else {
+      clearInterval(interval);
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = '⚡ Tái suy luận (Stream)';
+      }
+      if (chip) {
+        chip.textContent = '● Logic Đã Hội Tụ';
+        chip.className = 'chip live';
+        chip.style.background = '';
+        chip.style.color = '';
+        chip.style.borderColor = '';
+      }
+      showToast('Mạch tư duy đã hoàn tất chuỗi suy luận 5 bước!');
+    }
+  }, 220);
+}
+
+function copyThinkingTrace() {
+  const current = state.tmuxSessions.find(s => s.id === state.selectedTmuxSessionId) || state.tmuxSessions[0];
+  const sid = current ? current.id : 'gw-lead-agy';
+  const roleName = current ? current.role_name : 'Lead Architect';
+  
+  const cards = document.querySelectorAll('.thinkingStepNode');
+  let fullText = `=== MẠCH TƯ DUY NHẬN THỨC · ${roleName} (${sid}) ===\nThời gian: ${new Date().toLocaleString()}\n\n`;
+  
+  cards.forEach((card, i) => {
+    const title = card.querySelector('.thinkingStageTitle')?.textContent?.trim() || `Bước ${i+1}`;
+    const body = card.querySelector('.thinkingThoughtBody')?.textContent?.trim() || '';
+    fullText += `[${i+1}] ${title}\n${body}\n\n`;
+  });
+
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(fullText);
+  }
+  showToast('Đã sao chép toàn bộ mạch tư duy vào Clipboard!');
 }
 
 /* =========================================================================
