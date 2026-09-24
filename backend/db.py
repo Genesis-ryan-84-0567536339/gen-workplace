@@ -841,7 +841,12 @@ SWARM_DEFAULT_CONFIG = [
         "account_type": "owner_default",
         "conv_id": "conv-lead-architect",
         "gemini_model": "Gemini 3.8 Flash (High)",
-        "anthropic_model": "Claude Sonnet 4.6 (Thinking)"
+        "anthropic_model": "Claude Sonnet 4.6 (Thinking)",
+        "allowed_paths": ["docs/**", "workspace/roles/**", "AGENTS.md", "README.md", "ROADMAP.md"],
+        "blocked_paths": [],
+        "current_task_id": "TODO-01",
+        "scope": "Quản trị SSOT, điều phối toàn bộ tiến trình gen-workplace",
+        "mission": "Chịu trách nhiệm bảo toàn SSOT đặc tả gốc, thẩm định evidence từ các role và điều phối live workflow."
     },
     {
         "id": "gw-backend-agy",
@@ -850,7 +855,12 @@ SWARM_DEFAULT_CONFIG = [
         "account_type": "profile1",
         "conv_id": "conv-backend-db",
         "gemini_model": "Gemini 3.8 Flash (Low)",
-        "anthropic_model": "Claude Sonnet 4.6 (Thinking)"
+        "anthropic_model": "Claude Sonnet 4.6 (Thinking)",
+        "allowed_paths": ["backend/**", "data/**", "migrations/**"],
+        "blocked_paths": ["frontend/**", "Dockerfile", "docker-compose.yml"],
+        "current_task_id": "TODO-10",
+        "scope": "Python daemon, SQLite WAL, FTS5 catalog và runner",
+        "mission": "Thực thi API control plane, tối ưu truy vấn FTS5 catalog sub-ms, quản trị SQLite WAL và lock task."
     },
     {
         "id": "gw-frontend-agy",
@@ -859,7 +869,12 @@ SWARM_DEFAULT_CONFIG = [
         "account_type": "profile2",
         "conv_id": "conv-frontend-ui",
         "gemini_model": "Gemini 3.7 Flash (High)",
-        "anthropic_model": "Claude Sonnet 4.6 (Thinking)"
+        "anthropic_model": "Claude Sonnet 4.6 (Thinking)",
+        "allowed_paths": ["frontend/**", "assets/**"],
+        "blocked_paths": ["backend/**", "data/**", "Dockerfile"],
+        "current_task_id": "TODO-03",
+        "scope": "Web console UI, CSS Gen-workplace v1.1, real-time sync",
+        "mission": "Duy trì phong cách thiết kế Nocturne Slate v1.1, bố cục 2 cột List+Detail & Tabs, bind dữ liệu thật từ backend."
     },
     {
         "id": "gw-devops-agy",
@@ -868,7 +883,12 @@ SWARM_DEFAULT_CONFIG = [
         "account_type": "profile3",
         "conv_id": "conv-devops-docker",
         "gemini_model": "Gemini 3.8 Flash (High)",
-        "anthropic_model": "Claude Sonnet 4.6 (Thinking)"
+        "anthropic_model": "Claude Sonnet 4.6 (Thinking)",
+        "allowed_paths": ["Dockerfile", "docker-compose.yml", "install.sh", "installer_tui.py", "*.desktop", "scripts/**"],
+        "blocked_paths": ["backend/main.py", "frontend/**"],
+        "current_task_id": "TODO-05",
+        "scope": "Docker, SELinux bind mounts, TUI installer, desktop shortcut",
+        "mission": "Container hóa dịch vụ, tối ưu hóa SELinux :z mounts và kịch bản cài đặt 1-lệnh đồ họa TUI."
     },
     {
         "id": "gw-qa-agy",
@@ -877,7 +897,12 @@ SWARM_DEFAULT_CONFIG = [
         "account_type": "profile4",
         "conv_id": "conv-qa-testing",
         "gemini_model": "Gemini 3.8 Flash (Low)",
-        "anthropic_model": "Claude Sonnet 4.6 (Thinking)"
+        "anthropic_model": "Claude Sonnet 4.6 (Thinking)",
+        "allowed_paths": ["tests/**", "qa_reports/**", "fixtures/**"],
+        "blocked_paths": ["backend/**", "frontend/**", "Dockerfile"],
+        "current_task_id": "TODO-12",
+        "scope": "Kiểm thử cross-platform, test API /api/status, xác thực installer",
+        "mission": "Chạy regression tests, kiểm thử đa nền tảng (Linux, macOS, Windows WSL2), xác thực tính liên tục của conversation_id."
     },
     {
         "id": "gw-security-agy",
@@ -886,11 +911,16 @@ SWARM_DEFAULT_CONFIG = [
         "account_type": "owner_default",
         "conv_id": "conv-security-audit",
         "gemini_model": "Gemini 3.1 Pro (High)",
-        "anthropic_model": "Claude Opus 4.6 (Thinking)"
+        "anthropic_model": "Claude Opus 4.6 (Thinking)",
+        "allowed_paths": ["vault/**", "security_audits/**", ".env.example"],
+        "blocked_paths": ["backend/**", "frontend/**"],
+        "current_task_id": "TODO-05",
+        "scope": "Phân quyền volume Docker, audit file permission, kiểm soát Vault",
+        "mission": "Kiểm tra an toàn SELinux, cô lập quyền hạn biến môi trường và thẩm định secret boundary RFC 7636 PKCE."
     }
 ]
 
-def generate_role_spec_file(sid, role_name, scope="", mission="", conv_id=""):
+def generate_role_spec_file(sid, role_name, scope="", mission="", conv_id="", allowed_paths=None, blocked_paths=None):
     """
     Sinh file Role Specification (ROLE.md) cô lập ngữ cảnh và trách nhiệm cho từng Agent.
     Đảm bảo 0-conflict, khóa chặt boundary thư mục và liên kết trực tiếp tới Brain SSOT.
@@ -900,19 +930,15 @@ def generate_role_spec_file(sid, role_name, scope="", mission="", conv_id=""):
     roles_dir.mkdir(parents=True, exist_ok=True)
     role_spec_path = roles_dir / f"{sid}_ROLE.md"
 
-    DEFAULT_SCOPES = {
-        'gw-lead-agy': ('Toàn bộ kiến trúc & phân nhánh Git', 'Chỉ huy Swarm, kiểm soát hợp đồng I/O giữa Backend và Frontend, duy trì chuẩn SSOT.'),
-        'gw-backend-agy': ('backend/, data/, SQLite WAL, FTS5', 'Thiết kế Schema SQLite WAL, API REST /api/* và tối ưu hóa truy vấn catalog sub-ms.'),
-        'gw-frontend-agy': ('frontend/index.html, assets/', 'Xây dựng giao diện Mission Control Deck, Core Orchestrator IDE và tối ưu UX thời gian thực.'),
-        'gw-devops-agy': ('Dockerfile, docker-compose.yml, install.sh', 'Container hóa dịch vụ, tối ưu hóa SELinux :z mounts và kịch bản cài đặt 1-lệnh.'),
-        'gw-qa-agy': ('Kiểm thử tự động, test suites, API probe', 'Kiểm thử tính liên tục của conversation_id qua các chu kỳ sleep/wake và bảo toàn token.'),
-        'gw-security-agy': ('Xác thực OAuth, phân quyền volume, Vault', 'Thẩm định bảo mật endpoint API, ngăn rò rỉ token và bảo đảm RFC 7636 PKCE.')
-    }
+    cfg = next((c for c in SWARM_DEFAULT_CONFIG if c["id"] == sid), None)
+    use_scope = scope if scope else (cfg["scope"] if cfg else "Workspace dự án")
+    use_mission = mission if mission else (cfg["mission"] if cfg else f"Thực hiện nhiệm vụ chuyên môn {role_name}.")
+    use_conv = conv_id if conv_id else (cfg["conv_id"] if cfg else f"conv-{sid}")
+    use_allowed = allowed_paths if allowed_paths is not None else (cfg.get("allowed_paths", []) if cfg else [])
+    use_blocked = blocked_paths if blocked_paths is not None else (cfg.get("blocked_paths", []) if cfg else [])
 
-    def_scope, def_mission = DEFAULT_SCOPES.get(sid, (scope or "Workspace dự án", mission or f"Thực hiện nhiệm vụ chuyên môn {role_name}."))
-    use_scope = scope if scope else def_scope
-    use_mission = mission if mission else def_mission
-    use_conv = conv_id if conv_id else f"conv-{sid}"
+    allowed_md = "\n".join([f"  - `{p}`" for p in use_allowed]) if use_allowed else "  - *Toàn quyền theo phân công của Orchestrator*"
+    blocked_md = "\n".join([f"  - `{p}`" for p in use_blocked]) if use_blocked else "  - *Không có hạn chế đặc biệt*"
 
     content = f"""# Genesis Swarm Role Specification: {role_name}
 - **Session Identifier**: `{sid}`
@@ -922,8 +948,22 @@ def generate_role_spec_file(sid, role_name, scope="", mission="", conv_id=""):
 - **Master SSOT**: `docs/SSOT_ORIGINAL_SPEC.md`
 - **Genesis Brain Link**: branch `main` của repo `Genesis-ryan-84-0567536339/Brain` (`BOOTSTRAP.md`)
 - **Execution Policy**: Autonomous Execution & Full Bypass Policy (auto-accept, không dừng bước trung gian)
-- **Zero-Conflict Rule**: Nghiêm cấm sửa đổi code ngoài phạm vi assigned scope khi chưa có handoff từ Orchestrator.
-- **Reporting Protocol**: Báo cáo trạng thái qua `/api/chat` và cập nhật SQLite todos khi hoàn thành.
+
+---
+
+### 🛡️ Ranh Giới Thư Mục Cứng (Zero-Conflict Directory Boundary)
+- **Được phép chỉnh sửa (Allowed Paths)**:
+{allowed_md}
+- **CẤM TUYỆT ĐỐI CHẠM VÀO (Blocked Paths)**:
+{blocked_md}
+
+---
+
+### 📋 Quy Chuẩn Kỷ Luật Thực Thi (Swarm Governance Protocol)
+1. **Khóa Độc Quyền Nhiệm Vụ (Task Mutex)**: Phải gọi `POST /api/task/claim` trước khi bắt đầu công việc. Tuyệt đối không can thiệp vào task đã bị worker khác khóa.
+2. **Tuân Thủ Chuỗi Phụ Thuộc (Dependency Chain)**: Không tự ý nhảy cóc khi task tiền đề (`depends_on`) chưa hoàn tất.
+3. **Nghiệm Thu Bằng Chứng (Evidence-Backed Completion)**: Chỉ được phép gọi `POST /api/task/complete` khi có bằng chứng vật lý (`commit hash`, artifact path hoặc test log).
+4. **Báo Cáo Trực Tiếp**: Gửi tiến độ qua `/api/chat` và cập nhật SQLite khi hoàn tất.
 """
     try:
         with open(role_spec_path, "w", encoding="utf-8") as f:
@@ -1052,23 +1092,31 @@ def seed_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
             acc_label = p_info.get("label") or cfg["account_type"]
             profile_dir = p_info.get("path") or ""
 
+            allowed_p = json.dumps(cfg.get("allowed_paths", []))
+            blocked_p = json.dumps(cfg.get("blocked_paths", []))
+            task_id = cfg.get("current_task_id", "")
+
             if not has_rows:
                 cursor.execute("""
                 INSERT INTO tmux_sessions (
                     id, project_id, role_name, cli_tool, account_type, account_label,
-                    profile_dir, status, pid, cwd, terminal_output, conversation_id
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'active', 0, '/workspace', '', ?)
+                    profile_dir, status, pid, cwd, terminal_output, conversation_id,
+                    allowed_paths_json, blocked_paths_json, current_task_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'active', 0, '/workspace', '', ?, ?, ?, ?)
                 """, (
                     sid, project_id, cfg["role_name"], cfg["cli_tool"], cfg["account_type"],
-                    acc_label, profile_dir, cfg["conv_id"]
+                    acc_label, profile_dir, cfg["conv_id"], allowed_p, blocked_p, task_id
                 ))
             else:
                 cursor.execute("""
                 UPDATE tmux_sessions
                 SET conversation_id = CASE WHEN conversation_id IS NULL OR conversation_id = '' THEN ? ELSE conversation_id END,
-                    account_label = CASE WHEN ? != '' THEN ? ELSE account_label END
+                    account_label = CASE WHEN ? != '' THEN ? ELSE account_label END,
+                    allowed_paths_json = ?,
+                    blocked_paths_json = ?,
+                    current_task_id = CASE WHEN current_task_id IS NULL OR current_task_id = '' THEN ? ELSE current_task_id END
                 WHERE id = ? AND project_id = ?
-                """, (cfg["conv_id"], acc_label, acc_label, sid, project_id))
+                """, (cfg["conv_id"], acc_label, acc_label, allowed_p, blocked_p, task_id, sid, project_id))
 
         conn.commit()
 
@@ -1108,6 +1156,20 @@ def get_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
             if not quota_g or not quota_a:
                 quota_g, quota_a = get_quota_telemetry(acc_type, email or "")
 
+            allowed_p = []
+            blocked_p = []
+            if "allowed_paths_json" in r.keys() and r["allowed_paths_json"]:
+                try:
+                    allowed_p = json.loads(r["allowed_paths_json"])
+                except Exception:
+                    pass
+            if "blocked_paths_json" in r.keys() and r["blocked_paths_json"]:
+                try:
+                    blocked_p = json.loads(r["blocked_paths_json"])
+                except Exception:
+                    pass
+            task_id = r["current_task_id"] if "current_task_id" in r.keys() else ""
+
             results.append({
                 "id": r["id"],
                 "role_name": r["role_name"],
@@ -1125,6 +1187,9 @@ def get_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
                 "account_name": p_info.get("name"),
                 "quota_gemini": quota_g,
                 "quota_anthropic": quota_a,
+                "allowed_paths": allowed_p,
+                "blocked_paths": blocked_p,
+                "current_task_id": task_id,
                 "attach_cmd": f"docker exec -it gen-workplace-app tmux a -t {r['id']}",
                 "updated_at": r["updated_at"]
             })
@@ -1682,7 +1747,27 @@ def process_orch_instruction(user_message, project_id="PRJ-GEN-WORKPLACE"):
 
         reply = f"Báo cáo tiến độ Swarm: Đã hoàn tất <strong>{done_cnt}</strong> tác vụ, còn <strong>{pending_cnt}</strong> tác vụ đang triển khai hoặc chờ xử lý.<br>Roadmap hiện tại: <em>{rm_text}</em>.<br>Tất cả worker đều tuân thủ chặt chẽ đặc tả SSOT gốc."
 
-    # 3. Ý định Truy vấn SSOT / Brain / Memory
+    # 3. Ý định về Quy Chuẩn Xây Dự Án & Quản Trị Nhân Sự
+    elif any(k in lower for k in ["xây dự án", "quy chuẩn", "nhân sự", "qui cách", "quản trị", "điều chỉnh", "sop", "huấn luyện"]):
+        reply = """Tôi (Gen - Core Orchestrator) đã nắm vững và tuân thủ tuyệt đối <strong>Bộ Quy Chuẩn Kiến Thiết Dự Án & Quản Trị Nhân Sự AI Chuẩn Chỉnh</strong>:
+<br><br>
+<strong>🏗️ QUY TRÌNH 5 BƯỚC XÂY DỰ ÁN CHUẨN CHỈNH:</strong><br>
+1. <strong>Ingestion & Khóa SSOT:</strong> Tiếp nhận đặc tả gốc của Owner, lưu nguyên văn vào <code>docs/SSOT_ORIGINAL_SPEC.md</code> và bảng <code>master_ssot</code>.<br>
+2. <strong>Phân Rã Roadmap Tuần Tự:</strong> Chia bài toán thành các mốc Roadmap nối tiếp, mỗi mốc có tiêu chuẩn nghiệm thu rõ ràng.<br>
+3. <strong>Phát Sinh Todo List & Chuỗi Phụ Thuộc:</strong> Chẻ nhỏ việc cho từng Role, gắn chặt mã phụ thuộc <code>depends_on</code>.<br>
+4. <strong>Thiết Lập Live Workflow DAG:</strong> Vẽ sơ đồ luồng công việc giữa các Node, khóa Hợp đồng I/O Contract.<br>
+5. <strong>Đóng Gói All-In-One:</strong> Cấu hình Docker Compose (cờ <code>:z</code>), kịch bản cài đặt TUI và shortcut Desktop.<br>
+<br>
+<strong>👥 QUY CÁCH 6 ĐIỀU LỆ QUẢN TRỊ NHÂN SỰ SWARM:</strong><br>
+1. <strong>Đúng việc mới sinh:</strong> Chỉ spawn khi có nhiệm vụ cụ thể chưa ai đảm nhận.<br>
+2. <strong>1 Profile = 1 Identity:</strong> Mỗi worker chạy profile OAuth riêng để không xung đột hạn ngạch (chống lỗi 429).<br>
+3. <strong>Khóa ranh giới 0-Conflict:</strong> Whitelist thư mục được sửa và Blacklist thư mục cấm (lưu trong <code>ROLE.md</code>).<br>
+4. <strong>Khóa độc quyền nhiệm vụ (Task Mutex):</strong> Không cho phép 2 worker cùng nhận 1 task qua <code>/api/task/claim</code>.<br>
+5. <strong>Nghiệm thu bằng chứng:</strong> Phải nộp commit hash hoặc artifact qua <code>/api/task/complete</code> mới được duyệt.<br>
+6. <strong>Vòng đời tiết kiệm:</strong> Tự động ngủ đông (0% CPU, 0MB RAM) khi rảnh rỗi và tự động thu hồi task nếu bị crash.
+"""
+
+    # 4. Ý định Truy vấn SSOT / Brain / Memory
     elif any(k in lower for k in ["brain", "ssot", "trí nhớ", "memory", "nguồn chuẩn"]):
         reply = "Toàn bộ Swarm đang được neo vững chắc vào branch <code>main</code> của repository <code>Genesis-ryan-84-0567536339/Brain</code> (file <code>BOOTSTRAP.md</code>). Master SSOT <code>docs/SSOT_ORIGINAL_SPEC.md</code> được khóa bất biến. Mọi thay đổi dữ liệu đều ghi nhận tức thì vào SQLite WAL với chỉ mục FTS5."
 

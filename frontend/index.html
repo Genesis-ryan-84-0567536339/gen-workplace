@@ -2446,9 +2446,35 @@ button { cursor: pointer; }
                 </div>
                 <div class="deckHeadActions">
                   <span class="deckQuotaPill" id="deckQuotaPill">💎 72% · ⚡ 89%</span>
-                  <button class="btn small" onclick="triggerSessionLifecycle('pause')" title="Tạm dừng">⏸ Tạm dừng</button>
-                  <button class="btn small" onclick="triggerSessionLifecycle('sleep')" title="Ngủ đông">😴 Sleep</button>
-                  <button class="btn small primary" onclick="triggerSessionLifecycle('resume')" title="Đánh thức">⚡ Thức</button>
+                  <button class="btn small" onclick="triggerSessionLifecycle('pause')" title="Tạm dừng đóng băng CPU">⏸ Tạm dừng</button>
+                  <button class="btn small" onclick="triggerSessionLifecycle('sleep')" title="Ngủ đông giải phóng 100% RAM">😴 Sleep</button>
+                  <button class="btn small primary" onclick="triggerSessionLifecycle('resume')" title="Đánh thức phiên">⚡ Thức</button>
+                </div>
+              </div>
+
+              <!-- Anti-Chaos Governance Sub-bar -->
+              <div class="deckGovernanceBar" style="background:#090d14;border-bottom:1px solid #1a2332;padding:6px 16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;font-size:11px">
+                <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+                  <div style="display:flex;align-items:center;gap:5px">
+                    <span style="color:#94a3b8;font-weight:600">📌 Nhiệm vụ:</span>
+                    <span id="deckAgentActiveTask" style="font-family:var(--mono);font-weight:700;color:#38bdf8;background:rgba(56,189,248,0.12);padding:2px 8px;border-radius:4px;border:1px solid rgba(56,189,248,0.3)">Chưa nhận việc</span>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:5px">
+                    <span style="color:#94a3b8;font-weight:600">🛡️ Quyền sửa:</span>
+                    <span id="deckAgentAllowed" style="font-family:var(--mono);color:#4ade80;background:rgba(74,222,128,0.1);padding:2px 8px;border-radius:4px;border:1px solid rgba(74,222,128,0.25)" title="">*</span>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:5px">
+                    <span style="color:#94a3b8;font-weight:600">⛔ Cấm:</span>
+                    <span id="deckAgentBlocked" style="font-family:var(--mono);color:#f87171;background:rgba(248,113,113,0.1);padding:2px 8px;border-radius:4px;border:1px solid rgba(248,113,113,0.25)" title="">None</span>
+                  </div>
+                </div>
+                <div style="display:flex;align-items:center;gap:6px">
+                  <button class="btn small" style="font-size:10.5px;padding:3px 9px;background:rgba(56,189,248,0.15);color:#38bdf8;border-color:rgba(56,189,248,0.3)" onclick="promptClaimTask()" title="Khóa độc quyền một nhiệm vụ cho chuyên gia này (Task Mutex)">
+                    🔒 Khóa Task (Claim)
+                  </button>
+                  <button class="btn small" style="font-size:10.5px;padding:3px 9px;background:rgba(74,222,128,0.15);color:#4ade80;border-color:rgba(74,222,128,0.3)" onclick="promptCompleteTask()" title="Nghiệm thu hoàn thành task kèm bằng chứng commit/artifact">
+                    ✅ Nộp Bằng Chứng (Complete)
+                  </button>
                 </div>
               </div>
 
@@ -3867,6 +3893,7 @@ function renderTmuxSessions() {
 
   renderExpertSquadGrid();
   updateCommandDeck();
+  renderOrchSwarmCards();
 }
 
 function renderExpertSquadGrid() {
@@ -3878,13 +3905,20 @@ function renderExpertSquadGrid() {
     const avatar = ROLE_AVATARS[s.id] || '🤖';
     const email = s.email || (s.account_label?.includes('@') ? s.account_label.split('(')[1]?.replace(')', '') : 'Chưa đăng nhập');
     const isAuth = s.is_auth || (email && email !== 'Chưa đăng nhập');
-    const qG = s.quota_gemini || { percent: 25, model: 'Gemini 3.8 Flash' };
-    const qA = s.quota_anthropic || { percent: 94, model: 'Claude Sonnet 4.6' };
+    const qG = s.quota_gemini || { percent: 72, model: 'Gemini 3.8 Flash' };
+    const qA = s.quota_anthropic || { percent: 89, model: 'Claude Sonnet 4.6' };
     const isHib = s.status === 'hibernated';
     const isPaused = s.status === 'paused';
 
     const statusLabel = isHib ? '😴 Sleep' : (isPaused ? '⏸ Paused' : '● Live');
     const statusClass = isHib ? 'sleep' : (isPaused ? 'paused' : 'live');
+
+    const hasTask = Boolean(s.current_task_id && s.current_task_id.trim());
+    const taskBadge = hasTask 
+      ? `<div style="font-size:9.5px;font-family:var(--mono);font-weight:600;color:#38bdf8;background:rgba(56,189,248,0.12);padding:2px 6px;border-radius:4px;border:1px solid rgba(56,189,248,0.3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Nhiệm vụ đang giữ: ${escapeHtml(s.current_task_id)}">📌 ${escapeHtml(s.current_task_id)}</div>`
+      : `<div style="font-size:9.5px;color:var(--muted);background:rgba(255,255,255,0.03);padding:2px 6px;border-radius:4px;border:1px solid rgba(255,255,255,0.06);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">☕ Rảnh rỗi</div>`;
+
+    const allowed = (s.allowed_paths && s.allowed_paths.length) ? s.allowed_paths.slice(0, 2).join(', ') : 'Toàn quyền';
 
     return `
       <div class="expertCard ${isSel ? 'active' : ''} ${isHib ? 'hibernated' : ''}" onclick="selectTmuxSession('${escapeHtml(s.id)}')">
@@ -3914,6 +3948,12 @@ function renderExpertSquadGrid() {
           <span style="font-size:9px;color:var(--muted2);font-family:var(--mono)">${s.pid > 0 ? 'PID ' + s.pid : '0MB RAM'}</span>
         </div>
 
+        ${taskBadge}
+
+        <div style="font-size:9px;color:var(--muted2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Được sửa: ${escapeHtml(s.allowed_paths?.join(', ') || 'Toàn quyền')}">
+          🛡️ <span style="color:#4ade80">${escapeHtml(allowed)}</span>
+        </div>
+
         <div class="expertCardAccount" title="${escapeHtml(email)}">
           <span class="gIconBadge">G</span>
           <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(email)}</span>
@@ -3921,12 +3961,12 @@ function renderExpertSquadGrid() {
 
         <div class="expertCardQuota">
           <div class="microQuotaRow">
-            <span style="color:#38bdf8">G: ${qG.percent || 25}%</span>
-            <div class="microBarTrack"><div class="microBarFill gemini" style="width:${qG.percent || 25}%"></div></div>
+            <span style="color:#38bdf8">G: ${qG.percent || 72}%</span>
+            <div class="microBarTrack"><div class="microBarFill gemini" style="width:${qG.percent || 72}%"></div></div>
           </div>
           <div class="microQuotaRow">
-            <span style="color:#f59e0b">C: ${qA.percent || 94}%</span>
-            <div class="microBarTrack"><div class="microBarFill anthropic" style="width:${qA.percent || 94}%"></div></div>
+            <span style="color:#f59e0b">C: ${qA.percent || 89}%</span>
+            <div class="microBarTrack"><div class="microBarFill anthropic" style="width:${qA.percent || 89}%"></div></div>
           </div>
         </div>
       </div>
@@ -3942,17 +3982,47 @@ function updateCommandDeck() {
   const email = current.email || (current.account_label?.includes('@') ? current.account_label.split('(')[1]?.replace(')', '') : 'Chưa đăng nhập');
   const isHib = current.status === 'hibernated';
   const isPaused = current.status === 'paused';
-  const qG = current.quota_gemini || { percent: 25 };
-  const qA = current.quota_anthropic || { percent: 94 };
+  const qG = current.quota_gemini || { percent: 72 };
+  const qA = current.quota_anthropic || { percent: 89 };
 
   if ($('deckAgentAvatar')) $('deckAgentAvatar').textContent = avatar;
   if ($('deckAgentRole')) $('deckAgentRole').textContent = current.role_name;
   if ($('deckAgentSid')) $('deckAgentSid').textContent = current.id;
   if ($('deckAgentConv')) $('deckAgentConv').textContent = current.conversation_id || ('conv-' + current.id);
   if ($('deckAgentEmail')) $('deckAgentEmail').textContent = email;
-  if ($('deckQuotaGeminiVal')) $('deckQuotaGeminiVal').textContent = (qG.percent || 25) + '%';
-  if ($('deckQuotaClaudeVal')) $('deckQuotaClaudeVal').textContent = (qA.percent || 94) + '%';
-  if ($('deckQuotaPill')) $('deckQuotaPill').textContent = `💎 ${(qG.percent || 25)}% · ⚡ ${(qA.percent || 94)}%`;
+  if ($('deckQuotaGeminiVal')) $('deckQuotaGeminiVal').textContent = (qG.percent || 72) + '%';
+  if ($('deckQuotaClaudeVal')) $('deckQuotaClaudeVal').textContent = (qA.percent || 89) + '%';
+  if ($('deckQuotaPill')) $('deckQuotaPill').textContent = `💎 ${(qG.percent || 72)}% · ⚡ ${(qA.percent || 89)}%`;
+
+  // Anti-Chaos Task & Boundary binding
+  const taskEl = $('deckAgentActiveTask');
+  if (taskEl) {
+    if (current.current_task_id && current.current_task_id.trim()) {
+      taskEl.textContent = current.current_task_id;
+      taskEl.style.color = '#38bdf8';
+      taskEl.style.background = 'rgba(56,189,248,0.15)';
+      taskEl.style.borderColor = 'rgba(56,189,248,0.4)';
+    } else {
+      taskEl.textContent = '☕ Rảnh rỗi (Chưa nhận việc)';
+      taskEl.style.color = '#94a3b8';
+      taskEl.style.background = 'rgba(148,163,184,0.1)';
+      taskEl.style.borderColor = 'rgba(148,163,184,0.2)';
+    }
+  }
+
+  const allowedEl = $('deckAgentAllowed');
+  if (allowedEl) {
+    const list = current.allowed_paths || [];
+    allowedEl.textContent = list.length > 0 ? list.join(', ') : 'Toàn quyền';
+    allowedEl.title = list.join('\n');
+  }
+
+  const blockedEl = $('deckAgentBlocked');
+  if (blockedEl) {
+    const list = current.blocked_paths || [];
+    blockedEl.textContent = list.length > 0 ? list.join(', ') : 'Không có';
+    blockedEl.title = list.join('\n');
+  }
 
   // Status Badge
   const badge = $('deckAgentStatusBadge');
@@ -4361,13 +4431,13 @@ function renderOrchDefinition() {
   container.innerHTML = `
     <div class="orchSection">
       <div class="orchSectionHead">
-        <h4>📜 Hồ Sơ & Quyền Hạn Orchestrator</h4>
-        <span class="orchToggle">Core Leader</span>
+        <h4>📜 Hồ Sơ & Quyền Hạn Core Orchestrator (Gen)</h4>
+        <span class="orchToggle">Global Control Plane</span>
       </div>
       <div class="orchSectionBody">
-        <p><strong>Vai trò:</strong> Genesis Brain Swarm Orchestrator & Chief of Staff</p>
-        <p><strong>Nhiệm vụ:</strong> Tiếp nhận bài toán vĩ mô từ Owner (Ryan), phân rã yêu cầu thành các roadmap, sinh ra (spawn) sub-agent nhân viên theo nhu cầu thực tế và thu hồi (hibernate/kill) khi hoàn thành. Đảm bảo toàn bộ Swarm vận hành thống nhất theo tiêu chuẩn SSOT.</p>
-        <p><strong>Mô hình AI:</strong> Google Gemini 3.8 Flash (High) / Claude Sonnet 4.6 (Thinking)</p>
+        <p><strong>Vai trò:</strong> Genesis Brain Swarm Orchestrator & Chief of Staff (Gen)</p>
+        <p><strong>Nhiệm vụ tối cao:</strong> Tiếp nhận bài toán vĩ mô từ Owner (Ryan), phân rã yêu cầu thành các roadmap, sinh ra (spawn) sub-agent nhân viên theo nhu cầu thực tế, áp đặt ranh giới thư mục và thu hồi khi hoàn thành. Đảm bảo toàn bộ Swarm vận hành thống nhất theo tiêu chuẩn SSOT.</p>
+        <p><strong>Mô hình AI:</strong> Google Gemini 3.8 Flash (High) / Claude Sonnet 4.6 (Extended Thinking)</p>
         <p><strong>Cơ chế Bootstrap:</strong> Đọc trực tiếp <code>BOOTSTRAP.md</code> trên branch <code>main</code> của <code>Genesis-ryan-84-0567536339/Brain</code> trước mọi tác vụ.</p>
         <pre><code># Autonomous Execution & Full Bypass Policy
 - Tự động chạy tất cả lệnh terminal cần thiết, đọc/ghi/sửa file, gọi MCP tool mà không hỏi xin quyền ở bước trung gian.
@@ -4378,14 +4448,33 @@ function renderOrchDefinition() {
 
     <div class="orchSection">
       <div class="orchSectionHead">
-        <h4>🛡️ Hợp Đồng Trách Nhiệm Với Worker Swarm</h4>
-        <span class="orchToggle">Quy Chuẩn</span>
+        <h4>🏗️ Quy Trình 5 Bước Kiến Thiết Dự Án Chuẩn Chỉnh (Project Construction SOP)</h4>
+        <span class="orchToggle">Chuẩn Bắt Buộc</span>
       </div>
       <div class="orchSectionBody">
-        <ul style="margin:0;padding-left:18px;line-height:1.7">
-          <li><strong>Nguyên tắc 1 Profile = 1 Identity:</strong> Mỗi worker chạy trên 1 runtime tmux tách biệt, profile gemini riêng để chống cạn hạn ngạch chung.</li>
-          <li><strong>Không giẫm chân nhau (0-Conflict):</strong> Mọi thay đổi code đều tuân theo phân quyền thư mục (Frontend: <code>frontend/</code>, Backend: <code>backend/</code>, DevOps: <code>Dockerfile/docker-compose</code>).</li>
-          <li><strong>Tự động giải phóng tài nguyên:</strong> Khi không có nhiệm vụ, worker được chuyển sang trạng thái <code>hibernated</code> (0% CPU, 0MB RAM) và tự đánh thức tức thì khi có chỉ thị mới.</li>
+        <ol style="margin:0;padding-left:18px;line-height:1.75">
+          <li><strong>Tiếp nhận đặc tả & Khóa SSOT (Spec Ingestion):</strong> Lưu nguyên văn yêu cầu gốc của Owner vào <code>docs/SSOT_ORIGINAL_SPEC.md</code> và bảng <code>master_ssot</code>. Tuyệt đối không suy diễn thêm bớt ngoài ý định gốc.</li>
+          <li><strong>Phân rã Lộ trình Tuần tự (Roadmap Breakdown):</strong> Chia nhỏ dự án thành 3 - 6 mốc Roadmap tuần tự (Hàng 1), mỗi mốc gắn với một mục tiêu kiến trúc độc lập.</li>
+          <li><strong>Phát sinh Todo List & Khóa Phụ Thuộc (Todo DAG):</strong> Chẻ nhỏ việc cho từng Role, gắn chặt mã phụ thuộc <code>depends_on</code> để ngăn chặn việc chạy tắt đón đầu.</li>
+          <li><strong>Thiết lập Live Workflow DAG & Hợp đồng I/O:</strong> Vẽ sơ đồ luồng dữ liệu giữa các Node, khóa Hợp đồng Đầu vào / Đầu ra (Input/Output Contract).</li>
+          <li><strong>Đóng gói Phân phối All-In-One:</strong> Cấu hình Docker Compose (cờ <code>:z</code>), kịch bản cài đặt dòng lệnh TUI (<code>install.sh</code>) và tự động tạo shortcut Desktop.</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="orchSection">
+      <div class="orchSectionHead">
+        <h4>👥 Quy Cách 6 Điều Lệ Quản Trị & Sinh Nhân Sự AI (Personnel Governance)</h4>
+        <span class="orchToggle">Kỷ Luật Thép</span>
+      </div>
+      <div class="orchSectionBody">
+        <ul style="margin:0;padding-left:18px;line-height:1.75">
+          <li><strong>Điều 1: Đúng việc mới sinh (Demand-Driven Spawning):</strong> Không bao giờ spawn nhân sự bừa bãi. Chỉ spawn khi có đầu việc Todo cụ thể chưa ai đảm nhận.</li>
+          <li><strong>Điều 2: 1 Profile = 1 Identity (Cô lập OAuth Pool):</strong> Mỗi nhân sự chạy trên 1 runtime tmux tách biệt, profile Google/Claude độc lập để chống cạn hạn ngạch chung (chống lỗi 429).</li>
+          <li><strong>Điều 3: Khóa ranh giới thư mục 0-Conflict:</strong> Whitelist thư mục được sửa (Allowed Paths) và Blacklist thư mục cấm (Blocked Paths) được sinh vào <code>ROLE.md</code>. Cấm tuyệt đối xâm lấn file của đồng đội.</li>
+          <li><strong>Điều 4: Khóa độc quyền nhiệm vụ (Atomic Task Mutex):</strong> Worker phải claim task qua <code>/api/task/claim</code> trước khi làm. Tuyệt đối không cho 2 worker cùng nhận 1 task.</li>
+          <li><strong>Điều 5: Nghiệm thu bằng chứng (Evidence-Backed Completion):</strong> Cấm tự nhận "Done" bằng lời nói. Bắt buộc nộp commit hash hoặc artifact qua <code>/api/task/complete</code> mới được duyệt.</li>
+          <li><strong>Điều 6: Vòng đời tiết kiệm & Chống Zombie:</strong> Tự động ngủ đông (0% CPU, 0MB RAM) khi rảnh rỗi. Thu hồi task nếu worker bị crash quá 5 phút không heartbeat.</li>
         </ul>
       </div>
     </div>
@@ -4487,25 +4576,61 @@ function renderOrchSwarmCards() {
 
   container.innerHTML = sessions.map(s => {
     const avatar = ROLE_AVATARS[s.id] || '🤖';
-    const isLive = s.status === 'running' || s.status === 'idle';
-    const statusColor = isLive ? 'var(--green, #10b981)' : (s.status === 'paused' ? 'var(--yellow, #f59e0b)' : 'var(--muted, #6b7280)');
-    const statusText = isLive ? 'Live' : (s.status === 'paused' ? 'Paused' : 'Sleeping');
+    const isHib = s.status === 'hibernated';
+    const isPaused = s.status === 'paused';
+    const isLive = !isHib && !isPaused;
+
+    const statusLabel = isHib ? '😴 Ngủ đông' : (isPaused ? '⏸ Tạm dừng' : '● Đang chạy');
+    const statusClass = isHib ? 'sleep' : (isPaused ? 'paused' : 'live');
+    const qG = s.quota_gemini?.percent ?? 72;
+    const qA = s.quota_anthropic?.percent ?? 89;
+
+    const hasTask = Boolean(s.current_task_id && s.current_task_id.trim());
+    const allowed = (s.allowed_paths && s.allowed_paths.length) ? s.allowed_paths.join(', ') : 'Toàn quyền';
+    const blocked = (s.blocked_paths && s.blocked_paths.length) ? s.blocked_paths.join(', ') : 'Không có';
 
     return `
-      <div style="background:var(--panel2);border:1px solid var(--line);border-radius:var(--radius);padding:10px;display:flex;flex-direction:column;gap:6px">
+      <div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:8px">
         <div style="display:flex;align-items:center;justify-content:space-between">
           <div style="display:flex;align-items:center;gap:8px">
-            <span style="font-size:18px">${avatar}</span>
-            <strong style="font-size:12px;color:var(--text)">${escapeHtml(s.role_name || s.id)}</strong>
+            <span style="font-size:20px">${avatar}</span>
+            <div>
+              <strong style="font-size:13px;color:var(--text);display:block;line-height:1.2">${escapeHtml(s.role_name || s.id)}</strong>
+              <span style="font-size:10px;color:var(--muted);font-family:var(--mono)">${escapeHtml(s.id)}</span>
+            </div>
           </div>
-          <span style="font-size:10px;font-weight:600;color:${statusColor}">● ${statusText}</span>
+          <span class="expertStatusChip ${statusClass}">${statusLabel}</span>
         </div>
-        <div style="font-size:10.5px;color:var(--muted);font-family:var(--mono)">
-          <span>ID: ${escapeHtml(s.id)}</span> · <span>PID: ${escapeHtml(s.pid || 'N/A')}</span>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:10px;font-family:var(--mono);background:rgba(0,0,0,0.25);padding:3px 8px;border-radius:5px">
+          <span>PID: <strong style="color:var(--text)">${escapeHtml(s.pid > 0 ? s.pid : '0 (Off)')}</strong></span>
+          <span style="color:#7da8ff">💎 ${qG}% · ⚡ ${qA}%</span>
         </div>
-        <button class="btn small" style="font-size:10.5px;padding:3px 8px;margin-top:2px" onclick="focusWorkerFromOrch('${escapeHtml(s.id)}')">
-          🔍 Điều khiển chi tiết
-        </button>
+
+        <div style="font-size:11px;display:flex;flex-direction:column;gap:3px;background:rgba(255,255,255,0.02);padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.05)">
+          <div style="display:flex;align-items:center;gap:5px">
+            <span style="color:#94a3b8;font-size:10.5px">📌 Nhiệm vụ:</span>
+            <span style="font-family:var(--mono);font-size:10.5px;font-weight:600;color:${hasTask ? '#38bdf8' : '#94a3b8'}">${escapeHtml(hasTask ? s.current_task_id : 'Rảnh rỗi')}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+            <span style="color:#94a3b8;font-size:10px">🛡️ Được sửa:</span>
+            <span style="font-family:var(--mono);font-size:10px;color:#4ade80" title="${escapeHtml(allowed)}">${escapeHtml(allowed)}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+            <span style="color:#94a3b8;font-size:10px">⛔ Cấm sửa:</span>
+            <span style="font-family:var(--mono);font-size:10px;color:#f87171" title="${escapeHtml(blocked)}">${escapeHtml(blocked)}</span>
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:5px;margin-top:2px">
+          <button class="btn small primary" style="flex:1;font-size:11px;padding:4px 8px" onclick="focusWorkerFromOrch('${escapeHtml(s.id)}')">
+            🔍 Vào Bàn Làm Việc
+          </button>
+          ${isHib
+            ? `<button class="btn small" style="padding:4px 8px" onclick="triggerGridLifecycle('${escapeHtml(s.id)}', 'wake')" title="Đánh thức dậy">⚡ Thức</button>`
+            : `<button class="btn small" style="padding:4px 8px" onclick="triggerGridLifecycle('${escapeHtml(s.id)}', 'hibernate')" title="Ngủ đông giải phóng RAM">😴 Ngủ</button>`
+          }
+        </div>
       </div>
     `;
   }).join('');
@@ -4572,6 +4697,73 @@ async function orchSpawnWorker() {
   renderExpertSquadGrid();
   renderOrchSwarmCards();
   showToast('✅ Đã spawn thành công worker: ' + roleName);
+}
+
+async function promptClaimTask(defaultTaskId) {
+  const current = state.tmuxSessions?.find(s => s.id === state.selectedTmuxSessionId) || state.tmuxSessions?.[0];
+  if (!current) return;
+
+  const taskId = prompt(`[Khóa Task Độc Quyền] Nhập mã Task ID cần giao cho ${current.role_name} (${current.id}):`, defaultTaskId || current.current_task_id || '');
+  if (!taskId || !taskId.trim()) return;
+
+  try {
+    const res = await fetch('/api/task/claim', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        task_id: taskId.trim(),
+        session_id: current.id,
+        project_id: state.project?.id || 'PRJ-GEN-WORKPLACE'
+      })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      showToast(`🔒 Đã khóa thành công task ${taskId.trim()} cho ${current.role_name}!`);
+      await refreshTmuxSessions();
+      if (typeof loadTodos === 'function') loadTodos();
+    } else {
+      alert(`⚠️ Không thể khóa task: ${data.detail || 'Lỗi không xác định'}`);
+    }
+  } catch (e) {
+    alert(`❌ Lỗi kết nối: ${e.message}`);
+  }
+}
+
+async function promptCompleteTask() {
+  const current = state.tmuxSessions?.find(s => s.id === state.selectedTmuxSessionId) || state.tmuxSessions?.[0];
+  if (!current) return;
+
+  const taskId = current.current_task_id || prompt(`[Nghiệm Thu Nhiệm Vụ] Nhập mã Task ID mà ${current.role_name} đã hoàn thành:`);
+  if (!taskId || !taskId.trim()) return;
+
+  const evidence = prompt(`[Bằng Chứng Nghiệm Thu Bắt Buộc] Nhập Commit Hash, đường dẫn Artifact hoặc Test Log cho task ${taskId.trim()}:`);
+  if (!evidence || !evidence.trim()) {
+    alert('⚠️ Điều lệ số 5: Không thể hoàn tất nhiệm vụ mà không có bằng chứng (Evidence)! Yêu cầu nhập commit hash hoặc artifact path.');
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/task/complete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        task_id: taskId.trim(),
+        session_id: current.id,
+        evidence_ref: evidence.trim(),
+        project_id: state.project?.id || 'PRJ-GEN-WORKPLACE'
+      })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      showToast(`🎉 Nghiệm thu thành công task ${taskId.trim()}! Bằng chứng đã lưu vào hệ thống.`);
+      await refreshTmuxSessions();
+      if (typeof loadTodos === 'function') loadTodos();
+    } else {
+      alert(`⚠️ Không thể nghiệm thu task: ${data.detail || 'Lỗi không xác định'}`);
+    }
+  } catch (e) {
+    alert(`❌ Lỗi kết nối: ${e.message}`);
+  }
 }
 
 async function triggerSessionLifecycle(action) {
