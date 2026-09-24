@@ -213,6 +213,18 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             command = data.get("command", "").strip()
             key = data.get("key", "").strip()
             if session_id and (command or key):
+                # Tự động đánh thức nếu phiên đang ngủ đông hoặc đóng băng
+                with db.get_connection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT status FROM tmux_sessions WHERE id = ?", (session_id,))
+                    s_row = cursor.fetchone()
+                    if s_row and s_row["status"] == "hibernated":
+                        db.wake_tmux_session(session_id)
+                        time.sleep(0.2)
+                    elif s_row and s_row["status"] == "paused":
+                        db.resume_tmux_session(session_id)
+                        time.sleep(0.1)
+
                 tmux_success = False
                 payload = key if key else command
                 try:
@@ -235,6 +247,20 @@ class SwarmHandler(SimpleHTTPRequestHandler):
                 })
             else:
                 self._send_json(400, {"error": "Missing session_id or (command / key)"})
+            return
+
+        # 6.1. Quản trị vòng đời phiên Tmux (Pause, Resume, Hibernate, Wake)
+        if path == "/api/tmux/action":
+            session_id = data.get("session_id", "all")
+            action = data.get("action", "wake") # pause, resume, hibernate, wake, sleep_all, wake_all
+            project_id = data.get("project_id", "PRJ-GEN-WORKPLACE")
+            results = db.manage_tmux_swarm_lifecycle(action, session_id, project_id)
+            self._send_json(200, {
+                "status": "ok",
+                "action": action,
+                "target": session_id,
+                "results": results
+            })
             return
 
         # 7. Bắt đầu luồng đăng nhập OAuth cho Profile

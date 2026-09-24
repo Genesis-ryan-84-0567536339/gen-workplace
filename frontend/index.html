@@ -1827,15 +1827,18 @@ button { cursor: pointer; }
 
         <!-- 1. VIEW TMUX RUNTIMES (MẶC ĐỊNH HIỂN THỊ) -->
         <div class="agentSubView active" id="agentView-tmux">
-          <!-- Thanh điều khiển hiển thị (Cửa sổ chi tiết vs Lưới 6 phiên) -->
+          <!-- Thanh điều khiển hiển thị & Quản trị tài nguyên Swarm -->
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
             <div style="display:flex;align-items:center;gap:6px">
               <span style="font-size:11px;color:var(--muted)">Chế độ xem:</span>
               <button class="btn small primary" id="btnTmuxSingle" onclick="setTmuxMode('single')">Cửa sổ chi tiết (Interactive Terminal)</button>
               <button class="btn small" id="btnTmuxGrid" onclick="setTmuxMode('grid')">Lưới 6 phiên (Mission Control Grid)</button>
             </div>
-            <div style="font-size:11px;color:var(--muted2)">
-              CLI Engine mặc định: <b>agy CLI v1.2.8</b> · Tài khoản: <b>Owner Default Gmail</b>
+            <!-- Bổ sung Quản Trị Vòng Đời Swarm (Tiết kiệm tài nguyên) -->
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="font-size:11px;color:var(--muted)">Quản trị tài nguyên:</span>
+              <button class="btn small" onclick="triggerSwarmLifecycle('sleep_all')" title="Tạm tắt tất cả 6 phiên để giải phóng 100% CPU & RAM, bảo toàn hội thoại">😴 Ngủ đông tất cả (0% CPU/RAM)</button>
+              <button class="btn small primary" onclick="triggerSwarmLifecycle('wake_all')" title="Kích hoạt lại toàn bộ 6 phiên Swarm">⚡ Đánh thức tất cả (Wake All)</button>
             </div>
           </div>
 
@@ -1846,7 +1849,7 @@ button { cursor: pointer; }
           <div class="tmuxTerminalBox" id="tmuxSingleView">
             <div class="tmuxTerminalHead">
               <div class="tmuxTerminalTitle">
-                <span class="dot done"></span>
+                <span class="dot done" id="tmuxTermStatusDot"></span>
                 <strong id="tmuxTermSessionName">tmux: gw-lead-agy</strong>
                 <span style="color:var(--muted2)">· window 0: agy-cli · PID <span id="tmuxTermPid">30129</span></span>
                 <span class="chip done" id="tmuxTermConvBadge" style="font-size:10px;font-family:var(--mono)">🔗 conv-lead-architect</span>
@@ -1859,11 +1862,12 @@ button { cursor: pointer; }
                   <button class="btn small" onclick="openAccountModal()" style="padding:2px 6px;margin-left:4px">Đổi Profile</button>
                   <button class="btn small primary" onclick="openOauthModalForSession()" style="padding:2px 6px;margin-left:4px">🔐 Đăng nhập OAuth</button>
                 </div>
+                <!-- Dynamic Lifecycle Action Buttons (Pause, Resume, Hibernate, Wake) -->
+                <div style="display:flex;gap:4px" id="tmuxLifecycleButtons"></div>
                 <div style="display:flex;gap:4px">
                   <button class="btn small" onclick="sendTmuxKey('C-c')" title="Gửi ngắt lệnh Ctrl+C">Ctrl+C</button>
                   <button class="btn small" onclick="sendTmuxKey('Enter')" title="Gửi Enter">Enter</button>
                   <button class="btn small" onclick="clearTmuxTerminal()" title="Xóa màn hình">Clear</button>
-                  <button class="btn small" onclick="restartTmuxSession()" title="Khởi động lại phiên">Restart</button>
                 </div>
               </div>
             </div>
@@ -3429,9 +3433,46 @@ function renderTmuxSessions() {
   const current = state.tmuxSessions.find(s => s.id === state.selectedTmuxSessionId) || state.tmuxSessions[0];
   if (current) {
     if ($('tmuxTermSessionName')) $('tmuxTermSessionName').textContent = 'tmux: ' + current.id;
-    if ($('tmuxTermPid')) $('tmuxTermPid').textContent = current.pid || 'running';
+    if ($('tmuxTermPid')) $('tmuxTermPid').textContent = current.pid > 0 ? current.pid : '0 (ngủ đông)';
     if ($('tmuxTermConvBadge')) $('tmuxTermConvBadge').textContent = '🔗 ' + (current.conversation_id || 'conv-' + current.id);
     
+    // Status Dot & Badge
+    if ($('tmuxTermStatusDot')) {
+      $('tmuxTermStatusDot').className = current.status === 'active' ? 'dot done' : (current.status === 'paused' ? 'dot wait' : 'dot backlog');
+    }
+    if ($('tmuxLiveStatusBadge')) {
+      if (current.status === 'hibernated') {
+        $('tmuxLiveStatusBadge').textContent = '😴 Đang ngủ đông (0% CPU, 0MB RAM)';
+        $('tmuxLiveStatusBadge').className = 'chip backlog';
+      } else if (current.status === 'paused') {
+        $('tmuxLiveStatusBadge').textContent = '⏸ Đóng băng CPU (SIGSTOP)';
+        $('tmuxLiveStatusBadge').className = 'chip wait';
+      } else {
+        $('tmuxLiveStatusBadge').textContent = '● Real Tmux Live';
+        $('tmuxLiveStatusBadge').className = 'chip done';
+      }
+    }
+
+    // Dynamic Lifecycle Control Buttons
+    const lifeBox = $('tmuxLifecycleButtons');
+    if (lifeBox) {
+      if (current.status === 'hibernated') {
+        lifeBox.innerHTML = `
+          <button class="btn small primary" onclick="triggerSessionLifecycle('wake')" title="Khởi động lại phiên, nạp lại đúng Conversation ID">⚡ Gọi lại phiên (Wake Up)</button>
+        `;
+      } else if (current.status === 'paused') {
+        lifeBox.innerHTML = `
+          <button class="btn small primary" onclick="triggerSessionLifecycle('resume')" title="Mở khóa CPU tiếp tục">▶ Tiếp tục</button>
+          <button class="btn small" onclick="triggerSessionLifecycle('hibernate')" title="Tạm tắt giải phóng 100% RAM & CPU">😴 Ngủ đông</button>
+        `;
+      } else {
+        lifeBox.innerHTML = `
+          <button class="btn small" onclick="triggerSessionLifecycle('pause')" title="Đóng băng CPU về 0.0%">⏸ Đóng băng CPU</button>
+          <button class="btn small" onclick="triggerSessionLifecycle('hibernate')" title="Tạm tắt giải phóng 100% RAM & CPU, bảo toàn hội thoại">😴 Ngủ đông (0MB RAM)</button>
+        `;
+      }
+    }
+
     // Account Badge
     const email = current.email || (current.account_label?.includes('@') ? current.account_label.split('(')[1]?.replace(')', '') : null);
     if ($('tmuxTermAccountLabel')) {
@@ -3483,17 +3524,26 @@ function renderTmuxSessions() {
       const isAuth = s.is_auth || (email && email !== 'Chưa đăng nhập');
       const qG = s.quota_gemini || { percent: 88, model: 'Gemini 3.8 Flash' };
       const qA = s.quota_anthropic || { percent: 94, model: 'Claude Sonnet 4.6' };
+      const isHib = s.status === 'hibernated';
+      const isPaused = s.status === 'paused';
 
       return `
-        <div class="tmuxGridCell">
+        <div class="tmuxGridCell" style="${isHib ? 'opacity:0.75;border-color:#333' : ''}">
           <div class="tmuxGridHead">
             <div>
+              <span class="dot ${s.status === 'active' ? 'done' : (isPaused ? 'wait' : 'backlog')}"></span>
               <strong>${escapeHtml(s.role_name)}</strong>
               <span style="font-family:monospace;font-size:10px;color:var(--muted2)"> (${escapeHtml(s.id)})</span>
             </div>
-            <div style="display:flex;gap:4px">
-              <button class="btn small" onclick="copyGridAttach('${escapeHtml(s.id)}')" style="font-size:9.5px;padding:2px 5px" title="Sao chép lệnh attach terminal">Attach</button>
-              <button class="btn small" onclick="openAccountModal('${escapeHtml(s.id)}')" style="font-size:9.5px;padding:2px 5px">Đổi Acc</button>
+            <div style="display:flex;gap:3px">
+              ${isHib 
+                ? `<button class="btn small primary" onclick="triggerGridLifecycle('${escapeHtml(s.id)}', 'wake')" style="font-size:9px;padding:2px 5px">⚡ Đánh thức</button>`
+                : (isPaused 
+                    ? `<button class="btn small primary" onclick="triggerGridLifecycle('${escapeHtml(s.id)}', 'resume')" style="font-size:9px;padding:2px 5px">▶ Tiếp tục</button>`
+                    : `<button class="btn small" onclick="triggerGridLifecycle('${escapeHtml(s.id)}', 'hibernate')" style="font-size:9px;padding:2px 5px" title="Tạm tắt giải phóng 100% RAM/CPU">😴 Tắt</button>`
+                  )
+              }
+              <button class="btn small" onclick="copyGridAttach('${escapeHtml(s.id)}')" style="font-size:9px;padding:2px 5px" title="Sao chép lệnh attach">Attach</button>
             </div>
           </div>
 
@@ -3502,7 +3552,9 @@ function renderTmuxSessions() {
               <span class="gIconBadge">G</span>
               <span style="font-family:var(--mono);color:${isAuth ? '#5eead4' : '#f87171'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(email)}</span>
             </span>
-            <span style="color:var(--muted2);font-size:8.5px;white-space:nowrap">${escapeHtml(s.conversation_id || 'conv')}</span>
+            <span class="chip ${s.status === 'active' ? 'live' : (isPaused ? 'wait' : 'backlog')}" style="font-size:8.5px;padding:1px 4px">
+              ${s.status === 'active' ? '● Live' : (isPaused ? '⏸ Paused' : '😴 Sleep')}
+            </span>
           </div>
 
           <!-- Dual Quota Mini-Bars -->
@@ -3524,12 +3576,71 @@ function renderTmuxSessions() {
             ${escapeHtml(s.terminal_output || 'Session online. Ready.').replace(/\n/g, '<br>')}
           </div>
           <div class="tmuxGridFoot">
-            <input type="text" id="gridIn-${escapeHtml(s.id)}" class="tmuxInput" placeholder="Nhập lệnh..." onkeydown="if(event.key==='Enter')sendGridCmd('${escapeHtml(s.id)}')">
+            <input type="text" id="gridIn-${escapeHtml(s.id)}" class="tmuxInput" placeholder="${isHib ? 'Phiên đang ngủ, nhập lệnh để tự động đánh thức...' : 'Nhập lệnh...'}" onkeydown="if(event.key==='Enter')sendGridCmd('${escapeHtml(s.id)}')">
             <button class="btn small primary" onclick="sendGridCmd('${escapeHtml(s.id)}')">Gửi</button>
           </div>
         </div>
       `;
     }).join('');
+  }
+}
+
+async function triggerSessionLifecycle(action) {
+  const sid = state.selectedTmuxSessionId;
+  try {
+    const res = await fetch('/api/tmux/action', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: sid, action: action })
+    });
+    if (res.ok) {
+      const labels = {
+        'pause': '⏸ Đã đóng băng CPU cho ' + sid + ' (0.0% CPU)',
+        'resume': '▶ Đã kích hoạt lại CPU cho ' + sid,
+        'hibernate': '😴 Đã đưa ' + sid + ' vào ngủ đông (giải phóng 100% RAM & CPU)',
+        'wake': '⚡ Đã gọi lại phiên ' + sid + ' thành công!'
+      };
+      showToast(labels[action] || 'Đã chấp hành: ' + action);
+      await refreshTmuxSessions();
+    }
+  } catch (e) {
+    showToast('Lỗi: ' + e.message);
+  }
+}
+
+async function triggerGridLifecycle(sid, action) {
+  try {
+    const res = await fetch('/api/tmux/action', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: sid, action: action })
+    });
+    if (res.ok) {
+      showToast('Đã xử lý: ' + action + ' (' + sid + ')');
+      await refreshTmuxSessions();
+    }
+  } catch (e) {
+    showToast('Lỗi: ' + e.message);
+  }
+}
+
+async function triggerSwarmLifecycle(action) {
+  try {
+    const res = await fetch('/api/tmux/action', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: 'all', action: action })
+    });
+    if (res.ok) {
+      if (action === 'sleep_all') {
+        showToast('😴 Đã đưa toàn bộ 6 phiên Swarm vào trạng thái ngủ đông (0% CPU, 0MB RAM)!');
+      } else if (action === 'wake_all') {
+        showToast('⚡ Đã đánh thức và phục hồi toàn bộ 6 phiên Swarm!');
+      }
+      await refreshTmuxSessions();
+    }
+  } catch (e) {
+    showToast('Lỗi: ' + e.message);
   }
 }
 
