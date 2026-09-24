@@ -342,6 +342,42 @@ class SwarmHandler(SimpleHTTPRequestHandler):
                 self._send_json(400, {"error": "Missing role_name"})
             return
 
+        # 14. Khóa độc quyền nhiệm vụ (Anti-Chaos Task Claiming)
+        if path == "/api/task/claim":
+            session_id = data.get("session_id", "").strip()
+            todo_id = data.get("todo_id", "").strip()
+            project_id = data.get("project_id", "PRJ-GEN-WORKPLACE")
+            if session_id and todo_id:
+                res = db.claim_task(session_id, todo_id, project_id)
+                status_code = 409 if "error" in res else 200
+                self._send_json(status_code, res)
+            else:
+                self._send_json(400, {"error": "Missing session_id or todo_id"})
+            return
+
+        # 15. Nghiệm thu hoàn tất nhiệm vụ (Evidence-Backed Task Completion)
+        if path == "/api/task/complete":
+            session_id = data.get("session_id", "").strip()
+            todo_id = data.get("todo_id", "").strip()
+            evidence_ref = data.get("evidence_ref", "").strip()
+            verified_by = data.get("verified_by", "Lead Architect")
+            project_id = data.get("project_id", "PRJ-GEN-WORKPLACE")
+            if session_id and todo_id and evidence_ref:
+                res = db.complete_task(session_id, todo_id, evidence_ref, verified_by, project_id)
+                status_code = 400 if "error" in res else 200
+                self._send_json(status_code, res)
+            else:
+                self._send_json(400, {"error": "Missing session_id, todo_id, or evidence_ref"})
+            return
+
+        # 16. Thu hồi nhiệm vụ bị treo (Anti-Zombie Task Reclamation)
+        if path == "/api/task/reclaim":
+            timeout = int(data.get("timeout_seconds", 300))
+            project_id = data.get("project_id", "PRJ-GEN-WORKPLACE")
+            res = db.reclaim_stalled_tasks(timeout, project_id)
+            self._send_json(200, res)
+            return
+
         self.send_response(404)
         self.end_headers()
 

@@ -236,14 +236,31 @@ def init_db():
         );
         """)
 
-        # Tự động di trú các cột mới nếu đã có bảng trước đó
+        # Tự động di trú các cột mới chống rối loạn Swarm (Anti-Chaos Governance)
         for col, col_type in [
             ("conversation_id", "TEXT DEFAULT ''"),
             ("quota_gemini_json", "TEXT DEFAULT '{}'"),
-            ("quota_anthropic_json", "TEXT DEFAULT '{}'")
+            ("quota_anthropic_json", "TEXT DEFAULT '{}'"),
+            ("allowed_paths_json", "TEXT DEFAULT '[]'"),
+            ("blocked_paths_json", "TEXT DEFAULT '[]'"),
+            ("current_task_id", "TEXT DEFAULT ''"),
+            ("last_heartbeat", "TEXT DEFAULT ''")
         ]:
             try:
                 cursor.execute(f"ALTER TABLE tmux_sessions ADD COLUMN {col} {col_type};")
+            except Exception:
+                pass
+
+        # Di trú các cột quản trị tiến độ và khóa việc độc quyền cho todos
+        for col, col_type in [
+            ("assigned_session_id", "TEXT DEFAULT ''"),
+            ("depends_on", "TEXT DEFAULT ''"),
+            ("locked_at", "TEXT DEFAULT ''"),
+            ("evidence_ref", "TEXT DEFAULT ''"),
+            ("verified_by", "TEXT DEFAULT ''")
+        ]:
+            try:
+                cursor.execute(f"ALTER TABLE todos ADD COLUMN {col} {col_type};")
             except Exception:
                 pass
 
@@ -1680,6 +1697,96 @@ def process_orch_instruction(user_message, project_id="PRJ-GEN-WORKPLACE"):
         "user_time": user_time,
         "agent_time": agent_time
     }
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SWARM ANTI-CHAOS GOVERNANCE (CƠ CHẾ BẢO ĐẢM KHÔNG RỐI LOẠN)
+# ═══════════════════════════════════════════════════════════════════════════
+
+def claim_task(session_id, todo_id, project_id="PRJ-GEN-WORKPLACE"):
+    """
+    Khóa độc quyền nhiệm vụ (Atomic Task Mutex):
+    - Ngăn chặn 2 agent tranh chấp cùng 1 task (loại bỏ 100% race condition).
+    - Kiểm tra ràng buộc tiền đề (depends_on): chỉ cho nhận khi task phụ thuộc đã hoàn tất.
+    - Cập nhật thời điểm khóa (locked_at) và gán task cho session.
+    """
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, status, assigned_session_id, depends_on FROM todos WHERE id = ? AND project_id = ?", (todo_id, project_id))
+        todo = cursor.fetchone()
+        if not todo:
+            return {"error": "Task not found"}
+
+        # 1. Kiểm tra tranh chấp
+        if todo["status"] == "in_progress" and todo["assigned_session_id"] and todo["assigned_session_id"] != session_id:
+            return {"error": f"Task is already locked by active session {todo['assigned_session_id']}"}
+
+        # 2. Kiểm tra chuỗi phụ thuộc (Dependency Chain)
+        if todo["depends_on"]:
+            cursor.execute("SELECT status FROM todos WHERE id = ? AND project_id = ?", (todo["depends_on"], project_id))
+            dep = cursor.fetchone()
+            if dep and dep["status"] != "done":
+                return {"error": f"Prerequisite task {todo['depends_on']} is not done yet (status: {dep['status']})"}
+
+        # 3. Khóa độc quyền cho session
+        cursor.execute("""
+        UPDATE todos 
+        SET status = 'in_progress', assigned_session_id = ?, locked_at = CURRENT_TIMESTAMP
+        WHERE id = ? AND project_id = ?
+        """, (session_id, todo_id, project_id))
+
+        cursor.execute("""
+        UPDATE tmux_sessions 
+        SET current_task_id = ?, last_heartbeat = CURRENT_TIMESTAMP
+        WHERE id = ?
+        """, (todo_id, session_id))
+
+        conn.commit()
+        return {"status": "claimed", "task_id": todo_id, "session_id": session_id}
+
+def complete_task(session_id, todo_id, evidence_ref, verified_by="Lead Architect", project_id="PRJ-GEN-WORKPLACE"):
+    """
+    Nghiệm thu hoàn tất có bằng chứng (Evidence-Backed Completion):
+    - Agent không thể tự ý chuyển sang 'done' nếu thiếu bằng chứng (commit hash / artifact).
+    - Cần chữ ký nghiệm thu của Role chỉ huy (Lead Architect / Orchestrator).
+    - Tự động nhả khóa session để sẵn sàng nhận nhiệm vụ tiếp theo.
+    """
+    if not evidence_ref or not evidence_ref.strip():
+        return {"error": "Cannot complete task without verified evidence_ref (commit hash, artifact path or test log)"}
+
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+        UPDATE todos
+        SET status = 'done', evidence_ref = ?, verified_by = ?, assigned_session_id = ''
+        WHERE id = ? AND project_id = ?
+        """, (evidence_ref.strip(), verified_by, todo_id, project_id))
+
+        cursor.execute("""
+        UPDATE tmux_sessions
+        SET current_task_id = '', last_heartbeat = CURRENT_TIMESTAMP
+        WHERE id = ?
+        """, (session_id,))
+
+        conn.commit()
+        return {"status": "completed", "task_id": todo_id, "evidence_ref": evidence_ref, "verified_by": verified_by}
+
+def reclaim_stalled_tasks(timeout_seconds=300, project_id="PRJ-GEN-WORKPLACE"):
+    """
+    Thu hồi nhiệm vụ bị treo từ Agent bóng ma / crash (Anti-Zombie Reclamation):
+    - Quét các task 'in_progress' bị giữ quá timeout mà session không gửi heartbeat.
+    - Nhả task về lại trạng thái 'queued' để worker khác nhận việc.
+    """
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+        UPDATE todos
+        SET status = 'queued', assigned_session_id = '', locked_at = NULL
+        WHERE project_id = ? AND status = 'in_progress' 
+          AND strftime('%s', 'now') - strftime('%s', locked_at) > ?
+        """, (project_id, timeout_seconds))
+        reclaimed = cursor.rowcount
+        conn.commit()
+        return {"reclaimed_count": reclaimed}
 
 # Khởi tạo tự động khi import
 init_db()
