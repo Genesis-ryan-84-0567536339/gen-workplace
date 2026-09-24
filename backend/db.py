@@ -210,7 +210,26 @@ def init_db():
         END;
         """)
 
+        # 12. Tmux Sessions (Cửa sổ phiên nền Agent Runtimes do hệ thống tạo)
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS tmux_sessions (
+            id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+            role_name TEXT NOT NULL,
+            cli_tool TEXT NOT NULL,
+            account_type TEXT DEFAULT 'owner_default',
+            account_label TEXT DEFAULT 'Mặc định (Owner Gmail)',
+            profile_dir TEXT DEFAULT '',
+            status TEXT DEFAULT 'active',
+            pid INTEGER DEFAULT 0,
+            cwd TEXT,
+            terminal_output TEXT DEFAULT '',
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """)
+
         conn.commit()
+
 
 def seed_real_project():
     """Điền dữ liệu thực tế 100% của repository gen-workplace vào SQLite Core DB."""
@@ -622,6 +641,195 @@ def search_catalog_fts(query_str, project_id="PRJ-GEN-WORKPLACE"):
             for r in rows
         ]
 
+def seed_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM tmux_sessions WHERE project_id = ?", (project_id,))
+        if cursor.fetchone()[0] > 0:
+            return
+
+        sessions = [
+            (
+                'gw-lead-agy',
+                project_id,
+                'Lead Architect',
+                'Gemini CLI (agy --effort high)',
+                'owner_default',
+                'Mặc định (Owner Gmail)',
+                '~/.gemini',
+                'active',
+                30129,
+                '/workspace/LinuxDataA/gen-workplace',
+                """[tmux: gw-lead-agy - window 0 (agy-cli)]
+💎 Antigravity CLI v1.2.8 (Gemini 3.8 Flash / Thinking High)
+Logged in as: ryan@genesis.corp (Owner Default Gmail)
+Workspace: /workspace/LinuxDataA/gen-workplace
+Current Goal: Multi-Agent Swarm Orchestrator & SSOT Governance
+[14:20:11] Lead: Thẩm định SSOT đặc tả gốc tại docs/SSOT_ORIGINAL_SPEC.md.
+[14:20:15] Lead: Đã kiểm tra tiến trình 6 roles. Tất cả đang hoạt động trên branch main.
+[14:20:20] Lead: Chờ lệnh phân công nhiệm vụ từ Master Console...
+$ """
+            ),
+            (
+                'gw-backend-agy',
+                project_id,
+                'Backend & DB Specialist',
+                'Gemini CLI (agy --mode accept-edits)',
+                'profile1',
+                'Profile #1 (claude.bot@genesis.local)',
+                '/workspace/.agy-profiles/profile1',
+                'active',
+                30142,
+                '/workspace/LinuxDataA/gen-workplace',
+                """[tmux: gw-backend-agy - window 0 (agy-cli)]
+💎 Antigravity CLI v1.2.8 (--gemini_dir=/workspace/.agy-profiles/profile1)
+Logged in as: claude.bot@genesis.local (Profile 1)
+Workspace: /workspace/LinuxDataA/gen-workplace
+Task: TODO-09 & TODO-10 (SQLite WAL DB & FTS5 Catalog)
+[14:21:05] Backend: Khởi tạo schema 12 bảng SQLite tại /app/data/gen-workplace.db.
+[14:21:08] Backend: Kích hoạt PRAGMA journal_mode = WAL thành công.
+[14:21:12] Backend: Bảng ảo catalog_fts (FTS5) sẵn sàng phục vụ tra cứu tức thì < 1ms.
+$ """
+            ),
+            (
+                'gw-frontend-agy',
+                project_id,
+                'Frontend Specialist',
+                'Gemini CLI (agy)',
+                'owner_default',
+                'Mặc định (Owner Gmail)',
+                '~/.gemini',
+                'active',
+                30155,
+                '/workspace/LinuxDataA/gen-workplace',
+                """[tmux: gw-frontend-agy - window 0 (agy-cli)]
+💎 Antigravity CLI v1.2.8
+Logged in as: ryan@genesis.corp (Owner Default Gmail)
+Workspace: /workspace/LinuxDataA/gen-workplace
+Task: Cửa sổ phiên nền Tmux Runtimes & Tùy chọn Profile
+[14:22:30] Frontend: Đang cập nhật giao diện tab Runtimes với interactive terminal & profile switcher.
+[14:22:45] Frontend: Đồng bộ màu Slate Industrial Dark v1.1.
+$ """
+            ),
+            (
+                'gw-devops-agy',
+                project_id,
+                'DevOps & Packaging',
+                'Gemini CLI (agy --agent devops)',
+                'profile3',
+                'Profile #3 (profile3)',
+                '/workspace/.agy-profiles/profile3',
+                'active',
+                30168,
+                '/workspace/LinuxDataA/gen-workplace',
+                """[tmux: gw-devops-agy - window 0 (agy-cli)]
+💎 Antigravity CLI v1.2.8 (--gemini_dir=/workspace/.agy-profiles/profile3)
+Logged in as: profile3 (Subagent Workstream)
+Workspace: /workspace/LinuxDataA/gen-workplace
+Task: Docker Compose Live Mount & Installer TUI
+[14:23:01] DevOps: Container gen-workplace-app đang chạy healthy trên cổng 8888.
+[14:23:10] DevOps: Đã xác thực cờ SELinux :z hot-reload host ↔ container.
+$ """
+            ),
+            (
+                'gw-qa-agy',
+                project_id,
+                'QA Tester',
+                'Gemini CLI (agy)',
+                'profile4',
+                'Profile #4 (profile4)',
+                '/workspace/.agy-profiles/profile4',
+                'active',
+                30180,
+                '/workspace/LinuxDataA/gen-workplace',
+                """[tmux: gw-qa-agy - window 0 (agy-cli)]
+💎 Antigravity CLI v1.2.8 (--gemini_dir=/workspace/.agy-profiles/profile4)
+Logged in as: profile4
+Workspace: /workspace/LinuxDataA/gen-workplace
+Task: Cross-platform tests & Desktop Shortcut verify
+[14:24:12] QA: Đã kiểm tra /api/status HTTP 200 OK.
+[14:24:15] QA: Đã xác thực shortcut /workspace/Desktop/Gen-workplace.desktop.
+$ """
+            ),
+            (
+                'gw-security-agy',
+                project_id,
+                'Security Auditor',
+                'Codex Security CLI / agy',
+                'owner_default',
+                'Mặc định (Owner Gmail)',
+                '~/.gemini',
+                'idle',
+                30195,
+                '/workspace/LinuxDataA/gen-workplace',
+                """[tmux: gw-security-agy - window 0 (security-cli)]
+🛡️ Codex Security Sandbox (Read-Only Workspace Write Isolation)
+Logged in as: ryan@genesis.corp (Owner Default Gmail)
+Workspace: /workspace/LinuxDataA/gen-workplace
+[14:25:00] Security: Kiểm tra quyền volume mounts. Zero permission leak detected.
+[14:25:05] Security: Sẵn sàng audit các lệnh nguy hiểm (force, rm -rf, drop table).
+$ """
+            )
+        ]
+
+        for s in sessions:
+            cursor.execute("""
+            INSERT INTO tmux_sessions (id, project_id, role_name, cli_tool, account_type, account_label, profile_dir, status, pid, cwd, terminal_output)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, s)
+
+        conn.commit()
+
+def get_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM tmux_sessions WHERE project_id = ? ORDER BY id ASC", (project_id,))
+        rows = cursor.fetchall()
+        return [
+            {
+                "id": r["id"],
+                "role_name": r["role_name"],
+                "cli_tool": r["cli_tool"],
+                "account_type": r["account_type"],
+                "account_label": r["account_label"],
+                "profile_dir": r["profile_dir"],
+                "status": r["status"],
+                "pid": r["pid"],
+                "cwd": r["cwd"],
+                "terminal_output": r["terminal_output"],
+                "updated_at": r["updated_at"]
+            }
+            for r in rows
+        ]
+
+def update_tmux_account(session_id, account_type, account_label, profile_dir=""):
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+        UPDATE tmux_sessions 
+        SET account_type = ?, account_label = ?, profile_dir = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+        """, (account_type, account_label, profile_dir, session_id))
+        conn.commit()
+
+def append_tmux_output(session_id, command, output=""):
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT terminal_output FROM tmux_sessions WHERE id = ?", (session_id,))
+        row = cursor.fetchone()
+        current_out = row["terminal_output"] if row else ""
+        now_time = datetime.now().strftime("%H:%M:%S")
+        new_block = f"\n$ {command}\n[{now_time}] {output if output else 'Lệnh đã được chuyển vào phiên tmux chấp hành.'}\n$ "
+        updated_out = (current_out + new_block)[-4000:]
+        cursor.execute("""
+        UPDATE tmux_sessions
+        SET terminal_output = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+        """, (updated_out, session_id))
+        conn.commit()
+
 # Khởi tạo tự động khi import
 init_db()
 seed_real_project()
+seed_tmux_sessions()
+

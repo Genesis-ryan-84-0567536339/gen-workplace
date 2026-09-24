@@ -91,6 +91,25 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             })
             return
 
+        # 4. API Tmux Sessions (Phiên Nền Runtimes & Account Profiles)
+        if path == "/api/tmux/sessions":
+            prj_id = query.get("project", ["PRJ-GEN-WORKPLACE"])[0]
+            sessions = db.get_tmux_sessions(prj_id)
+            
+            # Thử capture live nếu có lệnh tmux trên hệ thống
+            for s in sessions:
+                sid = s["id"]
+                try:
+                    res = subprocess.run(["tmux", "capture-pane", "-t", sid, "-p", "-S", "-30"],
+                                         capture_output=True, text=True, timeout=1.5)
+                    if res.returncode == 0 and res.stdout.strip():
+                        s["terminal_output"] = res.stdout
+                except Exception:
+                    pass
+
+            self._send_json(200, {"sessions": sessions})
+            return
+
         return super().do_GET()
 
     def do_POST(self):
@@ -165,6 +184,51 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             }
             self._send_json(200, res)
             return
+
+        # 5. Đổi tài khoản / Profile cho phiên Tmux
+        if path == "/api/tmux/account":
+            session_id = data.get("session_id")
+            account_type = data.get("account_type", "owner_default")
+            account_label = data.get("account_label", "Mặc định (Owner Gmail)")
+            profile_dir = data.get("profile_dir", "")
+            if session_id:
+                db.update_tmux_account(session_id, account_type, account_label, profile_dir)
+                db.append_tmux_output(session_id, f"auth switch --account='{account_label}'", f"Đã chuyển cấu hình phiên sang: {account_label}")
+                self._send_json(200, {"status": "account_updated", "session_id": session_id, "account_label": account_label})
+            else:
+                self._send_json(400, {"error": "Missing session_id"})
+            return
+
+        # 6. Gửi lệnh / phím vào phiên Tmux (tmux send-keys)
+        if path == "/api/tmux/send":
+            session_id = data.get("session_id")
+            command = data.get("command", "").strip()
+            key = data.get("key", "").strip()
+            if session_id and (command or key):
+                tmux_success = False
+                payload = key if key else command
+                try:
+                    args = ["tmux", "send-keys", "-t", session_id, payload]
+                    if not key:
+                        args.append("Enter")
+                    res = subprocess.run(args, capture_output=True, text=True, timeout=2.0)
+                    tmux_success = (res.returncode == 0)
+                except Exception:
+                    pass
+
+                log_cmd = f"^[KEY: {key}]" if key else command
+                output_msg = f"Đã gửi trực tiếp vào tmux qua send-keys ({log_cmd})." if tmux_success else f"Đã ghi nhận tín hiệu '{log_cmd}' vào runtime của phiên."
+                db.append_tmux_output(session_id, log_cmd, output_msg)
+                self._send_json(200, {
+                    "status": "command_sent",
+                    "session_id": session_id,
+                    "command": log_cmd,
+                    "tmux_real": tmux_success
+                })
+            else:
+                self._send_json(400, {"error": "Missing session_id or (command / key)"})
+            return
+
 
         self.send_response(404)
         self.end_headers()

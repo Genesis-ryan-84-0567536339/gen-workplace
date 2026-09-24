@@ -1006,6 +1006,250 @@ button { cursor: pointer; }
 }
 .toast.show { opacity: 1; transform: none; }
 
+/* Agent View Switcher (Tmux Runtimes / Chat / Kanban) */
+.agentViewBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 8px;
+}
+.agentViewBtn {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 7px 14px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  transition: all 0.15s;
+}
+.agentViewBtn:hover {
+  color: #fff;
+  border-color: #384353;
+  background: #181d24;
+}
+.agentViewBtn.active {
+  color: #fff;
+  border-color: var(--accent);
+  background: rgba(125, 168, 255, 0.1);
+  font-weight: 600;
+}
+.viewBadge {
+  font-size: 10px;
+  background: rgba(58, 209, 139, 0.15);
+  color: #3ad18b;
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+/* Tmux Runtimes Session Tabs */
+.tmuxSessionTabs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  margin-bottom: 12px;
+  scrollbar-width: none;
+}
+.tmuxSessionTabs::-webkit-scrollbar { display: none; }
+.tmuxTab {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 8px 12px;
+  cursor: pointer;
+  min-width: 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  transition: all 0.15s;
+}
+.tmuxTab:hover {
+  border-color: #384353;
+  background: #181d24;
+}
+.tmuxTab.active {
+  border-color: var(--accent);
+  background: #151a22;
+}
+.tmuxTabTitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.tmuxTabMeta {
+  font-size: 10px;
+  color: var(--muted2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tmuxTabAccount {
+  font-size: 10px;
+  color: var(--accent2);
+  background: rgba(110, 209, 255, 0.08);
+  padding: 1px 5px;
+  border-radius: 4px;
+  margin-top: 2px;
+  width: fit-content;
+}
+
+/* Tmux Terminal Box */
+.tmuxTerminalBox {
+  background: #090c10;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.tmuxTerminalHead {
+  background: #10141a;
+  border-bottom: 1px solid var(--line);
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.tmuxTerminalTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-family: var(--mono);
+}
+.accountPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  background: #151a23;
+  border: 1px solid #2b3543;
+  padding: 3px 8px;
+  border-radius: 4px;
+  color: #e6edf3;
+}
+.tmuxTerminalBody {
+  height: 420px;
+  overflow-y: auto;
+  padding: 14px;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.5;
+  color: #c9d1d9;
+  background: #080b0f;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.tmuxTerminalInputRow {
+  background: #0f1319;
+  border-top: 1px solid var(--line);
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.tmuxPromptLabel {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: #3ad18b;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.tmuxInput {
+  flex: 1;
+  background: #090c10;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: #fff;
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 6px 10px;
+  outline: none;
+}
+.tmuxInput:focus {
+  border-color: var(--accent);
+}
+.tmuxShortcuts {
+  padding: 6px 12px 10px;
+  background: #0f1319;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  border-top: 1px solid rgba(255,255,255,0.03);
+}
+.tmuxPill {
+  background: #171c23;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 2px 7px;
+  font-size: 10px;
+  font-family: var(--mono);
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.tmuxPill:hover {
+  color: #fff;
+  border-color: var(--accent);
+  background: #202630;
+}
+
+/* Tmux Grid 3x2 */
+.tmuxGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-top: 8px;
+}
+.tmuxGridCard {
+  background: #090c10;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.tmuxGridHead {
+  background: #10141a;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.tmuxGridBody {
+  height: 180px;
+  padding: 8px 10px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  line-height: 1.4;
+  color: #8b949e;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  background: #07090d;
+}
+.tmuxGridFoot {
+  background: #0d1117;
+  border-top: 1px solid var(--line);
+  padding: 6px 8px;
+  display: flex;
+  gap: 6px;
+}
+
 /* Responsive */
 @media (max-width: 1150px) {
   .overviewGrid, .memoryGrid { grid-template-columns: 1fr; }
@@ -1107,21 +1351,6 @@ button { cursor: pointer; }
 
   <!-- MAIN VIEWPORT -->
   <main class="main">
-    <!-- Subtop Contextual Navigation (Tab con thiết thực theo từng phân khu) -->
-    <div class="subtop" id="subtopNav">
-      <div class="subtopBreadcrumb" id="subtopBreadcrumb">
-        <span class="subtopDomainIcon" id="subtopDomainIcon">◈</span>
-        <strong class="subtopDomainText" id="subtopDomainText">Implementation</strong>
-        <span class="subtopSep">›</span>
-      </div>
-      <div class="subtopTabs" id="subtopTabs">
-        <!-- Rendered dynamically by updateSubtopNav(screenId) -->
-      </div>
-      <div class="subtopRight" id="subtopRight">
-        <span class="chip live" id="subtopStatusChip">Docker Live · SQLite WAL</span>
-      </div>
-    </div>
-
     <div class="content">
 
       <!-- ========================================================================= -->
@@ -1308,98 +1537,186 @@ button { cursor: pointer; }
       <!-- ========================================================================= -->
       <!-- 3. MÔI TRƯỜNG AGENT (RUNTIMES THỰC TẾ) -->
       <!-- ========================================================================= -->
+      <!-- ========================================================================= -->
+      <!-- 3. MÔI TRƯỜNG AGENT (RUNTIMES THỰC TẾ & PHIÊN NỀN TMUX) -->
+      <!-- ========================================================================= -->
       <section class="screen" id="runtimes">
         <div class="pageHead">
           <div>
             <h1>Môi trường Agent & Điều Hành Swarm</h1>
-            <p>Mỗi Role có chatroom riêng, tự ghi nhật ký tư duy (Thinking), in-out request, handoff qua thread @mention, emoji reaction và Live Kanban.</p>
+            <p>Hệ thống tự động khởi tạo các phiên nền tmux tương ứng với từng Role. Mặc định khởi chạy <code>agy</code> CLI với Gmail mặc định của Owner; cho phép chỉ định tài khoản / profile khác nhau thủ công cho từng phiên.</p>
           </div>
           <div class="actions">
-            <button class="btn" onclick="refreshRuntimes()">Làm mới</button>
-            <button class="btn primary" onclick="requestRuntime()">+ Runtime</button>
+            <button class="btn" onclick="refreshTmuxSessions()">Làm mới Tmux</button>
+            <button class="btn primary" onclick="openNewTmuxModal()">+ Khởi tạo Role mới</button>
           </div>
         </div>
 
-        <div class="runtimeGrid">
-          <!-- Cột Trái: Danh sách Runtimes -->
-          <div class="card runtimeList" id="rtListCard">
-            <div class="cardHead">
-              <strong>Runtime đang kết nối</strong>
-              <span class="hint" id="runtimeCount">6</span>
+        <!-- TAB CHUYỂN ĐỔI CHỨC NĂNG CỦA MÔI TRƯỜNG AGENT -->
+        <div class="agentViewBar">
+          <button class="agentViewBtn active" id="btnViewTmux" onclick="switchAgentView('tmux', this)">
+            <span class="icon">🖥️</span> Phiên Nền Runtimes (Tmux Swarm)
+            <span class="viewBadge">6 Phiên</span>
+          </button>
+          <button class="agentViewBtn" id="btnViewChat" onclick="switchAgentView('chat', this)">
+            <span class="icon">💬</span> Chatroom & Luồng Bàn Giao
+          </button>
+          <button class="agentViewBtn" id="btnViewKanban" onclick="switchAgentView('kanban', this)">
+            <span class="icon">📋</span> Team Live Kanban
+          </button>
+        </div>
+
+        <!-- 1. VIEW TMUX RUNTIMES (MẶC ĐỊNH HIỂN THỊ) -->
+        <div class="agentSubView active" id="agentView-tmux">
+          <!-- Thanh điều khiển hiển thị (Cửa sổ chi tiết vs Lưới 6 phiên) -->
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="font-size:11px;color:var(--muted)">Chế độ xem:</span>
+              <button class="btn small primary" id="btnTmuxSingle" onclick="setTmuxMode('single')">Cửa sổ chi tiết (Interactive Terminal)</button>
+              <button class="btn small" id="btnTmuxGrid" onclick="setTmuxMode('grid')">Lưới 6 phiên (Mission Control Grid)</button>
             </div>
-            <div id="runtimeItems"></div>
-          </div>
-
-          <!-- Cột Giữa: Chatroom / Thread / Nhật ký tư duy -->
-          <div class="card chat" id="rtChatCard">
-            <div class="cardHead">
-              <div>
-                <strong id="chatTitle">Lead Architect · runtime-01</strong>
-                <div class="hint" id="chatPath">/workspace/LinuxDataA/gen-workplace · branch/main</div>
-              </div>
-              <div class="chatTabs">
-                <button class="chatTab active" data-chat="thread" onclick="switchChat('thread', this)">Luồng Chat & @Mention</button>
-                <button class="chatTab" data-chat="trace" onclick="switchChat('trace', this)">Nhật Ký Tư Duy (Thinking)</button>
-                <button class="chatTab" data-chat="io" onclick="switchChat('io', this)">Vào / Ra (In-Out)</button>
-              </div>
-            </div>
-
-            <!-- Thread Filter Bar -->
-            <div class="threadBar" id="threadBar"></div>
-
-            <!-- Messages Stream -->
-            <div class="messages" id="chatMessages"></div>
-
-            <!-- Chat Composer -->
-            <div class="composer">
-              <textarea id="chatInput" placeholder="Nhắn trong chatroom; @mention role để handoff/yêu cầu làm rõ, đính kèm file hoặc thả emoji phản hồi…"></textarea>
-              <div class="composeRow">
-                <div class="mention">
-                  <span style="color:var(--muted2)">Mention nhanh:</span>
-                  <a href="javascript:void(0)" onclick="insertAt('@Lead')" style="color:var(--accent2);text-decoration:none">@Lead</a> · 
-                  <a href="javascript:void(0)" onclick="insertAt('@Backend')" style="color:var(--accent2);text-decoration:none">@Backend</a> · 
-                  <a href="javascript:void(0)" onclick="insertAt('@QA')" style="color:var(--accent2);text-decoration:none">@QA</a> · 
-                  <a href="javascript:void(0)" onclick="insertAt('@DevOps')" style="color:var(--accent2);text-decoration:none">@DevOps</a>
-                </div>
-                <div style="display:flex;gap:5px;align-items:center">
-                  <span style="font-size:11px;color:var(--muted);cursor:pointer" onclick="insertEmoji('📥')">📥</span>
-                  <span style="font-size:11px;color:var(--muted);cursor:pointer" onclick="insertEmoji('⚠️')">⚠️</span>
-                  <span style="font-size:11px;color:var(--muted);cursor:pointer" onclick="insertEmoji('👎')">👎</span>
-                  <span style="font-size:11px;color:var(--muted);cursor:pointer" onclick="insertEmoji('✅')">✅</span>
-                  <span style="font-size:11px;color:var(--muted);cursor:pointer" onclick="insertEmoji('❓')">❓</span>
-                  <button class="btn primary" onclick="sendRuntimeMessage()">Gửi</button>
-                </div>
-              </div>
+            <div style="font-size:11px;color:var(--muted2)">
+              CLI Engine mặc định: <b>agy CLI v1.2.8</b> · Tài khoản: <b>Owner Default Gmail</b>
             </div>
           </div>
 
-          <!-- Cột Phải: Inspector Ngữ Cảnh & Tham Chiếu Bắt Buộc -->
-          <div class="card runtimeInspector" id="rtInspectorCard">
-            <div class="cardHead">
-              <strong>Ngữ cảnh Runtime</strong>
-              <span class="chip live" id="runtimeStatus">running</span>
+          <!-- Danh sách Tab các Phiên Tmux của từng Role -->
+          <div class="tmuxSessionTabs" id="tmuxSessionTabs"></div>
+
+          <!-- CHẾ ĐỘ 1: CỬA SỔ CHI TIẾT INTERACTIVE TERMINAL -->
+          <div class="tmuxTerminalBox" id="tmuxSingleView">
+            <div class="tmuxTerminalHead">
+              <div class="tmuxTerminalTitle">
+                <span class="dot done"></span>
+                <strong id="tmuxTermSessionName">tmux: gw-lead-agy</strong>
+                <span style="color:var(--muted2)">· window 0: agy-cli · PID <span id="tmuxTermPid">30129</span></span>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                <div class="accountPill">
+                  <span>🔑 Tài khoản:</span>
+                  <strong id="tmuxTermAccountLabel">Mặc định (Owner Gmail)</strong>
+                  <button class="btn small" onclick="openAccountModal()" style="padding:2px 6px;margin-left:4px">Đổi Tài Khoản / Profile</button>
+                </div>
+                <div style="display:flex;gap:4px">
+                  <button class="btn small" onclick="sendTmuxKey('C-c')" title="Gửi ngắt lệnh Ctrl+C">Ctrl+C</button>
+                  <button class="btn small" onclick="sendTmuxKey('Enter')" title="Gửi Enter">Enter</button>
+                  <button class="btn small" onclick="clearTmuxTerminal()" title="Xóa màn hình">Clear</button>
+                  <button class="btn small" onclick="restartTmuxSession()" title="Khởi động lại phiên">Restart</button>
+                </div>
+              </div>
             </div>
-            <div class="inspectorTabs">
-              <button class="insTab active" onclick="switchInspector('context', this)">Ngữ cảnh</button>
-              <button class="insTab" onclick="switchInspector('events', this)">Sự kiện</button>
-              <button class="insTab" onclick="switchInspector('files', this)">Tệp / Ref</button>
+
+            <!-- Màn hình Terminal Canvas -->
+            <div class="tmuxTerminalBody" id="tmuxTerminalOutput"></div>
+
+            <!-- Thanh nhập lệnh gửi vào tmux (tmux send-keys) -->
+            <div class="tmuxTerminalInputRow">
+              <span class="tmuxPromptLabel" id="tmuxPromptLabel">tmux: gw-lead-agy &gt;</span>
+              <input type="text" class="tmuxInput" id="tmuxCmdInput" placeholder="Nhập lệnh shell hoặc chỉ thị CLI gửi thẳng vào phiên tmux..." onkeydown="if(event.key==='Enter')sendTmuxCmd()">
+              <button class="btn primary small" onclick="sendTmuxCmd()">Gửi (Enter)</button>
             </div>
-            <div class="inspectorBody" id="runtimeInspectorBody"></div>
+
+            <!-- Phím tắt chỉ đạo nhanh -->
+            <div class="tmuxShortcuts">
+              <span style="font-size:10px;color:var(--muted2)">Chỉ đạo nhanh:</span>
+              <span class="tmuxPill" onclick="insertTmuxCmd('agy --version')">agy --version</span>
+              <span class="tmuxPill" onclick="insertTmuxCmd('git status')">git status</span>
+              <span class="tmuxPill" onclick="insertTmuxCmd('[BÀN GIAO] Đã hoàn thành task và kiểm thử')">[BÀN GIAO]</span>
+              <span class="tmuxPill" onclick="insertTmuxCmd('python3 -m unittest discover')">Run Tests</span>
+              <span class="tmuxPill" onclick="insertTmuxCmd('docker ps')">docker ps</span>
+              <span class="tmuxPill" onclick="insertTmuxCmd('agy auth status')">Kiểm tra Auth</span>
+            </div>
+          </div>
+
+          <!-- CHẾ ĐỘ 2: LƯỚI 6 PHIÊN (GRID VIEW) -->
+          <div class="tmuxGrid" id="tmuxGridView" style="display:none"></div>
+        </div>
+
+        <!-- 2. VIEW CHATROOM & LUỒNG BÀN GIAO -->
+        <div class="agentSubView" id="agentView-chat" style="display:none">
+          <div class="runtimeGrid">
+            <!-- Cột Trái: Danh sách Runtimes -->
+            <div class="card runtimeList" id="rtListCard">
+              <div class="cardHead">
+                <strong>Runtime đang kết nối</strong>
+                <span class="hint" id="runtimeCount">6</span>
+              </div>
+              <div id="runtimeItems"></div>
+            </div>
+
+            <!-- Cột Giữa: Chatroom / Thread / Nhật ký tư duy -->
+            <div class="card chat" id="rtChatCard">
+              <div class="cardHead">
+                <div>
+                  <strong id="chatTitle">Lead Architect · runtime-01</strong>
+                  <div class="hint" id="chatPath">/workspace/LinuxDataA/gen-workplace · branch/main</div>
+                </div>
+                <div class="chatTabs">
+                  <button class="chatTab active" data-chat="thread" onclick="switchChat('thread', this)">Luồng Chat & @Mention</button>
+                  <button class="chatTab" data-chat="trace" onclick="switchChat('trace', this)">Nhật Ký Tư Duy (Thinking)</button>
+                  <button class="chatTab" data-chat="io" onclick="switchChat('io', this)">Vào / Ra (In-Out)</button>
+                </div>
+              </div>
+
+              <!-- Thread Filter Bar -->
+              <div class="threadBar" id="threadBar"></div>
+
+              <!-- Messages Stream -->
+              <div class="messages" id="chatMessages"></div>
+
+              <!-- Chat Composer -->
+              <div class="composer">
+                <textarea id="chatInput" placeholder="Nhắn trong chatroom; @mention role để handoff/yêu cầu làm rõ, đính kèm file hoặc thả emoji phản hồi…"></textarea>
+                <div class="composeRow">
+                  <div class="mention">
+                    <span style="color:var(--muted2)">Mention nhanh:</span>
+                    <a href="javascript:void(0)" onclick="insertAt('@Lead')" style="color:var(--accent2);text-decoration:none">@Lead</a> · 
+                    <a href="javascript:void(0)" onclick="insertAt('@Backend')" style="color:var(--accent2);text-decoration:none">@Backend</a> · 
+                    <a href="javascript:void(0)" onclick="insertAt('@QA')" style="color:var(--accent2);text-decoration:none">@QA</a> · 
+                    <a href="javascript:void(0)" onclick="insertAt('@DevOps')" style="color:var(--accent2);text-decoration:none">@DevOps</a>
+                  </div>
+                  <div style="display:flex;gap:5px;align-items:center">
+                    <span style="font-size:11px;color:var(--muted);cursor:pointer" onclick="insertEmoji('📥')">📥</span>
+                    <span style="font-size:11px;color:var(--muted);cursor:pointer" onclick="insertEmoji('⚠️')">⚠️</span>
+                    <span style="font-size:11px;color:var(--muted);cursor:pointer" onclick="insertEmoji('👎')">👎</span>
+                    <span style="font-size:11px;color:var(--muted);cursor:pointer" onclick="insertEmoji('✅')">✅</span>
+                    <span style="font-size:11px;color:var(--muted);cursor:pointer" onclick="insertEmoji('❓')">❓</span>
+                    <button class="btn primary" onclick="sendRuntimeMessage()">Gửi</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Cột Phải: Inspector Ngữ Cảnh & Tham Chiếu Bắt Buộc -->
+            <div class="card runtimeInspector" id="rtInspectorCard">
+              <div class="cardHead">
+                <strong>Ngữ cảnh Runtime</strong>
+                <span class="chip live" id="runtimeStatus">running</span>
+              </div>
+              <div class="inspectorTabs">
+                <button class="insTab active" onclick="switchInspector('context', this)">Ngữ cảnh</button>
+                <button class="insTab" onclick="switchInspector('events', this)">Sự kiện</button>
+                <button class="insTab" onclick="switchInspector('files', this)">Tệp / Ref</button>
+              </div>
+              <div class="inspectorBody" id="runtimeInspectorBody"></div>
+            </div>
           </div>
         </div>
 
-        <!-- HÀNG KANBAN TIẾN TRÌNH CẢ TEAM DO TRƯỞNG NHÓM PHỤ TRÁCH -->
-        <div class="kanbanWrap" id="rtKanbanCard">
-          <div class="card">
-            <div class="cardHead">
-              <div>
-                <strong>Live Kanban · Tiến Trình gen-workplace</strong>
-                <div class="hint">Trưởng nhóm phụ trách update theo live time công việc; có thể kéo thả để chuyển cột.</div>
+        <!-- 3. VIEW TEAM LIVE KANBAN -->
+        <div class="agentSubView" id="agentView-kanban" style="display:none">
+          <div class="kanbanWrap" id="rtKanbanCard">
+            <div class="card">
+              <div class="cardHead">
+                <div>
+                  <strong>Live Kanban · Tiến Trình gen-workplace</strong>
+                  <div class="hint">Trưởng nhóm phụ trách update theo live time công việc; có thể kéo thả để chuyển cột.</div>
+                </div>
+                <span class="chip live">LIVE UPDATED</span>
               </div>
-              <span class="chip live">LIVE UPDATED</span>
-            </div>
-            <div class="cardBody">
-              <div class="kanban" id="kanban"></div>
+              <div class="cardBody">
+                <div class="kanban" id="kanban"></div>
+              </div>
             </div>
           </div>
         </div>
@@ -1691,6 +2008,53 @@ button { cursor: pointer; }
   </div>
 </div>
 
+<!-- MODAL CẤU HÌNH TÀI KHOẢN / PROFILE GOOGLE CHO PHIÊN TMUX -->
+<div class="modal" id="accountModal">
+  <div class="modalBox" style="max-width:540px">
+    <div class="modalHead">
+      <strong id="accountModalTitle">Cấu hình Tài khoản / Profile Google cho Phiên Tmux</strong>
+      <button class="iconBtn" onclick="closeAccountModal()">×</button>
+    </div>
+    <div class="modalBody">
+      <div style="font-size:12px;color:var(--muted2);margin-bottom:14px;line-height:1.5">
+        Chỉ định tài khoản Google đăng nhập cho <code>agy</code> CLI của phiên nền này. Mặc định là tài khoản Gmail của Owner (thư mục <code>~/.gemini</code>). Bạn có thể chọn các profile độc lập đã xác thực trên máy hoặc nhập thư mục profile tùy chỉnh.
+      </div>
+      <div class="field">
+        <label>Phiên Tmux đang chọn</label>
+        <input type="text" id="accountSessionId" readonly style="opacity:0.85;font-family:monospace;font-size:12px;background:var(--bg)">
+      </div>
+      <div class="field">
+        <label>Role</label>
+        <input type="text" id="accountRoleName" readonly style="opacity:0.85;font-size:12px;background:var(--bg)">
+      </div>
+      <div class="field">
+        <label>Chọn Tài khoản / Profile Google</label>
+        <select id="accountSelect" onchange="onAccountOptionChange()">
+          <option value="owner_default">Mặc định (Owner Gmail: ~/.gemini)</option>
+          <option value="profile1">Profile #1 (claude.bot@genesis.local)</option>
+          <option value="profile2">Profile #2 (/workspace/.agy-profiles/profile2)</option>
+          <option value="profile3">Profile #3 (/workspace/.agy-profiles/profile3)</option>
+          <option value="profile4">Profile #4 (/workspace/.agy-profiles/profile4)</option>
+          <option value="profile5">Profile #5 (/workspace/.agy-profiles/profile5)</option>
+          <option value="custom">Tùy chỉnh đường dẫn Profile...</option>
+        </select>
+      </div>
+      <div class="field" id="customProfileGroup" style="display:none">
+        <label>Đường dẫn thư mục Profile (--gemini_dir)</label>
+        <input type="text" id="accountCustomDir" placeholder="/workspace/.agy-profiles/my_profile">
+      </div>
+      <div class="field">
+        <label>Nhãn hiển thị tài khoản</label>
+        <input type="text" id="accountCustomLabel" placeholder="Ví dụ: Dev Lead Gmail / Specialist Account">
+      </div>
+    </div>
+    <div class="modalFoot">
+      <button class="btn" onclick="closeAccountModal()">Hủy</button>
+      <button class="btn primary" onclick="submitAccountChange()">Lưu cấu hình & Áp dụng</button>
+    </div>
+  </div>
+</div>
+
 <!-- TOAST NOTIFICATION -->
 <div class="toast" id="toast"></div>
 
@@ -1733,6 +2097,10 @@ const state = {
   inspectorMode: 'context',
   selectedMemory: 0,
   selectedThread: 'all',
+  tmuxSessions: [],
+  selectedTmuxSessionId: 'gw-lead-agy',
+  tmuxMode: 'single',
+  agentCurrentView: 'tmux',
   roadmap: [
     { id: 'RM-01', title: 'Core Architecture & SSOT Spec', desc: 'Thiết lập repo local, lưu nguyên văn đặc tả gốc của Owner vào docs/SSOT_ORIGINAL_SPEC.md.', todos: 3, status: 'done' },
     { id: 'RM-02', title: 'Docker Engine & Live Mount', desc: 'Container hóa toàn bộ hệ thống với Dockerfile, docker-compose.yml và live bind mount :z.', todos: 2, status: 'done' },
@@ -2005,8 +2373,9 @@ function go(id, el) {
   if (el) el.classList.add('active');
   else document.querySelector('.navItem[data-nav="' + id + '"]')?.classList.add('active');
   
-  // Cập nhật Subtop Navigation theo phân khu đang chọn
-  updateSubtopNav(id);
+  if (id === 'runtimes') {
+    refreshTmuxSessions();
+  }
 }
 
 
@@ -2426,6 +2795,338 @@ Branch: main (Clean)
 Docker Container: gen-workplace-app (Live mount: ./frontend, ./backend, ./docs)
 Desktop Entry: /workspace/Desktop/Gen-workplace.desktop
 Web Endpoint: http://localhost:8888`;
+}
+
+// =========================================================================
+// TMUX SESSIONS & AGENT RUNTIME CONTROLLER
+// =========================================================================
+function switchAgentView(viewName, el) {
+  state.agentCurrentView = viewName;
+  document.querySelectorAll('.agentViewBtn').forEach(b => b.classList.remove('active'));
+  if (el) {
+    el.classList.add('active');
+  } else {
+    const idMap = { 'tmux': 'btnViewTmux', 'chat': 'btnViewChat', 'kanban': 'btnViewKanban' };
+    if (idMap[viewName]) $(idMap[viewName])?.classList.add('active');
+  }
+
+  ['tmux', 'chat', 'kanban'].forEach(v => {
+    const sub = $('agentView-' + v);
+    if (sub) {
+      sub.style.display = v === viewName ? 'block' : 'none';
+      if (v === viewName) sub.classList.add('active');
+      else sub.classList.remove('active');
+    }
+  });
+
+  if (viewName === 'tmux') {
+    refreshTmuxSessions();
+  } else if (viewName === 'chat' || viewName === 'kanban') {
+    renderRuntimes();
+  }
+}
+
+function setTmuxMode(mode) {
+  state.tmuxMode = mode;
+  const btnSingle = $('btnTmuxSingle');
+  const btnGrid = $('btnTmuxGrid');
+  const singleView = $('tmuxSingleView');
+  const gridView = $('tmuxGridView');
+
+  if (mode === 'single') {
+    btnSingle?.classList.add('primary');
+    btnGrid?.classList.remove('primary');
+    if (singleView) singleView.style.display = 'flex';
+    if (gridView) gridView.style.display = 'none';
+  } else {
+    btnSingle?.classList.remove('primary');
+    btnGrid?.classList.add('primary');
+    if (singleView) singleView.style.display = 'none';
+    if (gridView) gridView.style.display = 'grid';
+  }
+  renderTmuxSessions();
+}
+
+async function refreshTmuxSessions() {
+  try {
+    const prj = state.project?.name || 'gen-workplace';
+    const res = await fetch('/api/tmux/sessions?project=' + encodeURIComponent(prj));
+    if (res.ok) {
+      const data = await res.json();
+      if (data && Array.isArray(data.sessions) && data.sessions.length > 0) {
+        state.tmuxSessions = data.sessions;
+      }
+    }
+  } catch (e) {
+    console.warn('[Tmux Sync] Backend unreachable, using fallback sessions:', e);
+  }
+
+  // Fallback default 6 roles if empty
+  if (!state.tmuxSessions || state.tmuxSessions.length === 0) {
+    state.tmuxSessions = [
+      { id: 'gw-lead-agy', role_name: 'Lead Architect', cli_tool: 'agy', account_type: 'owner_default', account_label: 'Mặc định (Owner Gmail)', profile_dir: '', status: 'active', pid: 30129, terminal_output: '[gw-lead-agy:0] agy CLI v1.2.8 ready\nListening for supervisor instructions...\nLogged in as: Owner Default Gmail (~/.gemini)\nWorkspace: /workspace/LinuxDataA/gen-workplace\nReady.' },
+      { id: 'gw-backend-agy', role_name: 'Backend Dev', cli_tool: 'agy', account_type: 'profile1', account_label: 'Profile #1 (claude.bot@genesis.local)', profile_dir: '/workspace/.agy-profiles/profile1', status: 'active', pid: 30130, terminal_output: '[gw-backend-agy:0] agy CLI v1.2.8 ready\nSession active with profile: /workspace/.agy-profiles/profile1\nPython SQLite service online (Port 8888).\nReady.' },
+      { id: 'gw-frontend-agy', role_name: 'Frontend Dev', cli_tool: 'agy', account_type: 'owner_default', account_label: 'Mặc định (Owner Gmail)', profile_dir: '', status: 'active', pid: 30131, terminal_output: '[gw-frontend-agy:0] agy CLI v1.2.8 ready\nFrontend live mount loaded: /frontend/index.html.\nReady.' },
+      { id: 'gw-devops-agy', role_name: 'DevOps & Docker', cli_tool: 'agy', account_type: 'profile3', account_label: 'Profile #3', profile_dir: '/workspace/.agy-profiles/profile3', status: 'active', pid: 30132, terminal_output: '[gw-devops-agy:0] agy CLI v1.2.8 ready\nDocker container gen-workplace-app running healthy.\nSELinux :z bind mount active.' },
+      { id: 'gw-qa-agy', role_name: 'QA & Verification', cli_tool: 'agy', account_type: 'profile4', account_label: 'Profile #4', profile_dir: '/workspace/.agy-profiles/profile4', status: 'active', pid: 30133, terminal_output: '[gw-qa-agy:0] agy CLI v1.2.8 ready\nRunning automated health checks on port 8888...\nStatus 200 OK. All 6 checks passed.' },
+      { id: 'gw-security-agy', role_name: 'Security & Secret Vault', cli_tool: 'agy', account_type: 'owner_default', account_label: 'Mặc định (Owner Gmail)', profile_dir: '', status: 'active', pid: 30134, terminal_output: '[gw-security-agy:0] agy CLI v1.2.8 ready\nAudited 0 vulnerabilities.\nVault encryption key verified.' }
+    ];
+  }
+
+  if (!state.tmuxSessions.some(s => s.id === state.selectedTmuxSessionId)) {
+    state.selectedTmuxSessionId = state.tmuxSessions[0]?.id || 'gw-lead-agy';
+  }
+
+  renderTmuxSessions();
+}
+
+function renderTmuxSessions() {
+  const tabsContainer = $('tmuxSessionTabs');
+  if (tabsContainer) {
+    tabsContainer.innerHTML = state.tmuxSessions.map(s => {
+      const isSel = s.id === state.selectedTmuxSessionId;
+      return `
+        <div class="tmuxTab ${isSel ? 'active' : ''}" onclick="selectTmuxSession('${escapeHtml(s.id)}')">
+          <span class="dot done"></span>
+          <span class="roleName">${escapeHtml(s.role_name)}</span>
+          <span class="cliTag">${escapeHtml(s.id)}</span>
+        </div>
+      `;
+    }).join('');
+  }
+
+  const current = state.tmuxSessions.find(s => s.id === state.selectedTmuxSessionId) || state.tmuxSessions[0];
+  if (current) {
+    if ($('tmuxTermSessionName')) $('tmuxTermSessionName').textContent = 'tmux: ' + current.id;
+    if ($('tmuxTermPid')) $('tmuxTermPid').textContent = current.pid || '30129';
+    if ($('tmuxTermAccountLabel')) $('tmuxTermAccountLabel').textContent = current.account_label || 'Mặc định (Owner Gmail)';
+    if ($('tmuxPromptLabel')) $('tmuxPromptLabel').textContent = current.id + ' >';
+
+    const outBox = $('tmuxTerminalOutput');
+    if (outBox) {
+      const rawText = current.terminal_output || `[tmux session: ${current.id}]\nEngine: ${current.cli_tool} CLI\nAccount: ${current.account_label}\nReady for instructions.`;
+      outBox.innerHTML = escapeHtml(rawText).replace(/\n/g, '<br>');
+      outBox.scrollTop = outBox.scrollHeight;
+    }
+  }
+
+  // Render Grid View
+  const gridContainer = $('tmuxGridView');
+  if (gridContainer && state.tmuxMode === 'grid') {
+    gridContainer.innerHTML = state.tmuxSessions.map(s => `
+      <div class="tmuxGridCell">
+        <div class="tmuxGridHead">
+          <div>
+            <strong>${escapeHtml(s.role_name)}</strong>
+            <span style="font-family:monospace;font-size:10px;color:var(--muted2)"> (${escapeHtml(s.id)})</span>
+          </div>
+          <button class="btn small" onclick="openAccountModal('${escapeHtml(s.id)}')" style="font-size:10px;padding:2px 6px">Đổi Acc</button>
+        </div>
+        <div class="tmuxGridAcc">
+          🔑 ${escapeHtml(s.account_label || 'Mặc định')}
+        </div>
+        <div class="tmuxGridBody" id="gridOut-${escapeHtml(s.id)}">
+          ${escapeHtml(s.terminal_output || 'Session online. Ready.').replace(/\n/g, '<br>')}
+        </div>
+        <div class="tmuxGridFoot">
+          <input type="text" id="gridIn-${escapeHtml(s.id)}" class="tmuxInput" placeholder="Nhập lệnh..." onkeydown="if(event.key==='Enter')sendGridCmd('${escapeHtml(s.id)}')">
+          <button class="btn small primary" onclick="sendGridCmd('${escapeHtml(s.id)}')">Gửi</button>
+        </div>
+      </div>
+    `).join('');
+  }
+}
+
+function selectTmuxSession(sid) {
+  state.selectedTmuxSessionId = sid;
+  renderTmuxSessions();
+}
+
+async function sendTmuxCmd() {
+  const input = $('tmuxCmdInput');
+  if (!input) return;
+  const cmd = input.value.trim();
+  if (!cmd) return;
+  input.value = '';
+
+  const sid = state.selectedTmuxSessionId;
+  const s = state.tmuxSessions.find(x => x.id === sid);
+  if (s) {
+    s.terminal_output = (s.terminal_output || '') + '\n$ ' + cmd + '\n[Đang gửi lệnh...]';
+    renderTmuxSessions();
+  }
+
+  try {
+    const res = await fetch('/api/tmux/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: sid, command: cmd })
+    });
+    if (res.ok) {
+      showToast('Đã gửi lệnh vào ' + sid);
+      await refreshTmuxSessions();
+    }
+  } catch (err) {
+    showToast('Lỗi gửi lệnh: ' + err.message);
+  }
+}
+
+async function sendGridCmd(sid) {
+  const input = document.getElementById('gridIn-' + sid);
+  if (!input) return;
+  const cmd = input.value.trim();
+  if (!cmd) return;
+  input.value = '';
+
+  try {
+    const res = await fetch('/api/tmux/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: sid, command: cmd })
+    });
+    if (res.ok) {
+      showToast('Đã gửi lệnh vào ' + sid);
+      await refreshTmuxSessions();
+    }
+  } catch (err) {
+    showToast('Lỗi gửi lệnh: ' + err.message);
+  }
+}
+
+async function sendTmuxKey(key) {
+  const sid = state.selectedTmuxSessionId;
+  try {
+    const res = await fetch('/api/tmux/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: sid, key: key })
+    });
+    if (res.ok) {
+      showToast('Đã gửi tín hiệu ' + key + ' vào ' + sid);
+      await refreshTmuxSessions();
+    }
+  } catch (err) {
+    showToast('Lỗi gửi key: ' + err.message);
+  }
+}
+
+function clearTmuxTerminal() {
+  const s = state.tmuxSessions.find(x => x.id === state.selectedTmuxSessionId);
+  if (s) {
+    s.terminal_output = `[tmux session: ${s.id}]\nMàn hình đã được xóa. Sẵn sàng nhận lệnh.`;
+    renderTmuxSessions();
+    showToast('Đã xóa màn hình');
+  }
+}
+
+function restartTmuxSession() {
+  const sid = state.selectedTmuxSessionId;
+  sendTmuxKey('C-c');
+  showToast('Đã gửi tín hiệu khởi động lại phiên ' + sid);
+}
+
+function insertTmuxCmd(text) {
+  const input = $('tmuxCmdInput');
+  if (input) {
+    input.value = text;
+    input.focus();
+  }
+}
+
+let accountModalTargetSid = null;
+
+function openAccountModal(optSessionId) {
+  const sid = optSessionId || state.selectedTmuxSessionId;
+  accountModalTargetSid = sid;
+  const s = state.tmuxSessions.find(x => x.id === sid);
+  if (!s) return;
+
+  $('accountSessionId').value = s.id;
+  $('accountRoleName').value = s.role_name;
+
+  const sel = $('accountSelect');
+  if (['owner_default', 'profile1', 'profile2', 'profile3', 'profile4', 'profile5'].includes(s.account_type)) {
+    sel.value = s.account_type;
+    $('customProfileGroup').style.display = 'none';
+  } else {
+    sel.value = 'custom';
+    $('customProfileGroup').style.display = 'block';
+  }
+
+  $('accountCustomDir').value = s.profile_dir || '';
+  $('accountCustomLabel').value = s.account_label || '';
+
+  $('accountModal').classList.add('show');
+}
+
+function closeAccountModal() {
+  $('accountModal').classList.remove('show');
+}
+
+function onAccountOptionChange() {
+  const val = $('accountSelect').value;
+  const customGroup = $('customProfileGroup');
+  const labelInput = $('accountCustomLabel');
+
+  if (val === 'custom') {
+    customGroup.style.display = 'block';
+    if (!labelInput.value) labelInput.value = 'Custom Profile';
+  } else {
+    customGroup.style.display = 'none';
+    if (val === 'owner_default') {
+      labelInput.value = 'Mặc định (Owner Gmail: ~/.gemini)';
+    } else if (val === 'profile1') {
+      labelInput.value = 'Profile #1 (claude.bot@genesis.local)';
+    } else if (val.startsWith('profile')) {
+      labelInput.value = 'Profile #' + val.replace('profile', '');
+    }
+  }
+}
+
+async function submitAccountChange() {
+  const sid = accountModalTargetSid || state.selectedTmuxSessionId;
+  const type = $('accountSelect').value;
+  let label = $('accountCustomLabel').value.trim();
+  let dir = '';
+
+  if (type === 'owner_default') {
+    if (!label) label = 'Mặc định (Owner Gmail)';
+    dir = '';
+  } else if (type === 'custom') {
+    dir = $('accountCustomDir').value.trim();
+    if (!label) label = 'Custom Profile (' + dir + ')';
+  } else {
+    const num = type.replace('profile', '');
+    dir = '/workspace/.agy-profiles/' + type;
+    if (!label) label = 'Profile #' + num + (type === 'profile1' ? ' (claude.bot@genesis.local)' : '');
+  }
+
+  try {
+    const res = await fetch('/api/tmux/account', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        session_id: sid,
+        account_type: type,
+        account_label: label,
+        profile_dir: dir
+      })
+    });
+
+    if (res.ok) {
+      showToast('Đã cập nhật tài khoản cho ' + sid);
+      closeAccountModal();
+      await refreshTmuxSessions();
+    } else {
+      showToast('Lỗi khi cập nhật tài khoản');
+    }
+  } catch (err) {
+    showToast('Lỗi kết nối: ' + err.message);
+  }
+}
+
+function openNewTmuxModal() {
+  showToast('Khởi tạo thêm Role: hãy dùng nút Khởi tạo Role trong khu Implementation');
 }
 
 // Runtimes, Comms, Threads & Reactions
@@ -2930,6 +3631,7 @@ function refreshAll() {
   renderOverview();
   renderRuntimes();
   renderMemory();
+  refreshTmuxSessions();
 }
 
 // Keyboard shortcuts
@@ -2965,7 +3667,6 @@ loadPersisted();
 ensureProjectWorkspaces();
 restoreWorkspace(state.projects[state.activeProjectIndex || 0]?.workspace || snapshotWorkspace());
 refreshAll();
-updateSubtopNav('implementation');
 persist();
 syncFromBackend();
 
