@@ -1065,10 +1065,11 @@ button { cursor: pointer; }
   border-radius: var(--radius);
   padding: 8px 12px;
   cursor: pointer;
-  min-width: 180px;
+  min-width: 210px;
+  max-width: 250px;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 5px;
   transition: all 0.15s;
 }
 .tmuxTab:hover {
@@ -1078,30 +1079,172 @@ button { cursor: pointer; }
 .tmuxTab.active {
   border-color: var(--accent);
   background: #151a22;
+  box-shadow: 0 0 0 1px var(--accent);
 }
-.tmuxTabTitle {
-  font-size: 12px;
-  font-weight: 600;
-  color: #fff;
+.tmuxTabHeader {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 6px;
 }
-.tmuxTabMeta {
-  font-size: 10px;
-  color: var(--muted2);
+.tmuxTabRole {
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.tmuxTabAccount {
+.tmuxTabSid {
+  font-size: 9.5px;
+  font-family: var(--mono);
+  color: var(--muted2);
+  background: rgba(255,255,255,0.05);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+.tmuxTabAcc {
+  display: flex;
+  align-items: center;
+  gap: 5px;
   font-size: 10px;
-  color: var(--accent2);
-  background: rgba(110, 209, 255, 0.08);
-  padding: 1px 5px;
+  padding: 2px 6px;
   border-radius: 4px;
-  margin-top: 2px;
   width: fit-content;
+  max-width: 100%;
+}
+.tmuxTabAcc.auth {
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.1);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+}
+.tmuxTabAcc.unauth {
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.1);
+  border: 1px solid rgba(248, 113, 113, 0.25);
+}
+.gIconBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #38bdf8;
+  color: #0d1014;
+  font-weight: 800;
+  font-size: 8px;
+}
+.warnBadge {
+  font-size: 10px;
+}
+.tmuxTabEmail {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--mono);
+}
+.tmuxTabMiniQuota {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 9px;
+  padding-top: 3px;
+  border-top: 1px dashed rgba(255,255,255,0.07);
+}
+.miniGauge {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex: 1;
+}
+.miniBar {
+  flex: 1;
+  height: 4px;
+  background: #1c222b;
+  border-radius: 2px;
+  overflow: hidden;
+}
+.miniFill {
+  height: 100%;
+  border-radius: 2px;
+}
+.miniFill.gemini { background: #38bdf8; }
+.miniFill.anthropic { background: #f59e0b; }
+
+/* Dual Model Quota Ribbon */
+.tmuxQuotaRibbon {
+  background: #0b0e13;
+  border-bottom: 1px solid var(--line);
+  padding: 8px 12px;
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 12px;
+  align-items: center;
+}
+.quotaBox {
+  background: #12161d;
+  border: 1px solid #1f2732;
+  border-radius: 6px;
+  padding: 6px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.quotaBoxHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+}
+.quotaBoxTitle {
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.quotaProgress {
+  height: 5px;
+  background: #18202b;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.quotaFill.gemini {
+  height: 100%;
+  background: linear-gradient(90deg, #0284c7, #38bdf8);
+}
+.quotaFill.anthropic {
+  height: 100%;
+  background: linear-gradient(90deg, #d97706, #f59e0b);
+}
+.quotaBoxFoot {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9.5px;
+  color: var(--muted2);
+  font-family: var(--mono);
+}
+
+/* Host Terminal Attach Box */
+.tmuxAttachRibbon {
+  background: #10141a;
+  border-bottom: 1px solid var(--line);
+  padding: 6px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 11px;
+  flex-wrap: wrap;
+}
+.tmuxAttachCmd {
+  background: #090c10;
+  border: 1px solid #232a35;
+  color: #5eead4;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 11px;
 }
 
 /* Tmux Terminal Box */
@@ -1706,11 +1849,13 @@ button { cursor: pointer; }
                 <span class="dot done"></span>
                 <strong id="tmuxTermSessionName">tmux: gw-lead-agy</strong>
                 <span style="color:var(--muted2)">· window 0: agy-cli · PID <span id="tmuxTermPid">30129</span></span>
+                <span class="chip done" id="tmuxTermConvBadge" style="font-size:10px;font-family:var(--mono)">🔗 conv-lead-architect</span>
               </div>
-              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-                <div class="accountPill">
-                  <span>🔑 Tài khoản:</span>
-                  <strong id="tmuxTermAccountLabel">Mặc định (Owner Gmail)</strong>
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                <div class="accountPill" id="tmuxTermAccountBadgeBox">
+                  <span class="gIconBadge">G</span>
+                  <span>Tài khoản:</span>
+                  <strong id="tmuxTermAccountLabel" style="color:#5eead4">owner@genesis.local</strong>
                   <button class="btn small" onclick="openAccountModal()" style="padding:2px 6px;margin-left:4px">Đổi Profile</button>
                   <button class="btn small primary" onclick="openOauthModalForSession()" style="padding:2px 6px;margin-left:4px">🔐 Đăng nhập OAuth</button>
                 </div>
@@ -1721,6 +1866,61 @@ button { cursor: pointer; }
                   <button class="btn small" onclick="restartTmuxSession()" title="Khởi động lại phiên">Restart</button>
                 </div>
               </div>
+            </div>
+
+            <!-- Host Terminal Attach Ribbon -->
+            <div class="tmuxAttachRibbon">
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                <span style="color:var(--muted)">💻 Attach Host Terminal:</span>
+                <code class="tmuxAttachCmd" id="tmuxAttachCmdDisplay">docker exec -it gen-workplace-app tmux a -t gw-lead-agy</code>
+                <button class="btn small" onclick="copyTmuxAttachCmd()" title="Sao chép lệnh attach vào clipboard">📋 Sao chép lệnh</button>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px">
+                <span style="color:var(--muted2);font-size:10.5px">Thoát attach an toàn: <code>Ctrl+b d</code></span>
+                <span class="chip done" id="tmuxLiveStatusBadge" style="font-size:10px">● Real Tmux Live</span>
+              </div>
+            </div>
+
+            <!-- Dual Model Quota Ribbon (Gemini & Anthropic Families) -->
+            <div class="tmuxQuotaRibbon">
+              <!-- Gemini Model Quota Card -->
+              <div class="quotaBox">
+                <div class="quotaBoxHead">
+                  <span class="quotaBoxTitle" style="color:#38bdf8">
+                    <span>💎</span> <span id="quotaGeminiTitle">Google Gemini 3.8 Flash (High)</span>
+                  </span>
+                  <span class="chip live" id="quotaGeminiBadge" style="font-size:9.5px;padding:1px 5px">Khả dụng 100%</span>
+                </div>
+                <div class="quotaProgress">
+                  <div class="quotaFill gemini" id="quotaGeminiBar" style="width:88%"></div>
+                </div>
+                <div class="quotaBoxFoot">
+                  <span id="quotaGeminiReq">180 / 1,500 requests</span>
+                  <span id="quotaGeminiDetails">RPM: 60 · TPM: 4.0M · Reset: 00:00 UTC</span>
+                </div>
+              </div>
+
+              <!-- Anthropic Model Quota Card -->
+              <div class="quotaBox">
+                <div class="quotaBoxHead">
+                  <span class="quotaBoxTitle" style="color:#f59e0b">
+                    <span>⚡</span> <span id="quotaAnthropicTitle">Claude Sonnet 4.6 (Thinking)</span>
+                  </span>
+                  <span class="chip done" id="quotaAnthropicBadge" style="font-size:9.5px;padding:1px 5px">Khả dụng 94%</span>
+                </div>
+                <div class="quotaProgress">
+                  <div class="quotaFill anthropic" id="quotaAnthropicBar" style="width:94%"></div>
+                </div>
+                <div class="quotaBoxFoot">
+                  <span id="quotaAnthropicReq">12.5k / 200k tokens</span>
+                  <span id="quotaAnthropicDetails">RPM: 50 · Extended Thinking · Reset: Rolling 5h</span>
+                </div>
+              </div>
+
+              <!-- Refresh Quota Button -->
+              <button class="btn small" onclick="refreshTmuxSessions(true)" title="Kiểm tra lại Quota mới nhất" style="height:fit-content">
+                🔄 Cập nhật Quota
+              </button>
             </div>
 
             <!-- Màn hình Terminal Canvas -->
@@ -3148,7 +3348,7 @@ function setTmuxMode(mode) {
   renderTmuxSessions();
 }
 
-async function refreshTmuxSessions() {
+async function refreshTmuxSessions(showNotify = false) {
   try {
     const prj = state.project?.name || 'gen-workplace';
     const res = await fetch('/api/tmux/sessions?project=' + encodeURIComponent(prj));
@@ -3156,6 +3356,7 @@ async function refreshTmuxSessions() {
       const data = await res.json();
       if (data && Array.isArray(data.sessions) && data.sessions.length > 0) {
         state.tmuxSessions = data.sessions;
+        if (showNotify) showToast('Đã cập nhật trạng thái Quota & Session mới nhất');
       }
     }
   } catch (e) {
@@ -3165,12 +3366,12 @@ async function refreshTmuxSessions() {
   // Fallback default 6 roles if empty
   if (!state.tmuxSessions || state.tmuxSessions.length === 0) {
     state.tmuxSessions = [
-      { id: 'gw-lead-agy', role_name: 'Lead Architect', cli_tool: 'agy', account_type: 'owner_default', account_label: 'Mặc định (Owner Gmail)', profile_dir: '', status: 'active', pid: 30129, terminal_output: '[gw-lead-agy:0] agy CLI v1.2.8 ready\nListening for supervisor instructions...\nLogged in as: Owner Default Gmail (~/.gemini)\nWorkspace: /workspace/LinuxDataA/gen-workplace\nReady.' },
-      { id: 'gw-backend-agy', role_name: 'Backend Dev', cli_tool: 'agy', account_type: 'profile1', account_label: 'Profile #1 (claude.bot@genesis.local)', profile_dir: '/workspace/.agy-profiles/profile1', status: 'active', pid: 30130, terminal_output: '[gw-backend-agy:0] agy CLI v1.2.8 ready\nSession active with profile: /workspace/.agy-profiles/profile1\nPython SQLite service online (Port 8888).\nReady.' },
-      { id: 'gw-frontend-agy', role_name: 'Frontend Dev', cli_tool: 'agy', account_type: 'owner_default', account_label: 'Mặc định (Owner Gmail)', profile_dir: '', status: 'active', pid: 30131, terminal_output: '[gw-frontend-agy:0] agy CLI v1.2.8 ready\nFrontend live mount loaded: /frontend/index.html.\nReady.' },
-      { id: 'gw-devops-agy', role_name: 'DevOps & Docker', cli_tool: 'agy', account_type: 'profile3', account_label: 'Profile #3', profile_dir: '/workspace/.agy-profiles/profile3', status: 'active', pid: 30132, terminal_output: '[gw-devops-agy:0] agy CLI v1.2.8 ready\nDocker container gen-workplace-app running healthy.\nSELinux :z bind mount active.' },
-      { id: 'gw-qa-agy', role_name: 'QA & Verification', cli_tool: 'agy', account_type: 'profile4', account_label: 'Profile #4', profile_dir: '/workspace/.agy-profiles/profile4', status: 'active', pid: 30133, terminal_output: '[gw-qa-agy:0] agy CLI v1.2.8 ready\nRunning automated health checks on port 8888...\nStatus 200 OK. All 6 checks passed.' },
-      { id: 'gw-security-agy', role_name: 'Security & Secret Vault', cli_tool: 'agy', account_type: 'owner_default', account_label: 'Mặc định (Owner Gmail)', profile_dir: '', status: 'active', pid: 30134, terminal_output: '[gw-security-agy:0] agy CLI v1.2.8 ready\nAudited 0 vulnerabilities.\nVault encryption key verified.' }
+      { id: 'gw-lead-agy', role_name: 'Lead Architect', cli_tool: 'agy', account_type: 'owner_default', account_label: 'Mặc định (Owner Gmail)', email: 'owner@genesis.local', is_auth: true, profile_dir: '', status: 'active', pid: 30129, terminal_output: '[gw-lead-agy:0] agy CLI ready.' },
+      { id: 'gw-backend-agy', role_name: 'Backend Dev', cli_tool: 'agy', account_type: 'profile1', account_label: 'Profile #1 (owner@genesis.local)', email: 'owner@genesis.local', is_auth: true, profile_dir: '/workspace/.agy-profiles/profile1', status: 'active', pid: 30130, terminal_output: '[gw-backend-agy:0] agy CLI ready.' },
+      { id: 'gw-frontend-agy', role_name: 'Frontend Dev', cli_tool: 'agy', account_type: 'profile2', account_label: 'Profile #2 (claude.bot@genesis.local)', email: 'claude.bot@genesis.local', is_auth: true, profile_dir: '', status: 'active', pid: 30131, terminal_output: '[gw-frontend-agy:0] agy CLI ready.' },
+      { id: 'gw-devops-agy', role_name: 'DevOps & Docker', cli_tool: 'agy', account_type: 'profile3', account_label: 'Profile #3 (admin@genesis.local)', email: 'admin@genesis.local', is_auth: true, profile_dir: '/workspace/.agy-profiles/profile3', status: 'active', pid: 30132, terminal_output: '[gw-devops-agy:0] agy CLI ready.' },
+      { id: 'gw-qa-agy', role_name: 'QA & Verification', cli_tool: 'agy', account_type: 'profile4', account_label: 'Profile #4 (admin@genesis.local)', email: 'admin@genesis.local', is_auth: true, profile_dir: '/workspace/.agy-profiles/profile4', status: 'active', pid: 30133, terminal_output: '[gw-qa-agy:0] agy CLI ready.' },
+      { id: 'gw-security-agy', role_name: 'Security & Secret Vault', cli_tool: 'agy', account_type: 'owner_default', account_label: 'Mặc định (Owner Gmail)', email: 'owner@genesis.local', is_auth: true, profile_dir: '', status: 'active', pid: 30134, terminal_output: '[gw-security-agy:0] agy CLI ready.' }
     ];
   }
 
@@ -3186,11 +3387,40 @@ function renderTmuxSessions() {
   if (tabsContainer) {
     tabsContainer.innerHTML = state.tmuxSessions.map(s => {
       const isSel = s.id === state.selectedTmuxSessionId;
+      const email = s.email || (s.account_label?.includes('@') ? s.account_label.split('(')[1]?.replace(')', '') : null);
+      const isAuth = s.is_auth || !!email;
+      const qG = s.quota_gemini || { percent: 88, status_label: 'Khả dụng' };
+      const qA = s.quota_anthropic || { percent: 94, status_label: 'Khả dụng' };
+
       return `
         <div class="tmuxTab ${isSel ? 'active' : ''}" onclick="selectTmuxSession('${escapeHtml(s.id)}')">
-          <span class="dot done"></span>
-          <span class="roleName">${escapeHtml(s.role_name)}</span>
-          <span class="cliTag">${escapeHtml(s.id)}</span>
+          <div class="tmuxTabHeader">
+            <div style="display:flex;align-items:center;gap:6px">
+              <span class="dot ${s.status === 'active' ? 'done' : 'wait'}"></span>
+              <strong class="tmuxTabRole">${escapeHtml(s.role_name)}</strong>
+            </div>
+            <span class="tmuxTabSid">${escapeHtml(s.id)}</span>
+          </div>
+
+          <div class="tmuxTabAcc ${isAuth ? 'auth' : 'unauth'}" title="${escapeHtml(email || 'Chưa đăng nhập')}">
+            ${isAuth 
+              ? `<span class="gIconBadge">G</span> <span class="tmuxTabEmail">${escapeHtml(email || s.account_label)}</span>` 
+              : `<span class="warnBadge">⚠️</span> <span class="tmuxTabEmail">Chưa đăng nhập</span>`
+            }
+          </div>
+
+          <div class="tmuxTabMiniQuota">
+            <div class="miniGauge" title="Google Gemini: ${escapeHtml(qG.status_label || '88%')}">
+              <span style="color:#38bdf8;font-weight:700">G</span>
+              <div class="miniBar"><div class="miniFill gemini" style="width:${qG.percent || 85}%"></div></div>
+              <span style="color:var(--muted2)">${qG.percent || 85}%</span>
+            </div>
+            <div class="miniGauge" title="Anthropic Claude: ${escapeHtml(qA.status_label || '94%')}">
+              <span style="color:#f59e0b;font-weight:700">C</span>
+              <div class="miniBar"><div class="miniFill anthropic" style="width:${qA.percent || 94}%"></div></div>
+              <span style="color:var(--muted2)">${qA.percent || 94}%</span>
+            </div>
+          </div>
         </div>
       `;
     }).join('');
@@ -3199,10 +3429,44 @@ function renderTmuxSessions() {
   const current = state.tmuxSessions.find(s => s.id === state.selectedTmuxSessionId) || state.tmuxSessions[0];
   if (current) {
     if ($('tmuxTermSessionName')) $('tmuxTermSessionName').textContent = 'tmux: ' + current.id;
-    if ($('tmuxTermPid')) $('tmuxTermPid').textContent = current.pid || '30129';
-    if ($('tmuxTermAccountLabel')) $('tmuxTermAccountLabel').textContent = current.account_label || 'Mặc định (Owner Gmail)';
+    if ($('tmuxTermPid')) $('tmuxTermPid').textContent = current.pid || 'running';
+    if ($('tmuxTermConvBadge')) $('tmuxTermConvBadge').textContent = '🔗 ' + (current.conversation_id || 'conv-' + current.id);
+    
+    // Account Badge
+    const email = current.email || (current.account_label?.includes('@') ? current.account_label.split('(')[1]?.replace(')', '') : null);
+    if ($('tmuxTermAccountLabel')) {
+      $('tmuxTermAccountLabel').textContent = email ? `${email} (${current.account_type})` : (current.account_label || 'Chưa đăng nhập');
+      $('tmuxTermAccountLabel').style.color = current.is_auth ? '#5eead4' : '#f87171';
+    }
+
+    // Host Attach Command
+    const attachCmd = current.attach_cmd || `docker exec -it gen-workplace-app tmux a -t ${current.id}`;
+    if ($('tmuxAttachCmdDisplay')) $('tmuxAttachCmdDisplay').textContent = attachCmd;
     if ($('tmuxPromptLabel')) $('tmuxPromptLabel').textContent = current.id + ' >';
 
+    // Quota Gemini
+    const qG = current.quota_gemini || {};
+    if ($('quotaGeminiTitle')) $('quotaGeminiTitle').textContent = qG.model || 'Google Gemini 3.8 Flash (High)';
+    if ($('quotaGeminiBadge')) {
+      $('quotaGeminiBadge').textContent = qG.status_label || (qG.percent + '% Khả dụng');
+      $('quotaGeminiBadge').className = 'chip ' + (qG.status === 'rate_limited' ? 'wait' : 'live');
+    }
+    if ($('quotaGeminiBar')) $('quotaGeminiBar').style.width = (qG.percent || 85) + '%';
+    if ($('quotaGeminiReq')) $('quotaGeminiReq').textContent = `${qG.used_requests || 180} / ${qG.limit_requests || 1500} req (${qG.percent || 85}%)`;
+    if ($('quotaGeminiDetails')) $('quotaGeminiDetails').textContent = qG.detail || 'RPM: 60 · TPM: 4.0M · Reset: 00:00 UTC';
+
+    // Quota Anthropic
+    const qA = current.quota_anthropic || {};
+    if ($('quotaAnthropicTitle')) $('quotaAnthropicTitle').textContent = qA.model || 'Claude Sonnet 4.6 (Thinking)';
+    if ($('quotaAnthropicBadge')) {
+      $('quotaAnthropicBadge').textContent = qA.status_label || (qA.percent + '% Khả dụng');
+      $('quotaAnthropicBadge').className = 'chip ' + (qA.status === 'rate_limited' ? 'wait' : 'done');
+    }
+    if ($('quotaAnthropicBar')) $('quotaAnthropicBar').style.width = (qA.percent || 94) + '%';
+    if ($('quotaAnthropicReq')) $('quotaAnthropicReq').textContent = `${((qA.used_tokens || 12500)/1000).toFixed(1)}k / ${((qA.limit_tokens || 200000)/1000)}k tokens (${qA.percent || 94}%)`;
+    if ($('quotaAnthropicDetails')) $('quotaAnthropicDetails').textContent = qA.detail || 'RPM: 50 · TPM: 200k · Extended Thinking';
+
+    // Terminal Output
     const outBox = $('tmuxTerminalOutput');
     if (outBox) {
       const rawText = current.terminal_output || `[tmux session: ${current.id}]\nEngine: ${current.cli_tool} CLI\nAccount: ${current.account_label}\nReady for instructions.`;
@@ -3211,31 +3475,78 @@ function renderTmuxSessions() {
     }
   }
 
-  // Render Grid View
+  // Render Grid View (Mission Control 3x2)
   const gridContainer = $('tmuxGridView');
   if (gridContainer && state.tmuxMode === 'grid') {
-    gridContainer.innerHTML = state.tmuxSessions.map(s => `
-      <div class="tmuxGridCell">
-        <div class="tmuxGridHead">
-          <div>
-            <strong>${escapeHtml(s.role_name)}</strong>
-            <span style="font-family:monospace;font-size:10px;color:var(--muted2)"> (${escapeHtml(s.id)})</span>
+    gridContainer.innerHTML = state.tmuxSessions.map(s => {
+      const email = s.email || (s.account_label?.includes('@') ? s.account_label.split('(')[1]?.replace(')', '') : 'Chưa đăng nhập');
+      const isAuth = s.is_auth || (email && email !== 'Chưa đăng nhập');
+      const qG = s.quota_gemini || { percent: 88, model: 'Gemini 3.8 Flash' };
+      const qA = s.quota_anthropic || { percent: 94, model: 'Claude Sonnet 4.6' };
+
+      return `
+        <div class="tmuxGridCell">
+          <div class="tmuxGridHead">
+            <div>
+              <strong>${escapeHtml(s.role_name)}</strong>
+              <span style="font-family:monospace;font-size:10px;color:var(--muted2)"> (${escapeHtml(s.id)})</span>
+            </div>
+            <div style="display:flex;gap:4px">
+              <button class="btn small" onclick="copyGridAttach('${escapeHtml(s.id)}')" style="font-size:9.5px;padding:2px 5px" title="Sao chép lệnh attach terminal">Attach</button>
+              <button class="btn small" onclick="openAccountModal('${escapeHtml(s.id)}')" style="font-size:9.5px;padding:2px 5px">Đổi Acc</button>
+            </div>
           </div>
-          <button class="btn small" onclick="openAccountModal('${escapeHtml(s.id)}')" style="font-size:10px;padding:2px 6px">Đổi Acc</button>
+
+          <div class="tmuxGridAcc" style="display:flex;align-items:center;justify-content:space-between;padding:4px 8px;background:#0d1117;font-size:10px">
+            <span style="display:flex;align-items:center;gap:5px;overflow:hidden">
+              <span class="gIconBadge">G</span>
+              <span style="font-family:var(--mono);color:${isAuth ? '#5eead4' : '#f87171'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(email)}</span>
+            </span>
+            <span style="color:var(--muted2);font-size:8.5px;white-space:nowrap">${escapeHtml(s.conversation_id || 'conv')}</span>
+          </div>
+
+          <!-- Dual Quota Mini-Bars -->
+          <div style="padding:4px 8px;background:#0a0d12;border-bottom:1px solid rgba(255,255,255,0.05);display:flex;flex-direction:column;gap:3px;font-size:9px">
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <span style="color:#38bdf8">Gemini: <b>${escapeHtml(qG.model?.split(' ')[1] || 'Flash')}</b></span>
+              <span style="color:${qG.status === 'rate_limited' ? '#f87171' : 'var(--muted2)'}">${qG.percent || 85}%</span>
+            </div>
+            <div class="miniBar" style="height:3px"><div class="miniFill gemini" style="width:${qG.percent || 85}%"></div></div>
+
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-top:2px">
+              <span style="color:#f59e0b">Claude: <b>${escapeHtml(qA.model?.split(' ')[1] || 'Sonnet')}</b></span>
+              <span style="color:var(--muted2)">${qA.percent || 94}%</span>
+            </div>
+            <div class="miniBar" style="height:3px"><div class="miniFill anthropic" style="width:${qA.percent || 94}%"></div></div>
+          </div>
+
+          <div class="tmuxGridBody" id="gridOut-${escapeHtml(s.id)}">
+            ${escapeHtml(s.terminal_output || 'Session online. Ready.').replace(/\n/g, '<br>')}
+          </div>
+          <div class="tmuxGridFoot">
+            <input type="text" id="gridIn-${escapeHtml(s.id)}" class="tmuxInput" placeholder="Nhập lệnh..." onkeydown="if(event.key==='Enter')sendGridCmd('${escapeHtml(s.id)}')">
+            <button class="btn small primary" onclick="sendGridCmd('${escapeHtml(s.id)}')">Gửi</button>
+          </div>
         </div>
-        <div class="tmuxGridAcc">
-          🔑 ${escapeHtml(s.account_label || 'Mặc định')}
-        </div>
-        <div class="tmuxGridBody" id="gridOut-${escapeHtml(s.id)}">
-          ${escapeHtml(s.terminal_output || 'Session online. Ready.').replace(/\n/g, '<br>')}
-        </div>
-        <div class="tmuxGridFoot">
-          <input type="text" id="gridIn-${escapeHtml(s.id)}" class="tmuxInput" placeholder="Nhập lệnh..." onkeydown="if(event.key==='Enter')sendGridCmd('${escapeHtml(s.id)}')">
-          <button class="btn small primary" onclick="sendGridCmd('${escapeHtml(s.id)}')">Gửi</button>
-        </div>
-      </div>
-    `).join('');
+      `;
+    }).join('');
   }
+}
+
+function copyTmuxAttachCmd() {
+  const cmd = $('tmuxAttachCmdDisplay')?.textContent || `docker exec -it gen-workplace-app tmux a -t ${state.selectedTmuxSessionId}`;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(cmd);
+  }
+  showToast('Đã sao chép lệnh: ' + cmd);
+}
+
+function copyGridAttach(sid) {
+  const cmd = `docker exec -it gen-workplace-app tmux a -t ${sid}`;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(cmd);
+  }
+  showToast('Đã sao chép lệnh: ' + cmd);
 }
 
 function selectTmuxSession(sid) {

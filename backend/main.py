@@ -9,6 +9,7 @@ import os
 import sys
 import json
 import time
+import subprocess
 import urllib.parse
 from pathlib import Path
 from http.server import SimpleHTTPRequestHandler, HTTPServer
@@ -17,7 +18,8 @@ from socketserver import ThreadingMixIn
 PORT = int(os.environ.get("PORT", 8888))
 BASE_DIR = Path(__file__).resolve().parent.parent
 FRONTEND_DIR = BASE_DIR / "frontend"
-DATA_DIR = Path(os.environ.get("DATA_DIR", "/app/data"))
+default_data = "/app/data" if (os.path.exists("/app") or os.environ.get("DOCKER_CONTAINER")) else str(BASE_DIR / "data")
+DATA_DIR = Path(os.environ.get("DATA_DIR", default_data))
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 # Tự động nạp SQLite DB Module
