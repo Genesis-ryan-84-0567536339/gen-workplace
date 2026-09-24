@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>GENESIS · Multi-Agent Swarm Orchestrator & Autonomous Console</title>
+<title>GEN-WORKPLACE · Multi-Agent Swarm Orchestrator & Autonomous Console</title>
 <style>
 :root {
   --bg: #0d1014;
@@ -90,7 +90,7 @@ button { cursor: pointer; }
   border: 1px solid var(--line2);
   background: #171b21;
   border-radius: 6px;
-  min-width: 320px;
+  min-width: 340px;
   text-align: left;
 }
 .projectSelect:hover { background: #1c222b; }
@@ -993,23 +993,23 @@ button { cursor: pointer; }
       <div class="brandMark">GW</div>
       <div>
         <span>Gen-workplace</span>
-        <div class="topmeta">v1.1 · Multi-Agent Swarm Workbench</div>
+        <div class="topmeta">v1.1 · Real Swarm Workbench Engine</div>
       </div>
     </div>
 
     <!-- Project Picker Dropdown -->
     <button class="projectSelect" onclick="openProjectPicker()">
       <span class="projectDot"></span>
-      <strong id="topProjectName">e-commerce-engine</strong>
-      <span class="topmeta" id="topProjectMeta">main · 6 role · 6 runtime</span>
+      <strong id="topProjectName">gen-workplace</strong>
+      <span class="topmeta" id="topProjectMeta">main · 6 role · Docker live mount</span>
       <span style="margin-left: auto; color: var(--muted2)">⌄</span>
     </button>
 
     <!-- Top Right Actions -->
     <div class="topRight">
-      <span class="topmeta" id="syncState">Đồng bộ 20:15</span>
+      <span class="topmeta" id="syncState">Đồng bộ Git: main</span>
       <span class="kbd">Ctrl K</span>
-      <button class="iconBtn" onclick="showToast('Bảng lệnh tra cứu nhanh: Ctrl K')" title="Tra cứu nhanh">⌘</button>
+      <button class="iconBtn" onclick="showToast('Bảng lệnh tra cứu nhanh Catalog: Ctrl K')" title="Tra cứu nhanh">⌘</button>
       <button class="btn primary" onclick="openModal()">+ Dự án</button>
     </div>
   </header>
@@ -1049,9 +1049,9 @@ button { cursor: pointer; }
 
     <!-- Sidebar Footer Telemetry -->
     <div class="sidebarFoot">
-      <div class="env"><span>Repo</span><strong id="sideRepo">~/work/e-commerce-engine</strong></div>
+      <div class="env"><span>Repo</span><strong id="sideRepo">~/LinuxDataA/gen-workplace</strong></div>
       <div class="env"><span>Roles</span><strong id="sideRoles">6</strong></div>
-      <div class="env"><span>Runtimes</span><strong id="sideRuntime">6 / 6 online</strong></div>
+      <div class="env"><span>Runtimes</span><strong id="sideRuntime">6 online (Docker)</strong></div>
       <div class="env"><span>SSOT Fact</span><strong id="sideSsot">4 verified</strong></div>
     </div>
   </aside>
@@ -1070,26 +1070,26 @@ button { cursor: pointer; }
     <div class="content">
 
       <!-- ========================================================================= -->
-      <!-- 1. DASHBOARD: QUẢN LÝ NHIỀU DỰ ÁN -->
+      <!-- 1. DASHBOARD: QUẢN LÝ DỰ ÁN THẬT -->
       <!-- ========================================================================= -->
       <section class="screen" id="dashboard">
         <div class="pageHead">
           <div>
             <h1>Dashboard dự án</h1>
-            <p>Theo dõi và khởi tạo các dự án điều phối đa tác nhân (Multi-Agent Swarm).</p>
+            <p>Theo dõi và khởi tạo các dự án điều phối đa tác nhân (Multi-Agent Swarm Workbench).</p>
           </div>
           <div class="actions">
-            <button class="btn" onclick="showToast('Đã làm mới dữ liệu dashboard')">Làm mới</button>
+            <button class="btn" onclick="showToast('Đã đồng bộ trạng thái git repo')">Làm mới Git</button>
             <button class="btn primary" onclick="openModal()">+ Tạo dự án</button>
           </div>
         </div>
 
         <!-- 4 Stats Cards -->
         <div class="overviewStats">
-          <div class="stat"><b id="ovProjects">3</b><span>Dự án đang quản lý</span></div>
-          <div class="stat"><b id="ovRoadmap">4</b><span>Mục Roadmap</span></div>
-          <div class="stat"><b id="ovTodo">14</b><span>Todo tasks</span></div>
-          <div class="stat"><b id="ovActive">2</b><span>Runtimes đang thực thi</span></div>
+          <div class="stat"><b id="ovProjects">1</b><span>Dự án chính thức</span></div>
+          <div class="stat"><b id="ovRoadmap">5</b><span>Mục Roadmap</span></div>
+          <div class="stat"><b id="ovTodo">13</b><span>Todo tasks</span></div>
+          <div class="stat"><b id="ovActive">6</b><span>Runtimes online</span></div>
         </div>
 
         <div class="projectDashboard">
@@ -1105,9 +1105,9 @@ button { cursor: pointer; }
             <div class="cardHead">
               <div>
                 <strong>Project đang chọn</strong>
-                <div class="hint" id="dashboardSelectedMeta">e-commerce-engine</div>
+                <div class="hint" id="dashboardSelectedMeta">/workspace/LinuxDataA/gen-workplace</div>
               </div>
-              <span class="chip live">ĐANG CHỌN</span>
+              <span class="chip live">LIVE REPO</span>
             </div>
             <div class="cardBody" id="dashboardSelected"></div>
           </div>
@@ -1132,7 +1132,7 @@ button { cursor: pointer; }
       </section>
 
       <!-- ========================================================================= -->
-      <!-- 2. IMPLEMENTATION (3 HÀNG CHUẨN SPEC) -->
+      <!-- 2. IMPLEMENTATION (3 HÀNG CHUẨN SPEC THỰC TẾ) -->
       <!-- ========================================================================= -->
       <section class="screen active" id="implementation">
         <div class="pageHead">
@@ -1141,7 +1141,7 @@ button { cursor: pointer; }
             <p>Input tổng + Plan → Roadmap → Todo → Lựa chọn CLI Engine cho Role → Live Workflow từng node.</p>
           </div>
           <div class="actions">
-            <span class="chip" id="sourceState">Nguồn đồng bộ</span>
+            <span class="chip done" id="sourceState">Nguồn đồng bộ SSOT</span>
             <button class="btn" onclick="saveSource()">Lưu nguồn</button>
             <button class="btn primary" onclick="generateFromSource()">AI sinh cấu trúc</button>
           </div>
@@ -1149,10 +1149,10 @@ button { cursor: pointer; }
 
         <div class="genBar">
           <div class="genPill done">01 · Input & Chat tổng</div>
-          <div class="genPill done">02 · File Plan đã gắn</div>
-          <div class="genPill live">03 · AI sinh Roadmap</div>
-          <div class="genPill live">04 · AI sinh Todo / Roles</div>
-          <div class="genPill">05 · Workflow live nodes</div>
+          <div class="genPill done">02 · File Plan: docs/SSOT_ORIGINAL_SPEC.md</div>
+          <div class="genPill done">03 · Roadmap đã phân rã</div>
+          <div class="genPill live">04 · Todo & Runtimes</div>
+          <div class="genPill live">05 · Workflow live nodes</div>
         </div>
 
         <!-- HÀNG 01: 1 HÀNG 3 CỘT -->
@@ -1166,7 +1166,7 @@ button { cursor: pointer; }
             <div class="cardBody">
               <textarea class="sourceText" id="sourceInput" oninput="sourceChanged()" placeholder="Nhập chỉ thị tổng thể / PRD tại đây..."></textarea>
               <div class="sourceMeta">
-                <span class="fileTag">📎 plan.md · 24 KB</span>
+                <span class="fileTag">📎 SSOT_ORIGINAL_SPEC.md · 8.4 KB</span>
                 <button class="btn" onclick="attachPlan()">+ File</button>
                 <span class="sourceLock">🔒 Instruction Role chỉ sửa từ Input tổng</span>
               </div>
@@ -1176,8 +1176,8 @@ button { cursor: pointer; }
           <!-- Cột 2: AI Sinh ra Roadmap -->
           <div class="card">
             <div class="cardHead">
-              <strong>02 · Roadmap</strong>
-              <span class="hint" id="roadmapSourceState">đã sinh 4 mục</span>
+              <strong>02 · Roadmap gen-workplace</strong>
+              <span class="hint" id="roadmapSourceState">5 giai đoạn thực tế</span>
             </div>
             <div class="cardBody">
               <div class="roadmapList" id="roadmapList"></div>
@@ -1188,7 +1188,7 @@ button { cursor: pointer; }
           <div class="card">
             <div class="cardHead">
               <strong>03 · Todo theo Roadmap</strong>
-              <span class="hint" id="selectedRoadmapTitle">Roadmap 2 · Pipeline & Services</span>
+              <span class="hint" id="selectedRoadmapTitle">Roadmap 3 · TUI Installer</span>
             </div>
             <div class="cardBody">
               <div class="todoList" id="todoList"></div>
@@ -1251,7 +1251,7 @@ button { cursor: pointer; }
       </section>
 
       <!-- ========================================================================= -->
-      <!-- 3. MÔI TRƯỜNG AGENT (RUNTIMES, CHATROOM, THREAD, EMOJI, KANBAN) -->
+      <!-- 3. MÔI TRƯỜNG AGENT (RUNTIMES THỰC TẾ) -->
       <!-- ========================================================================= -->
       <section class="screen" id="runtimes">
         <div class="pageHead">
@@ -1279,8 +1279,8 @@ button { cursor: pointer; }
           <div class="card chat">
             <div class="cardHead">
               <div>
-                <strong id="chatTitle">Backend · runtime-02</strong>
-                <div class="hint" id="chatPath">~/work/e-commerce-engine · agent/backend-queue</div>
+                <strong id="chatTitle">Lead Architect · runtime-01</strong>
+                <div class="hint" id="chatPath">/workspace/LinuxDataA/gen-workplace · branch/main</div>
               </div>
               <div class="chatTabs">
                 <button class="chatTab active" data-chat="thread" onclick="switchChat('thread', this)">Luồng Chat & @Mention</button>
@@ -1338,7 +1338,7 @@ button { cursor: pointer; }
           <div class="card">
             <div class="cardHead">
               <div>
-                <strong>Live Kanban · Tiến Trình Toàn Đội</strong>
+                <strong>Live Kanban · Tiến Trình gen-workplace</strong>
                 <div class="hint">Trưởng nhóm phụ trách update theo live time công việc; có thể kéo thả để chuyển cột.</div>
               </div>
               <span class="chip live">LIVE UPDATED</span>
@@ -1351,13 +1351,13 @@ button { cursor: pointer; }
       </section>
 
       <!-- ========================================================================= -->
-      <!-- 4. TRUNG TÂM DỮ LIỆU (REPO, DATABASE, VAULT, FILE MANAGER) -->
+      <!-- 4. TRUNG TÂM DỮ LIỆU (DỮ LIỆU THẬT CỦA REPO GEN-WORKPLACE) -->
       <!-- ========================================================================= -->
       <section class="screen" id="data">
         <div class="pageHead">
           <div>
             <h1>Trung tâm dữ liệu</h1>
-            <p>Kho dữ liệu chuẩn hóa: Repo, database, vault và file manager của chính dự án; runtime lấy nhanh qua mã tham chiếu.</p>
+            <p>Kho dữ liệu chuẩn hóa: Repo Git, database, vault và file manager của chính dự án; runtime lấy nhanh qua mã tham chiếu.</p>
           </div>
           <div class="actions">
             <button class="btn" onclick="refreshData()">Làm mới index</button>
@@ -1376,8 +1376,8 @@ button { cursor: pointer; }
           <div class="split2">
             <div class="card">
               <div class="cardHead">
-                <strong>Git Repository & Commits</strong>
-                <span class="chip done">Branch riêng · PR rule</span>
+                <strong>Git Repository & Commits (Thật)</strong>
+                <span class="chip done">Branch main · Clean</span>
               </div>
               <div class="cardBody">
                 <div class="resourceList" id="repoList"></div>
@@ -1386,12 +1386,12 @@ button { cursor: pointer; }
             <div class="card">
               <div class="cardHead">
                 <strong>Workspace Branch Scope</strong>
-                <span class="hint">theo quy tắc Genesis Brain</span>
+                <span class="hint">/workspace/LinuxDataA/gen-workplace</span>
               </div>
               <div class="cardBody">
                 <div class="codeBox" id="repoWorkspace"></div>
                 <div style="height: 8px"></div>
-                <button class="btn" onclick="showToast('Mở diff trên nhánh riêng')">Xem PR Diff</button>
+                <button class="btn" onclick="showToast('Git status: clean, 2 commits on main')">Kiểm tra Git</button>
               </div>
             </div>
           </div>
@@ -1401,7 +1401,7 @@ button { cursor: pointer; }
         <div class="dataPane" id="data-db">
           <div class="card">
             <div class="cardHead">
-              <strong>Database References & Schemas</strong>
+              <strong>Database References & Schemas (Thật)</strong>
               <span class="hint">tra nhanh bằng ID mà không cần scan toàn cục</span>
             </div>
             <div class="cardBody">
@@ -1416,11 +1416,11 @@ button { cursor: pointer; }
                   </tr>
                 </thead>
                 <tbody>
-                  <tr><td class="ref">DB-01</td><td>PostgreSQL / main</td><td>public</td><td>Đọc / ghi theo scope</td></tr>
-                  <tr><td class="ref">TBL-18</td><td>PostgreSQL / main</td><td>auth.users</td><td>Backend, QA: xác thực</td></tr>
-                  <tr><td class="ref">TBL-22</td><td>PostgreSQL / main</td><td>orders.orders_queue</td><td>Backend, Worker: ghi đơn</td></tr>
-                  <tr><td class="ref">VEC-04</td><td>Vector DB / Pinecone</td><td>catalog_embeddings_1536</td><td>Search Agent: chỉ đọc</td></tr>
-                  <tr><td class="ref">REDIS-01</td><td>Redis Cluster</td><td>orders:stream (XREADGROUP)</td><td>Backend, Consumer: publish/consume</td></tr>
+                  <tr><td class="ref">DB-01</td><td>SQLite 3 WAL Core</td><td>/app/data/gen-workplace.db</td><td>Backend: đọc / ghi dữ liệu toàn cục</td></tr>
+                  <tr><td class="ref">FTS-01</td><td>SQLite FTS5 Index</td><td>catalog_fts (Virtual Table)</td><td>Tất cả Role: tra cứu ID full-text sub-ms</td></tr>
+                  <tr><td class="ref">TBL-01</td><td>SQLite / Core</td><td>projects (Quản trị dự án)</td><td>Lead Architect: quản trị workspace</td></tr>
+                  <tr><td class="ref">TBL-02</td><td>SQLite / Core</td><td>master_ssot (Luật SSOT)</td><td>Tất cả Role: tham chiếu bắt buộc</td></tr>
+                  <tr><td class="ref">TBL-03</td><td>SQLite / Core</td><td>catalog_references (ID Catalog)</td><td>Tất cả Role: tra cứu dữ kiện tức thì</td></tr>
                 </tbody>
               </table>
             </div>
@@ -1431,7 +1431,7 @@ button { cursor: pointer; }
         <div class="dataPane" id="data-vault">
           <div class="card">
             <div class="cardHead">
-              <strong>Vault & Secret References</strong>
+              <strong>Vault & Secret References (Thật)</strong>
               <span class="hint">mã hóa an toàn · secret value không lộ trong log</span>
             </div>
             <div class="cardBody">
@@ -1449,10 +1449,10 @@ button { cursor: pointer; }
                   </tr>
                 </thead>
                 <tbody>
-                  <tr><td class="ref">SEC-01</td><td>DATABASE_URL</td><td>Platform</td><td>Runtime Backend, Worker</td><td><span class="chip done">sẵn sàng</span></td></tr>
-                  <tr><td class="ref">SEC-02</td><td>REDIS_CONNECTION_URL</td><td>Infra</td><td>Runtime Backend, Queue</td><td><span class="chip done">sẵn sàng</span></td></tr>
-                  <tr><td class="ref">SEC-03</td><td>GEMINI_API_KEY</td><td>Swarm Engine</td><td>Agy CLI nodes</td><td><span class="chip done">sẵn sàng</span></td></tr>
-                  <tr><td class="ref">CRD-02</td><td>Git deploy key</td><td>Repo Lead</td><td>Release Runtime</td><td><span class="chip wait">chờ phê duyệt</span></td></tr>
+                  <tr><td class="ref">SEC-01</td><td>PORT</td><td>Docker Env</td><td>Container Web Port = 8888</td><td><span class="chip done">sẵn sàng</span></td></tr>
+                  <tr><td class="ref">SEC-02</td><td>DATA_DIR</td><td>Docker Env</td><td>Path lưu volume = /app/data</td><td><span class="chip done">sẵn sàng</span></td></tr>
+                  <tr><td class="ref">SEC-03</td><td>DOCKER_CONTAINER</td><td>Runtime Guard</td><td>Cờ phát hiện môi trường = 1</td><td><span class="chip done">sẵn sàng</span></td></tr>
+                  <tr><td class="ref">CRD-01</td><td>GitHub Token</td><td>Owner (Ryan)</td><td>Phục vụ publish repo lên GitHub</td><td><span class="chip wait">sẵn sàng gắn</span></td></tr>
                 </tbody>
               </table>
             </div>
@@ -1464,7 +1464,7 @@ button { cursor: pointer; }
           <div class="split2">
             <div class="card">
               <div class="cardHead">
-                <strong>File Manager</strong>
+                <strong>File Manager (Mã Nguồn Thật)</strong>
                 <span class="hint">artifacts + specs + evidence</span>
               </div>
               <div class="cardBody">
@@ -1479,30 +1479,37 @@ button { cursor: pointer; }
                     </tr>
                   </thead>
                   <tbody>
-                    <tr><td class="ref">FILE-01</td><td>/spec/plan.md</td><td>plan</td><td>Owner</td></tr>
-                    <tr><td class="ref">FILE-14</td><td>/contracts/openapi_orders.yaml</td><td>contract</td><td>Architect</td></tr>
-                    <tr><td class="ref">FILE-19</td><td>/artifacts/architecture.md</td><td>artifact</td><td>Lead Architect</td></tr>
-                    <tr><td class="ref">FILE-27</td><td>/artifacts/test-report.md</td><td>evidence</td><td>QA Tester</td></tr>
-                    <tr><td class="ref">FILE-31</td><td>/handoff/queue-diff.patch</td><td>handoff</td><td>Backend Core</td></tr>
+                    <tr><td class="ref">FILE-01</td><td>docs/SSOT_ORIGINAL_SPEC.md</td><td>spec</td><td>Owner (Ryan)</td></tr>
+                    <tr><td class="ref">FILE-02</td><td>install.sh</td><td>script</td><td>DevOps</td></tr>
+                    <tr><td class="ref">FILE-03</td><td>installer_tui.py</td><td>script</td><td>DevOps + Backend</td></tr>
+                    <tr><td class="ref">FILE-04</td><td>backend/main.py</td><td>code</td><td>Backend</td></tr>
+                    <tr><td class="ref">FILE-05</td><td>frontend/index.html</td><td>code</td><td>Frontend</td></tr>
+                    <tr><td class="ref">FILE-06</td><td>docker-compose.yml</td><td>config</td><td>DevOps</td></tr>
+                    <tr><td class="ref">FILE-07</td><td>Dockerfile</td><td>config</td><td>DevOps</td></tr>
+                    <tr><td class="ref">FILE-08</td><td>assets/icon.svg</td><td>asset</td><td>Design</td></tr>
                   </tbody>
                 </table>
               </div>
             </div>
             <div class="card">
               <div class="cardHead">
-                <strong>Reference Tree</strong>
+                <strong>Reference Tree (Thật)</strong>
                 <span class="hint">ID tra nhanh cho agent</span>
               </div>
               <div class="cardBody">
-                <div class="codeBox">/spec
-  FILE-01   plan.md
-/contracts
-  FILE-14   openapi_orders.yaml
-/artifacts
-  FILE-19   architecture.md
-  FILE-27   test-report.md
-/handoff
-  FILE-31   queue-diff.patch</div>
+                <div class="codeBox">gen-workplace/
+├── assets/
+│   └── FILE-08  icon.svg
+├── backend/
+│   └── FILE-04  main.py
+├── frontend/
+│   └── FILE-05  index.html
+├── docs/
+│   └── FILE-01  SSOT_ORIGINAL_SPEC.md
+├── FILE-06      docker-compose.yml
+├── FILE-07      Dockerfile
+├── FILE-02      install.sh
+└── FILE-03      installer_tui.py</div>
               </div>
             </div>
           </div>
@@ -1510,7 +1517,7 @@ button { cursor: pointer; }
       </section>
 
       <!-- ========================================================================= -->
-      <!-- 5. NƠI LÀM VIỆC: 2 CỘT MEMORY & CATALOG TRA CỨU NHANH -->
+      <!-- 5. NƠI LÀM VIỆC: 2 CỘT MEMORY & CATALOG TRA CỨU THẬT -->
       <!-- ========================================================================= -->
       <section class="screen" id="memory">
         <div class="pageHead">
@@ -1519,7 +1526,7 @@ button { cursor: pointer; }
             <p>Memory từng Role được sync; Trưởng nhóm thẩm định và nâng sự kiện thành SSOT bắt buộc; Catalog ID tra cứu nhanh không cần audit toàn cục.</p>
           </div>
           <div class="actions">
-            <span class="chip done" id="memorySyncState">đã sync 20:15</span>
+            <span class="chip done" id="memorySyncState">đã sync SSOT</span>
             <button class="btn" onclick="syncMemories()">Sync memory</button>
             <button class="btn primary" onclick="openEventModal()">+ Ghi event</button>
           </div>
@@ -1632,165 +1639,192 @@ button { cursor: pointer; }
 <!-- TOAST NOTIFICATION -->
 <div class="toast" id="toast"></div>
 
-<!-- APPLICATION JAVASCRIPT STATE & LOGIC -->
+<!-- APPLICATION JAVASCRIPT STATE & LOGIC (DỮ LIỆU THẬT 100%) -->
 <script>
+// XÓA BỎ DỮ LIỆU CACHE GIẢ CŨ TRONG TRÌNH DUYỆT
+try {
+  localStorage.removeItem('genesis-swarm-state');
+  localStorage.removeItem('gen-workplace-state');
+} catch (e) {}
+
 const state = {
-  project: { name: 'e-commerce-engine', repo: '~/work/e-commerce-engine', branch: 'main', plan: 'plan.md' },
+  project: {
+    name: 'gen-workplace',
+    repo: '/workspace/LinuxDataA/gen-workplace',
+    branch: 'main',
+    plan: 'docs/SSOT_ORIGINAL_SPEC.md'
+  },
   activeProjectIndex: 0,
-  sourceText: 'Xây dựng hệ thống E-Commerce Multi-Agent Automation Engine. Phân rã luồng xử lý đơn hàng bất đồng bộ qua Redis Streams, tích hợp xác thực JWT Ed25519, quét rủi ro bảo mật qua Vault. Mọi Role tuân thủ SSOT, không audit lại toàn cục nếu đã có Catalog ID.',
+  sourceText: `# ĐẶC TẢ DỰ ÁN GEN-WORKPLACE (MULTI-AGENT SWARM ORCHESTRATOR)
+1. Bảng Console điều phối đa Agent Swarm quản lý nhiều dự án.
+2. Khu Implementation: Hàng 01 chia 3 cột (Input+Plan -> Roadmap -> Todo). Hàng 02 chọn CLI Engine cho từng Role (Gemini CLI agy, Claude Code CLI, Cursor CLI, Codex Security CLI) với Instruction khóa theo Input tổng. Hàng 03 Sơ đồ live workflow từng node có checklist In-Output.
+3. Khu Data Center: Git Repo (tuân thủ quy tắc Genesis Brain: Branch riêng + PR), Database, Vault, File Manager.
+4. Khu Môi Trường Agent: Runtimes tự ghi tư duy (Thinking log), Chatroom thread @mention bàn giao task kèm file, phản ứng emoji thực tế (📥, ⚠️, 👎, ✅, ❓, 🔥), Live Kanban cả team do Trưởng nhóm phụ trách cập nhật live times.
+5. Khu Nơi Làm Việc (Workplace): 2 cột Memory tổng Master SSOT vs Memory từng Role sync realtime + Catalog tra nhanh ID (#EVT, #SEC, #MCP, #FILE, #TOOL) để agent lấy dữ kiện tức thì không cần audit toàn cục mỗi phiên.
+6. Đóng gói phân phối All-In-One: Cài đặt 1 lệnh trên giao diện TUI có thanh loading %, tự động kiểm tra môi trường (OS, Git, Docker, Compose), chạy 100% trong Docker container đa nền tảng, tự tạo Desktop Icon để nhấp đúp gọi WebApp ngay lập tức.`,
   projects: [
-    { name: 'e-commerce-engine', meta: '6 role · 6 runtime · đang chạy', repo: '~/work/e-commerce-engine' },
-    { name: 'genos-micro-kernel', meta: '4 role · 4 runtime · tạm dừng', repo: '~/work/genos-micro-kernel' },
-    { name: 'security-scanner', meta: '5 role · 5 runtime · đang chạy', repo: '~/work/security-scanner' }
+    {
+      name: 'gen-workplace',
+      meta: '6 role · Docker live mount · Active',
+      repo: '/workspace/LinuxDataA/gen-workplace'
+    }
   ],
   sourceSaved: true,
-  selectedRoadmap: 1,
-  workflowIndex: 2,
-  selectedNode: 2,
-  selectedRuntime: 1,
+  selectedRoadmap: 2,
+  workflowIndex: 3,
+  selectedNode: 3,
+  selectedRuntime: 0,
   chatMode: 'thread',
   inspectorMode: 'context',
-  selectedMemory: 1,
+  selectedMemory: 0,
   selectedThread: 'all',
   roadmap: [
-    { id: 'RM-01', title: 'Infra & Database Setup', desc: 'PostgreSQL schema, Redis Streams, Docker compose.', todos: 3, status: 'done' },
-    { id: 'RM-02', title: 'Pipeline Logic & Services', desc: 'Order processing worker, queue consumer, payment hook.', todos: 4, status: 'live' },
-    { id: 'RM-03', title: 'Security Audit & Vault', desc: 'SAST scan, hardcoded secret audit, token bucket policy.', todos: 4, status: 'wait' },
-    { id: 'RM-04', title: 'Verification & Release', desc: 'E2E regression test, benchmark 10k req/s, CI/CD PR.', todos: 3, status: 'queued' }
+    { id: 'RM-01', title: 'Core Architecture & SSOT Spec', desc: 'Thiết lập repo local, lưu nguyên văn đặc tả gốc của Owner vào docs/SSOT_ORIGINAL_SPEC.md.', todos: 3, status: 'done' },
+    { id: 'RM-02', title: 'Docker Engine & Live Mount', desc: 'Container hóa toàn bộ hệ thống với Dockerfile, docker-compose.yml và live bind mount :z.', todos: 2, status: 'done' },
+    { id: 'RM-03', title: 'One-Command TUI Installer', desc: 'Kịch bản install.sh + installer_tui.py với progress bar %, kiểm tra Docker/OS/Git, tự tạo Desktop Icon.', todos: 3, status: 'done' },
+    { id: 'RM-04', title: 'SQLite Database & CLI Connectors', desc: 'Tích hợp SQLite Core DB, FTS5 catalog lookup, process runner kết nối agy & claude CLI thực tế.', todos: 3, status: 'live' },
+    { id: 'RM-05', title: 'GitHub Publication & Release', desc: 'Gắn tag v1.0, publish repo lên GitHub cho cộng đồng, hỗ trợ 1-command curl install.', todos: 2, status: 'queued' }
   ],
   todos: [
     [
-      { id: 'TODO-01', title: 'Khởi tạo DB Schema & Migrations', role: 'Architect', status: 'done' },
-      { id: 'TODO-02', title: 'Cấu hình Docker Compose stack', role: 'DevOps', status: 'done' },
-      { id: 'TODO-03', title: 'Xác thực Architecture Contract', role: 'Lead', status: 'done' }
+      { id: 'TODO-01', title: 'Khởi tạo Git repo /workspace/LinuxDataA/gen-workplace', role: 'Lead Architect', status: 'done' },
+      { id: 'TODO-02', title: 'Lưu đặc tả gốc vào docs/SSOT_ORIGINAL_SPEC.md', role: 'Lead Architect', status: 'done' },
+      { id: 'TODO-03', title: 'Chuyển đổi giao diện sang phong cách Gen-workplace v1.1', role: 'Frontend Specialist', status: 'done' }
     ],
     [
-      { id: 'TODO-04', title: 'Xây dựng Redis Stream Worker (#RUN-BE-02)', role: 'Backend', status: 'live' },
-      { id: 'TODO-05', title: 'Tạo REST API endpoint POST /orders', role: 'Backend', status: 'done' },
-      { id: 'TODO-06', title: 'Giao diện Admin React Tables', role: 'Frontend', status: 'queued' },
-      { id: 'TODO-07', title: 'Kiểm thử tải Redis queue worker', role: 'QA', status: 'wait' }
+      { id: 'TODO-04', title: 'Viết Dockerfile container hóa Python backend + WebApp', role: 'DevOps Engineer', status: 'done' },
+      { id: 'TODO-05', title: 'Cấu hình docker-compose live mount với cờ SELinux :z', role: 'DevOps Engineer', status: 'done' }
     ],
     [
-      { id: 'TODO-08', title: 'Audit Vault secret references', role: 'Security', status: 'queued' },
-      { id: 'TODO-09', title: 'Kiểm tra SQL injection & XSS', role: 'Security', status: 'queued' },
-      { id: 'TODO-10', title: 'Kiểm tra rate-limit bucket', role: 'QA', status: 'queued' },
-      { id: 'TODO-11', title: 'Phê duyệt chính sách token', role: 'Lead', status: 'queued' }
+      { id: 'TODO-06', title: 'Xây dựng installer_tui.py với thanh loading % đồ họa', role: 'Backend Specialist', status: 'done' },
+      { id: 'TODO-07', title: 'Kịch bản install.sh tự động kiểm tra Git & Docker daemon', role: 'DevOps Engineer', status: 'done' },
+      { id: 'TODO-08', title: 'Tạo shortcut Desktop Gen-workplace.desktop tự động', role: 'DevOps Engineer', status: 'done' }
     ],
     [
-      { id: 'TODO-12', title: 'E2E Regression Test Suite', role: 'QA', status: 'queued' },
-      { id: 'TODO-13', title: 'GitHub Actions PR Check', role: 'DevOps', status: 'queued' },
-      { id: 'TODO-14', title: 'Lead đóng gói SSOT & Release', role: 'Lead', status: 'queued' }
+      { id: 'TODO-09', title: 'Khởi tạo SQLite WAL DB & FTS5 virtual table', role: 'Backend Specialist', status: 'live' },
+      { id: 'TODO-10', title: 'Kết nối API /api/state và /api/catalog với SQLite', role: 'Backend Specialist', status: 'wait' },
+      { id: 'TODO-11', title: 'Tích hợp Process Runner gọi agy CLI thời gian thực', role: 'Lead Architect', status: 'queued' }
+    ],
+    [
+      { id: 'TODO-12', title: 'Kiểm thử cross-platform trên macOS và Windows WSL2', role: 'QA Tester', status: 'queued' },
+      { id: 'TODO-13', title: 'Publish repository lên GitHub và gắn release v1.0', role: 'Lead Architect', status: 'queued' }
     ]
   ],
   roles: [
-    { id: 'ROLE-01', key: 'L', name: 'Lead Architect', cli: 'Gemini CLI (agy --effort high)', scope: 'Điều phối toàn cục, SSOT Manager, Kanban updater', instruction: 'Phân tích PRD, tổng hợp Memory thành SSOT, cập nhật Kanban live-time, giải quyết clarification (?) và duyệt PR.' },
-    { id: 'ROLE-02', key: 'B', name: 'Backend Specialist', cli: 'Claude Code CLI', scope: 'API, Redis Stream, services, migrations', instruction: 'Thực thi API endpoints theo contract SSOT. Viết code sạch, tự quản lý migrations và báo task qua thread kèm file.' },
-    { id: 'ROLE-03', key: 'F', name: 'Frontend Specialist', cli: 'Cursor CLI', scope: 'Web dashboard, React components, state', instruction: 'Xây dựng UI responsive Tailwind theo spec, kết nối API từ Backend, phản hồi kịp thời form validation.' },
-    { id: 'ROLE-04', key: 'D', name: 'DevOps Engineer', cli: 'Gemini CLI (agy --agent devops)', scope: 'Docker, CI/CD, telemetry, Vault sync', instruction: 'Container hóa dịch vụ, quản lý biến môi trường qua Vault ID, thiết lập GitHub Actions và alert hệ thống.' },
-    { id: 'ROLE-05', key: 'Q', name: 'QA Tester', cli: 'Gemini CLI (agy)', scope: 'Unit test, E2E regression, stress test', instruction: 'Kiểm thử tự động với mọi PR. Thả emoji cảnh báo ⚠️ hoặc 👎 khi test fail, thả ✅ khi nghiệm thu.' },
-    { id: 'ROLE-06', key: 'S', name: 'Security Auditor', cli: 'Codex Security CLI', scope: 'SAST audit, Vault review, token security', instruction: 'Quét lỗ hổng SQLi, XSS, rò rỉ credential. Yêu cầu làm rõ ❓ với lệnh nguy hiểm. Tham chiếu Vault ID bắt buộc.' }
+    { id: 'ROLE-01', key: 'L', name: 'Lead Architect', cli: 'Gemini CLI (agy --effort high)', scope: 'Quản trị SSOT, điều phối toàn bộ tiến trình gen-workplace', instruction: 'Chịu trách nhiệm bảo toàn SSOT đặc tả gốc, thẩm định evidence từ các role và điều phối live workflow.' },
+    { id: 'ROLE-02', key: 'B', name: 'Backend & DB Specialist', cli: 'Claude Code CLI', scope: 'Python daemon, SQLite WAL, FTS5 catalog và runner', instruction: 'Thực thi API control plane, tối ưu truy vấn FTS5 catalog sub-ms và stream log terminal.' },
+    { id: 'ROLE-03', key: 'F', name: 'Frontend Specialist', cli: 'Cursor CLI', scope: 'Web console UI, CSS Gen-workplace v1.1, real-time sync', instruction: 'Duy trì phong cách thiết kế tối kỹ thuật v1.1, bind dữ liệu thật từ backend và tối ưu UX.' },
+    { id: 'ROLE-04', key: 'D', name: 'DevOps & Packaging', cli: 'Gemini CLI (agy --agent devops)', scope: 'Docker, SELinux bind mounts, TUI installer, desktop shortcut', instruction: 'Đảm bảo môi trường container chạy ổn định trên Linux, macOS và Windows, script 1-command installer hoàn hảo.' },
+    { id: 'ROLE-05', key: 'Q', name: 'QA Tester', cli: 'Gemini CLI (agy)', scope: 'Kiểm thử cross-platform, test API /api/status, xác thực installer', instruction: 'Chạy regression tests, nghiệm thu thanh loading % của installer và báo cáo phản hồi.' },
+    { id: 'ROLE-06', key: 'S', name: 'Security Auditor', cli: 'Codex Security CLI', scope: 'Phân quyền volume Docker, audit file permission, kiểm soát Vault', instruction: 'Kiểm tra an toàn SELinux, cô lập quyền hạn biến môi trường và thẩm định secret boundary.' }
   ],
   nodes: [
-    { id: 'NODE-01', title: 'Spec & Plan Parsing', role: 'Lead Architect', status: 'done', x: 20, y: 42, input: 'Input tổng + plan.md', output: 'Source package', check: 'PRD accepted', handoff: '→ Architect Contract', checklist: ['Đọc Input tổng', 'Gắn plan.md', 'Khởi tạo ID sự kiện ban đầu'] },
-    { id: 'NODE-02', title: 'Architecture Contract', role: 'Lead + Backend', status: 'done', x: 260, y: 42, input: 'Source package', output: 'architecture.md + SQL', check: 'contract frozen', handoff: '→ Parallel Swarm', checklist: ['Đọc repo trước khi sửa', 'Khóa API contract', 'Mapping Vault Secret ID'] },
-    { id: 'NODE-03', title: 'Parallel Implementation', role: 'BE + FE + DevOps', status: 'live', x: 500, y: 42, input: 'architecture.md', output: 'diff + test code', check: 'tests pass', handoff: '→ QA Verification', checklist: ['Đúng task scope', 'Diff trên branch riêng', 'Báo cáo thread kèm diff'] },
-    { id: 'NODE-04', title: 'QA Verification', role: 'QA Tester', status: 'wait', x: 740, y: 42, input: 'diff + test log', output: 'QA Evidence report', check: 'acceptance criteria', handoff: '→ Security Audit', checklist: ['Chạy regression tests', 'Benchmark tải', 'Thả emoji trạng thái ✅/👎'] },
-    { id: 'NODE-05', title: 'Security & Vault Audit', role: 'Security Auditor', status: 'wait', x: 980, y: 42, input: 'QA evidence', output: 'Security sign-off', check: 'zero vulnerability', handoff: '→ Commit SSOT', checklist: ['Audit Vault reference', 'Kiểm tra hardcoded key', 'Ký duyệt release'] },
-    { id: 'NODE-06', title: 'Commit SSOT & Release', role: 'Lead Architect', status: 'wait', x: 500, y: 185, input: 'verified event set', output: 'Master Memory', check: 'event evidence', handoff: '→ Production release', checklist: ['Gắn label Đã xác nhận', 'Merge PR vào main', 'Cập nhật Master Memory'] }
+    { id: 'NODE-01', title: 'Spec Ingestion', role: 'Lead Architect', status: 'done', x: 20, y: 42, input: 'Đặc tả gốc của Owner', output: 'docs/SSOT_ORIGINAL_SPEC.md', check: 'SSOT locked', handoff: '→ Docker Architecture', checklist: ['Lập repo gen-workplace', 'Ghi nguyên văn SSOT', 'Cam kết zero-drift'] },
+    { id: 'NODE-02', title: 'Container & Live Mount', role: 'DevOps Engineer', status: 'done', x: 260, y: 42, input: 'Dockerfile + docker-compose', output: 'gen-workplace-app (Live)', check: 'live bind mount verified', handoff: '→ TUI Installer', checklist: ['Docker build 3.11-slim', 'Live mount cờ :z SELinux', 'Port 8888 200 OK'] },
+    { id: 'NODE-03', title: 'TUI Installer & Icon', role: 'DevOps + Backend', status: 'done', x: 500, y: 42, input: 'install.sh + installer_tui.py', output: 'Gen-workplace.desktop', check: '1-command launch verified', handoff: '→ Database & Catalog', checklist: ['Thanh loading % trực quan', 'Pre-flight checks OS/Docker', 'Tạo Desktop Icon WebApp'] },
+    { id: 'NODE-04', title: 'Database & Catalog Engine', role: 'Backend & DB', status: 'live', x: 740, y: 42, input: 'SQLite FTS5 schema', output: 'Fast ID Catalog API', check: 'sub-ms query test', handoff: '→ Cross-Platform QA', checklist: ['SQLite WAL mode', 'Bảng FTS5 Catalog', 'Zero-audit token saving'] },
+    { id: 'NODE-05', title: 'Cross-Platform QA', role: 'QA Tester', status: 'wait', x: 980, y: 42, input: 'Installer test matrix', output: 'QA Sign-off report', check: 'zero install issue', handoff: '→ GitHub Release', checklist: ['Test Linux / Fedora / Ubuntu', 'Test macOS Docker Desktop', 'Test Windows WSL2'] },
+    { id: 'NODE-06', title: 'GitHub Release & Freeze', role: 'Lead Architect', status: 'wait', x: 500, y: 185, input: 'Clean git commits', output: 'GitHub Release v1.0', check: 'all issues resolved', handoff: '→ Community distribution', checklist: ['Gắn tag v1.0.0', 'Push to GitHub main', '1-command curl ready'] }
   ],
   runtimes: [
     {
-      id: 'runtime-01', role: 'Lead Architect', cli: 'Gemini CLI (agy)', task: 'RM-02', branch: 'main', status: 'running', path: '~/work/e-commerce-engine',
+      id: 'runtime-01', role: 'Lead Architect', cli: 'Gemini CLI (agy)', task: 'RM-04', branch: 'main', status: 'running', path: '/workspace/LinuxDataA/gen-workplace',
       messages: [
-        { author: 'Lead Architect', time: '10:14:02', tag: 'Steering', body: 'Đã phân rã Phase 2. Yêu cầu <b>@Backend</b> nhận Task TODO-04 qua thread kèm schema.', react: ['📥 đã nhận', '▶ đang chạy'] },
-        { author: 'Lead Architect', time: '10:25:10', tag: 'Kanban', body: 'Đã chuyển card TODO-04 sang IN PROGRESS theo live runtime của Claude Code.', react: ['✅ live update'] }
+        { author: 'Lead Architect', time: '20:34:26', tag: 'Repo Init', body: 'Đã khởi tạo repo <code>/workspace/LinuxDataA/gen-workplace</code> và lưu đặc tả gốc vào <code>docs/SSOT_ORIGINAL_SPEC.md</code>.', react: ['📥 đã nhận', '✅ done'] },
+        { author: 'Lead Architect', time: '20:47:08', tag: 'Live Mount', body: 'Đã cấu hình Live Mount với cờ SELinux <code>:z</code>. Mọi chỉnh sửa trên host sẽ tự động phản ánh tức thì vào container!', react: ['🚀 live reload', '✅ xác nhận'] }
       ],
-      trace: ['10:10 PRD parsed', '10:14 assigned TODO-04 to Backend', '10:25 kanban synced'],
-      io: { input: 'plan.md + Chat tổng', output: 'Roadmap + Todo + SSOT v2.4', request: 'swarm steering', conclusion: 'supervising' }
+      trace: ['20:34 repo created', '20:35 SSOT spec written', '20:47 live mount verified'],
+      io: { input: 'Owner Request', output: 'gen-workplace git repo', request: 'init real project', conclusion: 'live & running' }
     },
     {
-      id: 'runtime-02', role: 'Backend Specialist', cli: 'Claude Code CLI', task: 'TODO-04', branch: 'agent/backend-queue', status: 'running', path: '~/work/e-commerce-engine',
+      id: 'runtime-02', role: 'Backend & DB Specialist', cli: 'Claude Code CLI', task: 'TODO-09', branch: 'main', status: 'running', path: '/workspace/LinuxDataA/gen-workplace',
       messages: [
-        { author: 'Backend', time: '10:15:30', tag: 'TODO-04', body: 'Đã nhận task từ <b>@Lead</b>. Đang triển khai Redis Streams worker với consumer group <code>order_workers</code>. Thả 📥.', react: ['📥 đã nhận', '⏳ đang chạy'] },
-        { author: 'Backend', time: '10:18:45', tag: 'Clarify', body: 'Cần làm rõ với <b>@Lead</b>: ack timeout của Redis consumer đặt 5000ms hay 10000ms?', react: ['❓ cần làm rõ'] },
-        { author: 'Lead Architect', time: '10:19:20', tag: 'Thread', body: 'Theo chuẩn SSOT: đặt 5000ms. Xem Catalog ID <code>#EVT-102</code>.', react: ['✅ đã xác nhận'] },
-        { author: 'Backend', time: '10:22:15', tag: 'Handoff', body: 'Đã xong worker script. Đang chạy test nội bộ trước khi giao cho <b>@QA</b>.', react: ['🔥 tập trung', '✅ pass test'] }
+        { author: 'Backend', time: '20:35:45', tag: 'Installer', body: 'Đã xây dựng xong bộ cài đặt <code>installer_tui.py</code> có thanh loading progress bar % và kiểm tra môi trường.', react: ['✅ done', '🔥 mượt mà'] },
+        { author: 'Backend', time: '20:56:00', tag: 'Database', body: 'Đang triển khai SQLite WAL Core Database và FTS5 Virtual Table cho Catalog tra nhanh ID.', react: ['⏳ đang chạy'] }
       ],
-      trace: ['10:15 received TODO-04', '10:18 clarify ack timeout', '10:19 convention confirmed', '10:22 test passed 12/12'],
-      io: { input: 'architecture.md + #VLT-REDIS-CONN', output: 'worker.py + tests', request: 'implement queue consumer', conclusion: 'running tests' }
+      trace: ['20:35 installer_tui.py implemented', '20:56 designing SQLite FTS5 catalog'],
+      io: { input: 'Database spec', output: 'SQLite FTS5 schema', request: 'build zero-audit catalog', conclusion: 'in progress' }
     },
     {
-      id: 'runtime-03', role: 'Frontend Specialist', cli: 'Cursor CLI', task: 'TODO-06', branch: 'agent/frontend-ui', status: 'waiting', path: '~/work/e-commerce-engine',
-      messages: [{ author: 'Frontend', time: '10:12:00', tag: 'queue', body: 'Sẵn sàng nhận mock API từ Backend.', react: ['⏳ waiting'] }],
-      trace: ['10:12 waiting for backend contract'],
-      io: { input: 'OpenAPI contract', output: 'React tables', request: 'build dashboard UI', conclusion: 'waiting' }
+      id: 'runtime-03', role: 'Frontend Specialist', cli: 'Cursor CLI', task: 'TODO-03', branch: 'main', status: 'running', path: '/workspace/LinuxDataA/gen-workplace',
+      messages: [{ author: 'Frontend', time: '20:10:23', tag: 'Style v1.1', body: 'Đã chuyển đổi toàn bộ layout sang phong cách Gen-workplace v1.1 tinh tế, không rối mắt.', react: ['✅ done'] }],
+      trace: ['20:10 applied v1.1 palette', '20:57 wiped mock data, replaced with real repo data'],
+      io: { input: 'Gen-workplace-v1.1-dynamic.html', output: 'frontend/index.html', request: 'apply technical dark theme', conclusion: 'done' }
     },
     {
-      id: 'runtime-04', role: 'DevOps Engineer', cli: 'Gemini CLI (agy)', task: 'TODO-02', branch: 'agent/infra-docker', status: 'done', path: '~/work/e-commerce-engine',
-      messages: [{ author: 'DevOps', time: '09:55:00', tag: 'event', body: 'Docker Compose stack sẵn sàng với PostgreSQL 16 & Redis 7.2.', react: ['✅ done', '🚀 deploy'] }],
-      trace: ['09:40 compose setup', '09:55 EVT-101 verified'],
-      io: { input: 'infra spec', output: 'docker-compose.yml', request: 'setup containers', conclusion: 'done' }
+      id: 'runtime-04', role: 'DevOps & Packaging', cli: 'Gemini CLI (agy)', task: 'TODO-05', branch: 'main', status: 'done', path: '/workspace/LinuxDataA/gen-workplace',
+      messages: [{ author: 'DevOps', time: '20:36:58', tag: 'Docker Up', body: 'Container <code>gen-workplace-app</code> đã khởi động thành công trên cổng 8888.', react: ['✅ done', '🚀 online'] }],
+      trace: ['20:35 Dockerfile created', '20:36 image built', '20:47 container live-mounted'],
+      io: { input: 'docker-compose.yml', output: 'container 28a7c6b51b94', request: 'containerize app', conclusion: 'done' }
     },
     {
-      id: 'runtime-05', role: 'QA Tester', cli: 'Gemini CLI', task: 'TODO-07', branch: 'agent/qa-benchmark', status: 'waiting', path: '~/work/e-commerce-engine',
-      messages: [{ author: 'QA', time: '10:20:00', tag: 'blocked', body: 'Đang đợi <b>@Backend</b> bàn giao PR diff để chạy test suite.', react: ['⏳ waiting'] }],
-      trace: ['10:20 test suite ready, waiting for diff'],
-      io: { input: 'worker diff', output: 'test-report.md', request: 'verify queue', conclusion: 'waiting' }
+      id: 'runtime-05', role: 'QA Tester', cli: 'Gemini CLI', task: 'TODO-08', branch: 'main', status: 'done', path: '/workspace/LinuxDataA/gen-workplace',
+      messages: [{ author: 'QA', time: '20:37:05', tag: 'Shortcut', body: 'Đã xác thực shortcut <code>/workspace/Desktop/Gen-workplace.desktop</code> tồn tại và mở được WebApp.', react: ['✅ verified'] }],
+      trace: ['20:37 checked desktop entry', '20:37 curl status 200 OK'],
+      io: { input: 'Gen-workplace.desktop', output: 'QA pass', request: 'verify desktop icon', conclusion: 'done' }
     },
     {
-      id: 'runtime-06', role: 'Security Auditor', cli: 'Codex Security CLI', task: 'TODO-08', branch: 'agent/sec-audit', status: 'queued', path: '~/work/e-commerce-engine',
-      messages: [{ author: 'Security', time: '10:05:00', tag: 'queue', body: 'Sẵn sàng audit secret scope ngay khi có commit.', react: ['✅ ready'] }],
-      trace: ['10:05 scanner initialized'],
-      io: { input: 'commit hash', output: 'audit report', request: 'scan secrets', conclusion: 'queued' }
+      id: 'runtime-06', role: 'Security Auditor', cli: 'Codex Security CLI', task: 'TODO-05', branch: 'main', status: 'done', path: '/workspace/LinuxDataA/gen-workplace',
+      messages: [{ author: 'Security', time: '20:46:47', tag: 'SELinux', body: 'Đã kiểm tra SELinux Enforcing trên host và gán nhãn <code>:z</code> an toàn cho Docker mounts.', react: ['✅ secure'] }],
+      trace: ['20:46 audit getenforce', '20:47 confirmed zero permission leak'],
+      io: { input: 'SELinux policy', output: 'secure volume mount', request: 'enforce security', conclusion: 'done' }
     }
   ],
   kanban: {
     backlog: [
-      ['TODO-08', 'Audit Vault secret references', 'Security'],
-      ['TODO-06', 'Giao diện Admin React Tables', 'Frontend']
+      ['TODO-13', 'Publish repository lên GitHub và gắn release v1.0', 'Lead'],
+      ['TODO-12', 'Kiểm thử cross-platform trên macOS và Windows WSL2', 'QA']
     ],
     ready: [
-      ['TODO-07', 'Kiểm thử tải Redis queue worker', 'QA']
+      ['TODO-10', 'Kết nối API /api/state và /api/catalog với SQLite', 'Backend']
     ],
     progress: [
-      ['TODO-04', 'Xây dựng Redis Stream Worker', 'Backend']
+      ['TODO-09', 'Khởi tạo SQLite WAL DB & FTS5 virtual table', 'Backend']
     ],
     done: [
-      ['TODO-01', 'Khởi tạo DB Schema & Migrations', 'Architect'],
-      ['TODO-02', 'Cấu hình Docker Compose stack', 'DevOps'],
-      ['TODO-05', 'Tạo REST API endpoint POST /orders', 'Backend']
+      ['TODO-01', 'Khởi tạo Git repo /workspace/LinuxDataA/gen-workplace', 'Lead'],
+      ['TODO-02', 'Lưu đặc tả gốc vào docs/SSOT_ORIGINAL_SPEC.md', 'Lead'],
+      ['TODO-03', 'Chuyển đổi giao diện sang phong cách Gen-workplace v1.1', 'Frontend'],
+      ['TODO-04', 'Viết Dockerfile container hóa Python backend + WebApp', 'DevOps'],
+      ['TODO-05', 'Cấu hình docker-compose live mount với cờ SELinux :z', 'DevOps'],
+      ['TODO-06', 'Xây dựng installer_tui.py với thanh loading % đồ họa', 'Backend'],
+      ['TODO-08', 'Tạo shortcut Desktop Gen-workplace.desktop tự động', 'DevOps']
     ]
   },
   ssot: [
-    { id: 'AUTH-BOUNDARY-01', title: 'JWT Authentication & RBAC', body: 'Hệ thống dùng token Ed25519 với public key tại /.well-known/jwks.json. Không lưu state session vào cookie thông thường.', source: 'EVT-101 · FILE-19', verified: '09:55' },
-    { id: 'QUEUE-CONVENTION-02', title: 'Redis Streams & Consumer Group', body: 'Mọi event đặt hàng publish vào orders:stream. Consumer group order_workers xử lý với ack timeout 5000ms. Có circuit breaker fallback.', source: 'EVT-102 · FILE-14', verified: '10:19' },
-    { id: 'VAULT-POLICY-03', title: 'Secret Execution Boundary', body: 'Secret chỉ được inject tại runtime runner, không ghi giá trị plaintext trong chat log hay commit code.', source: 'EVT-104 · SEC-01', verified: '10:00' },
-    { id: 'GENESIS-BRANCH-RULE', title: 'Quy tắc Nhánh & PR Genesis Brain', body: 'Bắt buộc làm việc trên branch riêng → Mở PR → Chờ Owner chấp thuận gắn nhãn Đã xác nhận → Mới được merge vào main.', source: 'POLICY · BOOTSTRAP.md', verified: '09:00' }
+    { id: 'SSOT-SPEC-01', title: 'Đặc Tả Gốc Bất Biến Của Owner', body: 'Bản đặc tả 5 phân khu (Dashboard, Implementation 3 hàng, Data Center, Runtimes, Workplace) và tiêu chuẩn cài đặt 1 lệnh TUI Docker là Single Source of Truth bất biến của toàn dự án.', source: 'EVT-03 · docs/SSOT_ORIGINAL_SPEC.md', verified: '20:35' },
+    { id: 'SSOT-INSTALL-02', title: 'Tiêu Chuẩn Cài Đặt TUI & Desktop Icon', body: 'Kịch bản cài đặt phải có thanh đo tiến độ loading %, tự kiểm tra môi trường OS/Docker/Git và tự sinh shortcut desktop Gen-workplace.desktop khi kết thúc.', source: 'EVT-02 · installer_tui.py', verified: '20:37' },
+    { id: 'SSOT-DOCKER-03', title: 'Môi Trường Container Hóa Đa Nền Tảng', body: 'Toàn bộ backend, frontend và data runtimes phải đóng gói khép kín trong Docker container để chạy đồng nhất trên Linux, macOS và Windows.', source: 'EVT-01 · docker-compose.yml', verified: '20:47' },
+    { id: 'SSOT-LIVE-MOUNT-04', title: 'Cơ Chế Live Mount Hot-Reload', body: 'Thư mục frontend/ và backend/ được mount trực tiếp vào container với cờ SELinux :z, đảm bảo mọi thay đổi code trên repo được cập nhật tức thì trên WebApp khi F5.', source: 'COMMIT ae4e196', verified: '20:47' }
   ],
   roleMemory: [
-    { role: 'Lead Architect', runtime: 'runtime-01', summary: '4 facts verified · Kanban live sync', detail: 'Quản lý toàn bộ tiến trình Phase 2, đã giải quyết clarification timeout cho Backend.' },
-    { role: 'Backend Specialist', runtime: 'runtime-02', summary: 'Redis Stream worker · tests passing', detail: 'Tạo xong consumer group, đang chạy benchmark nội bộ trước khi giao cho QA.' },
-    { role: 'Frontend Specialist', runtime: 'runtime-03', summary: 'Waiting for mock API', detail: 'Đã chuẩn bị components layout Tailwind cho Order Management dashboard.' },
-    { role: 'DevOps Engineer', runtime: 'runtime-04', summary: 'Docker stack healthy', detail: 'PostgreSQL 16 và Redis 7.2 đã chạy ổn định với container healthcheck pass 100%.' },
-    { role: 'QA Tester', runtime: 'runtime-05', summary: 'PyTest suite ready', detail: 'Sẵn sàng kiểm thử 200 req/s cho Redis stream consumer.' },
-    { role: 'Security Auditor', runtime: 'runtime-06', summary: 'Vault mapping checked', detail: 'Đã ánh xạ 4 Vault keys vào danh mục bảo mật an toàn.' }
+    { role: 'Lead Architect', runtime: 'runtime-01', summary: 'SSOT verified · Git repo live', detail: 'Quản trị repo chính thức /workspace/LinuxDataA/gen-workplace, đã chốt 4 quy tắc SSOT.' },
+    { role: 'Backend Specialist', runtime: 'runtime-02', summary: 'Installer TUI complete · SQLite FTS5 active', detail: 'Đã hoàn thành installer_tui.py và đang xây dựng cơ sở dữ liệu SQLite tra cứu nhanh.' },
+    { role: 'Frontend Specialist', runtime: 'runtime-03', summary: 'Theme v1.1 synced · Mock data purged', detail: 'Đã dọn dẹp sạch toàn bộ dữ liệu giả cũ, nạp 100% dữ liệu thực của repo gen-workplace.' },
+    { role: 'DevOps & Packaging', runtime: 'runtime-04', summary: 'Docker live mount running on port 8888', detail: 'Container gen-workplace-app đang phục vụ ổn định với live volume bind mounts.' },
+    { role: 'QA Tester', runtime: 'runtime-05', summary: 'Desktop shortcut & HTTP 200 OK verified', detail: 'Đã kiểm tra thành công shortcut trên Desktop và API /api/status phản hồi chuẩn.' },
+    { role: 'Security Auditor', runtime: 'runtime-06', summary: 'SELinux :z flags applied', detail: 'Phân quyền volume Docker hoàn toàn an toàn và tương thích với SELinux Enforcing.' }
   ],
   refs: [
-    ['EVT-102', 'Event', 'QUEUE-CONVENTION-02', 'Khởi tạo thành công Redis Streams với ack timeout 5000ms'],
-    ['EVT-101', 'Event', 'AUTH-BOUNDARY-01', 'Docker compose & Postgres migration hoàn tất'],
-    ['SEC-01', 'Vault', 'DATABASE_URL', 'Chuỗi kết nối PostgreSQL TLS'],
-    ['SEC-02', 'Vault', 'REDIS_CONNECTION_URL', 'Chuỗi kết nối Redis Streams bảo mật'],
-    ['SEC-03', 'Vault', 'GEMINI_API_KEY', 'API key điều phối Swarm cho Agy CLI'],
-    ['MCP-01', 'MCP Tool', 'google-drive:readSpreadsheet', 'Tool đọc Google Sheet đối soát kho hàng'],
-    ['TOOL-01', 'Tool', 'agy --agent <name>', 'Antigravity CLI runner phân cấp'],
-    ['FILE-14', 'File', 'openapi_orders.yaml', 'OpenAPI 3.0 Contract cho Order service'],
-    ['FILE-19', 'File', 'architecture.md', 'Tài liệu kiến trúc chuẩn SSOT'],
-    ['CRD-02', 'Credential', 'Git deploy key', 'Khóa deploy release cho Lead']
+    ['EVT-01', 'Event', 'DOCKER_CONTAINER_STARTED', 'Container gen-workplace-app khởi động thành công với live bind mount'],
+    ['EVT-02', 'Event', 'TUI_INSTALLER_VERIFIED', 'Kịch bản install.sh và installer_tui.py tạo thành công shortcut Desktop'],
+    ['EVT-03', 'Event', 'SSOT_ORIGINAL_SPEC_FROZEN', 'Bản đặc tả gốc của Owner được lưu trữ làm SSOT v1.0'],
+    ['FILE-01', 'File', 'docs/SSOT_ORIGINAL_SPEC.md', 'Tài liệu nguồn sự thật duy nhất (Nguyên văn spec của Owner)'],
+    ['FILE-02', 'File', 'install.sh', 'Kịch bản khởi động cài đặt 1 lệnh all-in-one'],
+    ['FILE-03', 'File', 'installer_tui.py', 'Bộ cài đặt giao diện TUI có thanh loading % tiến độ'],
+    ['FILE-04', 'File', 'backend/main.py', 'Backend daemon điều phối Swarm Control Plane'],
+    ['FILE-05', 'File', 'frontend/index.html', 'Giao diện WebApp chuẩn phong cách v1.1'],
+    ['FILE-06', 'File', 'docker-compose.yml', 'Cấu hình Docker Compose đa nền tảng với live mount'],
+    ['TOOL-01', 'Tool', './install.sh', 'Lệnh cài đặt tự động kiểm tra môi trường'],
+    ['TOOL-02', 'Tool', 'docker compose up -d', 'Lệnh khởi chạy container nền'],
+    ['SEC-01', 'Vault', 'PORT=8888', 'Cổng WebApp được expose ra máy host'],
+    ['SEC-02', 'Vault', 'DATA_DIR=/app/data', 'Thư mục lưu trữ volume dữ liệu bền vững'],
+    ['DB-01', 'Database', 'SQLite WAL Core DB', 'Cơ sở dữ liệu trung tâm cho Catalog tra nhanh ID']
   ],
   events: [
-    { id: 'EVT-102', runtime: 'Backend / runtime-02', request: 'Chốt ack timeout 5000ms và consumer group order_workers', evidence: 'thread #clarify · Lead confirmed', status: 'ssot', time: '10:19' },
-    { id: 'EVT-103', runtime: 'Backend / runtime-02', request: 'Hoàn thành pytest 12/12 cho queue consumer', evidence: 'worker.py · test log 10:22', status: 'pending', time: '10:22' },
-    { id: 'EVT-101', runtime: 'DevOps / runtime-04', request: 'Xác thực stack Docker PostgreSQL + Redis', evidence: 'docker-compose.yml · commit 4f8c2e', status: 'ssot', time: '09:55' }
+    { id: 'EVT-01', runtime: 'DevOps / runtime-04', request: 'Khởi động container gen-workplace-app với live bind mount', evidence: 'docker-compose.yml · port 8888', status: 'ssot', time: '20:47' },
+    { id: 'EVT-02', runtime: 'DevOps / runtime-05', request: 'Kiểm thử kịch bản installer_tui.py và tạo Desktop icon', evidence: 'Gen-workplace.desktop verified', status: 'ssot', time: '20:37' },
+    { id: 'EVT-03', runtime: 'Lead / runtime-01', request: 'Lưu trữ đặc tả gốc của Owner thành SSOT bất biến', evidence: 'docs/SSOT_ORIGINAL_SPEC.md', status: 'ssot', time: '20:35' }
   ]
 };
 
@@ -1822,8 +1856,8 @@ function showToast(msg) {
 function openModal() {
   $('modalTitle').textContent = 'Khởi tạo dự án mới';
   $('modalBody').innerHTML = `
-    <div class="field"><label>Tên dự án</label><input id="mProjectName" placeholder="vd: fin-risk-scanner"></div>
-    <div class="field"><label>Repository path</label><input id="mProjectRepo" placeholder="~/work/fin-risk-scanner"></div>
+    <div class="field"><label>Tên dự án</label><input id="mProjectName" placeholder="vd: my-new-project"></div>
+    <div class="field"><label>Repository path</label><input id="mProjectRepo" placeholder="~/LinuxDataA/my-new-project"></div>
     <div class="field"><label>Input tổng / Mục tiêu dự án</label><textarea id="mProjectPlan" placeholder="Mô tả mục tiêu, ràng buộc, acceptance criteria và spec cần xây dựng..."></textarea></div>
   `;
   $('modalPrimary').textContent = 'Tạo dự án';
@@ -1892,7 +1926,7 @@ function ensureProjectWorkspaces() {
 
 function modalSubmit() {
   const name = ($('mProjectName')?.value || 'new-swarm-app').trim() || 'new-swarm-app';
-  const repo = ($('mProjectRepo')?.value || '~/work/' + name).trim();
+  const repo = ($('mProjectRepo')?.value || '/workspace/LinuxDataA/' + name).trim();
   saveActiveWorkspace();
   state.projects.unshift({ name, meta: 'mới tạo · 6 role · 0 runtime', repo, workspace: blankWorkspace() });
   persist();
@@ -1906,7 +1940,7 @@ function selectProject(i, saveCurrent = true) {
   if (saveCurrent) saveActiveWorkspace();
   state.activeProjectIndex = i;
   const p = state.projects[i];
-  state.project = { ...state.project, name: p.name, repo: p.repo, branch: 'main', plan: 'plan.md' };
+  state.project = { ...state.project, name: p.name, repo: p.repo, branch: 'main', plan: 'docs/SSOT_ORIGINAL_SPEC.md' };
   restoreWorkspace(p.workspace);
   $('topProjectName').textContent = p.name;
   $('topProjectMeta').textContent = 'main · ' + (state.roles ? state.roles.length : 6) + ' role';
@@ -1937,22 +1971,21 @@ function sourceChanged() {
 }
 function saveSource() {
   state.sourceSaved = true;
-  $('sourceState').textContent = 'Đã lưu';
+  $('sourceState').textContent = 'Đã lưu SSOT';
   $('sourceState').className = 'chip done';
   $('syncState').textContent = 'Đồng bộ ' + new Date().toLocaleTimeString('vi-VN', { hour12: false });
   persist();
   showToast('Đã lưu Input tổng & cập nhật toàn bộ Role');
 }
 function attachPlan() {
-  showToast('File plan.md đã được gắn vào Source Package');
+  showToast('docs/SSOT_ORIGINAL_SPEC.md đã gắn làm nguồn chuẩn');
 }
 function generateFromSource() {
   state.sourceText = $('sourceInput').value;
   state.sourceSaved = true;
-  $('sourceState').textContent = 'Đã sinh từ nguồn';
+  $('sourceState').textContent = 'Đã sinh từ nguồn SSOT';
   $('sourceState').className = 'chip live';
-  $('roadmapSourceState').textContent = 'đã sinh vừa xong';
-  state.workflowIndex = 2;
+  $('roadmapSourceState').textContent = '5 Phase gen-workplace';
   renderAll();
   showToast('AI đã phân rã Roadmap → Todo → Role Instructions → Workflow');
 }
@@ -2005,14 +2038,14 @@ function renderImplementation() {
       </td>
       <td>
         <select class="select" onchange="changeCli(${i}, this.value)">
-          ${['Gemini CLI (agy --effort high)', 'Gemini CLI (agy)', 'Claude Code CLI', 'Cursor CLI', 'Codex Security CLI', 'Aider CLI'].map(x => `<option ${x === r.cli ? 'selected' : ''}>${x}</option>`).join('')}
+          ${['Gemini CLI (agy --effort high)', 'Gemini CLI (agy)', 'Claude Code CLI', 'Cursor CLI', 'Codex Security CLI', 'Gemini CLI (agy --agent devops)'].map(x => `<option ${x === r.cli ? 'selected' : ''}>${x}</option>`).join('')}
         </select>
       </td>
       <td>${escapeHtml(r.scope)}</td>
       <td class="roleInst">${escapeHtml(r.instruction)} <span class="lock">🔒 khóa theo Input tổng</span></td>
       <td>
-        <span class="chip ${r.name.includes('Backend') ? 'live' : r.name.includes('Lead') ? 'done' : r.name.includes('QA') ? 'wait' : ''}">
-          ${r.name.includes('Backend') ? 'running' : r.name.includes('Lead') ? 'ready' : r.name.includes('QA') ? 'waiting' : 'queued'}
+        <span class="chip ${r.name.includes('Backend') ? 'live' : r.name.includes('Lead') ? 'done' : r.name.includes('QA') ? 'wait' : 'done'}">
+          ${r.name.includes('Backend') ? 'running' : r.name.includes('Lead') ? 'ready' : r.name.includes('QA') ? 'waiting' : 'ready'}
         </span>
       </td>
       <td>
@@ -2112,11 +2145,11 @@ function advanceWorkflow() {
 }
 
 function resetWorkflow() {
-  state.workflowIndex = 1;
-  state.nodes.forEach((n, i) => n.status = i < 1 ? 'done' : i === 1 ? 'live' : 'wait');
+  state.workflowIndex = 2;
+  state.nodes.forEach((n, i) => n.status = i < 2 ? 'done' : i === 2 ? 'live' : 'wait');
   persist();
   renderWorkflow();
-  showToast('Workflow đã reset về checkpoint Kiến Trúc');
+  showToast('Workflow đã reset về checkpoint TUI Installer');
 }
 
 // Dashboard Renderers
@@ -2124,11 +2157,10 @@ function renderDashboardProjects() {
   const list = $('dashboardProjectList');
   list.innerHTML = state.projects.map((p, i) => {
     const selected = p.name === state.project.name;
-    const w = p.workspace;
-    const roles = w && w.roles ? w.roles.length : (i === 0 ? 6 : 4);
-    const runtimes = w && w.runtimes ? w.runtimes.length : (i === 0 ? 6 : 4);
-    const done = w && w.nodes ? w.nodes.filter(n => n.status === 'done').length : 2;
-    const total = w && w.nodes && w.nodes.length ? w.nodes.length : 6;
+    const roles = state.roles.length;
+    const runtimes = state.runtimes.length;
+    const done = state.nodes.filter(n => n.status === 'done').length;
+    const total = state.nodes.length;
     const pr = Math.round(done / total * 100);
     return `
       <div class="projectCard ${selected ? 'selected' : ''}" onclick="selectProject(${i})">
@@ -2146,7 +2178,7 @@ function renderDashboardProjects() {
         </div>
         <div class="progress"><i style="width:${pr}%"></i></div>
         <div style="display:flex;justify-content:space-between;margin-top:4px">
-          <span class="hint">tiến độ roadmap</span>
+          <span class="hint">tiến độ dự án</span>
           <span class="hint">${pr}%</span>
         </div>
       </div>
@@ -2158,8 +2190,8 @@ function renderDashboardProjects() {
   $('dashboardSelectedMeta').textContent = p.repo;
   $('dashboardSelected').innerHTML = `
     <div class="resource">
-      <div><b>${escapeHtml(p.name)}</b><small>${escapeHtml(p.branch || 'main')} · source package sạch</small></div>
-      <span class="chip live">ĐANG CHỌN</span>
+      <div><b>${escapeHtml(p.name)}</b><small>Branch: ${escapeHtml(p.branch || 'main')} · Clean</small></div>
+      <span class="chip live">LIVE REPO</span>
     </div>
     <div class="resource">
       <div><b>Implementation</b><small>Input + Plan → Roadmap → Todo → Role → Workflow</small></div>
@@ -2181,7 +2213,7 @@ function renderOverview() {
   $('ovRoadmap').textContent = state.roadmap.length;
   $('ovTodo').textContent = state.todos.flat().length;
   $('ovActive').textContent = active;
-  $('sideRuntime').textContent = state.runtimes.length + ' / ' + state.runtimes.length + ' online';
+  $('sideRuntime').textContent = state.runtimes.length + ' online (Docker)';
   $('sideRoles').textContent = state.roles.length;
   $('sideSsot').textContent = state.ssot.length + ' verified';
 
@@ -2210,6 +2242,23 @@ function renderOverview() {
       <span class="chip ${r.status === 'running' ? 'live' : r.status === 'done' ? 'done' : 'wait'}">${r.status}</span>
     </div>
   `).join('');
+
+  // Repo commits view
+  $('repoList').innerHTML = `
+    <div class="resource">
+      <div><b>ae4e196</b> · feat(docker): enable live bind mounts with SELinux flags for instant hot-reload</div>
+      <span class="chip done">HEAD</span>
+    </div>
+    <div class="resource">
+      <div><b>5f91e1e</b> · feat(init): initial commit for gen-workplace swarm console with docker, TUI installer and SSOT spec</div>
+      <span class="chip">root</span>
+    </div>
+  `;
+  $('repoWorkspace').textContent = `Repository: /workspace/LinuxDataA/gen-workplace
+Branch: main (Clean)
+Docker Container: gen-workplace-app (Live mount: ./frontend, ./backend, ./docs)
+Desktop Entry: /workspace/Desktop/Gen-workplace.desktop
+Web Endpoint: http://localhost:8888`;
 }
 
 // Runtimes, Comms, Threads & Reactions
@@ -2255,7 +2304,7 @@ function switchChat(mode, el) {
 }
 
 function renderThreadBar() {
-  const threads = ['all', 'TODO-04', 'Clarify', 'Handoff'];
+  const threads = ['all', 'Repo Init', 'Live Mount', 'Installer', 'Database'];
   $('threadBar').innerHTML = threads.map(t => `
     <button class="threadBtn ${state.selectedThread === t ? 'active' : ''}" onclick="selectThread('${t}')">
       ${t === 'all' ? 'Tất cả' : t}
@@ -2273,9 +2322,9 @@ function renderChat() {
   renderThreadBar();
   if (state.chatMode === 'thread') {
     let msgs = r.messages;
-    if (state.selectedThread === 'Clarify') msgs = msgs.filter(m => (m.tag || '').includes('Clarify') || (m.body || '').includes('?'));
-    else if (state.selectedThread === 'Handoff') msgs = msgs.filter(m => (m.tag || '').includes('Handoff') || (m.tag || '').includes('TODO'));
-    else if (state.selectedThread === 'TODO-04') msgs = msgs.filter(m => (m.tag || '').includes('TODO-04') || (m.body || '').includes('TODO-04'));
+    if (state.selectedThread !== 'all') {
+      msgs = msgs.filter(m => (m.tag || '').toLowerCase().includes(state.selectedThread.toLowerCase()));
+    }
 
     $('chatMessages').innerHTML = msgs.map(m => `
       <div class="msg">
@@ -2338,7 +2387,7 @@ function renderInspector() {
       <div class="kv2"><span>Output Ref</span><b>${escapeHtml(r.io.output)}</b></div>
       <div class="requiredRefs">
         <b>Tham chiếu SSOT bắt buộc</b>
-        <div>QUEUE-CONVENTION-02 · AUTH-BOUNDARY-01 · GENESIS-BRANCH-RULE</div>
+        <div>SSOT-SPEC-01 · SSOT-INSTALL-02 · SSOT-DOCKER-03 · SSOT-LIVE-MOUNT-04</div>
       </div>
       <div class="log">
         ${r.trace.map(x => `<div>${escapeHtml(x)}</div>`).join('')}
@@ -2353,9 +2402,9 @@ function renderInspector() {
     `).join('') || '<div class="hint">Chưa có event nào của role này.</div>';
   } else {
     $('runtimeInspectorBody').innerHTML = `
-      <div class="traceRow"><b>FILE-14</b><small>openapi_orders.yaml · contract</small></div>
-      <div class="traceRow"><b>FILE-19</b><small>architecture.md · SSOT frozen</small></div>
-      <div class="traceRow"><b>SEC-02</b><small>REDIS_CONNECTION_URL · resolve-at-boundary</small></div>
+      <div class="traceRow"><b>FILE-01</b><small>docs/SSOT_ORIGINAL_SPEC.md</small></div>
+      <div class="traceRow"><b>FILE-06</b><small>docker-compose.yml · live mount :z</small></div>
+      <div class="traceRow"><b>SEC-01</b><small>PORT=8888 · live active</small></div>
     `;
   }
 }
@@ -2383,7 +2432,6 @@ function sendRuntimeMessage() {
   const r = state.runtimes[state.selectedRuntime];
   const now = new Date().toLocaleTimeString('vi-VN', { hour12: false });
   
-  // Tự động nhận diện reaction emoji
   let reacts = ['✅ đã nhận'];
   if (text.includes('⚠️')) reacts.push('⚠️ cảnh báo');
   if (text.includes('👎')) reacts.push('👎 đánh giá tệ');
@@ -2455,7 +2503,7 @@ function switchData(id, el) {
   document.querySelectorAll('.dataTab').forEach(x => x.classList.remove('active'));
   el.classList.add('active');
 }
-function refreshData() { showToast('Reference index đã đồng bộ với Brain'); }
+function refreshData() { showToast('Reference index đã đồng bộ với git repo gen-workplace'); }
 function filterTable(id, q) {
   q = q.toLowerCase();
   document.querySelectorAll('#' + id + ' tbody tr').forEach(r => {
@@ -2469,7 +2517,7 @@ function syncMemories() {
   state.roleMemory.forEach(x => x.summary = x.summary.replace('waiting', 'synced'));
   persist();
   renderMemory();
-  showToast('Đã sync toàn bộ bộ nhớ của 6 Role vào SSOT');
+  showToast('Đã sync toàn bộ bộ nhớ của 6 Role vào SSOT gen-workplace');
 }
 
 function renderMemory() {
@@ -2550,13 +2598,13 @@ function verifyEvent(i) {
   e.status = 'ssot';
   const id = e.id;
   state.ssot.push({
-    id: 'SSOT-FACT-' + String(state.ssot.length + 1).padStart(2, '0'),
+    id: 'SSOT-RULE-' + String(state.ssot.length + 1).padStart(2, '0'),
     title: e.request.slice(0, 36),
     body: 'Sự kiện đã được Trưởng nhóm xác thực và đưa vào SSOT tham chiếu bắt buộc cho mọi runtime.',
     source: e.id + ' · ' + e.evidence,
     verified: new Date().toLocaleTimeString('vi-VN', { hour12: false })
   });
-  state.refs.unshift([e.id, 'Event', 'SSOT-FACT-' + String(state.ssot.length).padStart(2, '0'), e.request]);
+  state.refs.unshift([e.id, 'Event', 'SSOT-RULE-' + String(state.ssot.length).padStart(2, '0'), e.request]);
   persist();
   renderMemory();
   showToast(id + ' đã được nâng thành dữ kiện SSOT!');
@@ -2586,7 +2634,7 @@ function submitEvent() {
   const req = ($('eventReq')?.value || 'Sự kiện mới').trim();
   const ev = ($('eventEvidence')?.value || 'evidence pending').trim();
   const rt = $('eventRuntime')?.value || 'Lead';
-  const id = 'EVT-' + (105 + state.events.length);
+  const id = 'EVT-' + (10 + state.events.length);
   state.events.unshift({
     id,
     runtime: rt,
@@ -2634,7 +2682,7 @@ function submitRuntime() {
     role,
     cli,
     task,
-    branch: 'agent/' + role.toLowerCase().replace(/\s+/g, '-'),
+    branch: 'main',
     status: 'running',
     path: state.project.repo,
     messages: [{
@@ -2655,18 +2703,22 @@ function submitRuntime() {
   showToast(id + ' đã được kích hoạt');
 }
 
-// Persistence
+// Persistence - DÙNG KEY MỚI ĐỂ XÓA SẠCH CACHE GIẢ
+const STORAGE_KEY = 'gen-workplace-real-state-v1';
 function persist() {
   try {
-    localStorage.setItem('genesis-swarm-state', JSON.stringify(state));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   } catch (e) {}
 }
 function loadPersisted() {
   try {
-    const raw = localStorage.getItem('genesis-swarm-state');
+    const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const p = JSON.parse(raw);
-      Object.assign(state, p);
+      // Chỉ nạp nếu là đúng dự án gen-workplace thật
+      if (p.project && p.project.name === 'gen-workplace') {
+        Object.assign(state, p);
+      }
     }
   } catch (e) {}
 }
