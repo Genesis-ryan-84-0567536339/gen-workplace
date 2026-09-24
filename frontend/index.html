@@ -1107,35 +1107,35 @@ button { cursor: pointer; }
 .expertCard {
   background: #10141b;
   border: 1px solid #1e2634;
-  border-radius: 12px;
-  padding: 12px 14px;
+  border-left: 3px solid transparent;
+  border-radius: 8px;
+  padding: 8px 10px;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.15s ease;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   position: relative;
   user-select: none;
 }
 .expertCard:hover {
   background: #141a24;
-  border-color: #3b82f6;
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+  border-color: #2a384f;
+  border-left-color: #60a5fa;
+  transform: translateX(2px);
 }
 .expertCard.active {
   background: #131c2a;
   border-color: #38bdf8;
-  box-shadow: 0 0 0 1.5px #38bdf8, 0 8px 25px rgba(56, 189, 248, 0.2);
+  border-left-color: #38bdf8;
+  box-shadow: 0 0 16px rgba(56, 189, 248, 0.15);
 }
 .expertCard.hibernated {
-  opacity: 0.7;
-  filter: grayscale(0.2);
-  background: #0b0e13;
+  opacity: 0.65;
+  background: #090c10;
 }
 .expertCard.hibernated:hover {
-  opacity: 0.95;
-  filter: none;
+  opacity: 0.9;
 }
 
 /* Inside Expert Card */
@@ -1152,13 +1152,13 @@ button { cursor: pointer; }
   min-width: 0;
 }
 .expertAvatar {
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   border-radius: 6px;
   background: #1c2433;
   display: grid;
   place-items: center;
-  font-size: 15px;
+  font-size: 14px;
   flex-shrink: 0;
   border: 1px solid rgba(255,255,255,0.06);
 }
@@ -1166,7 +1166,7 @@ button { cursor: pointer; }
   min-width: 0;
 }
 .expertRoleTitle {
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 700;
   color: #fff;
   white-space: nowrap;
@@ -1176,8 +1176,8 @@ button { cursor: pointer; }
 }
 .expertSidBadge {
   font-family: var(--mono);
-  font-size: 9px;
-  color: var(--muted2);
+  font-size: 9.5px;
+  color: #7da8ff;
   white-space: nowrap;
 }
 
@@ -1191,7 +1191,7 @@ button { cursor: pointer; }
   border: 1px solid rgba(255,255,255,0.1);
   color: var(--muted);
   font-size: 9.5px;
-  padding: 2px 5px;
+  padding: 2px 6px;
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.12s;
@@ -3007,93 +3007,127 @@ button { cursor: pointer; }
 
               <!-- Deck Nav Tabs -->
               <div class="commandDeckNav">
-                <button class="deckNavTab active" data-decktab="workbench" onclick="switchDeckTab('workbench', this)">📊 Bàn Làm Việc (Live Workbench)</button>
-                <button class="deckNavTab" data-decktab="chat" onclick="switchDeckTab('chat', this)">💬 Trao Đổi & I/O</button>
+                <button class="deckNavTab active" data-decktab="workbench" onclick="switchDeckTab('workbench', this)">📊 Bàn Làm Việc & Live Console</button>
+                <button class="deckNavTab" data-decktab="sop" onclick="switchDeckTab('sop', this)">📋 Hồ Sơ Chức Trách & SOP</button>
+                <button class="deckNavTab" data-decktab="chat" onclick="switchDeckTab('chat', this)">💬 Trao Đổi & Bàn Giao</button>
                 <button class="deckNavTab" data-decktab="thinking" onclick="switchDeckTab('thinking', this)">🧠 Mạch Tư Duy</button>
                 <button class="deckNavTab" data-decktab="kanban" onclick="switchDeckTab('kanban', this)">📋 Kanban</button>
-                <button class="deckNavTab" data-decktab="console" onclick="switchDeckTab('console', this)">💻 Console</button>
                 <button class="deckNavTab" data-decktab="oauth" onclick="switchDeckTab('oauth', this)">🔐 OAuth</button>
               </div>
 
               <!-- Deck Panels -->
-              <div class="deckPanel active" id="deckPanel-workbench" style="display:flex;flex:1;min-height:460px;gap:14px;padding:14px">
-                <!-- Cột trái: Hồ Sơ Nhiệm Vụ & Quy Trình SOP -->
-                <div class="workbenchLeftCol" style="flex:1;display:flex;flex-direction:column;gap:12px;min-width:320px;max-width:480px">
-                  
-                  <!-- Hộp nhiệm vụ đang thực thi -->
-                  <div class="wbBox" style="background:#111620;border:1px solid #1f2a3a;border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:8px">
+              <!-- 1. BÀN LÀM VIỆC & LIVE TERMINAL (FULL WIDTH 100%) -->
+              <div class="deckPanel active" id="deckPanel-workbench" style="display:flex;flex-direction:column;flex:1;min-height:0;height:100%;gap:10px;padding:12px;overflow:hidden">
+                <!-- Thanh Tóm Tắt SOP & Hợp Đồng I/O (Ribbon 3 Cards) -->
+                <div class="wbRibbon" style="display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:10px;flex-shrink:0">
+                  <!-- Card 1: Nhiệm vụ đang làm -->
+                  <div class="wbRibbonCard" style="background:#111620;border:1px solid #1f2a3a;border-radius:8px;padding:8px 12px;display:flex;flex-direction:column;gap:3px">
                     <div style="display:flex;align-items:center;justify-content:space-between">
-                      <span style="font-size:11px;font-weight:700;color:#7da8ff;text-transform:uppercase;letter-spacing:0.5px">🎯 Nhiệm Vụ Đang Thực Thi</span>
-                      <span class="expertStatusChip live" id="wbTaskStatusChip">● Đang chạy</span>
+                      <span style="font-size:10px;font-weight:700;color:#7da8ff;text-transform:uppercase;letter-spacing:0.5px">🎯 Nhiệm Vụ Đang Làm</span>
+                      <span class="expertStatusChip live" id="wbTaskStatusChip" style="font-size:8.5px;padding:1px 6px">● Đang chạy</span>
                     </div>
-                    <div id="wbTaskTitle" style="font-size:13.5px;font-weight:700;color:#f8fafc;line-height:1.35">
+                    <div id="wbTaskTitle" style="font-size:12px;font-weight:700;color:#f8fafc;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
                       Đang tải nhiệm vụ...
                     </div>
-                    <div style="font-size:11px;color:#94a3b8;display:flex;align-items:center;gap:6px">
+                    <div style="font-size:10px;color:#94a3b8;display:flex;align-items:center;gap:6px">
                       <span>Mã: <code id="wbTaskId" style="color:#38bdf8;font-weight:600">TODO-xx</code></span>
                       <span>·</span>
                       <span>Lộ trình: <span id="wbTaskRoadmap" style="color:#cbd5e1">RM-xx</span></span>
                     </div>
                   </div>
 
-                  <!-- Hộp Quy Trình Chuyển Giao (Input / Output Contract) -->
-                  <div class="wbBox" style="background:#111620;border:1px solid #1f2a3a;border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:10px">
-                    <div style="font-size:11px;font-weight:700;color:#7da8ff;text-transform:uppercase;letter-spacing:0.5px">🔄 Quy Trình & Hợp Đồng I/O</div>
-                    
-                    <div style="display:flex;flex-direction:column;gap:3px">
-                      <span style="font-size:10.5px;color:#94a3b8;font-weight:600">📥 Đầu vào nhận từ ai (Input):</span>
-                      <div id="wbInputFrom" style="font-size:11.5px;color:#e2e8f0;background:rgba(255,255,255,0.03);padding:6px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.06)">
-                        Đặc tả bài toán từ Lead Architect
-                      </div>
+                  <!-- Card 2: Hợp đồng I/O & Bàn giao -->
+                  <div class="wbRibbonCard" style="background:#111620;border:1px solid #1f2a3a;border-radius:8px;padding:8px 12px;display:flex;flex-direction:column;gap:3px">
+                    <span style="font-size:10px;font-weight:700;color:#7da8ff;text-transform:uppercase;letter-spacing:0.5px">🔄 Hợp Đồng Bàn Giao I/O</span>
+                    <div style="font-size:11px;color:#cbd5e1;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+                      <span style="color:#94a3b8">📥 Nhận từ:</span> <span id="wbInputFrom" style="color:#38bdf8">Lead Architect</span>
                     </div>
-
-                    <div style="display:flex;flex-direction:column;gap:3px">
-                      <span style="font-size:10.5px;color:#94a3b8;font-weight:600">📤 Đầu ra bàn giao cho ai (Output):</span>
-                      <div id="wbOutputTo" style="font-size:11.5px;color:#e2e8f0;background:rgba(255,255,255,0.03);padding:6px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.06)">
-                        Chuyển giao cho QA Tester nghiệm thu
-                      </div>
-                    </div>
-
-                    <div style="display:flex;flex-direction:column;gap:3px">
-                      <span style="font-size:10.5px;color:#94a3b8;font-weight:600">🛡️ Ranh giới thư mục:</span>
-                      <div style="display:flex;flex-direction:column;gap:4px;font-size:11px">
-                        <div style="color:#4ade80;background:rgba(74,222,128,0.08);padding:4px 8px;border-radius:4px;border:1px solid rgba(74,222,128,0.2)" id="wbAllowedBox">
-                          🛡️ Được sửa: backend/**, data/**
-                        </div>
-                        <div style="color:#f87171;background:rgba(248,113,113,0.08);padding:4px 8px;border-radius:4px;border:1px solid rgba(248,113,113,0.2)" id="wbBlockedBox">
-                          ⛔ Cấm sửa: frontend/**, Dockerfile
-                        </div>
-                      </div>
+                    <div style="font-size:11px;color:#cbd5e1;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+                      <span style="color:#94a3b8">📤 Giao cho:</span> <span id="wbOutputTo" style="color:#4ade80">QA Tester & Lead</span>
                     </div>
                   </div>
 
-                  <!-- Hộp Checklist 4 Bước Thực Thi Chuẩn SOP -->
-                  <div class="wbBox" style="background:#111620;border:1px solid #1f2a3a;border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:8px">
-                    <div style="font-size:11px;font-weight:700;color:#7da8ff;text-transform:uppercase;letter-spacing:0.5px">📋 Checklist 4 Bước Thực Thi</div>
-                    <div id="wbChecklist" style="display:flex;flex-direction:column;gap:5px;font-size:11.5px">
-                      <!-- dynamically rendered -->
+                  <!-- Card 3: Ranh giới thư mục & Link SOP -->
+                  <div class="wbRibbonCard" style="background:#111620;border:1px solid #1f2a3a;border-radius:8px;padding:8px 12px;display:flex;flex-direction:column;gap:3px">
+                    <div style="display:flex;align-items:center;justify-content:space-between">
+                      <span style="font-size:10px;font-weight:700;color:#7da8ff;text-transform:uppercase;letter-spacing:0.5px">🛡️ Ranh Giới & Nghiệm Thu</span>
+                      <button class="btn small" style="font-size:9.5px;padding:1px 6px;height:18px" onclick="switchDeckTab('sop')" title="Xem chi tiết hồ sơ SOP">Xem SOP đầy đủ ➔</button>
+                    </div>
+                    <div style="font-size:10.5px;font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+                      <span style="color:#4ade80" id="wbAllowedBox">🛡️ Sửa: backend/**</span>
+                    </div>
+                    <div style="font-size:10.5px;font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+                      <span style="color:#f87171" id="wbBlockedBox">⛔ Cấm: frontend/**</span>
                     </div>
                   </div>
-
                 </div>
 
-                <!-- Cột phải: Live Terminal Stream & Command Prompt -->
-                <div class="workbenchRightCol" style="flex:1.4;display:flex;flex-direction:column;gap:10px;min-width:360px">
-                  <div class="streamlinedConsole" style="flex:1;min-height:440px;display:flex;flex-direction:column;border:1px solid #1f2a3a;border-radius:10px;overflow:hidden;background:#080b0f">
-                    <div style="background:#111620;border-bottom:1px solid #1a2332;padding:8px 12px;display:flex;align-items:center;justify-content:space-between">
-                      <div style="display:flex;align-items:center;gap:8px">
-                        <span style="width:10px;height:10px;border-radius:50%;background:#22c55e"></span>
-                        <strong style="font-size:11.5px;color:#e2e8f0" id="wbConsoleTitle">Console Phiên Tmux: gw-lead-agy</strong>
+                <!-- Live Terminal & Console Stream (100% Full Width Cột Phải) -->
+                <div class="streamlinedConsole" style="flex:1;min-height:0;display:flex;flex-direction:column;border:1px solid #1f2a3a;border-radius:10px;overflow:hidden;background:#080b0f">
+                  <div style="background:#111620;border-bottom:1px solid #1a2332;padding:8px 14px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+                    <div style="display:flex;align-items:center;gap:10px">
+                      <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#22c55e;box-shadow:0 0 8px #22c55e"></span>
+                      <strong style="font-size:12px;color:#f8fafc" id="wbConsoleTitle">Console Phiên Tmux: gw-lead-agy</strong>
+                      <span class="badge" style="font-size:9px;background:#1e293b;color:#94a3b8;font-family:var(--mono)">Live Buffer 500 lines</span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:6px">
+                      <button class="btn small" style="font-size:10px;padding:2px 8px" onclick="copyTmuxAttachCmd()" title="Sao chép lệnh attach tmux">📋 Copy Attach</button>
+                      <button class="btn small" style="font-size:10px;padding:2px 8px" onclick="clearTmuxTerminal()" title="Xóa màn hình console">⌫ Xóa</button>
+                      <button class="btn small" style="font-size:10px;padding:2px 8px" onclick="refreshTmuxSessions()" title="Làm mới buffer">↻ Refresh</button>
+                    </div>
+                  </div>
+
+                  <div class="streamlinedConsoleBody" id="wbTerminalOutput" style="flex:1;padding:12px 14px;font-family:var(--mono);font-size:12px;line-height:1.6;color:#e2e8f0;overflow-y:auto;background:#05070a;white-space:pre-wrap;word-break:break-all">
+                    <span style="color:#64748b">▸ Đang kết nối terminal stream...</span>
+                  </div>
+
+                  <div class="streamlinedConsoleInputRow" style="background:#0d1219;border-top:1px solid #1a2332;padding:8px 12px;display:flex;align-items:center;gap:8px;flex-shrink:0">
+                    <span style="color:#38bdf8;font-family:var(--mono);font-size:13px;font-weight:700">$</span>
+                    <input id="wbCmdInput" class="chatInput" style="flex:1;background:transparent;border:none;color:#f8fafc;font-family:var(--mono);font-size:12px" placeholder="Gửi lệnh thực thi vào tmux session này (Enter để gửi)…" onkeydown="if(event.key==='Enter')sendWbTmuxCmd()"/>
+                    <button class="btn small" style="font-size:10.5px;padding:3px 8px;font-family:var(--mono)" onclick="sendTmuxKey('C-c')" title="Gửi phím ngắt Ctrl+C">^C</button>
+                    <button class="btn small primary" style="font-size:11px;padding:3px 12px" onclick="sendWbTmuxCmd()">Chạy lệnh</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 2. HỒ SƠ CHỨC TRÁCH & SOP CHI TIẾT -->
+              <div class="deckPanel" id="deckPanel-sop" style="display:none;flex:1;padding:14px;overflow-y:auto">
+                <div style="max-width:960px;margin:0 auto;display:flex;flex-direction:column;gap:12px">
+                  <div class="card" style="padding:14px 16px;background:#111620;border:1px solid #1f2a3a;border-radius:10px">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+                      <h3 style="margin:0;font-size:13.5px;color:#fff" id="sopRoleTitle">Lead Architect · Quy Chuẩn Vận Hành SOP</h3>
+                      <span class="chip done" id="sopStatusChip" style="font-size:9.5px">● Đang hoạt động</span>
+                    </div>
+                    <p style="font-size:11.5px;color:#94a3b8;line-height:1.5;margin:0" id="sopRoleMission">
+                      Bảo tồn đặc tả SSOT gốc, phân rã Roadmap & Todo DAG, kiểm duyệt bằng chứng và ký nghiệm thu.
+                    </p>
+                  </div>
+
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                    <div class="card" style="padding:12px 14px;background:#111620;border:1px solid #1f2a3a;border-radius:10px;display:flex;flex-direction:column;gap:8px">
+                      <h4 style="margin:0;font-size:11.5px;color:#7da8ff;text-transform:uppercase;letter-spacing:0.5px">🔄 Hợp Đồng Bàn Giao I/O</h4>
+                      <div style="display:flex;flex-direction:column;gap:6px;font-size:11.5px">
+                        <div><strong style="color:#94a3b8">📥 Nhận đầu vào từ:</strong> <div id="sopInputFrom" style="color:#e2e8f0;background:rgba(255,255,255,0.03);padding:6px 10px;border-radius:6px;margin-top:3px;border:1px solid rgba(255,255,255,0.05)">Đặc tả bài toán từ Ryan</div></div>
+                        <div><strong style="color:#94a3b8">📤 Bàn giao đầu ra cho:</strong> <div id="sopOutputTo" style="color:#e2e8f0;background:rgba(255,255,255,0.03);padding:6px 10px;border-radius:6px;margin-top:3px;border:1px solid rgba(255,255,255,0.05)">QA Tester & Backend</div></div>
                       </div>
-                      <span style="font-size:10px;color:var(--muted);font-family:var(--mono)">Live Buffer 500 lines</span>
                     </div>
-                    <div class="streamlinedConsoleBody" id="wbTerminalOutput" style="flex:1;padding:12px;font-family:var(--mono);font-size:11.5px;line-height:1.6;color:#e2e8f0;overflow-y:auto;background:#05070a">
-                      <span style="color:#64748b">▸ Đang kết nối terminal stream...</span>
+
+                    <div class="card" style="padding:12px 14px;background:#111620;border:1px solid #1f2a3a;border-radius:10px;display:flex;flex-direction:column;gap:8px">
+                      <h4 style="margin:0;font-size:11.5px;color:#7da8ff;text-transform:uppercase;letter-spacing:0.5px">🛡️ Ranh Giới Thư Mục (Security Boundary)</h4>
+                      <div style="display:flex;flex-direction:column;gap:6px;font-size:11px">
+                        <div><strong style="color:#4ade80">🛡️ Được phép sửa đổi:</strong> <div id="sopAllowedPaths" style="font-family:var(--mono);color:#4ade80;background:rgba(74,222,128,0.08);padding:6px 10px;border-radius:6px;margin-top:3px;border:1px solid rgba(74,222,128,0.2)">* (Toàn quyền)</div></div>
+                        <div><strong style="color:#f87171">⛔ Tuyệt đối cấm can thiệp:</strong> <div id="sopBlockedPaths" style="font-family:var(--mono);color:#f87171;background:rgba(248,113,113,0.08);padding:6px 10px;border-radius:6px;margin-top:3px;border:1px solid rgba(248,113,113,0.2)">None</div></div>
+                      </div>
                     </div>
-                    <div class="streamlinedConsoleInputRow" style="background:#0e131b;border-top:1px solid #1a2332;padding:8px 12px;display:flex;align-items:center;gap:8px">
-                      <span style="color:#38bdf8;font-family:var(--mono);font-size:12px;font-weight:700">$</span>
-                      <input id="wbCmdInput" class="chatInput" style="flex:1;background:transparent;border:none;color:#f8fafc;font-family:var(--mono);font-size:12px" placeholder="Gửi lệnh thực thi vào tmux session này…" onkeydown="if(event.key==='Enter')sendWbTmuxCmd()"/>
-                      <button class="btn small primary" onclick="sendWbTmuxCmd()">Chạy lệnh</button>
+                  </div>
+
+                  <div class="card" style="padding:12px 14px;background:#111620;border:1px solid #1f2a3a;border-radius:10px;display:flex;flex-direction:column;gap:8px">
+                    <div style="display:flex;align-items:center;justify-content:space-between">
+                      <h4 style="margin:0;font-size:11.5px;color:#7da8ff;text-transform:uppercase;letter-spacing:0.5px">📋 Checklist 4 Bước Nghiệm Thu Chuẩn SOP</h4>
+                      <span style="font-size:10px;color:var(--muted)">Chuẩn ISO / SSOT Execution</span>
+                    </div>
+                    <div id="sopChecklistBody" style="display:flex;flex-direction:column;gap:6px">
+                      <!-- Render dynamically -->
                     </div>
                   </div>
                 </div>
@@ -4113,11 +4147,12 @@ const SUBTAB_CONFIG = {
     icon: '◉',
     name: 'Swarm Chuyên Gia',
     tabs: [
-      { id: 'rt-squad', label: '🚀 Ban Chỉ Huy Swarm', target: '#expertSquadGrid' },
-      { id: 'rt-chat', label: '💬 Luồng Chat & Bàn Giao', action: () => switchDeckTab('chat') },
+      { id: 'rt-workbench', label: '📊 Bàn Làm Việc & Console', action: () => switchDeckTab('workbench') },
+      { id: 'rt-sop', label: '📋 Hồ Sơ SOP', action: () => switchDeckTab('sop') },
+      { id: 'rt-chat', label: '💬 Trao Đổi & Bàn Giao', action: () => switchDeckTab('chat') },
       { id: 'rt-thinking', label: '🧠 Mạch Tư Duy', action: () => switchDeckTab('thinking') },
       { id: 'rt-kanban', label: '📋 Live Kanban', action: () => switchDeckTab('kanban') },
-      { id: 'rt-console', label: '💻 Live Console', action: () => switchDeckTab('console') }
+      { id: 'rt-oauth', label: '🔐 Tài Khoản & Quota', action: () => switchDeckTab('oauth') }
     ]
   },
   implementation: {
@@ -4861,35 +4896,36 @@ function renderExpertSquadGrid() {
   container.innerHTML = state.tmuxSessions.map(s => {
     const isSel = s.id === state.selectedTmuxSessionId;
     const avatar = ROLE_AVATARS[s.id] || '🤖';
-    const email = s.email || (s.account_label?.includes('@') ? s.account_label.split('(')[1]?.replace(')', '') : 'Chưa đăng nhập');
     const qG = s.quota_gemini || { percent: 72, model: 'Gemini 3.8 Flash' };
     const qA = s.quota_anthropic || { percent: 89, model: 'Claude Sonnet 4.6' };
     const isHib = s.status === 'hibernated';
     const isPaused = s.status === 'paused';
 
-    const statusLabel = isHib ? '😴 Ngủ đông' : (isPaused ? '⏸ Tạm dừng' : '● Đang làm việc');
-    const statusClass = isHib ? 'sleep' : (isPaused ? 'paused' : 'live');
+    const statusDotColor = isHib ? '#64748b' : (isPaused ? '#facc15' : '#22c55e');
+    const statusTitle = isHib ? 'Ngủ đông' : (isPaused ? 'Tạm dừng' : 'Đang chạy');
     const roleInfo = ROLE_DETAILS[s.id] || { mission: 'Thực thi các tác vụ theo phân công SSOT' };
-
-    const allowed = (s.allowed_paths && s.allowed_paths.length) ? s.allowed_paths.slice(0, 2).join(', ') : 'Toàn quyền';
-    const blocked = (s.blocked_paths && s.blocked_paths.length) ? s.blocked_paths.slice(0, 2).join(', ') : 'Không có';
+    const taskText = s.current_task_id ? `${s.current_task_id}: ${s.task_title || ''}` : 'Rảnh rỗi (Chưa nhận việc)';
 
     return `
       <div class="expertCard ${isSel ? 'active' : ''} ${isHib ? 'hibernated' : ''}" onclick="selectTmuxSession('${escapeHtml(s.id)}')">
+        <!-- Hàng 1: Avatar + Tên Role + SID + Nút Lifecycle Mini -->
         <div class="expertCardTop">
           <div class="expertCardAvatarBox">
-            <div class="expertAvatar" style="font-size:18px">${avatar}</div>
+            <div style="position:relative;flex-shrink:0">
+              <div class="expertAvatar">${avatar}</div>
+              <span style="position:absolute;bottom:-1px;right:-1px;width:7px;height:7px;border-radius:50%;background:${statusDotColor};border:1.5px solid #10141b" title="${statusTitle}"></span>
+            </div>
             <div class="expertNameBlock">
-              <div class="expertRoleTitle" style="font-size:12.5px;color:#fff">${escapeHtml(s.role_name)}</div>
-              <div class="expertSidBadge" style="font-size:10px;color:#7da8ff">${escapeHtml(s.id)}</div>
+              <div class="expertRoleTitle">${escapeHtml(s.role_name)}</div>
+              <div class="expertSidBadge">${escapeHtml(s.id)}</div>
             </div>
           </div>
           <div class="expertCardActions" onclick="event.stopPropagation()">
             ${isHib 
               ? `<button class="expertMiniBtn wake" onclick="triggerGridLifecycle('${escapeHtml(s.id)}', 'wake')" title="Đánh thức dậy">⚡ Thức</button>`
               : (isPaused
-                  ? `<button class="expertMiniBtn" onclick="triggerGridLifecycle('${escapeHtml(s.id)}', 'resume')" title="Tiếp tục">▶ Tiếp tục</button>
-                     <button class="expertMiniBtn" onclick="triggerGridLifecycle('${escapeHtml(s.id)}', 'hibernate')" title="Ngủ đông">😴 Ngủ</button>`
+                  ? `<button class="expertMiniBtn wake" onclick="triggerGridLifecycle('${escapeHtml(s.id)}', 'resume')" title="Tiếp tục">▶</button>
+                     <button class="expertMiniBtn" onclick="triggerGridLifecycle('${escapeHtml(s.id)}', 'hibernate')" title="Ngủ đông">😴</button>`
                   : `<button class="expertMiniBtn" onclick="triggerGridLifecycle('${escapeHtml(s.id)}', 'pause')" title="Tạm dừng">⏸</button>
                      <button class="expertMiniBtn" onclick="triggerGridLifecycle('${escapeHtml(s.id)}', 'hibernate')" title="Ngủ đông">😴</button>`
                 )
@@ -4897,35 +4933,13 @@ function renderExpertSquadGrid() {
           </div>
         </div>
 
-        <!-- Hộp Nhiệm Vụ Đang Làm Rõ Ràng -->
-        <div style="background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.25);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;gap:4px">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:6px">
-            <span style="font-family:var(--mono);font-size:10px;font-weight:700;color:#38bdf8">📌 ${escapeHtml(s.current_task_id || 'CHƯA NHẬN VIỆC')}</span>
-            <span class="expertStatusChip ${statusClass}" style="font-size:8.5px;padding:1px 5px">${statusLabel}</span>
+        <!-- Hàng 2: Task tag ngắn gọn & Quota chip -->
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:10px">
+          <div style="min-width:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#cbd5e1;background:rgba(255,255,255,0.03);padding:2px 6px;border-radius:4px;border:1px solid rgba(255,255,255,0.06)" title="${escapeHtml(taskText)}">
+            <span style="color:#38bdf8;font-weight:700">📌</span> ${escapeHtml(taskText)}
           </div>
-          <div style="font-size:12px;font-weight:700;color:#f8fafc;line-height:1.3;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">
-            ${escapeHtml(s.task_title || roleInfo.mission)}
-          </div>
-        </div>
-
-        <!-- Hoạt Động & Ranh Giới Thư Mục -->
-        <div style="font-size:11px;color:#94a3b8;line-height:1.4">
-          <div style="color:#cbd5e1;margin-bottom:3px;font-size:11px"><strong>⚡ Chức trách:</strong> ${escapeHtml(roleInfo.mission)}</div>
-          <div style="display:flex;flex-wrap:wrap;gap:4px;font-size:9.5px;font-family:var(--mono);margin-top:4px">
-            <span style="color:#4ade80;background:rgba(74,222,128,0.1);padding:1px 6px;border-radius:4px" title="${escapeHtml(s.allowed_paths?.join(', ') || '')}">🛡️ Sửa: ${escapeHtml(allowed)}</span>
-            ${blocked !== 'Không có' ? `<span style="color:#f87171;background:rgba(248,113,113,0.1);padding:1px 6px;border-radius:4px" title="${escapeHtml(s.blocked_paths?.join(', ') || '')}">⛔ Cấm: ${escapeHtml(blocked)}</span>` : ''}
-          </div>
-        </div>
-
-        <!-- Quota & Thao Tác 1-Click -->
-        <div style="display:flex;align-items:center;justify-content:space-between;padding-top:6px;border-top:1px dashed rgba(255,255,255,0.08);margin-top:auto">
-          <div style="font-size:10.5px;font-family:var(--mono);color:#7da8ff">
-            💎 ${qG.percent || 72}% · ⚡ ${qA.percent || 89}%
-          </div>
-          <div style="display:flex;align-items:center;gap:4px">
-            <button class="btn small primary" style="font-size:10.5px;padding:3px 9px" onclick="selectTmuxSession('${escapeHtml(s.id)}');$('commandDeck')?.scrollIntoView({behavior:'smooth'})">
-              🔍 Bàn Làm Việc
-            </button>
+          <div style="font-family:var(--mono);color:#94a3b8;font-size:9.5px;flex-shrink:0;background:rgba(0,0,0,0.3);padding:2px 5px;border-radius:4px" title="Quota: Gemini ${qG.percent || 72}% · Claude ${qA.percent || 89}%">
+            💎${qG.percent || 72}% ⚡${qA.percent || 89}%
           </div>
         </div>
       </div>
@@ -5053,6 +5067,28 @@ function updateCommandDeck() {
     $('wbTerminalOutput').scrollTop = $('wbTerminalOutput').scrollHeight;
   }
 
+  // Update SOP Panel Elements
+  if ($('sopRoleTitle')) $('sopRoleTitle').textContent = `${current.role_name} (${current.id}) · Quy Chuẩn Vận Hành SOP`;
+  if ($('sopRoleMission')) $('sopRoleMission').textContent = roleInfo.mission;
+  if ($('sopInputFrom')) $('sopInputFrom').textContent = roleInfo.inputFrom;
+  if ($('sopOutputTo')) $('sopOutputTo').textContent = roleInfo.outputTo;
+  if ($('sopAllowedPaths')) $('sopAllowedPaths').textContent = current.allowed_paths?.join(', ') || '* (Toàn quyền trong workspace)';
+  if ($('sopBlockedPaths')) $('sopBlockedPaths').textContent = current.blocked_paths?.join(', ') || 'Không có hạn chế';
+  if ($('sopStatusChip')) {
+    $('sopStatusChip').textContent = isHib ? '😴 Đang ngủ đông' : (isPaused ? '⏸ Tạm dừng' : '● Đang hoạt động');
+    $('sopStatusChip').className = `chip ${isHib ? 'wait' : (isPaused ? 'wait' : 'done')}`;
+  }
+  if ($('sopChecklistBody')) {
+    $('sopChecklistBody').innerHTML = (roleInfo.checklist || []).map(item => `
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:6px">
+        <span style="display:inline-grid;place-items:center;width:20px;height:20px;border-radius:4px;font-size:11px;font-weight:700;background:${item.done ? '#15803d' : '#334155'};color:#fff">
+          ${item.done ? '✓' : '⚙️'}
+        </span>
+        <span style="font-size:12px;color:${item.done ? '#cbd5e1' : '#f8fafc'}">${escapeHtml(item.text)}</span>
+      </div>
+    `).join('');
+  }
+
   // 2. Lifecycle Action Buttons
   const lifeBox = $('deckLifecycleActions');
   if (lifeBox) {
@@ -5112,7 +5148,7 @@ function switchDeckTab(tabName, el) {
   if (el) el.classList.add('active');
   else document.querySelector(`.deckNavTab[data-decktab="${tabName}"]`)?.classList.add('active');
 
-  ['workbench', 'chat', 'thinking', 'kanban', 'console', 'oauth'].forEach(tab => {
+  ['workbench', 'sop', 'chat', 'thinking', 'kanban', 'console', 'oauth'].forEach(tab => {
     const p = $('deckPanel-' + tab);
     if (p) p.style.display = (tab === tabName) ? (tab === 'chat' || tab === 'console' || tab === 'workbench' ? 'flex' : 'block') : 'none';
   });
@@ -5120,7 +5156,7 @@ function switchDeckTab(tabName, el) {
   if (tabName === 'kanban') renderKanban();
   if (tabName === 'thinking') renderThinkingCards();
   if (tabName === 'oauth') renderOauthProfiles();
-  if (tabName === 'workbench') updateCommandDeck();
+  if (tabName === 'workbench' || tabName === 'sop') updateCommandDeck();
 }
 
 async function sendWbTmuxCmd() {
