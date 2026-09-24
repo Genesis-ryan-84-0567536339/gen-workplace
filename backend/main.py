@@ -110,6 +110,12 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             self._send_json(200, {"sessions": sessions})
             return
 
+        # 5. API Danh sách OAuth Profiles & Trạng thái Google Login
+        if path == "/api/oauth/profiles":
+            profiles = db.get_oauth_profiles()
+            self._send_json(200, {"profiles": profiles})
+            return
+
         return super().do_GET()
 
     def do_POST(self):
@@ -227,6 +233,53 @@ class SwarmHandler(SimpleHTTPRequestHandler):
                 })
             else:
                 self._send_json(400, {"error": "Missing session_id or (command / key)"})
+            return
+
+        # 7. Bắt đầu luồng đăng nhập OAuth cho Profile
+        if path == "/api/oauth/start":
+            profile_id = data.get("profile_id", "profile1")
+            custom_path = data.get("custom_path", "")
+            res = db.start_oauth_login(profile_id, custom_path)
+            self._send_json(200, res)
+            return
+
+        # 8. Kiểm tra trạng thái xác thực OAuth của Profile
+        if path == "/api/oauth/check":
+            profile_id = data.get("profile_id", "profile1")
+            res = db.check_oauth_status(profile_id)
+            self._send_json(200, res)
+            return
+
+        # 9. Lưu token OAuth thủ công (JSON / Token String / Import)
+        if path == "/api/oauth/save_token":
+            profile_id = data.get("profile_id")
+            token_data = data.get("token_data")
+            if profile_id and token_data:
+                res = db.save_oauth_token(profile_id, token_data)
+                self._send_json(200, res)
+            else:
+                self._send_json(400, {"error": "Missing profile_id or token_data"})
+            return
+
+        # 10. Gán Profile OAuth cho Swarm Role
+        if path == "/api/oauth/assign":
+            session_id = data.get("session_id")
+            profile_id = data.get("profile_id")
+            if session_id and profile_id:
+                res = db.assign_oauth_to_role(session_id, profile_id)
+                self._send_json(200, res)
+            else:
+                self._send_json(400, {"error": "Missing session_id or profile_id"})
+            return
+
+        # 11. Đăng xuất / Xóa token của Profile
+        if path == "/api/oauth/logout":
+            profile_id = data.get("profile_id")
+            if profile_id:
+                res = db.logout_oauth_profile(profile_id)
+                self._send_json(200, res)
+            else:
+                self._send_json(400, {"error": "Missing profile_id"})
             return
 
 

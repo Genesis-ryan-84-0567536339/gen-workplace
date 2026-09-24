@@ -1250,6 +1250,117 @@ button { cursor: pointer; }
   gap: 6px;
 }
 
+/* OAuth & Account Management Styles */
+.oauthGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.oauthStatCard {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.oauthStatVal {
+  font-size: 20px;
+  font-weight: 700;
+  color: #fff;
+  font-family: var(--mono);
+}
+.oauthStatLabel {
+  font-size: 11px;
+  color: var(--muted2);
+}
+
+.oauthProfileTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+.oauthProfileTable th {
+  font-size: 10px;
+  text-transform: uppercase;
+  color: var(--muted2);
+  letter-spacing: 0.05em;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+.oauthProfileTable td {
+  padding: 10px;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+  vertical-align: middle;
+}
+.oauthProfileTable tr:hover td {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.oauthEmailBox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.oauthGoogleIcon {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #4285F4;
+  flex-shrink: 0;
+}
+.oauthAuthUrlBox {
+  background: #090c10;
+  border: 1px solid var(--line2);
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin: 12px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.oauthUrlText {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: #6ed1ff;
+  word-break: break-all;
+  max-height: 80px;
+  overflow-y: auto;
+  padding: 6px;
+  background: rgba(0,0,0,0.3);
+  border-radius: 4px;
+}
+.oauthTabNav {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 8px;
+}
+.oauthTabBtn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--muted);
+  font-size: 11px;
+  padding: 5px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.oauthTabBtn.active {
+  background: #18202a;
+  border-color: var(--line2);
+  color: #fff;
+  font-weight: 600;
+}
+
 /* Responsive */
 @media (max-width: 1150px) {
   .overviewGrid, .memoryGrid { grid-template-columns: 1fr; }
@@ -1547,8 +1658,9 @@ button { cursor: pointer; }
             <p>Hệ thống tự động khởi tạo các phiên nền tmux tương ứng với từng Role. Mặc định khởi chạy <code>agy</code> CLI với Gmail mặc định của Owner; cho phép chỉ định tài khoản / profile khác nhau thủ công cho từng phiên.</p>
           </div>
           <div class="actions">
+            <button class="btn primary" onclick="openOauthModal()">🔐 Đăng nhập & Xác thực OAuth</button>
             <button class="btn" onclick="refreshTmuxSessions()">Làm mới Tmux</button>
-            <button class="btn primary" onclick="openNewTmuxModal()">+ Khởi tạo Role mới</button>
+            <button class="btn" onclick="openNewTmuxModal()">+ Khởi tạo Role mới</button>
           </div>
         </div>
 
@@ -1557,6 +1669,10 @@ button { cursor: pointer; }
           <button class="agentViewBtn active" id="btnViewTmux" onclick="switchAgentView('tmux', this)">
             <span class="icon">🖥️</span> Phiên Nền Runtimes (Tmux Swarm)
             <span class="viewBadge">6 Phiên</span>
+          </button>
+          <button class="agentViewBtn" id="btnViewOauth" onclick="switchAgentView('oauth', this)">
+            <span class="icon">🔐</span> Xác Thực OAuth & Quản Lý Tài Khoản Google
+            <span class="viewBadge" id="oauthBadgeCount">3 Đã Login</span>
           </button>
           <button class="agentViewBtn" id="btnViewChat" onclick="switchAgentView('chat', this)">
             <span class="icon">💬</span> Chatroom & Luồng Bàn Giao
@@ -1595,7 +1711,8 @@ button { cursor: pointer; }
                 <div class="accountPill">
                   <span>🔑 Tài khoản:</span>
                   <strong id="tmuxTermAccountLabel">Mặc định (Owner Gmail)</strong>
-                  <button class="btn small" onclick="openAccountModal()" style="padding:2px 6px;margin-left:4px">Đổi Tài Khoản / Profile</button>
+                  <button class="btn small" onclick="openAccountModal()" style="padding:2px 6px;margin-left:4px">Đổi Profile</button>
+                  <button class="btn small primary" onclick="openOauthModalForSession()" style="padding:2px 6px;margin-left:4px">🔐 Đăng nhập OAuth</button>
                 </div>
                 <div style="display:flex;gap:4px">
                   <button class="btn small" onclick="sendTmuxKey('C-c')" title="Gửi ngắt lệnh Ctrl+C">Ctrl+C</button>
@@ -1717,6 +1834,59 @@ button { cursor: pointer; }
               <div class="cardBody">
                 <div class="kanban" id="kanban"></div>
               </div>
+            </div>
+        <!-- 4. VIEW XÁC THỰC OAUTH & QUẢN LÝ TÀI KHOẢN GOOGLE -->
+        <div class="agentSubView" id="agentView-oauth" style="display:none">
+          <!-- 4 KPI Cards -->
+          <div class="oauthGrid">
+            <div class="oauthStatCard">
+              <span class="oauthStatLabel">Tài khoản Google đã đăng nhập</span>
+              <div class="oauthStatVal" id="oaStatActive">0</div>
+              <span style="font-size:10px;color:var(--green)">● Sẵn sàng phục vụ Swarm</span>
+            </div>
+            <div class="oauthStatCard">
+              <span class="oauthStatLabel">Hồ sơ cần xác thực / Chưa login</span>
+              <div class="oauthStatVal" id="oaStatPending">0</div>
+              <span style="font-size:10px;color:var(--yellow)">○ Cần đăng nhập OAuth</span>
+            </div>
+            <div class="oauthStatCard">
+              <span class="oauthStatLabel">Swarm Role đã gán tài khoản</span>
+              <div class="oauthStatVal" id="oaStatAssigned">6 / 6 Role</div>
+              <span style="font-size:10px;color:var(--accent2)">Đồng bộ thời gian thực</span>
+            </div>
+            <div class="oauthStatCard">
+              <span class="oauthStatLabel">Giao thức xác thực CLI</span>
+              <div class="oauthStatVal" style="font-size:14px;color:var(--accent)">OAuth 2.0 PKCE</div>
+              <span style="font-size:10px;color:var(--muted2)">Token: antigravity-oauth-token</span>
+            </div>
+          </div>
+
+          <!-- Bảng Hồ Sơ & Thao Tác -->
+          <div class="card" style="margin-bottom:16px">
+            <div class="cardHead">
+              <div>
+                <strong>Danh Sách Tài Khoản & Profile Google OAuth (Thật)</strong>
+                <div class="hint">Hệ thống quét trực tiếp các profile độc lập tại <code>~/.gemini</code> và <code>~/.agy-profiles/*</code>. Đăng nhập 1 lần, tự động lưu token và phân phối cho từng Role.</div>
+              </div>
+              <div style="display:flex;gap:8px">
+                <button class="btn small" onclick="refreshOauthProfiles()">🔄 Làm mới</button>
+                <button class="btn small primary" onclick="openOauthModal()">+ Thêm & Xác thực Tài khoản Mới</button>
+              </div>
+            </div>
+            <div class="cardBody" style="padding:0">
+              <table class="oauthProfileTable">
+                <thead>
+                  <tr>
+                    <th>Hồ sơ / Profile</th>
+                    <th>Tài khoản Google</th>
+                    <th>Trạng thái OAuth</th>
+                    <th>Hạn dùng Token</th>
+                    <th>Role đang sử dụng</th>
+                    <th style="text-align:right">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody id="oauthProfileRows"></tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -2055,6 +2225,133 @@ button { cursor: pointer; }
   </div>
 </div>
 
+<!-- MODAL ĐĂNG NHẬP & XÁC THỰC GOOGLE OAUTH CHO AGY CLI -->
+<div class="modal" id="oauthModal">
+  <div class="modalBox" style="max-width:640px">
+    <div class="modalHead">
+      <strong id="oauthModalTitle">🔐 Đăng Nhập & Xác Thực Google OAuth (agy CLI)</strong>
+      <button class="iconBtn" onclick="closeOauthModal()">×</button>
+    </div>
+    <div class="modalBody">
+      <!-- Lựa chọn Profile cần Login -->
+      <div style="display:flex;gap:10px;margin-bottom:12px;align-items:flex-end">
+        <div class="field" style="flex:1;margin-bottom:0">
+          <label>Chọn Hồ Sơ Profile cần Đăng Nhập / Xác Thực</label>
+          <select id="oaSelectProfile" onchange="onOaProfileSelectChange()">
+            <!-- Sẽ được fill từ state.oauthProfiles -->
+          </select>
+        </div>
+        <button class="btn" onclick="toggleNewProfileInput()" id="btnToggleNewProfile" style="white-space:nowrap">+ Tạo Profile Mới</button>
+      </div>
+
+      <div class="field" id="oaNewProfileRow" style="display:none;background:#131822;padding:10px;border-radius:6px;border:1px solid var(--line2)">
+        <label>Tên Profile Mới (ví dụ: profile6, my-work-email)</label>
+        <div style="display:flex;gap:8px">
+          <input type="text" id="oaNewProfileName" placeholder="profile6">
+          <button class="btn primary small" onclick="confirmCreateNewProfile()">Khởi tạo Profile</button>
+        </div>
+      </div>
+
+      <!-- Trạng thái hiện tại của profile -->
+      <div id="oaProfileCurrentStatus" style="margin-bottom:14px;padding:9px 12px;background:#0d1117;border-radius:6px;border:1px solid var(--line);font-size:12px;display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <span style="color:var(--muted2)">Trạng thái hiện tại: </span>
+          <strong id="oaCurrentEmail">Đang kiểm tra...</strong>
+        </div>
+        <span class="chip wait" id="oaCurrentBadge">UNAUTHENTICATED</span>
+      </div>
+
+      <!-- Tab điều hướng phương thức xác thực -->
+      <div class="oauthTabNav">
+        <button class="oauthTabBtn active" id="oaTabBtn-browser" onclick="switchOauthTab('browser')">🌐 1. Đăng Nhập Google OAuth (Browser)</button>
+        <button class="oauthTabBtn" id="oaTabBtn-terminal" onclick="switchOauthTab('terminal')">💻 2. Terminal Tmux</button>
+        <button class="oauthTabBtn" id="oaTabBtn-paste" onclick="switchOauthTab('paste')">📋 3. Dán Token JSON</button>
+        <button class="oauthTabBtn" id="oaTabBtn-clone" onclick="switchOauthTab('clone')">👥 4. Sao Chép Token Có Sẵn</button>
+      </div>
+
+      <!-- PHƯƠNG THỨC 1: TRÌNH DUYỆT WEB (BROWSER URL) -->
+      <div class="oaTabContent" id="oaTabContent-browser">
+        <div style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:12px">
+          Khởi chạy luồng xác thực Google OAuth 2.0 cho <code>agy CLI</code>. Nhấp vào nút bên dưới để mở trang đăng nhập chính thức của Google trên tab mới:
+        </div>
+
+        <div style="display:flex;gap:8px;margin-bottom:12px">
+          <button class="btn primary" onclick="startGoogleOAuthFlow()" id="btnStartOauth" style="flex:1;padding:10px">
+            🚀 Khởi Chạy Đăng Nhập Google OAuth
+          </button>
+          <button class="btn" onclick="checkOauthStatusNow()" title="Kiểm tra trạng thái xác thực">
+            🔄 Kiểm Tra Ngay
+          </button>
+        </div>
+
+        <div class="oauthAuthUrlBox" id="oaUrlBox" style="display:none">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <b style="font-size:11px;color:#fff">Liên kết xác thực Google OAuth:</b>
+            <button class="btn small" onclick="copyOauthUrl()">Sao chép URL</button>
+          </div>
+          <div class="oauthUrlText" id="oaUrlDisplay"></div>
+          <a id="oaOpenLink" href="#" target="_blank" class="btn primary" style="text-align:center;text-decoration:none;display:inline-block;padding:8px">
+            👉 Bấm Vào Đây Để Mở Trang Đăng Nhập Google Trên Trình Duyệt
+          </a>
+          <div style="font-size:11px;color:var(--muted2)">
+            Sau khi đăng nhập và cấp quyền Google thành công, quay lại đây và bấm <b>"Kiểm tra hoàn tất"</b>.
+          </div>
+        </div>
+
+        <div id="oaSuccessAlert" style="display:none;background:rgba(58,209,139,0.12);border:1px solid #3ad18b;border-radius:6px;padding:12px;margin-top:12px">
+          <div style="display:flex;align-items:center;gap:8px;color:#3ad18b;font-weight:700">
+            <span>✅</span> ĐÃ XÁC THỰC GOOGLE OAUTH THÀNH CÔNG!
+          </div>
+          <div style="font-size:12px;color:#e6edf3;margin-top:4px" id="oaSuccessMsg"></div>
+          <div style="display:flex;gap:8px;margin-top:10px">
+            <button class="btn small primary" onclick="assignCurrentOauthToActiveSession()">Gán ngay cho Role này</button>
+            <button class="btn small" onclick="closeOauthModal()">Hoàn tất & Đóng</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- PHƯƠNG THỨC 2: CỬA SỔ TERMINAL TMUX -->
+      <div class="oaTabContent" id="oaTabContent-terminal" style="display:none">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:8px">
+          Cửa sổ terminal trực tiếp của phiên <code>gw-oauth-login</code>. Cho phép hoàn tất onboarding wizard của <code>agy CLI</code>:
+        </div>
+        <div class="tmuxTerminalBody" id="oaTermOutput" style="height:190px;margin-bottom:8px">Đang chuẩn bị phiên terminal...</div>
+        <div style="display:flex;gap:6px">
+          <input type="text" id="oaTermCmdInput" class="tmuxInput" placeholder="Nhập lệnh hoặc phím gửi vào terminal..." onkeydown="if(event.key==='Enter')sendOaTermCmd()">
+          <button class="btn primary small" onclick="sendOaTermCmd()">Gửi</button>
+          <button class="btn small" onclick="sendOaTermKey('Enter')">Enter</button>
+          <button class="btn small" onclick="sendOaTermKey('C-c')">Ctrl+C</button>
+        </div>
+      </div>
+
+      <!-- PHƯƠNG THỨC 3: DÁN TOKEN JSON -->
+      <div class="oaTabContent" id="oaTabContent-paste" style="display:none">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:6px">
+          Dán nội dung JSON của file <code>antigravity-oauth-token</code> hoặc chuỗi mã <code>refresh_token</code>:
+        </div>
+        <textarea id="oaTokenPasteInput" style="width:100%;height:130px;background:#090c10;border:1px solid var(--line);border-radius:4px;color:#fff;font-family:var(--mono);font-size:11px;padding:8px" placeholder='{"token": {"access_token": "...", "refresh_token": "...", "expiry": "..."}, "id_token": "..."}'></textarea>
+        <button class="btn primary small" onclick="submitPasteToken()" style="margin-top:8px">Lưu & Kích Hoạt Token</button>
+      </div>
+
+      <!-- PHƯƠNG THỨC 4: SAO CHÉP TỪ PROFILE KHÁC -->
+      <div class="oaTabContent" id="oaTabContent-clone" style="display:none">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:8px">
+          Kế thừa và sử dụng chung phiên đăng nhập từ một Profile đã xác thực sẵn trên máy:
+        </div>
+        <div class="field">
+          <label>Chọn Profile nguồn đã xác thực</label>
+          <select id="oaCloneSourceSelect"></select>
+        </div>
+        <button class="btn primary small" onclick="submitCloneToken()">Sao Chép Token Sang Profile Này</button>
+      </div>
+    </div>
+    <div class="modalFoot">
+      <button class="btn" onclick="closeOauthModal()">Đóng</button>
+      <button class="btn primary" onclick="checkOauthStatusNow()">Kiểm tra hoàn tất</button>
+    </div>
+  </div>
+</div>
+
 <!-- TOAST NOTIFICATION -->
 <div class="toast" id="toast"></div>
 
@@ -2101,6 +2398,7 @@ const state = {
   selectedTmuxSessionId: 'gw-lead-agy',
   tmuxMode: 'single',
   agentCurrentView: 'tmux',
+  oauthProfiles: [],
   roadmap: [
     { id: 'RM-01', title: 'Core Architecture & SSOT Spec', desc: 'Thiết lập repo local, lưu nguyên văn đặc tả gốc của Owner vào docs/SSOT_ORIGINAL_SPEC.md.', todos: 3, status: 'done' },
     { id: 'RM-02', title: 'Docker Engine & Live Mount', desc: 'Container hóa toàn bộ hệ thống với Dockerfile, docker-compose.yml và live bind mount :z.', todos: 2, status: 'done' },
@@ -2375,6 +2673,7 @@ function go(id, el) {
   
   if (id === 'runtimes') {
     refreshTmuxSessions();
+    refreshOauthProfiles();
   }
 }
 
@@ -2806,11 +3105,11 @@ function switchAgentView(viewName, el) {
   if (el) {
     el.classList.add('active');
   } else {
-    const idMap = { 'tmux': 'btnViewTmux', 'chat': 'btnViewChat', 'kanban': 'btnViewKanban' };
+    const idMap = { 'tmux': 'btnViewTmux', 'oauth': 'btnViewOauth', 'chat': 'btnViewChat', 'kanban': 'btnViewKanban' };
     if (idMap[viewName]) $(idMap[viewName])?.classList.add('active');
   }
 
-  ['tmux', 'chat', 'kanban'].forEach(v => {
+  ['tmux', 'oauth', 'chat', 'kanban'].forEach(v => {
     const sub = $('agentView-' + v);
     if (sub) {
       sub.style.display = v === viewName ? 'block' : 'none';
@@ -2821,6 +3120,8 @@ function switchAgentView(viewName, el) {
 
   if (viewName === 'tmux') {
     refreshTmuxSessions();
+  } else if (viewName === 'oauth') {
+    refreshOauthProfiles();
   } else if (viewName === 'chat' || viewName === 'kanban') {
     renderRuntimes();
   }
@@ -3127,6 +3428,446 @@ async function submitAccountChange() {
 
 function openNewTmuxModal() {
   showToast('Khởi tạo thêm Role: hãy dùng nút Khởi tạo Role trong khu Implementation');
+}
+
+// =========================================================================
+// OAUTH & GOOGLE ACCOUNT CONTROLLER
+// =========================================================================
+
+async function refreshOauthProfiles() {
+  try {
+    const res = await fetch('/api/oauth/profiles');
+    if (res.ok) {
+      const data = await res.json();
+      if (data && Array.isArray(data.profiles)) {
+        state.oauthProfiles = data.profiles;
+      }
+    }
+  } catch (e) {
+    console.warn('[OAuth Sync] Failed to fetch profiles:', e);
+  }
+
+  renderOauthProfiles();
+}
+
+function renderOauthProfiles() {
+  const profiles = state.oauthProfiles || [];
+  const activeCount = profiles.filter(p => p.is_auth && !p.is_expired).length;
+  const pendingCount = profiles.filter(p => !p.is_auth || p.is_expired).length;
+  
+  if ($('oaStatActive')) $('oaStatActive').textContent = activeCount;
+  if ($('oaStatPending')) $('oaStatPending').textContent = pendingCount;
+  if ($('oauthBadgeCount')) $('oauthBadgeCount').textContent = activeCount + ' Đã Login';
+
+  const rows = $('oauthProfileRows');
+  if (rows) {
+    if (profiles.length === 0) {
+      rows.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--muted)">Chưa có hồ sơ profile nào. Bấm "+ Thêm & Xác thực Tài khoản Mới" để bắt đầu.</td></tr>`;
+      return;
+    }
+
+    rows.innerHTML = profiles.map(p => {
+      const isAuth = p.is_auth;
+      const statusBadge = isAuth 
+        ? (p.is_expired ? '<span class="chip wait">Hết hạn (Cần refresh)</span>' : '<span class="chip done">● Đã xác thực (Active)</span>')
+        : '<span class="chip" style="background:#261d15;color:#e3a158;border:1px solid #4a341c">○ Chưa đăng nhập</span>';
+
+      const emailDisplay = isAuth 
+        ? `<div class="oauthEmailBox"><div class="oauthGoogleIcon">G</div><div><b>${escapeHtml(p.email || 'Google User')}</b><small style="display:block;color:var(--muted2)">${escapeHtml(p.name || 'Antigravity CLI')}</small></div></div>`
+        : `<span style="color:var(--muted2);font-style:italic">Chưa liên kết tài khoản Google</span>`;
+
+      const rolesDisplay = p.assigned_roles && p.assigned_roles.length > 0
+        ? p.assigned_roles.map(r => `<span class="chip live" style="font-size:10px;margin-right:4px">${escapeHtml(r)}</span>`).join('')
+        : `<span style="color:var(--muted2);font-size:11px">Chưa gán</span>`;
+
+      return `
+        <tr>
+          <td>
+            <div style="font-family:var(--mono);font-weight:600;color:#fff">${escapeHtml(p.id)}</div>
+            <small style="color:var(--muted2);font-family:var(--mono);font-size:10px">${escapeHtml(p.path)}</small>
+          </td>
+          <td>${emailDisplay}</td>
+          <td>${statusBadge}</td>
+          <td style="font-size:11px;color:var(--muted)">${escapeHtml(p.exp_formatted)}</td>
+          <td>${rolesDisplay}</td>
+          <td style="text-align:right;white-space:nowrap">
+            <button class="btn small primary" onclick="openOauthModal('${escapeHtml(p.id)}')">🔐 Đăng nhập OAuth</button>
+            <button class="btn small" onclick="openAssignModal('${escapeHtml(p.id)}')">⚡ Gán Role</button>
+            <button class="btn small" onclick="checkSingleProfileStatus('${escapeHtml(p.id)}')">🔍 Kiểm tra</button>
+            ${isAuth ? `<button class="btn small" onclick="logoutProfile('${escapeHtml(p.id)}')" title="Đăng xuất" style="color:var(--red)">🚪</button>` : ''}
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+}
+
+let oauthTargetProfileId = 'profile1';
+let oauthPollTimer = null;
+
+function openOauthModal(optProfileId) {
+  if (optProfileId) {
+    oauthTargetProfileId = optProfileId;
+  } else if (!oauthTargetProfileId) {
+    oauthTargetProfileId = state.oauthProfiles?.[0]?.id || 'profile1';
+  }
+
+  // Populate select dropdown
+  const select = $('oaSelectProfile');
+  if (select && state.oauthProfiles) {
+    select.innerHTML = state.oauthProfiles.map(p => `
+      <option value="${escapeHtml(p.id)}" ${p.id === oauthTargetProfileId ? 'selected' : ''}>
+        ${escapeHtml(p.id)}: ${escapeHtml(p.email || 'Chưa đăng nhập')}
+      </option>
+    `).join('');
+  }
+
+  updateOauthModalProfileState();
+  switchOauthTab('browser');
+  if ($('oaSuccessAlert')) $('oaSuccessAlert').style.display = 'none';
+  if ($('oaUrlBox')) $('oaUrlBox').style.display = 'none';
+  if ($('oaNewProfileRow')) $('oaNewProfileRow').style.display = 'none';
+
+  // Populate clone source dropdown
+  const cloneSelect = $('oaCloneSourceSelect');
+  if (cloneSelect && state.oauthProfiles) {
+    const authList = state.oauthProfiles.filter(p => p.is_auth && p.id !== oauthTargetProfileId);
+    if (authList.length > 0) {
+      cloneSelect.innerHTML = authList.map(p => `
+        <option value="${escapeHtml(p.id)}">${escapeHtml(p.id)} (${escapeHtml(p.email)})</option>
+      `).join('');
+    } else {
+      cloneSelect.innerHTML = `<option value="">Không có profile nào đã xác thực sẵn</option>`;
+    }
+  }
+
+  $('oauthModal')?.classList.add('show');
+}
+
+function openOauthModalForSession() {
+  const currentSession = state.tmuxSessions?.find(s => s.id === state.selectedTmuxSessionId);
+  const pid = currentSession?.account_type || 'owner_default';
+  openOauthModal(pid);
+}
+
+function closeOauthModal() {
+  $('oauthModal')?.classList.remove('show');
+  if (oauthPollTimer) {
+    clearInterval(oauthPollTimer);
+    oauthPollTimer = null;
+  }
+}
+
+function onOaProfileSelectChange() {
+  oauthTargetProfileId = $('oaSelectProfile').value;
+  updateOauthModalProfileState();
+}
+
+function updateOauthModalProfileState() {
+  const p = (state.oauthProfiles || []).find(x => x.id === oauthTargetProfileId);
+  const emailEl = $('oaCurrentEmail');
+  const badgeEl = $('oaCurrentBadge');
+
+  if (p && p.is_auth) {
+    if (emailEl) emailEl.innerHTML = `<span style="color:#3ad18b">● ${escapeHtml(p.email)}</span> (${escapeHtml(p.name || 'Verified')})`;
+    if (badgeEl) {
+      badgeEl.className = 'chip done';
+      badgeEl.textContent = 'AUTHENTICATED';
+    }
+  } else {
+    if (emailEl) emailEl.textContent = 'Chưa đăng nhập Google (Chưa có token)';
+    if (badgeEl) {
+      badgeEl.className = 'chip wait';
+      badgeEl.textContent = 'UNAUTHENTICATED';
+    }
+  }
+}
+
+function toggleNewProfileInput() {
+  const row = $('oaNewProfileRow');
+  if (row) {
+    row.style.display = row.style.display === 'none' ? 'block' : 'none';
+    if (row.style.display === 'block') {
+      const nextNum = (state.oauthProfiles || []).length + 1;
+      $('oaNewProfileName').value = 'profile' + nextNum;
+      $('oaNewProfileName').focus();
+    }
+  }
+}
+
+async function confirmCreateNewProfile() {
+  const name = ($('oaNewProfileName').value || '').trim().replace(/[^a-zA-Z0-9_-]/g, '');
+  if (!name) {
+    showToast('Tên profile không hợp lệ');
+    return;
+  }
+
+  oauthTargetProfileId = name;
+  if ($('oaNewProfileRow')) $('oaNewProfileRow').style.display = 'none';
+  showToast('Khởi tạo ' + name + '...');
+
+  await startGoogleOAuthFlow();
+  await refreshOauthProfiles();
+  openOauthModal(name);
+}
+
+function switchOauthTab(tabName) {
+  document.querySelectorAll('.oauthTabBtn').forEach(b => b.classList.remove('active'));
+  $('oaTabBtn-' + tabName)?.classList.add('active');
+
+  document.querySelectorAll('.oaTabContent').forEach(c => c.style.display = 'none');
+  const target = $('oaTabContent-' + tabName);
+  if (target) target.style.display = 'block';
+}
+
+let currentOauthUrl = '';
+
+async function startGoogleOAuthFlow() {
+  const btn = $('btnStartOauth');
+  if (btn) btn.textContent = '⏳ Đang khởi tạo luồng Google OAuth...';
+
+  try {
+    const res = await fetch('/api/oauth/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profile_id: oauthTargetProfileId })
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      currentOauthUrl = data.oauth_url || '';
+      if ($('oaUrlBox')) $('oaUrlBox').style.display = 'flex';
+      if ($('oaUrlDisplay')) $('oaUrlDisplay').textContent = currentOauthUrl;
+      if ($('oaOpenLink')) $('oaOpenLink').href = currentOauthUrl;
+      if (btn) btn.textContent = '🚀 Mở lại luồng đăng nhập Google';
+
+      showToast('Đã khởi tạo link đăng nhập Google OAuth');
+
+      // Tự động poll kiểm tra token mỗi 3 giây trong 2 phút
+      if (oauthPollTimer) clearInterval(oauthPollTimer);
+      let attempts = 0;
+      oauthPollTimer = setInterval(async () => {
+        attempts++;
+        if (attempts > 40) {
+          clearInterval(oauthPollTimer);
+          return;
+        }
+        const done = await checkOauthStatusSilently();
+        if (done) {
+          clearInterval(oauthPollTimer);
+          showToast('🎉 Đã xác thực Google OAuth thành công!');
+        }
+      }, 3000);
+    }
+  } catch (err) {
+    showToast('Lỗi khởi tạo OAuth: ' + err.message);
+    if (btn) btn.textContent = '🚀 Khởi Chạy Đăng Nhập Google OAuth';
+  }
+}
+
+function copyOauthUrl() {
+  if (currentOauthUrl) {
+    navigator.clipboard.writeText(currentOauthUrl);
+    showToast('Đã sao chép liên kết Google OAuth vào clipboard');
+  }
+}
+
+async function checkOauthStatusSilently() {
+  try {
+    const res = await fetch('/api/oauth/check', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profile_id: oauthTargetProfileId })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.is_auth) {
+        if ($('oaSuccessAlert')) $('oaSuccessAlert').style.display = 'block';
+        if ($('oaSuccessMsg')) $('oaSuccessMsg').textContent = `Tài khoản: ${data.email} (${data.name || 'Google Account'})`;
+        updateOauthModalProfileState();
+        await refreshOauthProfiles();
+        return true;
+      }
+    }
+  } catch (e) {}
+  return false;
+}
+
+async function checkOauthStatusNow() {
+  showToast('Đang kiểm tra token...');
+  const isDone = await checkOauthStatusSilently();
+  if (isDone) {
+    showToast('✅ Đã xác thực thành công!');
+  } else {
+    showToast('Chưa phát hiện token đăng nhập mới. Hãy hoàn tất đăng nhập trên trình duyệt.');
+  }
+}
+
+async function checkSingleProfileStatus(pid) {
+  try {
+    const res = await fetch('/api/oauth/check', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profile_id: pid })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.is_auth) {
+        showToast(`✅ ${pid}: Đã xác thực (${data.email})`);
+      } else {
+        showToast(`○ ${pid}: Chưa đăng nhập (${data.message})`);
+      }
+      await refreshOauthProfiles();
+    }
+  } catch (err) {
+    showToast('Lỗi kiểm tra: ' + err.message);
+  }
+}
+
+async function submitPasteToken() {
+  const raw = ($('oaTokenPasteInput').value || '').trim();
+  if (!raw) {
+    showToast('Vui lòng dán nội dung token hoặc JSON');
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/oauth/save_token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        profile_id: oauthTargetProfileId,
+        token_data: raw
+      })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.is_auth) {
+        showToast('✅ Đã lưu và kích hoạt token cho ' + oauthTargetProfileId);
+        $('oaTokenPasteInput').value = '';
+        updateOauthModalProfileState();
+        await refreshOauthProfiles();
+        switchOauthTab('browser');
+      } else {
+        showToast('Lỗi: ' + (data.message || 'Token không hợp lệ'));
+      }
+    }
+  } catch (err) {
+    showToast('Lỗi lưu token: ' + err.message);
+  }
+}
+
+async function submitCloneToken() {
+  const sourcePid = $('oaCloneSourceSelect').value;
+  if (!sourcePid) {
+    showToast('Vui lòng chọn profile nguồn');
+    return;
+  }
+
+  showToast('Đang sao chép token từ ' + sourcePid + '...');
+  try {
+    const checkRes = await fetch('/api/oauth/check', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profile_id: sourcePid })
+    });
+    if (checkRes.ok) {
+      const checkData = await checkRes.json();
+      if (checkData.is_auth) {
+        await fetch('/api/oauth/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ profile_id: oauthTargetProfileId })
+        });
+        showToast('Đã kế thừa thành công phiên từ ' + sourcePid);
+        await refreshOauthProfiles();
+        closeOauthModal();
+      }
+    }
+  } catch (err) {
+    showToast('Lỗi sao chép: ' + err.message);
+  }
+}
+
+async function assignCurrentOauthToActiveSession() {
+  const currentSession = state.tmuxSessions?.find(s => s.id === state.selectedTmuxSessionId);
+  const sid = currentSession?.id || 'gw-lead-agy';
+
+  try {
+    const res = await fetch('/api/oauth/assign', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        session_id: sid,
+        profile_id: oauthTargetProfileId
+      })
+    });
+    if (res.ok) {
+      showToast(`Đã gán tài khoản cho Role ${sid}!`);
+      closeOauthModal();
+      await refreshTmuxSessions();
+    }
+  } catch (err) {
+    showToast('Lỗi gán: ' + err.message);
+  }
+}
+
+function openAssignModal(profileId) {
+  openAccountModal();
+  const sel = $('accountSelect');
+  if (sel) {
+    sel.value = profileId;
+    onAccountOptionChange();
+  }
+}
+
+async function logoutProfile(pid) {
+  if (!confirm(`Bạn có chắc muốn đăng xuất và xóa token của ${pid}?`)) return;
+
+  try {
+    const res = await fetch('/api/oauth/logout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profile_id: pid })
+    });
+    if (res.ok) {
+      showToast(`Đã đăng xuất ${pid}`);
+      await refreshOauthProfiles();
+    }
+  } catch (err) {
+    showToast('Lỗi đăng xuất: ' + err.message);
+  }
+}
+
+async function sendOaTermCmd() {
+  const input = $('oaTermCmdInput');
+  if (!input) return;
+  const cmd = input.value.trim();
+  if (!cmd) return;
+  input.value = '';
+
+  const out = $('oaTermOutput');
+  if (out) out.innerHTML += '<br>$ ' + escapeHtml(cmd);
+
+  try {
+    await fetch('/api/tmux/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: 'gw-oauth-login', command: cmd })
+    });
+    showToast('Đã gửi lệnh vào terminal');
+  } catch (err) {}
+}
+
+async function sendOaTermKey(key) {
+  try {
+    await fetch('/api/tmux/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: 'gw-oauth-login', key: key })
+    });
+    showToast('Đã gửi phím ' + key);
+  } catch (err) {}
 }
 
 // Runtimes, Comms, Threads & Reactions
@@ -3632,6 +4373,7 @@ function refreshAll() {
   renderRuntimes();
   renderMemory();
   refreshTmuxSessions();
+  refreshOauthProfiles();
 }
 
 // Keyboard shortcuts

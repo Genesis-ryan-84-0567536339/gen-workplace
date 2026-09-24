@@ -13,6 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     ca-certificates \
     procps \
+    tmux \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

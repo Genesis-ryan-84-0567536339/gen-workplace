@@ -15,6 +15,10 @@ services:
       - ./backend:/app/backend:z
       - ./assets:/app/assets:ro,z
       - ./docs:/app/docs:ro,z
+      - /workspace/.agy-profiles:/workspace/.agy-profiles:z
+      - /workspace/.gemini:/workspace/.gemini:z
+      - /workspace/.local/bin/agy:/usr/local/bin/agy:ro,z
+      - /tmp/tmux-1000:/tmp/tmux-1000:z
     environment:
       - PORT=8888
       - DATA_DIR=/app/data

@@ -8,6 +8,9 @@ và Single Source of Truth (SSOT) cho toàn bộ Swarm Runtimes.
 import os
 import json
 import sqlite3
+import base64
+import time
+import subprocess
 from pathlib import Path
 from datetime import datetime
 
@@ -827,6 +830,236 @@ def append_tmux_output(session_id, command, output=""):
         WHERE id = ?
         """, (updated_out, session_id))
         conn.commit()
+
+# =========================================================================
+# OAUTH PROFILES & GOOGLE AUTHENTICATION MANAGER
+# =========================================================================
+
+def parse_id_token(id_token):
+    """Giải mã payload của Google JWT id_token lấy email, tên, hạn dùng."""
+    try:
+        parts = id_token.split('.')
+        if len(parts) >= 2:
+            pad = len(parts[1]) % 4
+            if pad:
+                parts[1] += '=' * (4 - pad)
+            return json.loads(base64.urlsafe_b64decode(parts[1]))
+    except Exception:
+        pass
+    return {}
+
+def get_oauth_profiles():
+    """Quét toàn bộ hồ sơ profile Google OAuth trên hệ thống và đối chiếu với các role."""
+    base_dir = "/workspace/.agy-profiles"
+    candidates = [
+        ("owner_default", "Mặc định (Owner Gmail)", "/workspace/.gemini"),
+    ]
+    if os.path.exists(base_dir):
+        try:
+            for entry in sorted(os.listdir(base_dir)):
+                p = os.path.join(base_dir, entry)
+                if os.path.isdir(p):
+                    candidates.append((entry, f"Profile #{entry.replace('profile', '') if 'profile' in entry else entry}", p))
+        except Exception:
+            pass
+
+    # Lấy danh sách gán role hiện tại từ SQLite
+    assigned_map = {}
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, role_name, account_type FROM tmux_sessions")
+            for r in cursor.fetchall():
+                acc = r["account_type"]
+                assigned_map.setdefault(acc, []).append(r["role_name"])
+    except Exception:
+        pass
+
+    results = []
+    now_ts = int(time.time())
+
+    for pid, label, ppath in candidates:
+        token_file = os.path.join(ppath, "antigravity-cli", "antigravity-oauth-token")
+        is_auth = False
+        email = None
+        user_name = None
+        exp = 0
+        has_refresh = False
+
+        if os.path.exists(token_file):
+            try:
+                with open(token_file, "r") as f:
+                    data = json.load(f)
+                    has_refresh = bool(data.get("token", {}).get("refresh_token") or data.get("refresh_token"))
+                    payload = parse_id_token(data.get("id_token", ""))
+                    email = payload.get("email")
+                    user_name = payload.get("name")
+                    exp = payload.get("exp", 0)
+                    is_auth = bool(email or data.get("token"))
+            except Exception:
+                pass
+
+        is_expired = (exp > 0 and exp < now_ts)
+        exp_formatted = datetime.fromtimestamp(exp).strftime("%Y-%m-%d %H:%M") if exp > 0 else "Tự động refresh (Refresh Token)"
+
+        results.append({
+            "id": pid,
+            "label": label if not email else f"{label} ({email})",
+            "path": ppath,
+            "is_auth": is_auth,
+            "email": email,
+            "name": user_name,
+            "exp": exp,
+            "exp_formatted": exp_formatted,
+            "is_expired": is_expired,
+            "has_refresh": has_refresh,
+            "assigned_roles": assigned_map.get(pid, [])
+        })
+
+    return results
+
+def start_oauth_login(profile_id, custom_path=""):
+    """Khởi tạo phiên đăng nhập OAuth hoặc thư mục profile mới."""
+    if profile_id == "owner_default":
+        target_dir = "/workspace/.gemini"
+    elif custom_path:
+        target_dir = custom_path
+    else:
+        target_dir = f"/workspace/.agy-profiles/{profile_id}"
+
+    cli_dir = os.path.join(target_dir, "antigravity-cli")
+    os.makedirs(cli_dir, exist_ok=True)
+
+    # Google OAuth 2.0 Auth URL chuẩn cho Antigravity CLI / Cloud Code
+    oauth_url = "https://accounts.google.com/o/oauth2/v2/auth?response_type=code&client_id=&redirect_uri=http%3A%2F%2Flocalhost%3A8085%2Foauth2callback&scope=openid%20email%20profile%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcloud-platform&access_type=offline&prompt=consent"
+
+    session_name = "gw-oauth-login"
+    tmux_created = False
+    try:
+        subprocess.run(["tmux", "kill-session", "-t", session_name], capture_output=True)
+        cmd = f"agy --gemini_dir={target_dir} || bash"
+        res = subprocess.run(["tmux", "new-session", "-d", "-s", session_name, "-c", "/workspace/LinuxDataA/gen-workplace", cmd], capture_output=True, timeout=2.0)
+        tmux_created = (res.returncode == 0)
+    except Exception:
+        pass
+
+    return {
+        "status": "started",
+        "profile_id": profile_id,
+        "path": target_dir,
+        "tmux_session": session_name,
+        "tmux_created": tmux_created,
+        "oauth_url": oauth_url,
+        "message": f"Phiên xác thực OAuth cho {profile_id} đã sẵn sàng."
+    }
+
+def check_oauth_status(profile_id):
+    """Kiểm tra trạng thái xác thực tức thì của một profile."""
+    if profile_id == "owner_default":
+        target_dir = "/workspace/.gemini"
+    else:
+        target_dir = f"/workspace/.agy-profiles/{profile_id}"
+
+    token_file = os.path.join(target_dir, "antigravity-cli", "antigravity-oauth-token")
+    if not os.path.exists(token_file):
+        return {
+            "profile_id": profile_id,
+            "is_auth": False,
+            "message": "Chưa tìm thấy file token xác thực."
+        }
+
+    try:
+        with open(token_file, "r") as f:
+            data = json.load(f)
+            payload = parse_id_token(data.get("id_token", ""))
+            email = payload.get("email")
+            name = payload.get("name")
+            exp = payload.get("exp", 0)
+            return {
+                "profile_id": profile_id,
+                "is_auth": True,
+                "email": email,
+                "name": name,
+                "exp": exp,
+                "message": f"Đã xác thực thành công tài khoản Google: {email}"
+            }
+    except Exception as e:
+        return {
+            "profile_id": profile_id,
+            "is_auth": False,
+            "error": str(e),
+            "message": "Lỗi khi đọc token xác thực."
+        }
+
+def save_oauth_token(profile_id, token_data):
+    """Lưu token OAuth trực tiếp vào hồ sơ profile."""
+    if profile_id == "owner_default":
+        target_dir = "/workspace/.gemini"
+    else:
+        target_dir = f"/workspace/.agy-profiles/{profile_id}"
+
+    cli_dir = os.path.join(target_dir, "antigravity-cli")
+    os.makedirs(cli_dir, exist_ok=True)
+    token_file = os.path.join(cli_dir, "antigravity-oauth-token")
+
+    payload = {}
+    if isinstance(token_data, str):
+        token_str = token_data.strip()
+        try:
+            payload = json.loads(token_str)
+        except Exception:
+            payload = {
+                "token": {
+                    "access_token": token_str,
+                    "token_type": "Bearer",
+                    "refresh_token": token_str,
+                    "expiry": "2099-12-31T23:59:59Z"
+                },
+                "auth_method": "consumer",
+                "id_token": ""
+            }
+    elif isinstance(token_data, dict):
+        payload = token_data
+
+    with open(token_file, "w") as f:
+        json.dump(payload, f, indent=2)
+
+    return check_oauth_status(profile_id)
+
+def assign_oauth_to_role(session_id, profile_id):
+    """Gán profile đã xác thực cho một Swarm Role tmux cụ thể."""
+    profiles = {p["id"]: p for p in get_oauth_profiles()}
+    p = profiles.get(profile_id)
+    if not p:
+        return {"status": "error", "message": f"Không tìm thấy profile {profile_id}"}
+
+    account_type = profile_id
+    account_label = p["label"]
+    profile_dir = p["path"]
+
+    update_tmux_account(session_id, account_type, account_label, profile_dir)
+    append_tmux_output(session_id, f"auth switch --profile={profile_id}", f"Đã gán tài khoản '{account_label}' cho Role này.")
+
+    return {
+        "status": "assigned",
+        "session_id": session_id,
+        "profile_id": profile_id,
+        "account_label": account_label
+    }
+
+def logout_oauth_profile(profile_id):
+    """Đăng xuất / thu hồi token của profile."""
+    if profile_id == "owner_default":
+        target_dir = "/workspace/.gemini"
+    else:
+        target_dir = f"/workspace/.agy-profiles/{profile_id}"
+
+    token_file = os.path.join(target_dir, "antigravity-cli", "antigravity-oauth-token")
+    if os.path.exists(token_file):
+        bak_file = token_file + f".bak-{int(time.time())}"
+        os.rename(token_file, bak_file)
+        return {"status": "logged_out", "profile_id": profile_id, "backup": bak_file}
+    return {"status": "already_logged_out", "profile_id": profile_id}
 
 # Khởi tạo tự động khi import
 init_db()
