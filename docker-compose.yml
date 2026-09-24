@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  gen-workplace:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: gen-workplace:latest
+    container_name: gen-workplace-app
+    restart: unless-stopped
+    ports:
+      - "8888:8888"
+    volumes:
+      - gen-workplace-data:/app/data
+      - ./workspace:/workspace
+    environment:
+      - PORT=8888
+      - DATA_DIR=/app/data
+      - DOCKER_CONTAINER=1
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8888/api/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  gen-workplace-data:
+    driver: local

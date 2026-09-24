@@ -1,0 +1,2702 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GENESIS · Multi-Agent Swarm Orchestrator & Autonomous Console</title>
+<style>
+:root {
+  --bg: #0d1014;
+  --panel: #13171d;
+  --panel2: #101419;
+  --panel3: #171c23;
+  --panel4: #1b2129;
+  --line: #252c35;
+  --line2: #343d48;
+  --text: #edf1f5;
+  --muted: #8b96a3;
+  --muted2: #66717e;
+  --accent: #7da8ff;
+  --accent2: #a9c6ff;
+  --green: #71c88d;
+  --yellow: #dfb75e;
+  --red: #df7e7e;
+  --cyan: #6dd4e8;
+  --purple: #b392f0;
+  --radius: 7px;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+}
+* { box-sizing: border-box; }
+html, body {
+  height: 100%;
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 13px/1.42 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  overflow: hidden;
+}
+button, input, textarea, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+.hidden { display: none !important; }
+
+/* Custom Scrollbars */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--line2); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted2); }
+
+/* Layout Grid */
+.app {
+  height: 100vh;
+  display: grid;
+  grid-template-columns: 230px minmax(0, 1fr);
+  grid-template-rows: 50px 1fr;
+  overflow: hidden;
+}
+
+/* Header Top */
+.top {
+  grid-column: 1 / 3;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--line);
+  background: #111419;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 216px;
+  font-weight: 700;
+}
+.brandMark {
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--line2);
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  color: var(--accent);
+  font: 700 11px var(--mono);
+  background: #161c24;
+}
+.projectSelect {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 11px;
+  border: 1px solid var(--line2);
+  background: #171b21;
+  border-radius: 6px;
+  min-width: 320px;
+  text-align: left;
+}
+.projectSelect:hover { background: #1c222b; }
+.projectDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--green);
+}
+.topmeta { color: var(--muted); font-size: 10px; }
+.topRight {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.btn, .iconBtn {
+  border: 1px solid var(--line2);
+  background: #171b21;
+  border-radius: 6px;
+  padding: 6px 11px;
+  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s;
+}
+.iconBtn { width: 30px; height: 30px; padding: 0; justify-content: center; }
+.btn:hover, .iconBtn:hover { background: #1d232b; border-color: var(--muted2); }
+.btn.primary {
+  background: #23354f;
+  border-color: #456286;
+  color: #eff5ff;
+  font-weight: 600;
+}
+.btn.primary:hover { background: #2d4466; border-color: #5d81ac; }
+.kbd {
+  font: 10px var(--mono);
+  color: var(--muted2);
+  border: 1px solid var(--line2);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+/* Sidebar */
+.sidebar {
+  border-right: 1px solid var(--line);
+  background: #111419;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.nav { padding: 10px 8px; }
+.navGroup { margin-bottom: 14px; }
+.navLabel {
+  padding: 6px 9px;
+  color: var(--muted2);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  font-weight: 600;
+}
+.navItem {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  border-radius: 6px;
+  padding: 7px 9px;
+  text-align: left;
+  color: #b4bdc7;
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  font-size: 12px;
+  transition: background 0.12s;
+}
+.navItem:hover { background: #181d23; color: #edf1f5; }
+.navItem.active { background: #1c2430; color: #f2f5f8; font-weight: 500; }
+.navIcon { width: 16px; color: var(--muted); font-size: 13px; text-align: center; }
+.projectList { padding: 0 8px; max-height: 200px; overflow-y: auto; }
+.projectRow {
+  padding: 7px 9px;
+  border-radius: 6px;
+  margin-bottom: 2px;
+  cursor: pointer;
+  color: #b5bdc7;
+}
+.projectRow:hover { background: #171c22; }
+.projectRow.active { background: #1a212a; color: #eef2f5; }
+.projectRow small { display: block; color: var(--muted2); font-size: 10px; margin-top: 2px; }
+.sidebarFoot {
+  margin-top: auto;
+  border-top: 1px solid var(--line);
+  padding: 10px 11px;
+  color: var(--muted);
+  font-size: 10px;
+  background: #0f1216;
+}
+.env { display: flex; justify-content: space-between; gap: 8px; margin: 4px 0; }
+.env strong {
+  font: 500 9px var(--mono);
+  color: #bcc6d0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Main Area */
+.main {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+.subtop {
+  height: 40px;
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  padding: 0 13px;
+  gap: 4px;
+  background: #101318;
+}
+.tab {
+  border: 0;
+  background: transparent;
+  border-bottom: 2px solid transparent;
+  height: 40px;
+  padding: 0 12px;
+  color: var(--muted);
+  font-size: 12px;
+  transition: all 0.15s;
+}
+.tab:hover { color: #d0d7de; }
+.tab.active { color: #f3f5f7; border-bottom-color: var(--accent); font-weight: 500; }
+.content { padding: 14px; overflow: auto; min-height: 0; flex: 1; }
+.screen { display: none; }
+.screen.active { display: block; }
+.pageHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+.pageHead h1 { font-size: 15px; line-height: 1.2; margin: 0 0 3px; font-weight: 700; color: #fff; }
+.pageHead p { font-size: 11px; color: var(--muted); margin: 0; }
+.actions { display: flex; gap: 7px; align-items: center; }
+
+/* Cards & Surfaces */
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.cardHead {
+  min-height: 38px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 11px;
+  gap: 10px;
+}
+.cardHead strong { font-size: 11px; font-weight: 600; color: #dce3eb; }
+.hint { font-size: 10px; color: var(--muted); }
+.cardBody { padding: 11px; }
+
+/* Chips & Badges */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: 99px;
+  background: #1b2128;
+  border: 1px solid var(--line2);
+  font-size: 9px;
+  color: #c0c8d1;
+  white-space: nowrap;
+}
+.chip.live { color: #c0d6ff; border-color: #405978; background: #182436; }
+.chip.done { color: #bce7c9; border-color: #355844; background: #17251c; }
+.chip.wait { color: #eed58e; border-color: #5e4e27; background: #262117; }
+.chip.bad { color: #f0b5b5; border-color: #6a3737; background: #281b1b; }
+.ref { font: 10px var(--mono); color: #a9c4fa; }
+.mono { font-family: var(--mono); }
+
+/* Dashboard Styles */
+.overviewStats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 11px;
+}
+.stat {
+  background: #12161b;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 9px 12px;
+}
+.stat b { display: block; font-size: 18px; font-weight: 700; color: #f0f4f8; }
+.stat span { font-size: 10px; color: var(--muted); }
+.projectDashboard {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) 380px;
+  gap: 10px;
+}
+.projectCard {
+  padding: 10px;
+  border: 1px solid var(--line);
+  background: #12161b;
+  border-radius: 7px;
+  margin-bottom: 7px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.projectCard:hover { background: #161c23; border-color: var(--line2); }
+.projectCard.selected { border-color: #4a6586; background: #18202a; }
+.projectCardHead { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+.projectCard b { font-size: 11px; color: #e2e8f0; }
+.projectCard small { display: block; color: var(--muted); font-size: 10px; margin-top: 2px; }
+.projectMetaRow { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 7px; }
+.progress { height: 4px; background: #1d232a; border-radius: 9px; overflow: hidden; margin-top: 8px; }
+.progress i { display: block; height: 100%; background: #678dbf; }
+.overviewMain { display: grid; grid-template-columns: 1.35fr 1fr; gap: 10px; margin-top: 10px; }
+.runStep {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+.runStep:last-child { border-bottom: 0; }
+.stepNo {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 5px;
+  background: #202630;
+  color: #b6c1cc;
+  font: 10px var(--mono);
+}
+.runStep b { font-size: 11px; }
+.runStep small { display: block; color: var(--muted); font-size: 10px; margin-top: 2px; }
+
+/* Implementation 3 Cột */
+.implTop { display: grid; grid-template-columns: 1.15fr 1fr 1fr; gap: 10px; }
+.sourceText {
+  width: 100%;
+  height: 140px;
+  background: #0d1116;
+  border: 1px solid var(--line2);
+  border-radius: 6px;
+  padding: 9px;
+  resize: vertical;
+  outline: none;
+  color: #e7ebef;
+  font-size: 11px;
+  line-height: 1.45;
+}
+.sourceText:focus { border-color: #4a668b; }
+.sourceMeta { display: flex; align-items: center; gap: 7px; margin-top: 8px; }
+.fileTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #1a2027;
+  border: 1px solid var(--line2);
+  border-radius: 5px;
+  padding: 4px 7px;
+  color: #bcc5cf;
+  font-size: 10px;
+}
+.sourceLock { color: var(--yellow); font-size: 10px; margin-left: auto; }
+.genBar {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  margin: -2px 0 10px;
+  padding-bottom: 2px;
+}
+.genPill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #11151a;
+  color: var(--muted);
+  white-space: nowrap;
+  font-size: 10px;
+}
+.genPill.done { color: #bde7ca; border-color: #355844; }
+.genPill.live { color: #c0d6ff; border-color: #405978; }
+
+.roadmapList, .todoList { display: grid; gap: 6px; max-height: 240px; overflow-y: auto; }
+.roadmapRow {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #12161b;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.roadmapRow:hover, .todoItem:hover { background: #171c22; }
+.roadmapRow.selected { border-color: #4a6586; background: #171e27; }
+.rmNo {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 5px;
+  background: #20252d;
+  color: #b7c1cb;
+  font: 700 10px var(--mono);
+}
+.roadmapRow b { font-size: 11px; }
+.roadmapRow small { display: block; color: var(--muted); font-size: 10px; margin-top: 2px; }
+.count { font-size: 10px; color: var(--muted); }
+.todoItem {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  gap: 7px;
+  align-items: center;
+  padding: 7px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #12161b;
+}
+.check {
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--line2);
+  border-radius: 4px;
+  display: grid;
+  place-items: center;
+  font-size: 9px;
+  color: var(--green);
+}
+.todoItem.done .check { background: #1a2b20; border-color: #355844; }
+.todoItem b { font-size: 11px; font-weight: 500; }
+.todoItem small { display: block; color: var(--muted); font-size: 9px; margin-top: 2px; }
+
+/* Roles & CLI Table */
+.sectionCard { margin-top: 10px; }
+.roleTable { width: 100%; border-collapse: collapse; }
+.roleTable th, .roleTable td {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+.roleTable th {
+  font-size: 9px;
+  color: var(--muted2);
+  text-transform: uppercase;
+  letter-spacing: .07em;
+}
+.roleTable td { font-size: 11px; }
+.roleName { display: flex; align-items: center; gap: 8px; }
+.roleBadge {
+  width: 24px;
+  height: 24px;
+  border-radius: 5px;
+  background: #20262d;
+  display: grid;
+  place-items: center;
+  color: #bfd2ff;
+  font: 10px var(--mono);
+}
+.roleInst {
+  color: #b3bdc8;
+  font-size: 10px;
+  line-height: 1.45;
+  max-width: 480px;
+}
+.lock { color: var(--yellow); font-size: 9px; }
+.select {
+  width: 100%;
+  min-width: 140px;
+  background: #0e1217;
+  border: 1px solid var(--line2);
+  border-radius: 5px;
+  padding: 4px 6px;
+  font-size: 10px;
+  color: #edf1f5;
+  outline: none;
+}
+
+/* Workflow Canvas & Node Details */
+.wfToolbar { display: flex; gap: 6px; align-items: center; }
+.wfWrap { padding: 11px; }
+.wfScroll {
+  overflow: auto;
+  background: #0d1015;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+.wf {
+  position: relative;
+  width: 1180px;
+  height: 310px;
+  background-image: linear-gradient(rgba(255, 255, 255, .025) 1px, transparent 1px),
+                    linear-gradient(90deg, rgba(255, 255, 255, .025) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+.wfEdge {
+  position: absolute;
+  height: 1px;
+  background: #4c5560;
+  transform-origin: left center;
+}
+.wfEdge.live {
+  background: var(--accent);
+  box-shadow: 0 0 6px rgba(125, 168, 255, 0.5);
+}
+.node {
+  position: absolute;
+  width: 185px;
+  padding: 8px 10px;
+  border: 1px solid var(--line2);
+  border-radius: 7px;
+  background: #151a20;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.node:hover { border-color: #53677d; }
+.node.live { border-color: #4c688a; background: #17202b; }
+.node.done { border-color: #416349; background: #141c17; }
+.node.blocked { border-color: #744141; background: #201616; }
+.node b { font-size: 11px; font-weight: 600; }
+.node small { display: block; color: var(--muted); font-size: 10px; margin-top: 3px; }
+.nodeMeta {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  margin-top: 6px;
+  font: 8px var(--mono);
+  color: var(--muted2);
+}
+.wfLegend {
+  display: flex;
+  gap: 14px;
+  color: var(--muted2);
+  font-size: 10px;
+  margin-top: 8px;
+}
+.nodeDetail {
+  margin-top: 10px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1.2fr;
+  gap: 8px;
+}
+.detailBox {
+  background: #101419;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+.detailBox b { font-size: 10px; display: block; margin-bottom: 4px; color: #ced7e0; }
+.detailBox p { font-size: 10px; color: var(--muted); margin: 0; }
+.ioList { display: grid; gap: 3px; }
+.ioTag { font: 9px var(--mono); color: #bdc7d1; }
+.checkList { display: grid; gap: 3px; }
+.checkItem { display: flex; gap: 6px; align-items: center; font-size: 10px; color: var(--muted); }
+.checkItem .checkDot {
+  width: 12px;
+  height: 12px;
+  border: 1px solid var(--line2);
+  border-radius: 3px;
+  display: grid;
+  place-items: center;
+  font-size: 8px;
+  color: var(--green);
+}
+.checkItem.done .checkDot { background: #17251c; border-color: #355844; }
+
+/* Runtimes & Comms */
+.runtimeGrid {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr) 290px;
+  gap: 10px;
+  height: 480px;
+}
+.runtimeList { height: 100%; overflow: auto; }
+.runtimeItem {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.runtimeItem:hover { background: #171c22; }
+.runtimeItem.active { background: #1b222b; }
+.r1 { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+.runtimeItem b { font-size: 11px; }
+.runtimeItem small { display: block; color: var(--muted); font-size: 9px; margin-top: 3px; }
+.rtDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 5px;
+}
+.rtRun { background: var(--green); }
+.rtWait { background: var(--yellow); }
+.rtOff { background: var(--muted2); }
+
+.chat { display: flex; flex-direction: column; min-height: 0; height: 100%; }
+.chatTabs { display: flex; gap: 2px; }
+.chatTab {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 10px;
+  padding: 4px 8px;
+  border-bottom: 2px solid transparent;
+}
+.chatTab.active { color: #eef2f5; border-bottom-color: var(--accent); }
+.threadBar {
+  display: flex;
+  gap: 5px;
+  padding: 6px 11px;
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+  background: #101419;
+}
+.threadBtn {
+  border: 1px solid var(--line);
+  background: #11151a;
+  border-radius: 99px;
+  padding: 3px 8px;
+  color: var(--muted);
+  font-size: 9px;
+  white-space: nowrap;
+}
+.threadBtn.active { color: #eef2f5; background: #1c2430; border-color: #405978; }
+.messages { flex: 1; overflow: auto; padding: 12px; }
+.msg { margin-bottom: 11px; }
+.msgHead { display: flex; gap: 7px; align-items: center; font-size: 10px; color: var(--muted); }
+.msgHead strong { color: #e3e8ed; font-size: 11px; }
+.msgBody {
+  margin-top: 4px;
+  background: #11151a;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 8px 10px;
+  font-size: 11px;
+  max-width: 95%;
+  line-height: 1.45;
+}
+.reaction { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 5px; }
+.react {
+  padding: 2px 6px;
+  border: 1px solid var(--line2);
+  border-radius: 99px;
+  background: #191e25;
+  color: #b7c0c9;
+  font-size: 10px;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.react:hover { background: #222831; border-color: var(--muted2); }
+.composer { border-top: 1px solid var(--line); padding: 9px; background: #101318; }
+.composer textarea {
+  width: 100%;
+  height: 56px;
+  background: #0e1217;
+  border: 1px solid var(--line2);
+  border-radius: 6px;
+  padding: 7px 9px;
+  resize: none;
+  outline: none;
+  font-size: 11px;
+  color: #e7ebef;
+}
+.composer textarea:focus { border-color: #4a668b; }
+.composeRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.mention { color: var(--accent2); font-size: 10px; }
+
+/* Inspector Sidebar */
+.runtimeInspector { overflow: auto; }
+.inspectorBody { padding: 10px; }
+.inspectorTabs { display: flex; border-bottom: 1px solid var(--line); padding: 0 10px; }
+.insTab {
+  border: 0;
+  background: transparent;
+  padding: 7px 8px;
+  color: var(--muted);
+  font-size: 10px;
+  border-bottom: 2px solid transparent;
+}
+.insTab.active { color: #eef2f5; border-bottom-color: var(--accent); }
+.kv2 {
+  display: grid;
+  grid-template-columns: 86px 1fr;
+  gap: 7px;
+  font-size: 10px;
+  padding: 5px 0;
+  border-bottom: 1px solid #1f252d;
+}
+.kv2 span { color: var(--muted2); }
+.kv2 b { font-weight: 500; color: #d4dce4; }
+.requiredRefs {
+  margin-top: 9px;
+  padding: 8px;
+  border: 1px solid #33445b;
+  background: #121c2a;
+  border-radius: 6px;
+}
+.requiredRefs b { font-size: 10px; color: #a9c4fa; }
+.requiredRefs div { margin-top: 4px; font: 9px var(--mono); color: #b4c5dc; }
+.log {
+  margin-top: 9px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #0d1014;
+}
+.log div {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line);
+  font: 9px var(--mono);
+  color: #aeb8c3;
+}
+.log div:last-child { border-bottom: 0; }
+.traceRow {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 10px;
+}
+.traceRow:last-child { border-bottom: 0; }
+.traceRow b { display: block; font-size: 10px; }
+.traceRow small { color: var(--muted); }
+
+/* Live Kanban Board */
+.kanbanWrap { margin-top: 10px; }
+.kanban { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.kanCol {
+  background: #12161b;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  min-height: 200px;
+}
+.kanHead {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--muted);
+  display: flex;
+  justify-content: space-between;
+}
+.taskCard {
+  margin: 7px;
+  border: 1px solid var(--line);
+  background: #171b21;
+  border-radius: 6px;
+  padding: 8px;
+  cursor: grab;
+  transition: all 0.12s;
+}
+.taskCard:hover { border-color: var(--line2); background: #1c222a; }
+.taskCard:active { cursor: grabbing; }
+.taskCard b { font-size: 10px; font-weight: 600; display: block; }
+.taskCard small { display: block; color: var(--muted); font-size: 9px; margin-top: 3px; }
+.taskFoot {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 7px;
+  color: var(--muted2);
+  font: 9px var(--mono);
+}
+
+/* Data Center */
+.dataTabs { display: flex; gap: 3px; margin-bottom: 10px; }
+.dataTab {
+  border: 1px solid var(--line);
+  background: #12161b;
+  padding: 6px 10px;
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 10px;
+}
+.dataTab:hover { color: #edf1f5; }
+.dataTab.active { background: #1b232d; color: #eef2f5; border-color: #435c78; font-weight: 500; }
+.dataPane { display: none; }
+.dataPane.active { display: block; }
+.split2 { display: grid; grid-template-columns: 1.2fr .8fr; gap: 10px; }
+.resourceList { display: grid; }
+.resource {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+.resource:last-child { border-bottom: 0; }
+.resLeft { display: flex; align-items: center; gap: 8px; }
+.resIcon {
+  width: 24px;
+  height: 24px;
+  border-radius: 5px;
+  background: #20262d;
+  display: grid;
+  place-items: center;
+  color: #becbe0;
+  font: 10px var(--mono);
+}
+.resource b { font-size: 11px; }
+.resource small { display: block; color: var(--muted); font-size: 10px; margin-top: 2px; }
+.searchBox {
+  width: 100%;
+  background: #0e1217;
+  border: 1px solid var(--line2);
+  border-radius: 6px;
+  padding: 6px 9px;
+  outline: none;
+  font-size: 11px;
+  color: #e7ebef;
+}
+.searchBox:focus { border-color: #4a668b; }
+.dataTable { width: 100%; border-collapse: collapse; margin-top: 8px; }
+.dataTable th, .dataTable td {
+  padding: 8px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  font-size: 10px;
+}
+.dataTable th {
+  color: var(--muted2);
+  text-transform: uppercase;
+  font-size: 9px;
+  letter-spacing: .05em;
+}
+.codeBox {
+  background: #0d1014;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 10px;
+  font: 10px/1.5 var(--mono);
+  color: #bfc9d3;
+  white-space: pre-wrap;
+}
+.vaultNotice {
+  padding: 8px 10px;
+  border: 1px solid #584921;
+  background: #211d14;
+  color: #dec989;
+  border-radius: 6px;
+  font-size: 10px;
+  margin-bottom: 9px;
+}
+
+/* Workplace: Memory & SSOT */
+.memoryGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.memoryIndex { grid-column: 1 / -1; }
+.ssotList, .memoryList { display: grid; gap: 6px; max-height: 240px; overflow-y: auto; }
+.ssotItem, .memoryItem {
+  background: #11151a;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 10px;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.ssotItem:hover, .memoryItem:hover { background: #161c22; }
+.ssotItem.selected, .memoryItem.selected { border-color: #4a6586; background: #18202a; }
+.ssotItem b, .memoryItem b { font-size: 11px; font-weight: 600; }
+.ssotItem p, .memoryItem p { font-size: 10px; color: var(--muted); margin: 3px 0 0; line-height: 1.4; }
+.memoryDetail {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  font-size: 11px;
+}
+.memoryDetail b { font-size: 11px; display: block; margin-bottom: 3px; }
+.memoryDetail p { color: var(--muted); margin: 0; font-size: 10px; }
+.eventTable { width: 100%; border-collapse: collapse; }
+.eventTable th, .eventTable td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  font-size: 10px;
+}
+.eventTable th { color: var(--muted2); font-size: 9px; text-transform: uppercase; }
+.statusActions { display: flex; gap: 4px; }
+.indexToolbar { display: flex; gap: 7px; margin-bottom: 8px; }
+.indexToolbar .searchBox { max-width: 340px; }
+
+/* Modals & Toasts */
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, .65);
+  display: none;
+  place-items: center;
+  z-index: 50;
+  backdrop-filter: blur(2px);
+}
+.modal.show { display: grid; }
+.modalBox {
+  width: min(600px, 92vw);
+  background: #15191f;
+  border: 1px solid var(--line2);
+  border-radius: 8px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .5);
+}
+.modalHead, .modalFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.modalFoot { border-top: 1px solid var(--line); border-bottom: 0; justify-content: flex-end; gap: 7px; }
+.modalHead strong { font-size: 13px; color: #fff; }
+.modalBody { padding: 14px; }
+.field { display: grid; gap: 5px; margin-bottom: 10px; }
+.field label { font-size: 10px; color: var(--muted); }
+.field input, .field textarea, .field select {
+  background: #0e1217;
+  border: 1px solid var(--line2);
+  border-radius: 6px;
+  padding: 7px 9px;
+  outline: none;
+  font-size: 11px;
+}
+.field input:focus, .field textarea:focus { border-color: #4a668b; }
+.field textarea { min-height: 100px; resize: vertical; }
+
+.toast {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  background: #1a2027;
+  border: 1px solid var(--line2);
+  color: #e5eaf0;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 11px;
+  opacity: 0;
+  transform: translateY(6px);
+  pointer-events: none;
+  transition: .18s;
+  z-index: 60;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+}
+.toast.show { opacity: 1; transform: none; }
+
+/* Responsive */
+@media (max-width: 1150px) {
+  .overviewGrid, .memoryGrid { grid-template-columns: 1fr; }
+  .overviewMain, .split2 { grid-template-columns: 1fr; }
+  .runtimeGrid { grid-template-columns: 190px minmax(0, 1fr); }
+  .runtimeInspector { grid-column: 1 / 3; height: 240px; }
+  .implTop { grid-template-columns: 1fr 1fr; }
+  .implTop .card:last-child { grid-column: 1 / 3; }
+}
+@media (max-width: 820px) {
+  .app { grid-template-columns: 60px minmax(0, 1fr); }
+  .brand span { display: none; }
+  .brand { min-width: auto; }
+  .projectSelect { min-width: 0; flex: 1; }
+  .projectSelect .topmeta { display: none; }
+  .sidebar .navLabel, .projectList, .sidebarFoot { display: none; }
+  .navItem { justify-content: center; font-size: 0; padding: 10px 0; }
+  .navIcon { font-size: 14px; }
+  .topRight .topmeta, .kbd { display: none; }
+  .implTop, .memoryGrid { grid-template-columns: 1fr; }
+  .implTop .card:last-child { grid-column: auto; }
+  .roleTable { min-width: 750px; }
+  .roles { overflow-x: auto; }
+  .kanban { grid-template-columns: repeat(4, 210px); overflow-x: auto; }
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- TOP APP BAR -->
+  <header class="top">
+    <div class="brand">
+      <div class="brandMark">GW</div>
+      <div>
+        <span>Gen-workplace</span>
+        <div class="topmeta">v1.1 · Multi-Agent Swarm Workbench</div>
+      </div>
+    </div>
+
+    <!-- Project Picker Dropdown -->
+    <button class="projectSelect" onclick="openProjectPicker()">
+      <span class="projectDot"></span>
+      <strong id="topProjectName">e-commerce-engine</strong>
+      <span class="topmeta" id="topProjectMeta">main · 6 role · 6 runtime</span>
+      <span style="margin-left: auto; color: var(--muted2)">⌄</span>
+    </button>
+
+    <!-- Top Right Actions -->
+    <div class="topRight">
+      <span class="topmeta" id="syncState">Đồng bộ 20:15</span>
+      <span class="kbd">Ctrl K</span>
+      <button class="iconBtn" onclick="showToast('Bảng lệnh tra cứu nhanh: Ctrl K')" title="Tra cứu nhanh">⌘</button>
+      <button class="btn primary" onclick="openModal()">+ Dự án</button>
+    </div>
+  </header>
+
+  <!-- SIDEBAR NAVIGATION -->
+  <aside class="sidebar">
+    <nav class="nav">
+      <div class="navGroup">
+        <div class="navLabel">Phân Khu Quản Trị</div>
+        <button class="navItem" data-nav="dashboard" onclick="go('dashboard', this)">
+          <span class="navIcon">⌂</span>
+          <span>Dashboard</span>
+        </button>
+        <button class="navItem active" data-nav="implementation" onclick="go('implementation', this)">
+          <span class="navIcon">◈</span>
+          <span>Implementation</span>
+        </button>
+        <button class="navItem" data-nav="runtimes" onclick="go('runtimes', this)">
+          <span class="navIcon">◉</span>
+          <span>Môi trường Agent</span>
+        </button>
+        <button class="navItem" data-nav="data" onclick="go('data', this)">
+          <span class="navIcon">▦</span>
+          <span>Trung tâm dữ liệu</span>
+        </button>
+        <button class="navItem" data-nav="memory" onclick="go('memory', this)">
+          <span class="navIcon">◌</span>
+          <span>Nơi làm việc / SSOT</span>
+        </button>
+      </div>
+
+      <div class="navGroup">
+        <div class="navLabel">Dự Án Đang Có</div>
+        <div class="projectList" id="projectList"></div>
+      </div>
+    </nav>
+
+    <!-- Sidebar Footer Telemetry -->
+    <div class="sidebarFoot">
+      <div class="env"><span>Repo</span><strong id="sideRepo">~/work/e-commerce-engine</strong></div>
+      <div class="env"><span>Roles</span><strong id="sideRoles">6</strong></div>
+      <div class="env"><span>Runtimes</span><strong id="sideRuntime">6 / 6 online</strong></div>
+      <div class="env"><span>SSOT Fact</span><strong id="sideSsot">4 verified</strong></div>
+    </div>
+  </aside>
+
+  <!-- MAIN VIEWPORT -->
+  <main class="main">
+    <!-- Subtop Tabs (Đồng bộ với Sidebar) -->
+    <div class="subtop">
+      <button class="tab" data-screen="dashboard" onclick="go('dashboard')">Dashboard</button>
+      <button class="tab active" data-screen="implementation" onclick="go('implementation')">Implementation</button>
+      <button class="tab" data-screen="runtimes" onclick="go('runtimes')">Môi trường Agent</button>
+      <button class="tab" data-screen="data" onclick="go('data')">Trung tâm dữ liệu</button>
+      <button class="tab" data-screen="memory" onclick="go('memory')">Nơi làm việc / SSOT</button>
+    </div>
+
+    <div class="content">
+
+      <!-- ========================================================================= -->
+      <!-- 1. DASHBOARD: QUẢN LÝ NHIỀU DỰ ÁN -->
+      <!-- ========================================================================= -->
+      <section class="screen" id="dashboard">
+        <div class="pageHead">
+          <div>
+            <h1>Dashboard dự án</h1>
+            <p>Theo dõi và khởi tạo các dự án điều phối đa tác nhân (Multi-Agent Swarm).</p>
+          </div>
+          <div class="actions">
+            <button class="btn" onclick="showToast('Đã làm mới dữ liệu dashboard')">Làm mới</button>
+            <button class="btn primary" onclick="openModal()">+ Tạo dự án</button>
+          </div>
+        </div>
+
+        <!-- 4 Stats Cards -->
+        <div class="overviewStats">
+          <div class="stat"><b id="ovProjects">3</b><span>Dự án đang quản lý</span></div>
+          <div class="stat"><b id="ovRoadmap">4</b><span>Mục Roadmap</span></div>
+          <div class="stat"><b id="ovTodo">14</b><span>Todo tasks</span></div>
+          <div class="stat"><b id="ovActive">2</b><span>Runtimes đang thực thi</span></div>
+        </div>
+
+        <div class="projectDashboard">
+          <div class="card">
+            <div class="cardHead">
+              <strong>Các project đang quản trị</strong>
+              <span class="hint">chọn project để nạp workspace riêng</span>
+            </div>
+            <div class="cardBody" id="dashboardProjectList"></div>
+          </div>
+
+          <div class="card">
+            <div class="cardHead">
+              <div>
+                <strong>Project đang chọn</strong>
+                <div class="hint" id="dashboardSelectedMeta">e-commerce-engine</div>
+              </div>
+              <span class="chip live">ĐANG CHỌN</span>
+            </div>
+            <div class="cardBody" id="dashboardSelected"></div>
+          </div>
+        </div>
+
+        <div class="overviewMain">
+          <div class="card">
+            <div class="cardHead">
+              <strong>Tiến trình thực thi Swarm</strong>
+              <span class="chip live">TRỰC TIẾP</span>
+            </div>
+            <div class="cardBody" id="overviewSteps"></div>
+          </div>
+          <div class="card">
+            <div class="cardHead">
+              <strong>Agent Roles đang giữ việc</strong>
+              <span class="hint">theo runtime</span>
+            </div>
+            <div class="cardBody" id="overviewAgents"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================================================= -->
+      <!-- 2. IMPLEMENTATION (3 HÀNG CHUẨN SPEC) -->
+      <!-- ========================================================================= -->
+      <section class="screen active" id="implementation">
+        <div class="pageHead">
+          <div>
+            <h1>Implementation</h1>
+            <p>Input tổng + Plan → Roadmap → Todo → Lựa chọn CLI Engine cho Role → Live Workflow từng node.</p>
+          </div>
+          <div class="actions">
+            <span class="chip" id="sourceState">Nguồn đồng bộ</span>
+            <button class="btn" onclick="saveSource()">Lưu nguồn</button>
+            <button class="btn primary" onclick="generateFromSource()">AI sinh cấu trúc</button>
+          </div>
+        </div>
+
+        <div class="genBar">
+          <div class="genPill done">01 · Input & Chat tổng</div>
+          <div class="genPill done">02 · File Plan đã gắn</div>
+          <div class="genPill live">03 · AI sinh Roadmap</div>
+          <div class="genPill live">04 · AI sinh Todo / Roles</div>
+          <div class="genPill">05 · Workflow live nodes</div>
+        </div>
+
+        <!-- HÀNG 01: 1 HÀNG 3 CỘT -->
+        <div class="implTop">
+          <!-- Cột 1: Input + File Plan & Master Chat Steering -->
+          <div class="card">
+            <div class="cardHead">
+              <strong>01 · Input + File Plan</strong>
+              <span class="hint">nguồn duy nhất để sinh cấu trúc</span>
+            </div>
+            <div class="cardBody">
+              <textarea class="sourceText" id="sourceInput" oninput="sourceChanged()" placeholder="Nhập chỉ thị tổng thể / PRD tại đây..."></textarea>
+              <div class="sourceMeta">
+                <span class="fileTag">📎 plan.md · 24 KB</span>
+                <button class="btn" onclick="attachPlan()">+ File</button>
+                <span class="sourceLock">🔒 Instruction Role chỉ sửa từ Input tổng</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Cột 2: AI Sinh ra Roadmap -->
+          <div class="card">
+            <div class="cardHead">
+              <strong>02 · Roadmap</strong>
+              <span class="hint" id="roadmapSourceState">đã sinh 4 mục</span>
+            </div>
+            <div class="cardBody">
+              <div class="roadmapList" id="roadmapList"></div>
+            </div>
+          </div>
+
+          <!-- Cột 3: Todo List theo từng mục Roadmap -->
+          <div class="card">
+            <div class="cardHead">
+              <strong>03 · Todo theo Roadmap</strong>
+              <span class="hint" id="selectedRoadmapTitle">Roadmap 2 · Pipeline & Services</span>
+            </div>
+            <div class="cardBody">
+              <div class="todoList" id="todoList"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- HÀNG 02: LIST AGENT ROLES & CLI ENGINE SELECTOR -->
+        <div class="card sectionCard roles">
+          <div class="cardHead">
+            <div>
+              <strong>04 · Danh Sách Agent Roles & Lựa Chọn CLI Engine</strong>
+              <div class="hint">Owner lựa chọn loại CLI phù hợp cho từng Role. Instruction khóa theo Input tổng để thống nhất.</div>
+            </div>
+            <button class="btn" onclick="openRoleSource()">Sửa từ Input tổng</button>
+          </div>
+          <div style="overflow-x: auto">
+            <table class="roleTable">
+              <thead>
+                <tr>
+                  <th>Role</th>
+                  <th>CLI runtime engine</th>
+                  <th>Phạm vi nhiệm vụ</th>
+                  <th>Instruction sinh từ Input tổng</th>
+                  <th>Trạng thái</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="roleRows"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- HÀNG 03: SƠ ĐỒ LIVE WORKFLOW TỪNG NODE -->
+        <div class="card sectionCard workflow">
+          <div class="cardHead">
+            <div>
+              <strong>05 · Live Workflow Sơ Đồ Tiến Trình Step-by-Step</strong>
+              <div class="hint">Node thể hiện thứ tự, Role, checklist In - Output, checkpoint và handoff.</div>
+            </div>
+            <div class="wfToolbar">
+              <span class="chip live" id="wfRunStatus">ĐANG CHẠY</span>
+              <button class="btn" onclick="resetWorkflow()">Đặt lại</button>
+              <button class="btn primary" onclick="advanceWorkflow()">Bước tiếp →</button>
+            </div>
+          </div>
+          <div class="wfWrap">
+            <div class="wfScroll">
+              <div class="wf" id="workflowCanvas"></div>
+            </div>
+            <div class="wfLegend">
+              <span>● hoàn thành</span>
+              <span>● đang chạy</span>
+              <span>● chờ dependency</span>
+              <span>● blocked</span>
+            </div>
+            <div class="nodeDetail" id="nodeDetail"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================================================= -->
+      <!-- 3. MÔI TRƯỜNG AGENT (RUNTIMES, CHATROOM, THREAD, EMOJI, KANBAN) -->
+      <!-- ========================================================================= -->
+      <section class="screen" id="runtimes">
+        <div class="pageHead">
+          <div>
+            <h1>Môi trường Agent & Điều Hành Swarm</h1>
+            <p>Mỗi Role có chatroom riêng, tự ghi nhật ký tư duy (Thinking), in-out request, handoff qua thread @mention, emoji reaction và Live Kanban.</p>
+          </div>
+          <div class="actions">
+            <button class="btn" onclick="refreshRuntimes()">Làm mới</button>
+            <button class="btn primary" onclick="requestRuntime()">+ Runtime</button>
+          </div>
+        </div>
+
+        <div class="runtimeGrid">
+          <!-- Cột Trái: Danh sách Runtimes -->
+          <div class="card runtimeList">
+            <div class="cardHead">
+              <strong>Runtime đang kết nối</strong>
+              <span class="hint" id="runtimeCount">6</span>
+            </div>
+            <div id="runtimeItems"></div>
+          </div>
+
+          <!-- Cột Giữa: Chatroom / Thread / Nhật ký tư duy -->
+          <div class="card chat">
+            <div class="cardHead">
+              <div>
+                <strong id="chatTitle">Backend · runtime-02</strong>
+                <div class="hint" id="chatPath">~/work/e-commerce-engine · agent/backend-queue</div>
+              </div>
+              <div class="chatTabs">
+                <button class="chatTab active" data-chat="thread" onclick="switchChat('thread', this)">Luồng Chat & @Mention</button>
+                <button class="chatTab" data-chat="trace" onclick="switchChat('trace', this)">Nhật Ký Tư Duy (Thinking)</button>
+                <button class="chatTab" data-chat="io" onclick="switchChat('io', this)">Vào / Ra (In-Out)</button>
+              </div>
+            </div>
+
+            <!-- Thread Filter Bar -->
+            <div class="threadBar" id="threadBar"></div>
+
+            <!-- Messages Stream -->
+            <div class="messages" id="chatMessages"></div>
+
+            <!-- Chat Composer -->
+            <div class="composer">
+              <textarea id="chatInput" placeholder="Nhắn trong chatroom; @mention role để handoff/yêu cầu làm rõ, đính kèm file hoặc thả emoji phản hồi…"></textarea>
+              <div class="composeRow">
+                <div class="mention">
+                  <span style="color:var(--muted2)">Mention nhanh:</span>
+                  <a href="javascript:void(0)" onclick="insertAt('@Lead')" style="color:var(--accent2);text-decoration:none">@Lead</a> · 
+                  <a href="javascript:void(0)" onclick="insertAt('@Backend')" style="color:var(--accent2);text-decoration:none">@Backend</a> · 
+                  <a href="javascript:void(0)" onclick="insertAt('@QA')" style="color:var(--accent2);text-decoration:none">@QA</a> · 
+                  <a href="javascript:void(0)" onclick="insertAt('@DevOps')" style="color:var(--accent2);text-decoration:none">@DevOps</a>
+                </div>
+                <div style="display:flex;gap:5px;align-items:center">
+                  <span style="font-size:11px;color:var(--muted);cursor:pointer" onclick="insertEmoji('📥')">📥</span>
+                  <span style="font-size:11px;color:var(--muted);cursor:pointer" onclick="insertEmoji('⚠️')">⚠️</span>
+                  <span style="font-size:11px;color:var(--muted);cursor:pointer" onclick="insertEmoji('👎')">👎</span>
+                  <span style="font-size:11px;color:var(--muted);cursor:pointer" onclick="insertEmoji('✅')">✅</span>
+                  <span style="font-size:11px;color:var(--muted);cursor:pointer" onclick="insertEmoji('❓')">❓</span>
+                  <button class="btn primary" onclick="sendRuntimeMessage()">Gửi</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Cột Phải: Inspector Ngữ Cảnh & Tham Chiếu Bắt Buộc -->
+          <div class="card runtimeInspector">
+            <div class="cardHead">
+              <strong>Ngữ cảnh Runtime</strong>
+              <span class="chip live" id="runtimeStatus">running</span>
+            </div>
+            <div class="inspectorTabs">
+              <button class="insTab active" onclick="switchInspector('context', this)">Ngữ cảnh</button>
+              <button class="insTab" onclick="switchInspector('events', this)">Sự kiện</button>
+              <button class="insTab" onclick="switchInspector('files', this)">Tệp / Ref</button>
+            </div>
+            <div class="inspectorBody" id="runtimeInspectorBody"></div>
+          </div>
+        </div>
+
+        <!-- HÀNG KANBAN TIẾN TRÌNH CẢ TEAM DO TRƯỞNG NHÓM PHỤ TRÁCH -->
+        <div class="kanbanWrap">
+          <div class="card">
+            <div class="cardHead">
+              <div>
+                <strong>Live Kanban · Tiến Trình Toàn Đội</strong>
+                <div class="hint">Trưởng nhóm phụ trách update theo live time công việc; có thể kéo thả để chuyển cột.</div>
+              </div>
+              <span class="chip live">LIVE UPDATED</span>
+            </div>
+            <div class="cardBody">
+              <div class="kanban" id="kanban"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================================================= -->
+      <!-- 4. TRUNG TÂM DỮ LIỆU (REPO, DATABASE, VAULT, FILE MANAGER) -->
+      <!-- ========================================================================= -->
+      <section class="screen" id="data">
+        <div class="pageHead">
+          <div>
+            <h1>Trung tâm dữ liệu</h1>
+            <p>Kho dữ liệu chuẩn hóa: Repo, database, vault và file manager của chính dự án; runtime lấy nhanh qua mã tham chiếu.</p>
+          </div>
+          <div class="actions">
+            <button class="btn" onclick="refreshData()">Làm mới index</button>
+          </div>
+        </div>
+
+        <div class="dataTabs">
+          <button class="dataTab active" onclick="switchData('repo', this)">Repo & Worktrees</button>
+          <button class="dataTab" onclick="switchData('db', this)">Database Explorer</button>
+          <button class="dataTab" onclick="switchData('vault', this)">Vault & Secrets</button>
+          <button class="dataTab" onclick="switchData('files', this)">File Manager & Artifacts</button>
+        </div>
+
+        <!-- Tab 1: Repo -->
+        <div class="dataPane active" id="data-repo">
+          <div class="split2">
+            <div class="card">
+              <div class="cardHead">
+                <strong>Git Repository & Commits</strong>
+                <span class="chip done">Branch riêng · PR rule</span>
+              </div>
+              <div class="cardBody">
+                <div class="resourceList" id="repoList"></div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="cardHead">
+                <strong>Workspace Branch Scope</strong>
+                <span class="hint">theo quy tắc Genesis Brain</span>
+              </div>
+              <div class="cardBody">
+                <div class="codeBox" id="repoWorkspace"></div>
+                <div style="height: 8px"></div>
+                <button class="btn" onclick="showToast('Mở diff trên nhánh riêng')">Xem PR Diff</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 2: Database -->
+        <div class="dataPane" id="data-db">
+          <div class="card">
+            <div class="cardHead">
+              <strong>Database References & Schemas</strong>
+              <span class="hint">tra nhanh bằng ID mà không cần scan toàn cục</span>
+            </div>
+            <div class="cardBody">
+              <input class="searchBox" placeholder="Tìm kiếm bảng, schema, DB-ID..." oninput="filterTable('dbTable', this.value)">
+              <table class="dataTable" id="dbTable">
+                <thead>
+                  <tr>
+                    <th>Mã ID</th>
+                    <th>Database Engine</th>
+                    <th>Đối tượng / Schema</th>
+                    <th>Quyền truy cập của Runtime</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><td class="ref">DB-01</td><td>PostgreSQL / main</td><td>public</td><td>Đọc / ghi theo scope</td></tr>
+                  <tr><td class="ref">TBL-18</td><td>PostgreSQL / main</td><td>auth.users</td><td>Backend, QA: xác thực</td></tr>
+                  <tr><td class="ref">TBL-22</td><td>PostgreSQL / main</td><td>orders.orders_queue</td><td>Backend, Worker: ghi đơn</td></tr>
+                  <tr><td class="ref">VEC-04</td><td>Vector DB / Pinecone</td><td>catalog_embeddings_1536</td><td>Search Agent: chỉ đọc</td></tr>
+                  <tr><td class="ref">REDIS-01</td><td>Redis Cluster</td><td>orders:stream (XREADGROUP)</td><td>Backend, Consumer: publish/consume</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 3: Vault -->
+        <div class="dataPane" id="data-vault">
+          <div class="card">
+            <div class="cardHead">
+              <strong>Vault & Secret References</strong>
+              <span class="hint">mã hóa an toàn · secret value không lộ trong log</span>
+            </div>
+            <div class="cardBody">
+              <div class="vaultNotice">
+                Quy tắc an toàn: Runtime chỉ nhận <b>ID + Quyền + Mục đích</b>. Giá trị secret thực sự chỉ được nạp ở execution boundary.
+              </div>
+              <table class="dataTable" id="vaultTable">
+                <thead>
+                  <tr>
+                    <th>Mã ID</th>
+                    <th>Tên Secret / Credential</th>
+                    <th>Chủ sở hữu</th>
+                    <th>Phạm vi phân quyền</th>
+                    <th>Trạng thái</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><td class="ref">SEC-01</td><td>DATABASE_URL</td><td>Platform</td><td>Runtime Backend, Worker</td><td><span class="chip done">sẵn sàng</span></td></tr>
+                  <tr><td class="ref">SEC-02</td><td>REDIS_CONNECTION_URL</td><td>Infra</td><td>Runtime Backend, Queue</td><td><span class="chip done">sẵn sàng</span></td></tr>
+                  <tr><td class="ref">SEC-03</td><td>GEMINI_API_KEY</td><td>Swarm Engine</td><td>Agy CLI nodes</td><td><span class="chip done">sẵn sàng</span></td></tr>
+                  <tr><td class="ref">CRD-02</td><td>Git deploy key</td><td>Repo Lead</td><td>Release Runtime</td><td><span class="chip wait">chờ phê duyệt</span></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 4: File Manager -->
+        <div class="dataPane" id="data-files">
+          <div class="split2">
+            <div class="card">
+              <div class="cardHead">
+                <strong>File Manager</strong>
+                <span class="hint">artifacts + specs + evidence</span>
+              </div>
+              <div class="cardBody">
+                <input class="searchBox" placeholder="Tìm file hoặc folder..." oninput="filterTable('fileTable', this.value)">
+                <table class="dataTable" id="fileTable">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Đường dẫn</th>
+                      <th>Loại</th>
+                      <th>Nguồn cấp</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr><td class="ref">FILE-01</td><td>/spec/plan.md</td><td>plan</td><td>Owner</td></tr>
+                    <tr><td class="ref">FILE-14</td><td>/contracts/openapi_orders.yaml</td><td>contract</td><td>Architect</td></tr>
+                    <tr><td class="ref">FILE-19</td><td>/artifacts/architecture.md</td><td>artifact</td><td>Lead Architect</td></tr>
+                    <tr><td class="ref">FILE-27</td><td>/artifacts/test-report.md</td><td>evidence</td><td>QA Tester</td></tr>
+                    <tr><td class="ref">FILE-31</td><td>/handoff/queue-diff.patch</td><td>handoff</td><td>Backend Core</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div class="card">
+              <div class="cardHead">
+                <strong>Reference Tree</strong>
+                <span class="hint">ID tra nhanh cho agent</span>
+              </div>
+              <div class="cardBody">
+                <div class="codeBox">/spec
+  FILE-01   plan.md
+/contracts
+  FILE-14   openapi_orders.yaml
+/artifacts
+  FILE-19   architecture.md
+  FILE-27   test-report.md
+/handoff
+  FILE-31   queue-diff.patch</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================================================= -->
+      <!-- 5. NƠI LÀM VIỆC: 2 CỘT MEMORY & CATALOG TRA CỨU NHANH -->
+      <!-- ========================================================================= -->
+      <section class="screen" id="memory">
+        <div class="pageHead">
+          <div>
+            <h1>Nơi làm việc / Memory SSOT & Catalog Tra Cứu</h1>
+            <p>Memory từng Role được sync; Trưởng nhóm thẩm định và nâng sự kiện thành SSOT bắt buộc; Catalog ID tra cứu nhanh không cần audit toàn cục.</p>
+          </div>
+          <div class="actions">
+            <span class="chip done" id="memorySyncState">đã sync 20:15</span>
+            <button class="btn" onclick="syncMemories()">Sync memory</button>
+            <button class="btn primary" onclick="openEventModal()">+ Ghi event</button>
+          </div>
+        </div>
+
+        <div class="memoryGrid">
+          <!-- Cột 1: Memory Tổng (SSOT Toàn Dự Án) -->
+          <div class="card">
+            <div class="cardHead">
+              <div>
+                <strong>Memory Tổng · Master SSOT Toàn Dự Án</strong>
+                <div class="hint">nguồn tham chiếu bắt buộc của mọi runtime trong tiến trình công việc</div>
+              </div>
+              <span class="chip done" id="ssotCount">4 verified</span>
+            </div>
+            <div class="cardBody">
+              <div class="ssotList" id="ssotList"></div>
+            </div>
+          </div>
+
+          <!-- Cột 2: Memory Từng Role (Sync Realtime) -->
+          <div class="card">
+            <div class="cardHead">
+              <div>
+                <strong>Memory Từng Role</strong>
+                <div class="hint">sync từ memory của từng role runtime đang chạy</div>
+              </div>
+              <span class="hint">6 roles</span>
+            </div>
+            <div class="cardBody">
+              <div class="memoryList" id="roleMemoryList"></div>
+              <div class="memoryDetail" id="memoryDetail"></div>
+            </div>
+          </div>
+
+          <!-- Bảng Catalog Tra Cứu Nhanh ID Toàn Cục (Không cần audit toàn cục) -->
+          <div class="card memoryIndex">
+            <div class="cardHead">
+              <div>
+                <strong>Catalog Tra Cứu Nhanh ID Dữ Kiện (Quick ID Lookup Database)</strong>
+                <div class="hint">Nơi agent tra nhanh ID để lấy dữ kiện database / mã nguồn mà không cần audit toàn cục mỗi phiên</div>
+              </div>
+              <span class="hint">Event · Vault · MCP · Tool · Credential · File · DB</span>
+            </div>
+            <div class="cardBody">
+              <div class="indexToolbar">
+                <input class="searchBox" placeholder="Tìm mã ID, tên sự kiện, vault, mcp tool, file..." oninput="filterRefs(this.value)">
+              </div>
+              <table class="eventTable">
+                <thead>
+                  <tr>
+                    <th>Mã ID</th>
+                    <th>Phân loại</th>
+                    <th>Đối tượng / Khóa Target</th>
+                    <th>Mô tả ngắn & Dữ kiện trọng yếu</th>
+                  </tr>
+                </thead>
+                <tbody id="refRows"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Event Register: Nơi Lead thẩm định sự kiện đã xác thực -->
+        <div class="card sectionCard">
+          <div class="cardHead">
+            <div>
+              <strong>Event Register · Bảng Xác Thực Sự Kiện</strong>
+              <div class="hint">Trưởng nhóm thẩm định evidence: xác thực nâng thành SSOT hoặc yêu cầu Role làm rõ.</div>
+            </div>
+            <span class="hint">nguồn sự thật trước khi commit vào Master Memory</span>
+          </div>
+          <div class="cardBody">
+            <table class="eventTable">
+              <thead>
+                <tr>
+                  <th>Event ID</th>
+                  <th>Runtime / Role</th>
+                  <th>Yêu cầu / Kết luận</th>
+                  <th>Evidence</th>
+                  <th>Trạng thái</th>
+                  <th>Hành động</th>
+                </tr>
+              </thead>
+              <tbody id="eventRows"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+</div>
+
+<!-- MODAL POPUP (TẠO DỰ ÁN, EVENT, RUNTIME) -->
+<div class="modal" id="modal">
+  <div class="modalBox">
+    <div class="modalHead">
+      <strong id="modalTitle">Tạo dự án</strong>
+      <button class="iconBtn" onclick="closeModal()">×</button>
+    </div>
+    <div class="modalBody" id="modalBody"></div>
+    <div class="modalFoot">
+      <button class="btn" onclick="closeModal()">Hủy</button>
+      <button class="btn primary" id="modalPrimary" onclick="modalSubmit()">Tạo</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST NOTIFICATION -->
+<div class="toast" id="toast"></div>
+
+<!-- APPLICATION JAVASCRIPT STATE & LOGIC -->
+<script>
+const state = {
+  project: { name: 'e-commerce-engine', repo: '~/work/e-commerce-engine', branch: 'main', plan: 'plan.md' },
+  activeProjectIndex: 0,
+  sourceText: 'Xây dựng hệ thống E-Commerce Multi-Agent Automation Engine. Phân rã luồng xử lý đơn hàng bất đồng bộ qua Redis Streams, tích hợp xác thực JWT Ed25519, quét rủi ro bảo mật qua Vault. Mọi Role tuân thủ SSOT, không audit lại toàn cục nếu đã có Catalog ID.',
+  projects: [
+    { name: 'e-commerce-engine', meta: '6 role · 6 runtime · đang chạy', repo: '~/work/e-commerce-engine' },
+    { name: 'genos-micro-kernel', meta: '4 role · 4 runtime · tạm dừng', repo: '~/work/genos-micro-kernel' },
+    { name: 'security-scanner', meta: '5 role · 5 runtime · đang chạy', repo: '~/work/security-scanner' }
+  ],
+  sourceSaved: true,
+  selectedRoadmap: 1,
+  workflowIndex: 2,
+  selectedNode: 2,
+  selectedRuntime: 1,
+  chatMode: 'thread',
+  inspectorMode: 'context',
+  selectedMemory: 1,
+  selectedThread: 'all',
+  roadmap: [
+    { id: 'RM-01', title: 'Infra & Database Setup', desc: 'PostgreSQL schema, Redis Streams, Docker compose.', todos: 3, status: 'done' },
+    { id: 'RM-02', title: 'Pipeline Logic & Services', desc: 'Order processing worker, queue consumer, payment hook.', todos: 4, status: 'live' },
+    { id: 'RM-03', title: 'Security Audit & Vault', desc: 'SAST scan, hardcoded secret audit, token bucket policy.', todos: 4, status: 'wait' },
+    { id: 'RM-04', title: 'Verification & Release', desc: 'E2E regression test, benchmark 10k req/s, CI/CD PR.', todos: 3, status: 'queued' }
+  ],
+  todos: [
+    [
+      { id: 'TODO-01', title: 'Khởi tạo DB Schema & Migrations', role: 'Architect', status: 'done' },
+      { id: 'TODO-02', title: 'Cấu hình Docker Compose stack', role: 'DevOps', status: 'done' },
+      { id: 'TODO-03', title: 'Xác thực Architecture Contract', role: 'Lead', status: 'done' }
+    ],
+    [
+      { id: 'TODO-04', title: 'Xây dựng Redis Stream Worker (#RUN-BE-02)', role: 'Backend', status: 'live' },
+      { id: 'TODO-05', title: 'Tạo REST API endpoint POST /orders', role: 'Backend', status: 'done' },
+      { id: 'TODO-06', title: 'Giao diện Admin React Tables', role: 'Frontend', status: 'queued' },
+      { id: 'TODO-07', title: 'Kiểm thử tải Redis queue worker', role: 'QA', status: 'wait' }
+    ],
+    [
+      { id: 'TODO-08', title: 'Audit Vault secret references', role: 'Security', status: 'queued' },
+      { id: 'TODO-09', title: 'Kiểm tra SQL injection & XSS', role: 'Security', status: 'queued' },
+      { id: 'TODO-10', title: 'Kiểm tra rate-limit bucket', role: 'QA', status: 'queued' },
+      { id: 'TODO-11', title: 'Phê duyệt chính sách token', role: 'Lead', status: 'queued' }
+    ],
+    [
+      { id: 'TODO-12', title: 'E2E Regression Test Suite', role: 'QA', status: 'queued' },
+      { id: 'TODO-13', title: 'GitHub Actions PR Check', role: 'DevOps', status: 'queued' },
+      { id: 'TODO-14', title: 'Lead đóng gói SSOT & Release', role: 'Lead', status: 'queued' }
+    ]
+  ],
+  roles: [
+    { id: 'ROLE-01', key: 'L', name: 'Lead Architect', cli: 'Gemini CLI (agy --effort high)', scope: 'Điều phối toàn cục, SSOT Manager, Kanban updater', instruction: 'Phân tích PRD, tổng hợp Memory thành SSOT, cập nhật Kanban live-time, giải quyết clarification (?) và duyệt PR.' },
+    { id: 'ROLE-02', key: 'B', name: 'Backend Specialist', cli: 'Claude Code CLI', scope: 'API, Redis Stream, services, migrations', instruction: 'Thực thi API endpoints theo contract SSOT. Viết code sạch, tự quản lý migrations và báo task qua thread kèm file.' },
+    { id: 'ROLE-03', key: 'F', name: 'Frontend Specialist', cli: 'Cursor CLI', scope: 'Web dashboard, React components, state', instruction: 'Xây dựng UI responsive Tailwind theo spec, kết nối API từ Backend, phản hồi kịp thời form validation.' },
+    { id: 'ROLE-04', key: 'D', name: 'DevOps Engineer', cli: 'Gemini CLI (agy --agent devops)', scope: 'Docker, CI/CD, telemetry, Vault sync', instruction: 'Container hóa dịch vụ, quản lý biến môi trường qua Vault ID, thiết lập GitHub Actions và alert hệ thống.' },
+    { id: 'ROLE-05', key: 'Q', name: 'QA Tester', cli: 'Gemini CLI (agy)', scope: 'Unit test, E2E regression, stress test', instruction: 'Kiểm thử tự động với mọi PR. Thả emoji cảnh báo ⚠️ hoặc 👎 khi test fail, thả ✅ khi nghiệm thu.' },
+    { id: 'ROLE-06', key: 'S', name: 'Security Auditor', cli: 'Codex Security CLI', scope: 'SAST audit, Vault review, token security', instruction: 'Quét lỗ hổng SQLi, XSS, rò rỉ credential. Yêu cầu làm rõ ❓ với lệnh nguy hiểm. Tham chiếu Vault ID bắt buộc.' }
+  ],
+  nodes: [
+    { id: 'NODE-01', title: 'Spec & Plan Parsing', role: 'Lead Architect', status: 'done', x: 20, y: 42, input: 'Input tổng + plan.md', output: 'Source package', check: 'PRD accepted', handoff: '→ Architect Contract', checklist: ['Đọc Input tổng', 'Gắn plan.md', 'Khởi tạo ID sự kiện ban đầu'] },
+    { id: 'NODE-02', title: 'Architecture Contract', role: 'Lead + Backend', status: 'done', x: 260, y: 42, input: 'Source package', output: 'architecture.md + SQL', check: 'contract frozen', handoff: '→ Parallel Swarm', checklist: ['Đọc repo trước khi sửa', 'Khóa API contract', 'Mapping Vault Secret ID'] },
+    { id: 'NODE-03', title: 'Parallel Implementation', role: 'BE + FE + DevOps', status: 'live', x: 500, y: 42, input: 'architecture.md', output: 'diff + test code', check: 'tests pass', handoff: '→ QA Verification', checklist: ['Đúng task scope', 'Diff trên branch riêng', 'Báo cáo thread kèm diff'] },
+    { id: 'NODE-04', title: 'QA Verification', role: 'QA Tester', status: 'wait', x: 740, y: 42, input: 'diff + test log', output: 'QA Evidence report', check: 'acceptance criteria', handoff: '→ Security Audit', checklist: ['Chạy regression tests', 'Benchmark tải', 'Thả emoji trạng thái ✅/👎'] },
+    { id: 'NODE-05', title: 'Security & Vault Audit', role: 'Security Auditor', status: 'wait', x: 980, y: 42, input: 'QA evidence', output: 'Security sign-off', check: 'zero vulnerability', handoff: '→ Commit SSOT', checklist: ['Audit Vault reference', 'Kiểm tra hardcoded key', 'Ký duyệt release'] },
+    { id: 'NODE-06', title: 'Commit SSOT & Release', role: 'Lead Architect', status: 'wait', x: 500, y: 185, input: 'verified event set', output: 'Master Memory', check: 'event evidence', handoff: '→ Production release', checklist: ['Gắn label Đã xác nhận', 'Merge PR vào main', 'Cập nhật Master Memory'] }
+  ],
+  runtimes: [
+    {
+      id: 'runtime-01', role: 'Lead Architect', cli: 'Gemini CLI (agy)', task: 'RM-02', branch: 'main', status: 'running', path: '~/work/e-commerce-engine',
+      messages: [
+        { author: 'Lead Architect', time: '10:14:02', tag: 'Steering', body: 'Đã phân rã Phase 2. Yêu cầu <b>@Backend</b> nhận Task TODO-04 qua thread kèm schema.', react: ['📥 đã nhận', '▶ đang chạy'] },
+        { author: 'Lead Architect', time: '10:25:10', tag: 'Kanban', body: 'Đã chuyển card TODO-04 sang IN PROGRESS theo live runtime của Claude Code.', react: ['✅ live update'] }
+      ],
+      trace: ['10:10 PRD parsed', '10:14 assigned TODO-04 to Backend', '10:25 kanban synced'],
+      io: { input: 'plan.md + Chat tổng', output: 'Roadmap + Todo + SSOT v2.4', request: 'swarm steering', conclusion: 'supervising' }
+    },
+    {
+      id: 'runtime-02', role: 'Backend Specialist', cli: 'Claude Code CLI', task: 'TODO-04', branch: 'agent/backend-queue', status: 'running', path: '~/work/e-commerce-engine',
+      messages: [
+        { author: 'Backend', time: '10:15:30', tag: 'TODO-04', body: 'Đã nhận task từ <b>@Lead</b>. Đang triển khai Redis Streams worker với consumer group <code>order_workers</code>. Thả 📥.', react: ['📥 đã nhận', '⏳ đang chạy'] },
+        { author: 'Backend', time: '10:18:45', tag: 'Clarify', body: 'Cần làm rõ với <b>@Lead</b>: ack timeout của Redis consumer đặt 5000ms hay 10000ms?', react: ['❓ cần làm rõ'] },
+        { author: 'Lead Architect', time: '10:19:20', tag: 'Thread', body: 'Theo chuẩn SSOT: đặt 5000ms. Xem Catalog ID <code>#EVT-102</code>.', react: ['✅ đã xác nhận'] },
+        { author: 'Backend', time: '10:22:15', tag: 'Handoff', body: 'Đã xong worker script. Đang chạy test nội bộ trước khi giao cho <b>@QA</b>.', react: ['🔥 tập trung', '✅ pass test'] }
+      ],
+      trace: ['10:15 received TODO-04', '10:18 clarify ack timeout', '10:19 convention confirmed', '10:22 test passed 12/12'],
+      io: { input: 'architecture.md + #VLT-REDIS-CONN', output: 'worker.py + tests', request: 'implement queue consumer', conclusion: 'running tests' }
+    },
+    {
+      id: 'runtime-03', role: 'Frontend Specialist', cli: 'Cursor CLI', task: 'TODO-06', branch: 'agent/frontend-ui', status: 'waiting', path: '~/work/e-commerce-engine',
+      messages: [{ author: 'Frontend', time: '10:12:00', tag: 'queue', body: 'Sẵn sàng nhận mock API từ Backend.', react: ['⏳ waiting'] }],
+      trace: ['10:12 waiting for backend contract'],
+      io: { input: 'OpenAPI contract', output: 'React tables', request: 'build dashboard UI', conclusion: 'waiting' }
+    },
+    {
+      id: 'runtime-04', role: 'DevOps Engineer', cli: 'Gemini CLI (agy)', task: 'TODO-02', branch: 'agent/infra-docker', status: 'done', path: '~/work/e-commerce-engine',
+      messages: [{ author: 'DevOps', time: '09:55:00', tag: 'event', body: 'Docker Compose stack sẵn sàng với PostgreSQL 16 & Redis 7.2.', react: ['✅ done', '🚀 deploy'] }],
+      trace: ['09:40 compose setup', '09:55 EVT-101 verified'],
+      io: { input: 'infra spec', output: 'docker-compose.yml', request: 'setup containers', conclusion: 'done' }
+    },
+    {
+      id: 'runtime-05', role: 'QA Tester', cli: 'Gemini CLI', task: 'TODO-07', branch: 'agent/qa-benchmark', status: 'waiting', path: '~/work/e-commerce-engine',
+      messages: [{ author: 'QA', time: '10:20:00', tag: 'blocked', body: 'Đang đợi <b>@Backend</b> bàn giao PR diff để chạy test suite.', react: ['⏳ waiting'] }],
+      trace: ['10:20 test suite ready, waiting for diff'],
+      io: { input: 'worker diff', output: 'test-report.md', request: 'verify queue', conclusion: 'waiting' }
+    },
+    {
+      id: 'runtime-06', role: 'Security Auditor', cli: 'Codex Security CLI', task: 'TODO-08', branch: 'agent/sec-audit', status: 'queued', path: '~/work/e-commerce-engine',
+      messages: [{ author: 'Security', time: '10:05:00', tag: 'queue', body: 'Sẵn sàng audit secret scope ngay khi có commit.', react: ['✅ ready'] }],
+      trace: ['10:05 scanner initialized'],
+      io: { input: 'commit hash', output: 'audit report', request: 'scan secrets', conclusion: 'queued' }
+    }
+  ],
+  kanban: {
+    backlog: [
+      ['TODO-08', 'Audit Vault secret references', 'Security'],
+      ['TODO-06', 'Giao diện Admin React Tables', 'Frontend']
+    ],
+    ready: [
+      ['TODO-07', 'Kiểm thử tải Redis queue worker', 'QA']
+    ],
+    progress: [
+      ['TODO-04', 'Xây dựng Redis Stream Worker', 'Backend']
+    ],
+    done: [
+      ['TODO-01', 'Khởi tạo DB Schema & Migrations', 'Architect'],
+      ['TODO-02', 'Cấu hình Docker Compose stack', 'DevOps'],
+      ['TODO-05', 'Tạo REST API endpoint POST /orders', 'Backend']
+    ]
+  },
+  ssot: [
+    { id: 'AUTH-BOUNDARY-01', title: 'JWT Authentication & RBAC', body: 'Hệ thống dùng token Ed25519 với public key tại /.well-known/jwks.json. Không lưu state session vào cookie thông thường.', source: 'EVT-101 · FILE-19', verified: '09:55' },
+    { id: 'QUEUE-CONVENTION-02', title: 'Redis Streams & Consumer Group', body: 'Mọi event đặt hàng publish vào orders:stream. Consumer group order_workers xử lý với ack timeout 5000ms. Có circuit breaker fallback.', source: 'EVT-102 · FILE-14', verified: '10:19' },
+    { id: 'VAULT-POLICY-03', title: 'Secret Execution Boundary', body: 'Secret chỉ được inject tại runtime runner, không ghi giá trị plaintext trong chat log hay commit code.', source: 'EVT-104 · SEC-01', verified: '10:00' },
+    { id: 'GENESIS-BRANCH-RULE', title: 'Quy tắc Nhánh & PR Genesis Brain', body: 'Bắt buộc làm việc trên branch riêng → Mở PR → Chờ Owner chấp thuận gắn nhãn Đã xác nhận → Mới được merge vào main.', source: 'POLICY · BOOTSTRAP.md', verified: '09:00' }
+  ],
+  roleMemory: [
+    { role: 'Lead Architect', runtime: 'runtime-01', summary: '4 facts verified · Kanban live sync', detail: 'Quản lý toàn bộ tiến trình Phase 2, đã giải quyết clarification timeout cho Backend.' },
+    { role: 'Backend Specialist', runtime: 'runtime-02', summary: 'Redis Stream worker · tests passing', detail: 'Tạo xong consumer group, đang chạy benchmark nội bộ trước khi giao cho QA.' },
+    { role: 'Frontend Specialist', runtime: 'runtime-03', summary: 'Waiting for mock API', detail: 'Đã chuẩn bị components layout Tailwind cho Order Management dashboard.' },
+    { role: 'DevOps Engineer', runtime: 'runtime-04', summary: 'Docker stack healthy', detail: 'PostgreSQL 16 và Redis 7.2 đã chạy ổn định với container healthcheck pass 100%.' },
+    { role: 'QA Tester', runtime: 'runtime-05', summary: 'PyTest suite ready', detail: 'Sẵn sàng kiểm thử 200 req/s cho Redis stream consumer.' },
+    { role: 'Security Auditor', runtime: 'runtime-06', summary: 'Vault mapping checked', detail: 'Đã ánh xạ 4 Vault keys vào danh mục bảo mật an toàn.' }
+  ],
+  refs: [
+    ['EVT-102', 'Event', 'QUEUE-CONVENTION-02', 'Khởi tạo thành công Redis Streams với ack timeout 5000ms'],
+    ['EVT-101', 'Event', 'AUTH-BOUNDARY-01', 'Docker compose & Postgres migration hoàn tất'],
+    ['SEC-01', 'Vault', 'DATABASE_URL', 'Chuỗi kết nối PostgreSQL TLS'],
+    ['SEC-02', 'Vault', 'REDIS_CONNECTION_URL', 'Chuỗi kết nối Redis Streams bảo mật'],
+    ['SEC-03', 'Vault', 'GEMINI_API_KEY', 'API key điều phối Swarm cho Agy CLI'],
+    ['MCP-01', 'MCP Tool', 'google-drive:readSpreadsheet', 'Tool đọc Google Sheet đối soát kho hàng'],
+    ['TOOL-01', 'Tool', 'agy --agent <name>', 'Antigravity CLI runner phân cấp'],
+    ['FILE-14', 'File', 'openapi_orders.yaml', 'OpenAPI 3.0 Contract cho Order service'],
+    ['FILE-19', 'File', 'architecture.md', 'Tài liệu kiến trúc chuẩn SSOT'],
+    ['CRD-02', 'Credential', 'Git deploy key', 'Khóa deploy release cho Lead']
+  ],
+  events: [
+    { id: 'EVT-102', runtime: 'Backend / runtime-02', request: 'Chốt ack timeout 5000ms và consumer group order_workers', evidence: 'thread #clarify · Lead confirmed', status: 'ssot', time: '10:19' },
+    { id: 'EVT-103', runtime: 'Backend / runtime-02', request: 'Hoàn thành pytest 12/12 cho queue consumer', evidence: 'worker.py · test log 10:22', status: 'pending', time: '10:22' },
+    { id: 'EVT-101', runtime: 'DevOps / runtime-04', request: 'Xác thực stack Docker PostgreSQL + Redis', evidence: 'docker-compose.yml · commit 4f8c2e', status: 'ssot', time: '09:55' }
+  ]
+};
+
+const $ = id => document.getElementById(id);
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+}
+
+// Navigation Screen Switching
+function go(id, el) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  $(id)?.classList.add('active');
+  document.querySelectorAll('.navItem').forEach(n => n.classList.remove('active'));
+  if (el) el.classList.add('active');
+  else document.querySelector('.navItem[data-nav="' + id + '"]')?.classList.add('active');
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.screen === id));
+}
+
+// Toast
+function showToast(msg) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(window.toastTimer);
+  window.toastTimer = setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+// Modal Control
+function openModal() {
+  $('modalTitle').textContent = 'Khởi tạo dự án mới';
+  $('modalBody').innerHTML = `
+    <div class="field"><label>Tên dự án</label><input id="mProjectName" placeholder="vd: fin-risk-scanner"></div>
+    <div class="field"><label>Repository path</label><input id="mProjectRepo" placeholder="~/work/fin-risk-scanner"></div>
+    <div class="field"><label>Input tổng / Mục tiêu dự án</label><textarea id="mProjectPlan" placeholder="Mô tả mục tiêu, ràng buộc, acceptance criteria và spec cần xây dựng..."></textarea></div>
+  `;
+  $('modalPrimary').textContent = 'Tạo dự án';
+  $('modalPrimary').onclick = modalSubmit;
+  $('modal').classList.add('show');
+  setTimeout(() => $('mProjectName')?.focus(), 40);
+}
+
+function openProjectPicker() {
+  openModal();
+  $('modalTitle').textContent = 'Chuyển đổi dự án';
+  $('modalPrimary').textContent = 'Đóng';
+  $('modalPrimary').onclick = closeModal;
+  const list = state.projects.map((p, i) => `
+    <button class="btn" style="width:100%;text-align:left;margin-bottom:6px" onclick="selectProject(${i});closeModal()">
+      <b>${escapeHtml(p.name)}</b><span class="hint"> · ${escapeHtml(p.meta)}</span>
+    </button>
+  `).join('');
+  $('modalBody').innerHTML = list;
+}
+
+function closeModal() { $('modal').classList.remove('show'); }
+
+// Workspace Cloning & Snapshot
+const WORKSPACE_KEYS = ['sourceText', 'sourceSaved', 'selectedRoadmap', 'workflowIndex', 'selectedNode', 'roles', 'roadmap', 'todos', 'nodes', 'runtimes', 'kanban', 'ssot', 'roleMemory', 'refs', 'events'];
+function deepClone(x) { return JSON.parse(JSON.stringify(x)); }
+function snapshotWorkspace() {
+  const out = {};
+  WORKSPACE_KEYS.forEach(k => out[k] = deepClone(state[k]));
+  return out;
+}
+function blankWorkspace() {
+  const w = snapshotWorkspace();
+  w.sourceText = '';
+  w.sourceSaved = false;
+  w.selectedRoadmap = 0;
+  w.workflowIndex = 0;
+  w.selectedNode = 0;
+  w.todos = [];
+  w.kanban = { backlog: [], ready: [], progress: [], done: [] };
+  return w;
+}
+function saveActiveWorkspace() {
+  const p = state.projects[state.activeProjectIndex];
+  if (p) p.workspace = snapshotWorkspace();
+}
+function restoreWorkspace(w) {
+  if (!w) return;
+  WORKSPACE_KEYS.forEach(k => {
+    if (w[k] !== undefined) state[k] = deepClone(w[k]);
+  });
+  state.selectedRuntime = 0;
+  state.chatMode = 'thread';
+  state.inspectorMode = 'context';
+  state.selectedThread = 'all';
+}
+function ensureProjectWorkspaces() {
+  if (!state.projects.length) return;
+  if (!state.projects[state.activeProjectIndex || 0]?.workspace) {
+    state.projects = state.projects.map((p, i) => ({
+      ...p,
+      workspace: i === (state.activeProjectIndex || 0) ? snapshotWorkspace() : blankWorkspace()
+    }));
+  }
+}
+
+function modalSubmit() {
+  const name = ($('mProjectName')?.value || 'new-swarm-app').trim() || 'new-swarm-app';
+  const repo = ($('mProjectRepo')?.value || '~/work/' + name).trim();
+  saveActiveWorkspace();
+  state.projects.unshift({ name, meta: 'mới tạo · 6 role · 0 runtime', repo, workspace: blankWorkspace() });
+  persist();
+  selectProject(0, false);
+  closeModal();
+  showToast('Đã tạo dự án ' + name + ' — hãy nhập Input tổng');
+}
+
+function selectProject(i, saveCurrent = true) {
+  if (!state.projects[i]) return;
+  if (saveCurrent) saveActiveWorkspace();
+  state.activeProjectIndex = i;
+  const p = state.projects[i];
+  state.project = { ...state.project, name: p.name, repo: p.repo, branch: 'main', plan: 'plan.md' };
+  restoreWorkspace(p.workspace);
+  $('topProjectName').textContent = p.name;
+  $('topProjectMeta').textContent = 'main · ' + (state.roles ? state.roles.length : 6) + ' role';
+  $('sideRepo').textContent = p.repo;
+  $('sourceInput').value = state.sourceText || '';
+  renderProjectList();
+  refreshAll();
+  persist();
+  showToast('Đã chuyển sang dự án ' + p.name);
+}
+
+function renderProjectList() {
+  $('projectList').innerHTML = state.projects.map((p, i) => `
+    <div class="projectRow ${p.name === state.project.name ? 'active' : ''}" onclick="selectProject(${i})">
+      <b>${escapeHtml(p.name)}</b>
+      <small>${escapeHtml(p.meta)}</small>
+    </div>
+  `).join('');
+}
+
+// Implementation Handlers
+function sourceChanged() {
+  state.sourceText = $('sourceInput').value;
+  state.sourceSaved = false;
+  $('sourceState').textContent = 'Nguồn đã thay đổi';
+  $('sourceState').className = 'chip wait';
+  $('roadmapSourceState').textContent = 'chưa regenerate';
+}
+function saveSource() {
+  state.sourceSaved = true;
+  $('sourceState').textContent = 'Đã lưu';
+  $('sourceState').className = 'chip done';
+  $('syncState').textContent = 'Đồng bộ ' + new Date().toLocaleTimeString('vi-VN', { hour12: false });
+  persist();
+  showToast('Đã lưu Input tổng & cập nhật toàn bộ Role');
+}
+function attachPlan() {
+  showToast('File plan.md đã được gắn vào Source Package');
+}
+function generateFromSource() {
+  state.sourceText = $('sourceInput').value;
+  state.sourceSaved = true;
+  $('sourceState').textContent = 'Đã sinh từ nguồn';
+  $('sourceState').className = 'chip live';
+  $('roadmapSourceState').textContent = 'đã sinh vừa xong';
+  state.workflowIndex = 2;
+  renderAll();
+  showToast('AI đã phân rã Roadmap → Todo → Role Instructions → Workflow');
+}
+
+function renderImplementation() {
+  $('sourceInput').value = state.sourceText || '';
+  
+  // 1. Roadmap List
+  $('roadmapList').innerHTML = state.roadmap.map((r, i) => `
+    <div class="roadmapRow ${i === state.selectedRoadmap ? 'selected' : ''}" onclick="selectRoadmap(${i})">
+      <div class="rmNo">${i + 1}</div>
+      <div>
+        <b>${escapeHtml(r.title)}</b>
+        <small>${escapeHtml(r.desc)}</small>
+      </div>
+      <span class="count">${r.todos} todo</span>
+      <span class="chip ${r.status === 'done' ? 'done' : r.status === 'live' ? 'live' : r.status === 'wait' ? 'wait' : ''}">
+        ${r.status === 'done' ? 'done' : r.status === 'live' ? 'live' : r.status === 'wait' ? 'chờ' : 'queued'}
+      </span>
+    </div>
+  `).join('');
+
+  // 2. Todo List
+  const todos = state.todos[state.selectedRoadmap] || [];
+  $('selectedRoadmapTitle').textContent = `${state.roadmap[state.selectedRoadmap]?.id || ''} · ${state.roadmap[state.selectedRoadmap]?.title || ''}`;
+  $('todoList').innerHTML = todos.map(t => `
+    <div class="todoItem ${t.status === 'done' ? 'done' : ''}" onclick="showToast('${t.id} · ${escapeHtml(t.title)}')">
+      <span class="check">${t.status === 'done' ? '✓' : ''}</span>
+      <div>
+        <b>${escapeHtml(t.title)}</b>
+        <small>${escapeHtml(t.role)} · ${t.id}</small>
+      </div>
+      <span class="chip ${t.status === 'done' ? 'done' : t.status === 'live' ? 'live' : t.status === 'wait' ? 'wait' : ''}">
+        ${t.status === 'done' ? 'done' : t.status === 'live' ? 'running' : t.status === 'wait' ? 'blocked' : 'queued'}
+      </span>
+    </div>
+  `).join('');
+
+  // 3. Roles Table (Owner chọn CLI, Instruction khóa theo Input tổng)
+  $('roleRows').innerHTML = state.roles.map((r, i) => `
+    <tr>
+      <td>
+        <div class="roleName">
+          <div class="roleBadge">${r.key}</div>
+          <div>
+            <b>${escapeHtml(r.name)}</b>
+            <div class="hint">${r.id}</div>
+          </div>
+        </div>
+      </td>
+      <td>
+        <select class="select" onchange="changeCli(${i}, this.value)">
+          ${['Gemini CLI (agy --effort high)', 'Gemini CLI (agy)', 'Claude Code CLI', 'Cursor CLI', 'Codex Security CLI', 'Aider CLI'].map(x => `<option ${x === r.cli ? 'selected' : ''}>${x}</option>`).join('')}
+        </select>
+      </td>
+      <td>${escapeHtml(r.scope)}</td>
+      <td class="roleInst">${escapeHtml(r.instruction)} <span class="lock">🔒 khóa theo Input tổng</span></td>
+      <td>
+        <span class="chip ${r.name.includes('Backend') ? 'live' : r.name.includes('Lead') ? 'done' : r.name.includes('QA') ? 'wait' : ''}">
+          ${r.name.includes('Backend') ? 'running' : r.name.includes('Lead') ? 'ready' : r.name.includes('QA') ? 'waiting' : 'queued'}
+        </span>
+      </td>
+      <td>
+        <button class="btn" onclick="openRoleSource('${r.name}')">Chỉnh từ Source</button>
+      </td>
+    </tr>
+  `).join('');
+
+  renderWorkflow();
+}
+
+function selectRoadmap(i) {
+  state.selectedRoadmap = i;
+  persist();
+  renderImplementation();
+}
+
+function openRoleSource(role = 'Role') {
+  go('implementation');
+  $('sourceInput').focus();
+  $('sourceInput').selectionStart = 0;
+  $('sourceInput').selectionEnd = $('sourceInput').value.length;
+  showToast(role + ' instruction được đồng bộ từ Input tổng');
+}
+
+function changeCli(i, v) {
+  state.roles[i].cli = v;
+  persist();
+  showToast(state.roles[i].name + ' engine → ' + v);
+}
+
+// Workflow Canvas & Detail
+function renderWorkflow() {
+  const c = $('workflowCanvas');
+  const ns = state.nodes;
+  let html = '';
+  for (let i = 0; i < ns.length - 1; i++) {
+    const a = ns[i], b = ns[i + 1];
+    const x = a.x + 185, y = a.y + 36;
+    const dx = b.x - (a.x + 185), dy = b.y - a.y;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    const ang = Math.atan2(dy, dx) * 180 / Math.PI;
+    html += `<div class="wfEdge ${i < state.workflowIndex ? 'live' : ''}" style="left:${x}px;top:${y}px;width:${len}px;transform:rotate(${ang}deg)"></div>`;
+  }
+  html += ns.map((n, i) => `
+    <div class="node ${n.status === 'done' ? 'done' : n.status === 'live' ? 'live' : n.status === 'blocked' ? 'blocked' : ''}" style="left:${n.x}px;top:${n.y}px" onclick="selectNode(${i})">
+      <b>${n.id} · ${escapeHtml(n.title)}</b>
+      <small>${escapeHtml(n.role)} · ${n.status === 'done' ? 'hoàn thành' : n.status === 'live' ? 'đang chạy' : n.status === 'blocked' ? 'blocked' : 'chờ dependency'}</small>
+      <div class="nodeMeta">
+        <span>IN ${escapeHtml(n.input.slice(0, 16))}</span>
+        <span>${i === state.workflowIndex ? 'TRỰC TIẾP' : ''}</span>
+      </div>
+    </div>
+  `).join('');
+  c.innerHTML = html;
+  selectNode(state.selectedNode);
+}
+
+function selectNode(i) {
+  state.selectedNode = i;
+  const n = state.nodes[i];
+  $('nodeDetail').innerHTML = `
+    <div class="detailBox">
+      <b>Node / Role</b>
+      <p><span class="ref">${n.id}</span> · ${escapeHtml(n.role)}</p>
+    </div>
+    <div class="detailBox">
+      <b>Checklist Input</b>
+      <div class="ioList"><span class="ioTag">${escapeHtml(n.input)}</span></div>
+    </div>
+    <div class="detailBox">
+      <b>Checklist Output</b>
+      <div class="ioList"><span class="ioTag">${escapeHtml(n.output)}</span></div>
+    </div>
+    <div class="detailBox">
+      <b>Checkpoint / Handoff</b>
+      <p>${escapeHtml(n.check)} · ${escapeHtml(n.handoff)}</p>
+      <div class="checkList" style="margin-top:6px">
+        ${(n.checklist || []).map((x, j) => `<div class="checkItem ${j === 0 && n.status === 'done' ? 'done' : ''}"><span class="checkDot">${j === 0 && n.status === 'done' ? '✓' : ''}</span>${escapeHtml(x)}</div>`).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function advanceWorkflow() {
+  if (state.workflowIndex < state.nodes.length - 1) {
+    state.workflowIndex++;
+    state.nodes[state.workflowIndex].status = 'live';
+    if (state.workflowIndex > 0) state.nodes[state.workflowIndex - 1].status = 'done';
+    if (state.workflowIndex === state.nodes.length - 1) $('wfRunStatus').textContent = 'CHECKPOINT RELEASE';
+    persist();
+    renderWorkflow();
+    showToast('Workflow chuyển sang ' + state.nodes[state.workflowIndex].id);
+  } else {
+    showToast('Workflow đang ở checkpoint cuối cùng');
+  }
+}
+
+function resetWorkflow() {
+  state.workflowIndex = 1;
+  state.nodes.forEach((n, i) => n.status = i < 1 ? 'done' : i === 1 ? 'live' : 'wait');
+  persist();
+  renderWorkflow();
+  showToast('Workflow đã reset về checkpoint Kiến Trúc');
+}
+
+// Dashboard Renderers
+function renderDashboardProjects() {
+  const list = $('dashboardProjectList');
+  list.innerHTML = state.projects.map((p, i) => {
+    const selected = p.name === state.project.name;
+    const w = p.workspace;
+    const roles = w && w.roles ? w.roles.length : (i === 0 ? 6 : 4);
+    const runtimes = w && w.runtimes ? w.runtimes.length : (i === 0 ? 6 : 4);
+    const done = w && w.nodes ? w.nodes.filter(n => n.status === 'done').length : 2;
+    const total = w && w.nodes && w.nodes.length ? w.nodes.length : 6;
+    const pr = Math.round(done / total * 100);
+    return `
+      <div class="projectCard ${selected ? 'selected' : ''}" onclick="selectProject(${i})">
+        <div class="projectCardHead">
+          <div>
+            <b>${escapeHtml(p.name)}</b>
+            <small>${escapeHtml(p.repo)}</small>
+          </div>
+          <span class="chip ${selected ? 'live' : ''}">${selected ? 'đang chọn' : 'dự án'}</span>
+        </div>
+        <div class="projectMetaRow">
+          <span class="chip">${roles} role</span>
+          <span class="chip">${runtimes} runtime</span>
+          <span class="chip">${selected ? 'theo dõi trực tiếp' : 'theo dõi'}</span>
+        </div>
+        <div class="progress"><i style="width:${pr}%"></i></div>
+        <div style="display:flex;justify-content:space-between;margin-top:4px">
+          <span class="hint">tiến độ roadmap</span>
+          <span class="hint">${pr}%</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  $('ovProjects').textContent = state.projects.length;
+  const p = state.project;
+  $('dashboardSelectedMeta').textContent = p.repo;
+  $('dashboardSelected').innerHTML = `
+    <div class="resource">
+      <div><b>${escapeHtml(p.name)}</b><small>${escapeHtml(p.branch || 'main')} · source package sạch</small></div>
+      <span class="chip live">ĐANG CHỌN</span>
+    </div>
+    <div class="resource">
+      <div><b>Implementation</b><small>Input + Plan → Roadmap → Todo → Role → Workflow</small></div>
+      <button class="btn" onclick="go('implementation')">Mở</button>
+    </div>
+    <div class="resource">
+      <div><b>Runtimes Điều Hành</b><small>${state.runtimes.filter(r => r.status === 'running').length} đang chạy · ${state.runtimes.length} tổng</small></div>
+      <button class="btn" onclick="go('runtimes')">Xem</button>
+    </div>
+    <div class="resource">
+      <div><b>Nơi làm việc / SSOT</b><small>${state.ssot.length} dữ kiện đã xác thực</small></div>
+      <button class="btn" onclick="go('memory')">Mở</button>
+    </div>
+  `;
+}
+
+function renderOverview() {
+  const active = state.runtimes.filter(r => r.status === 'running').length;
+  $('ovRoadmap').textContent = state.roadmap.length;
+  $('ovTodo').textContent = state.todos.flat().length;
+  $('ovActive').textContent = active;
+  $('sideRuntime').textContent = state.runtimes.length + ' / ' + state.runtimes.length + ' online';
+  $('sideRoles').textContent = state.roles.length;
+  $('sideSsot').textContent = state.ssot.length + ' verified';
+
+  $('overviewSteps').innerHTML = state.nodes.map((n, i) => `
+    <div class="runStep">
+      <div class="stepNo">${i + 1}</div>
+      <div>
+        <b>${escapeHtml(n.title)}</b>
+        <small>${escapeHtml(n.role)} · ${escapeHtml(n.input)} → ${escapeHtml(n.output)}</small>
+      </div>
+      <span class="chip ${n.status === 'done' ? 'done' : n.status === 'live' ? 'live' : n.status === 'blocked' ? 'bad' : 'wait'}">
+        ${n.status === 'done' ? 'done' : n.status === 'live' ? 'running' : n.status === 'blocked' ? 'blocked' : 'waiting'}
+      </span>
+    </div>
+  `).join('');
+
+  $('overviewAgents').innerHTML = state.runtimes.map(r => `
+    <div class="resource">
+      <div class="resLeft">
+        <div class="resIcon">${r.role[0]}</div>
+        <div>
+          <b>${escapeHtml(r.role)}</b>
+          <small>${escapeHtml(r.task)} · ${escapeHtml(r.cli)}</small>
+        </div>
+      </div>
+      <span class="chip ${r.status === 'running' ? 'live' : r.status === 'done' ? 'done' : 'wait'}">${r.status}</span>
+    </div>
+  `).join('');
+}
+
+// Runtimes, Comms, Threads & Reactions
+function refreshRuntimes() {
+  renderRuntimes();
+  showToast('Danh sách Runtime đã được cập nhật');
+}
+
+function renderRuntimes() {
+  const r = state.runtimes[state.selectedRuntime];
+  $('runtimeCount').textContent = state.runtimes.length + ' đang kết nối';
+  $('runtimeItems').innerHTML = state.runtimes.map((x, i) => `
+    <div class="runtimeItem ${i === state.selectedRuntime ? 'active' : ''}" onclick="selectRuntime(${i})">
+      <div class="r1">
+        <b><span class="rtDot ${x.status === 'running' ? 'rtRun' : x.status === 'waiting' ? 'rtWait' : 'rtOff'}"></span>${escapeHtml(x.role)}</b>
+        <span class="chip ${x.status === 'running' ? 'live' : x.status === 'done' ? 'done' : 'wait'}">${x.status}</span>
+      </div>
+      <small>${escapeHtml(x.cli)} · ${escapeHtml(x.task)} · ${escapeHtml(x.id)}</small>
+    </div>
+  `).join('');
+
+  $('chatTitle').textContent = r.role + ' · ' + r.id;
+  $('chatPath').textContent = r.path + ' · ' + r.branch;
+  $('runtimeStatus').textContent = r.status;
+  renderChat();
+  renderInspector();
+  renderKanban();
+}
+
+function selectRuntime(i) {
+  state.selectedRuntime = i;
+  state.chatMode = 'thread';
+  state.inspectorMode = 'context';
+  persist();
+  renderRuntimes();
+}
+
+function switchChat(mode, el) {
+  state.chatMode = mode;
+  document.querySelectorAll('.chatTab').forEach(x => x.classList.remove('active'));
+  el.classList.add('active');
+  renderChat();
+}
+
+function renderThreadBar() {
+  const threads = ['all', 'TODO-04', 'Clarify', 'Handoff'];
+  $('threadBar').innerHTML = threads.map(t => `
+    <button class="threadBtn ${state.selectedThread === t ? 'active' : ''}" onclick="selectThread('${t}')">
+      ${t === 'all' ? 'Tất cả' : t}
+    </button>
+  `).join('');
+}
+
+function selectThread(t) {
+  state.selectedThread = t;
+  renderChat();
+}
+
+function renderChat() {
+  const r = state.runtimes[state.selectedRuntime];
+  renderThreadBar();
+  if (state.chatMode === 'thread') {
+    let msgs = r.messages;
+    if (state.selectedThread === 'Clarify') msgs = msgs.filter(m => (m.tag || '').includes('Clarify') || (m.body || '').includes('?'));
+    else if (state.selectedThread === 'Handoff') msgs = msgs.filter(m => (m.tag || '').includes('Handoff') || (m.tag || '').includes('TODO'));
+    else if (state.selectedThread === 'TODO-04') msgs = msgs.filter(m => (m.tag || '').includes('TODO-04') || (m.body || '').includes('TODO-04'));
+
+    $('chatMessages').innerHTML = msgs.map(m => `
+      <div class="msg">
+        <div class="msgHead">
+          <strong>${escapeHtml(m.author)}</strong>
+          <span>${m.time}</span>
+          <span class="ref">${m.tag || ''}</span>
+        </div>
+        <div class="msgBody">${m.body}</div>
+        <div class="reaction">
+          ${(m.react || []).map(x => `<span class="react" onclick="reactMsg('${escapeHtml(x)}')">${escapeHtml(x)}</span>`).join('')}
+        </div>
+      </div>
+    `).join('');
+  } else if (state.chatMode === 'trace') {
+    $('chatMessages').innerHTML = r.trace.map(t => `
+      <div class="traceRow">
+        <b class="mono">${escapeHtml(t.split(' ')[0])}</b>
+        <small>${escapeHtml(t.substring(t.indexOf(' ') + 1))}</small>
+      </div>
+    `).join('');
+  } else {
+    $('chatMessages').innerHTML = `
+      <div class="detailBox" style="margin-bottom:8px">
+        <b>Request</b>
+        <p>${escapeHtml(r.io.request)}</p>
+      </div>
+      <div class="detailBox" style="margin-bottom:8px">
+        <b>Input Contract</b>
+        <p>${escapeHtml(r.io.input)}</p>
+      </div>
+      <div class="detailBox" style="margin-bottom:8px">
+        <b>Output Artifact</b>
+        <p>${escapeHtml(r.io.output)}</p>
+      </div>
+      <div class="detailBox">
+        <b>Kết Luận & Quyết Định</b>
+        <p>${escapeHtml(r.io.conclusion)}</p>
+      </div>
+    `;
+  }
+}
+
+function switchInspector(mode, el) {
+  state.inspectorMode = mode;
+  document.querySelectorAll('.insTab').forEach(x => x.classList.remove('active'));
+  el.classList.add('active');
+  renderInspector();
+}
+
+function renderInspector() {
+  const r = state.runtimes[state.selectedRuntime];
+  if (state.inspectorMode === 'context') {
+    $('runtimeInspectorBody').innerHTML = `
+      <div class="kv2"><span>Role</span><b>${escapeHtml(r.role)}</b></div>
+      <div class="kv2"><span>Task ID</span><b>${escapeHtml(r.task)}</b></div>
+      <div class="kv2"><span>CLI Engine</span><b>${escapeHtml(r.cli)}</b></div>
+      <div class="kv2"><span>Git Branch</span><b>${escapeHtml(r.branch)}</b></div>
+      <div class="kv2"><span>Input Ref</span><b>${escapeHtml(r.io.input)}</b></div>
+      <div class="kv2"><span>Output Ref</span><b>${escapeHtml(r.io.output)}</b></div>
+      <div class="requiredRefs">
+        <b>Tham chiếu SSOT bắt buộc</b>
+        <div>QUEUE-CONVENTION-02 · AUTH-BOUNDARY-01 · GENESIS-BRANCH-RULE</div>
+      </div>
+      <div class="log">
+        ${r.trace.map(x => `<div>${escapeHtml(x)}</div>`).join('')}
+      </div>
+    `;
+  } else if (state.inspectorMode === 'events') {
+    $('runtimeInspectorBody').innerHTML = state.events.filter(e => e.runtime.includes(r.role.split(' ')[0])).map(e => `
+      <div class="traceRow">
+        <b>${e.id}</b>
+        <small>${escapeHtml(e.request)} · <span class="chip ${e.status === 'ssot' ? 'done' : 'wait'}">${e.status}</span></small>
+      </div>
+    `).join('') || '<div class="hint">Chưa có event nào của role này.</div>';
+  } else {
+    $('runtimeInspectorBody').innerHTML = `
+      <div class="traceRow"><b>FILE-14</b><small>openapi_orders.yaml · contract</small></div>
+      <div class="traceRow"><b>FILE-19</b><small>architecture.md · SSOT frozen</small></div>
+      <div class="traceRow"><b>SEC-02</b><small>REDIS_CONNECTION_URL · resolve-at-boundary</small></div>
+    `;
+  }
+}
+
+function insertAt(text) {
+  const input = $('chatInput');
+  input.value += (input.value ? ' ' : '') + text + ' ';
+  input.focus();
+}
+
+function insertEmoji(emoji) {
+  const input = $('chatInput');
+  input.value += (input.value ? ' ' : '') + emoji + ' ';
+  input.focus();
+}
+
+function reactMsg(label) {
+  showToast('Đã thả reaction: ' + label);
+}
+
+function sendRuntimeMessage() {
+  const input = $('chatInput');
+  const text = input.value.trim();
+  if (!text) return;
+  const r = state.runtimes[state.selectedRuntime];
+  const now = new Date().toLocaleTimeString('vi-VN', { hour12: false });
+  
+  // Tự động nhận diện reaction emoji
+  let reacts = ['✅ đã nhận'];
+  if (text.includes('⚠️')) reacts.push('⚠️ cảnh báo');
+  if (text.includes('👎')) reacts.push('👎 đánh giá tệ');
+  if (text.includes('❓')) reacts.push('❓ cần làm rõ');
+  if (text.includes('🔥')) reacts.push('🔥 blocker');
+
+  r.messages.push({
+    author: 'Owner (Ryan)',
+    time: now,
+    tag: text.includes('@') ? 'mention' : 'message',
+    body: escapeHtml(text),
+    react: reacts
+  });
+  r.trace.push(now + ' message dispatched by Owner');
+  input.value = '';
+  persist();
+  renderChat();
+  showToast('Đã gửi tin nhắn vào ' + r.id);
+}
+
+// Live Kanban Drag & Drop
+function renderKanban() {
+  const k = $('kanban');
+  const cols = [
+    ['backlog', 'BACKLOG'],
+    ['ready', 'IN QUEUE'],
+    ['progress', 'AGENT RUNNING ⚙️'],
+    ['done', 'DONE & VERIFIED ✅']
+  ];
+  k.innerHTML = cols.map(([key, label]) => `
+    <div class="kanCol" ondragover="event.preventDefault()" ondrop="dropKanban(event, '${key}')">
+      <div class="kanHead">
+        <span>${label}</span>
+        <span>${state.kanban[key].length}</span>
+      </div>
+      ${state.kanban[key].map((t, i) => `
+        <div class="taskCard" draggable="true" ondragstart="dragKanban(event, '${key}', ${i})">
+          <b>${escapeHtml(t[1])}</b>
+          <small>${t[0]} · ${escapeHtml(t[2])}</small>
+          <div class="taskFoot">
+            <span>${key}</span>
+            <span>${escapeHtml(t[2].slice(0, 7))}</span>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `).join('');
+}
+
+let dragRef = null;
+function dragKanban(e, key, i) {
+  dragRef = { key, i };
+  e.dataTransfer.effectAllowed = 'move';
+}
+function dropKanban(e, target) {
+  if (!dragRef) return;
+  const item = state.kanban[dragRef.key].splice(dragRef.i, 1)[0];
+  state.kanban[target].push(item);
+  dragRef = null;
+  persist();
+  renderKanban();
+  showToast('Task đã chuyển sang ' + target + ' bởi Trưởng nhóm');
+}
+
+// Data Center Handlers
+function switchData(id, el) {
+  document.querySelectorAll('.dataPane').forEach(x => x.classList.remove('active'));
+  $('data-' + id).classList.add('active');
+  document.querySelectorAll('.dataTab').forEach(x => x.classList.remove('active'));
+  el.classList.add('active');
+}
+function refreshData() { showToast('Reference index đã đồng bộ với Brain'); }
+function filterTable(id, q) {
+  q = q.toLowerCase();
+  document.querySelectorAll('#' + id + ' tbody tr').forEach(r => {
+    r.style.display = r.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+}
+
+// Memory, SSOT & Catalog Tra Cứu Nhanh
+function syncMemories() {
+  $('memorySyncState').textContent = 'đã sync ' + new Date().toLocaleTimeString('vi-VN', { hour12: false });
+  state.roleMemory.forEach(x => x.summary = x.summary.replace('waiting', 'synced'));
+  persist();
+  renderMemory();
+  showToast('Đã sync toàn bộ bộ nhớ của 6 Role vào SSOT');
+}
+
+function renderMemory() {
+  $('ssotCount').textContent = state.ssot.length + ' verified';
+  
+  // 1. Master SSOT List
+  $('ssotList').innerHTML = state.ssot.map((s, i) => `
+    <div class="ssotItem ${i === 0 ? 'selected' : ''}" onclick="selectSSOT(${i})">
+      <b>${s.id} · ${escapeHtml(s.title)}</b>
+      <p>${escapeHtml(s.body)}</p>
+      <p class="mono" style="margin-top:4px;color:var(--muted2)">${escapeHtml(s.source)} · ${escapeHtml(s.verified)}</p>
+    </div>
+  `).join('');
+
+  // 2. Role Memories List
+  $('roleMemoryList').innerHTML = state.roleMemory.map((m, i) => `
+    <div class="memoryItem ${i === state.selectedMemory ? 'selected' : ''}" onclick="selectMemory(${i})">
+      <b>${escapeHtml(m.role)} · ${m.runtime}</b>
+      <p>${escapeHtml(m.summary)}</p>
+    </div>
+  `).join('');
+
+  const m = state.roleMemory[state.selectedMemory] || state.roleMemory[0];
+  $('memoryDetail').innerHTML = `
+    <b>${escapeHtml(m.role)} memory snapshot</b>
+    <p>${escapeHtml(m.detail)}</p>
+  `;
+
+  // 3. Quick ID Lookup Catalog
+  $('refRows').innerHTML = state.refs.map(r => `
+    <tr>
+      <td class="ref">${r[0]}</td>
+      <td><span class="chip">${escapeHtml(r[1])}</span></td>
+      <td><b>${escapeHtml(r[2])}</b></td>
+      <td>${escapeHtml(r[3])}</td>
+    </tr>
+  `).join('');
+
+  // 4. Event Register
+  $('eventRows').innerHTML = state.events.map((e, i) => `
+    <tr>
+      <td class="ref">${e.id}</td>
+      <td>${escapeHtml(e.runtime)}</td>
+      <td>${escapeHtml(e.request)}</td>
+      <td>${escapeHtml(e.evidence)}</td>
+      <td><span class="chip ${e.status === 'ssot' ? 'done' : e.status === 'pending' ? 'wait' : 'bad'}">${e.status === 'ssot' ? 'SSOT' : e.status}</span></td>
+      <td>
+        <div class="statusActions">
+          ${e.status === 'pending' ? `
+            <button class="btn" onclick="verifyEvent(${i})">Xác thực</button>
+            <button class="btn" onclick="clarifyEvent(${i})">Làm rõ</button>
+          ` : `
+            <button class="btn" onclick="showToast('${e.id} đã là SSOT')">Mở</button>
+          `}
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function selectMemory(i) {
+  state.selectedMemory = i;
+  renderMemory();
+}
+function selectSSOT(i) {
+  document.querySelectorAll('.ssotItem').forEach((x, j) => x.classList.toggle('selected', j === i));
+  showToast('Đang xem ' + state.ssot[i].id);
+}
+function filterRefs(q) {
+  q = q.toLowerCase();
+  document.querySelectorAll('#refRows tr').forEach(r => {
+    r.style.display = r.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+}
+
+function verifyEvent(i) {
+  const e = state.events[i];
+  e.status = 'ssot';
+  const id = e.id;
+  state.ssot.push({
+    id: 'SSOT-FACT-' + String(state.ssot.length + 1).padStart(2, '0'),
+    title: e.request.slice(0, 36),
+    body: 'Sự kiện đã được Trưởng nhóm xác thực và đưa vào SSOT tham chiếu bắt buộc cho mọi runtime.',
+    source: e.id + ' · ' + e.evidence,
+    verified: new Date().toLocaleTimeString('vi-VN', { hour12: false })
+  });
+  state.refs.unshift([e.id, 'Event', 'SSOT-FACT-' + String(state.ssot.length).padStart(2, '0'), e.request]);
+  persist();
+  renderMemory();
+  showToast(id + ' đã được nâng thành dữ kiện SSOT!');
+}
+
+function clarifyEvent(i) {
+  showToast('Đã gửi yêu cầu làm rõ cho ' + state.events[i].id + ' vào thread của runtime');
+}
+
+function openEventModal() {
+  $('modalTitle').textContent = 'Ghi nhận Sự Kiện Mới';
+  $('modalBody').innerHTML = `
+    <div class="field"><label>Nội dung sự kiện / Request</label><input id="eventReq" placeholder="Runtime vừa hoàn thành điều gì?"></div>
+    <div class="field"><label>Evidence / Tham chiếu</label><input id="eventEvidence" placeholder="FILE-xx · commit / thread / test log"></div>
+    <div class="field"><label>Runtime ghi nhận</label>
+      <select id="eventRuntime">
+        ${state.runtimes.map(r => `<option>${escapeHtml(r.role)} / ${r.id}</option>`).join('')}
+      </select>
+    </div>
+  `;
+  $('modalPrimary').textContent = 'Ghi nhận';
+  $('modalPrimary').onclick = submitEvent;
+  $('modal').classList.add('show');
+}
+
+function submitEvent() {
+  const req = ($('eventReq')?.value || 'Sự kiện mới').trim();
+  const ev = ($('eventEvidence')?.value || 'evidence pending').trim();
+  const rt = $('eventRuntime')?.value || 'Lead';
+  const id = 'EVT-' + (105 + state.events.length);
+  state.events.unshift({
+    id,
+    runtime: rt,
+    request: req,
+    evidence: ev,
+    status: 'pending',
+    time: new Date().toLocaleTimeString('vi-VN', { hour12: false })
+  });
+  closeModal();
+  persist();
+  renderMemory();
+  showToast('Đã ghi nhận ' + id + ' · chờ Trưởng nhóm xác thực');
+}
+
+function requestRuntime() {
+  openModal();
+  $('modalTitle').textContent = 'Khởi tạo Agent Runtime mới';
+  $('modalBody').innerHTML = `
+    <div class="field"><label>Role</label>
+      <select id="rtRole">
+        ${state.roles.map(r => `<option>${escapeHtml(r.name)}</option>`).join('')}
+      </select>
+    </div>
+    <div class="field"><label>CLI Engine</label>
+      <select id="rtCli">
+        <option>Gemini CLI (agy --effort high)</option>
+        <option>Claude Code CLI</option>
+        <option>Cursor CLI</option>
+        <option>Codex Security CLI</option>
+      </select>
+    </div>
+    <div class="field"><label>Task scope</label><input id="rtTask" placeholder="TODO-xx"></div>
+  `;
+  $('modalPrimary').textContent = 'Tạo Runtime';
+  $('modalPrimary').onclick = submitRuntime;
+}
+
+function submitRuntime() {
+  const role = $('rtRole').value;
+  const cli = $('rtCli').value;
+  const task = $('rtTask').value || 'TODO-new';
+  const id = 'runtime-0' + (state.runtimes.length + 1);
+  state.runtimes.push({
+    id,
+    role,
+    cli,
+    task,
+    branch: 'agent/' + role.toLowerCase().replace(/\s+/g, '-'),
+    status: 'running',
+    path: state.project.repo,
+    messages: [{
+      author: role,
+      time: new Date().toLocaleTimeString('vi-VN', { hour12: false }),
+      tag: 'init',
+      body: 'Runtime đã sẵn sàng nhận task từ Workflow.',
+      react: ['✅ ready']
+    }],
+    trace: ['runtime initialized'],
+    io: { input: 'workflow contract', output: 'task artifact', request: task, conclusion: 'running' }
+  });
+  closeModal();
+  state.selectedRuntime = state.runtimes.length - 1;
+  persist();
+  renderRuntimes();
+  renderOverview();
+  showToast(id + ' đã được kích hoạt');
+}
+
+// Persistence
+function persist() {
+  try {
+    localStorage.setItem('genesis-swarm-state', JSON.stringify(state));
+  } catch (e) {}
+}
+function loadPersisted() {
+  try {
+    const raw = localStorage.getItem('genesis-swarm-state');
+    if (raw) {
+      const p = JSON.parse(raw);
+      Object.assign(state, p);
+    }
+  } catch (e) {}
+}
+
+function refreshAll() {
+  renderProjectList();
+  renderDashboardProjects();
+  renderImplementation();
+  renderOverview();
+  renderRuntimes();
+  renderMemory();
+}
+
+// Keyboard shortcuts
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+    e.preventDefault();
+    go('memory');
+    document.querySelector('.indexToolbar .searchBox')?.focus();
+    showToast('Catalog tra cứu nhanh ID: Event / Vault / MCP / File');
+  }
+  if (e.key === 'Escape') closeModal();
+});
+
+// Initial boot
+loadPersisted();
+ensureProjectWorkspaces();
+restoreWorkspace(state.projects[state.activeProjectIndex || 0]?.workspace || snapshotWorkspace());
+refreshAll();
+persist();
+</script>
+</body>
+</html>
