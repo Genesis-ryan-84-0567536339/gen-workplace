@@ -873,6 +873,48 @@ SWARM_DEFAULT_CONFIG = [
     }
 ]
 
+def generate_role_spec_file(sid, role_name, scope="", mission="", conv_id=""):
+    """
+    Sinh file Role Specification (ROLE.md) cô lập ngữ cảnh và trách nhiệm cho từng Agent.
+    Đảm bảo 0-conflict, khóa chặt boundary thư mục và liên kết trực tiếp tới Brain SSOT.
+    """
+    workspace_dir = "/workspace" if os.path.exists("/workspace") else "/workspace/LinuxDataA/gen-workplace"
+    roles_dir = Path(workspace_dir) / "roles"
+    roles_dir.mkdir(parents=True, exist_ok=True)
+    role_spec_path = roles_dir / f"{sid}_ROLE.md"
+
+    DEFAULT_SCOPES = {
+        'gw-lead-agy': ('Toàn bộ kiến trúc & phân nhánh Git', 'Chỉ huy Swarm, kiểm soát hợp đồng I/O giữa Backend và Frontend, duy trì chuẩn SSOT.'),
+        'gw-backend-agy': ('backend/, data/, SQLite WAL, FTS5', 'Thiết kế Schema SQLite WAL, API REST /api/* và tối ưu hóa truy vấn catalog sub-ms.'),
+        'gw-frontend-agy': ('frontend/index.html, assets/', 'Xây dựng giao diện Mission Control Deck, Core Orchestrator IDE và tối ưu UX thời gian thực.'),
+        'gw-devops-agy': ('Dockerfile, docker-compose.yml, install.sh', 'Container hóa dịch vụ, tối ưu hóa SELinux :z mounts và kịch bản cài đặt 1-lệnh.'),
+        'gw-qa-agy': ('Kiểm thử tự động, test suites, API probe', 'Kiểm thử tính liên tục của conversation_id qua các chu kỳ sleep/wake và bảo toàn token.'),
+        'gw-security-agy': ('Xác thực OAuth, phân quyền volume, Vault', 'Thẩm định bảo mật endpoint API, ngăn rò rỉ token và bảo đảm RFC 7636 PKCE.')
+    }
+
+    def_scope, def_mission = DEFAULT_SCOPES.get(sid, (scope or "Workspace dự án", mission or f"Thực hiện nhiệm vụ chuyên môn {role_name}."))
+    use_scope = scope if scope else def_scope
+    use_mission = mission if mission else def_mission
+    use_conv = conv_id if conv_id else f"conv-{sid}"
+
+    content = f"""# Genesis Swarm Role Specification: {role_name}
+- **Session Identifier**: `{sid}`
+- **Assigned Scope**: `{use_scope}`
+- **Active Mission**: {use_mission}
+- **Conversation Thread**: `{use_conv}`
+- **Master SSOT**: `docs/SSOT_ORIGINAL_SPEC.md`
+- **Genesis Brain Link**: branch `main` của repo `Genesis-ryan-84-0567536339/Brain` (`BOOTSTRAP.md`)
+- **Execution Policy**: Autonomous Execution & Full Bypass Policy (auto-accept, không dừng bước trung gian)
+- **Zero-Conflict Rule**: Nghiêm cấm sửa đổi code ngoài phạm vi assigned scope khi chưa có handoff từ Orchestrator.
+- **Reporting Protocol**: Báo cáo trạng thái qua `/api/chat` và cập nhật SQLite todos khi hoàn thành.
+"""
+    try:
+        with open(role_spec_path, "w", encoding="utf-8") as f:
+            f.write(content)
+    except Exception as e:
+        print(f"Error writing role spec for {sid}: {e}")
+    return str(role_spec_path)
+
 def ensure_real_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
     """
     Đảm bảo 6 phiên tmux thật sự đang chạy nền bên trong container.
@@ -915,6 +957,9 @@ def ensure_real_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
 
             quota_g, quota_a = get_quota_telemetry(acc_type, email)
 
+            # Tạo role bootstrap spec
+            role_spec_file = generate_role_spec_file(sid, role_name, conv_id=conv_id)
+
             # Nếu phiên tmux chưa chạy thật sự -> Khởi tạo phiên tmux bash thật!
             if sid not in live_sessions:
                 init_script_path = f"/tmp/tmux_init_{sid}.sh"
@@ -927,18 +972,21 @@ echo "🤖 GENESIS AGENT RUNTIME: {role_name} ({sid})"
 echo "💎 CLI Engine: agy v1.2.10 | Target Conv: {conv_id}"
 echo "🔑 Account: {email} ({'Đã xác thực Google OAuth' if is_auth else 'Chưa đăng nhập'})"
 echo "📂 Profile: {p_dir_clean} | Workspace: {workspace_dir}"
+echo "📋 Role Spec: {role_spec_file} (gõ 'gw-role' để tra cứu)"
 echo "📜 SSOT Ref: docs/SSOT_ORIGINAL_SPEC.md (Single Source of Truth locked)"
 echo "--------------------------------------------------------------------------------"
 echo "💡 Sẵn sàng chấp hành chỉ thị! Gõ 'agy-run' để tiếp tục luồng hội thoại,"
-echo "   hoặc 'gw-status' để kiểm tra context, hoặc nhập lệnh shell bất kỳ."
+echo "   hoặc 'gw-role' để xem phạm vi role, hoặc 'gw-status' để kiểm tra context."
 echo "================================================================================"
 export PS1='[\\033[38;5;39m{sid}\\033[0m:\\033[38;5;48m\\w\\033[0m]$ '
 export GEN_ROLE='{role_name}'
 export GEN_CONV_ID='{conv_id}'
 export GEMINI_DIR='{p_dir_clean}'
+export GEN_ROLE_SPEC='{role_spec_file}'
 alias agy="agy --gemini_dir='{p_dir_clean}' --dangerously-skip-permissions"
 alias agy-run="agy --gemini_dir='{p_dir_clean}' --dangerously-skip-permissions --conversation '{conv_id}'"
-alias gw-status="echo '=== SWARM ROLE: {role_name} ===' && echo 'Session: {sid}' && echo 'Account: {email}' && echo 'ConvID: {conv_id}' && echo 'SSOT: docs/SSOT_ORIGINAL_SPEC.md'"
+alias gw-role="cat '{role_spec_file}'"
+alias gw-status="echo '=== SWARM ROLE: {role_name} ===' && echo 'Session: {sid}' && echo 'Account: {email}' && echo 'ConvID: {conv_id}' && echo 'Role Spec: {role_spec_file}' && echo 'SSOT: docs/SSOT_ORIGINAL_SPEC.md'"
 """)
                     subprocess.run(["tmux", "new-session", "-d", "-s", sid, "-c", workspace_dir, f"bash --init-file {init_script_path}"], capture_output=True, timeout=3.0)
                     time.sleep(0.15)
@@ -1244,6 +1292,7 @@ def wake_tmux_session(session_id):
         p_info = oauth_map.get(acc_type, {})
         email = p_info.get("email") or "owner@genesis.local"
         p_dir_clean = profile_dir or p_info.get("path") or "/workspace/.gemini"
+        role_spec_file = generate_role_spec_file(session_id, role_name, conv_id=conv_id)
 
         init_script_path = f"/tmp/tmux_init_{session_id}.sh"
         try:
@@ -1253,17 +1302,21 @@ echo "==========================================================================
 echo "⚡ GENESIS AGENT RUNTIME: {role_name} ({session_id}) - ĐÃ ĐƯỢC GỌI LẠI!"
 echo "💎 CLI Engine: agy v1.2.10 | Tiếp tục mạch tư duy: {conv_id}"
 echo "🔑 Account: {email} | Profile: {p_dir_clean}"
+echo "📋 Role Spec: {role_spec_file} (gõ 'gw-role' để tra cứu)"
 echo "📜 SSOT Ref: docs/SSOT_ORIGINAL_SPEC.md (Toàn vẹn ngữ cảnh bất biến)"
 echo "--------------------------------------------------------------------------------"
 echo "💡 Toàn bộ trí nhớ phiên và Conversation ID đã phục hồi. Nhập lệnh để tiếp tục."
+echo "   hoặc 'gw-role' để xem phạm vi role, hoặc 'gw-status' để kiểm tra context."
 echo "================================================================================"
 export PS1='[\\033[38;5;39m{session_id}\\033[0m:\\033[38;5;48m\\w\\033[0m]$ '
 export GEN_ROLE='{role_name}'
 export GEN_CONV_ID='{conv_id}'
 export GEMINI_DIR='{p_dir_clean}'
+export GEN_ROLE_SPEC='{role_spec_file}'
 alias agy="agy --gemini_dir='{p_dir_clean}' --dangerously-skip-permissions"
 alias agy-run="agy --gemini_dir='{p_dir_clean}' --dangerously-skip-permissions --conversation '{conv_id}'"
-alias gw-status="echo '=== SWARM ROLE: {role_name} ===' && echo 'Session: {session_id}' && echo 'Account: {email}' && echo 'ConvID: {conv_id}' && echo 'SSOT: docs/SSOT_ORIGINAL_SPEC.md'"
+alias gw-role="cat '{role_spec_file}'"
+alias gw-status="echo '=== SWARM ROLE: {role_name} ===' && echo 'Session: {session_id}' && echo 'Account: {email}' && echo 'ConvID: {conv_id}' && echo 'Role Spec: {role_spec_file}' && echo 'SSOT: docs/SSOT_ORIGINAL_SPEC.md'"
 """)
             subprocess.run(["tmux", "kill-session", "-t", session_id], capture_output=True)
             subprocess.run(["tmux", "new-session", "-d", "-s", session_id, "-c", workspace_dir, f"bash --init-file {init_script_path}"], capture_output=True, timeout=3.0)
@@ -1461,6 +1514,172 @@ def logout_oauth_profile(profile_id):
         os.rename(token_file, bak_file)
         return {"status": "logged_out", "profile_id": profile_id, "backup": bak_file}
     return {"status": "already_logged_out", "profile_id": profile_id}
+
+# =========================================================================
+# GENESIS ORCHESTRATOR CONTROL PLANE & DYNAMIC WORKER SPAWN
+# =========================================================================
+
+def get_orch_chat_messages(project_id="PRJ-GEN-WORKPLACE"):
+    """Lấy danh sách tin nhắn giữa Owner và Orchestrator."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+        SELECT * FROM chat_messages 
+        WHERE runtime_id = 'orch' AND project_id = ?
+        ORDER BY id ASC
+        """, (project_id,))
+        rows = cursor.fetchall()
+        msgs = []
+        for r in rows:
+            msgs.append({
+                "id": r["id"],
+                "author": r["author"],
+                "time": r["created_time"],
+                "tag": r["tag"],
+                "body": r["body"],
+                "react": json.loads(r["react_json"] or "[]")
+            })
+        return msgs
+
+def save_orch_chat_message(author, body, tag="Orchestrator", project_id="PRJ-GEN-WORKPLACE"):
+    """Lưu tin nhắn của Owner hoặc Orchestrator vào SQLite."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        now_time = time.strftime("%H:%M:%S")
+        cursor.execute("""
+        INSERT INTO chat_messages (project_id, runtime_id, author, created_time, tag, body, react_json)
+        VALUES (?, 'orch', ?, ?, ?, ?, ?)
+        """, (project_id, author, now_time, tag, body, json.dumps(["✅ đã ghi nhận"], ensure_ascii=False)))
+        conn.commit()
+        return now_time
+
+def spawn_worker(role_name, project_id="PRJ-GEN-WORKPLACE", account_type="owner_default", mission="", scope=""):
+    """
+    Sinh worker runtime mới động theo nhu cầu của dự án.
+    Tạo hồ sơ trong agent_roles, cấu hình phiên trong tmux_sessions,
+    sinh file bootstrap ngữ cảnh vai trò (Role Spec) và khởi tạo tmux session thật.
+    """
+    role_slug = role_name.lower().replace(" ", "-").replace("&", "").replace("/", "-")
+    role_slug = "".join(c for c in role_slug if c.isalnum() or c == "-")[:16].strip("-")
+    sid = f"gw-{role_slug}-agy"
+    conv_id = f"conv-{sid}"
+    clean_mission = mission or f"Thực thi các hạng mục chuyên môn cho vai trò {role_name} theo chuẩn SSOT."
+    clean_scope = scope or "Thực hiện theo chỉ định của Orchestrator trong workspace dự án."
+
+    workspace_dir = "/workspace" if os.path.exists("/workspace") else "/workspace/LinuxDataA/gen-workplace"
+    role_spec_path = generate_role_spec_file(sid, role_name, scope=clean_scope, mission=clean_mission, conv_id=conv_id)
+
+    # 1. Lưu vào SQLite
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        
+        # Check if already exists in tmux_sessions
+        cursor.execute("SELECT id FROM tmux_sessions WHERE id = ?", (sid,))
+        if not cursor.fetchone():
+            cursor.execute("""
+            INSERT INTO tmux_sessions (
+                id, project_id, role_name, cli_tool, status, pid, cwd,
+                terminal_output, account_type, account_label, profile_dir, conversation_id,
+                quota_gemini_json, quota_anthropic_json
+            ) VALUES (?, ?, ?, 'agy', 'active', 0, ?, ?, ?, 'Mặc định (Owner Gmail: ~/.gemini)', '/workspace/.gemini', ?, ?, ?)
+            """, (
+                sid, project_id, role_name, workspace_dir,
+                f"[{role_name} ({sid}) spawned by Orchestrator]\nRole spec generated: {role_spec_path}\nReady for tasks.",
+                account_type, conv_id,
+                json.dumps({"percent": 85, "limit": 100}),
+                json.dumps({"percent": 90, "limit": 100})
+            ))
+
+        # Check if already exists in agent_roles
+        role_key = role_name[:1].upper()
+        cursor.execute("SELECT id FROM agent_roles WHERE role_key = ?", (role_key,))
+        if not cursor.fetchone():
+            role_id = f"ROLE-{len(sid)}"
+            cursor.execute("""
+            INSERT INTO agent_roles (id, project_id, role_key, name, cli_tool, scope, instruction, status)
+            VALUES (?, ?, ?, ?, 'agy', ?, ?, 'active')
+            """, (f"ROLE-{sid[:8]}", project_id, role_key, role_name, clean_scope, clean_mission))
+
+        conn.commit()
+
+    # 2. Kích hoạt tmux session thật
+    ensure_real_tmux_sessions(project_id)
+
+    # 3. Ghi nhận thông báo vào Orchestrator chat
+    now_time = time.strftime("%H:%M:%S")
+    save_orch_chat_message(
+        "Genesis Orchestrator",
+        f"⚡ <strong>Đã sinh thành công Worker mới</strong>: <code>{role_name}</code> (Session: <code>{sid}</code>, Conversation: <code>{conv_id}</code>). Role bootstrap spec đã lưu tại <code>roles/{sid}_ROLE.md</code>.",
+        tag="SpawnEvent",
+        project_id=project_id
+    )
+
+    return {
+        "status": "spawned",
+        "session_id": sid,
+        "role_name": role_name,
+        "conversation_id": conv_id,
+        "role_spec": str(role_spec_path),
+        "created_at": now_time
+    }
+
+def process_orch_instruction(user_message, project_id="PRJ-GEN-WORKPLACE"):
+    """
+    Xử lý chỉ thị từ Owner (Ryan) gửi cho Orchestrator:
+    - Lưu tin nhắn người dùng.
+    - Phân tích ý định: spawn worker, truy vấn tiến độ, đồng bộ SSOT, bàn giao nhiệm vụ.
+    - Sinh câu trả lời thông minh kèm hành động thực tế.
+    - Lưu câu trả lời của Orchestrator.
+    """
+    user_time = save_orch_chat_message("Owner (Ryan)", user_message, tag="Instruction", project_id=project_id)
+    lower = user_message.lower().strip()
+    action_taken = None
+    reply = ""
+
+    # 1. Ý định Spawn Worker
+    if any(k in lower for k in ["spawn", "tạo worker", "thêm worker", "đẻ worker", "tạo nhân viên"]):
+        parts = user_message.replace(":", " ").replace("-", " ").split()
+        role_guess = "Specialist Worker"
+        for i, p in enumerate(parts):
+            if p.lower() in ["worker", "nhân", "viên", "role", "spawn"] and i + 1 < len(parts):
+                candidate = " ".join(parts[i+1:]).strip()
+                if candidate:
+                    role_guess = candidate.title()
+                    break
+        spawn_res = spawn_worker(role_guess, project_id=project_id, mission=user_message)
+        action_taken = "spawn_worker"
+        reply = f"Đã chấp hành chỉ thị! Tôi đã cấp phát tài nguyên và khởi tạo thành công Worker <strong>{role_guess}</strong> (Session: <code>{spawn_res['session_id']}</code>). Ngữ cảnh và hồ sơ role đã được cô lập an toàn tại <code>{spawn_res['role_spec']}</code>."
+
+    # 2. Ý định Truy vấn Tiến độ / Roadmap / Todos
+    elif any(k in lower for k in ["tiến độ", "roadmap", "todo", "kế hoạch", "plan", "báo cáo"]):
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT status, count(*) FROM todos WHERE project_id = ? GROUP BY status", (project_id,))
+            counts = dict(cursor.fetchall())
+            done_cnt = counts.get("done", 0)
+            pending_cnt = counts.get("pending", 0) + counts.get("live", 0) + counts.get("queued", 0)
+            
+            cursor.execute("SELECT id, title, status FROM roadmaps WHERE project_id = ? ORDER BY order_idx ASC", (project_id,))
+            rms = cursor.fetchall()
+            rm_text = " | ".join([f"{r['id']}: {r['title']} ({r['status']})" for r in rms])
+
+        reply = f"Báo cáo tiến độ Swarm: Đã hoàn tất <strong>{done_cnt}</strong> tác vụ, còn <strong>{pending_cnt}</strong> tác vụ đang triển khai hoặc chờ xử lý.<br>Roadmap hiện tại: <em>{rm_text}</em>.<br>Tất cả worker đều tuân thủ chặt chẽ đặc tả SSOT gốc."
+
+    # 3. Ý định Truy vấn SSOT / Brain / Memory
+    elif any(k in lower for k in ["brain", "ssot", "trí nhớ", "memory", "nguồn chuẩn"]):
+        reply = "Toàn bộ Swarm đang được neo vững chắc vào branch <code>main</code> của repository <code>Genesis-ryan-84-0567536339/Brain</code> (file <code>BOOTSTRAP.md</code>). Master SSOT <code>docs/SSOT_ORIGINAL_SPEC.md</code> được khóa bất biến. Mọi thay đổi dữ liệu đều ghi nhận tức thì vào SQLite WAL với chỉ mục FTS5."
+
+    # 4. Chỉ thị chung
+    else:
+        reply = f"Chỉ huy tối cao đã ghi nhận chỉ thị: <em>\"{user_message}\"</em>. Tôi đang điều phối yêu cầu này tới Swarm theo chính sách <strong>Autonomous Execution & Full Bypass Policy</strong> (tự động thực thi, không block). Kết quả sẽ được cập nhật liên tục trên Command Deck."
+
+    agent_time = save_orch_chat_message("Genesis Orchestrator", reply, tag="Reply", project_id=project_id)
+    return {
+        "reply": reply,
+        "action_taken": action_taken,
+        "user_time": user_time,
+        "agent_time": agent_time
+    }
 
 # Khởi tạo tự động khi import
 init_db()

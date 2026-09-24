@@ -3914,7 +3914,7 @@ function toggleSwarmBody(btn) {
   if (collapseBtn) collapseBtn.textContent = isCollapsed ? 'Mở rộng ▼' : 'Thu gọn ▲';
 }
 
-function sendOrchMessage() {
+async function sendOrchMessage() {
   const input = $('orchChatInput');
   if (!input) return;
   const text = input.value.trim();
@@ -3954,39 +3954,116 @@ function sendOrchMessage() {
     chat.scrollTop = chat.scrollHeight;
   }
 
-  // 3. Simulate Orchestrator intelligent response
-  setTimeout(() => {
+  try {
+    const res = await fetch('/api/orch/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: text, project_id: 'PRJ-GEN-WORKPLACE' })
+    });
     const typingEl = $(typingId);
     if (typingEl) typingEl.remove();
 
-    let reply = '';
-    const lower = text.toLowerCase();
+    if (res.ok) {
+      const data = await res.json();
+      const reply = data.reply || 'Đã chấp hành chỉ thị của Owner.';
+      const agentTime = data.agent_time || now;
 
-    if (lower.includes('spawn') || lower.includes('worker') || lower.includes('nhân viên') || lower.includes('role')) {
-      reply = `Đã phân tích yêu cầu điều phối worker. Hệ thống đang quản lý <strong>6 chuyên gia cốt lõi</strong> (Lead, Backend, Frontend, DevOps, QA, Security). Nếu dự án phát sinh nhu cầu chuyên biệt (như Data Engineer, Crawler, Pentester), tôi có thể tạo một worker profile mới với branch worktree và context cô lập. Bạn có thể nhấn nút <code>⚡ Spawn Workers</code> để chỉ định.`;
-    } else if (lower.includes('trí nhớ') || lower.includes('memory') || lower.includes('ssot') || lower.includes('brain')) {
-      reply = `Ngữ cảnh trung tâm đang được đồng bộ chuẩn hóa từ Brain repository (<code>Genesis-ryan-84-0567536339/Brain</code>) qua file <code>BOOTSTRAP.md</code>. Tất cả các quyết định kiến trúc, catalog ID và luật SSOT (0 conflict, WAL SQLite, live bind mount) đều được tôi bảo toàn trong Tab <strong>🧠 Trí Nhớ</strong>.`;
-    } else if (lower.includes('plan') || lower.includes('kế hoạch') || lower.includes('todo') || lower.includes('tiến độ')) {
-      const pendingCount = (state.todos || []).filter(t => t.status !== 'done').length;
-      reply = `Tiến độ dự án hiện tại: Có <strong>${pendingCount}</strong> tác vụ đang chờ xử lý trong Roadmap. Mọi worker đều đang được giám sát theo sát chỉ tiêu SSOT. Tôi sẽ tự động phân rã chỉ thị của bạn và giao cho worker phù hợp nhất.`;
+      if (chat) {
+        const agentDiv = document.createElement('div');
+        agentDiv.className = 'orchMsgAgent';
+        agentDiv.innerHTML = `
+          <div class="orchBubbleAvatar">🧠</div>
+          <div>
+            <div class="orchBubble">${reply}</div>
+            <div class="orchMsgMeta">Genesis Orchestrator · ${agentTime} · SSOT Synced</div>
+          </div>
+        `;
+        chat.appendChild(agentDiv);
+        chat.scrollTop = chat.scrollHeight;
+      }
+
+      if (data.action_taken === 'spawn_worker') {
+        await refreshTmuxSessions();
+        renderOrchSwarmCards();
+      }
     } else {
-      reply = `Chỉ thị đã được ghi nhận vào bộ đệm chỉ huy tối cao (Orchestrator Control Plane). Tôi đang điều hướng yêu cầu: <em>"${escapeHtml(text)}"</em> tới toàn bộ hệ thống Swarm. Mọi tương tác đều tuân thủ chính sách <strong>Autonomous Execution & Full Bypass Policy</strong> (thực thi độc lập, không block vô cớ).`;
+      throw new Error('API status: ' + res.status);
     }
-
+  } catch (err) {
+    console.warn('[Orchestrator Chat] Local fallback:', err);
+    const typingEl = $(typingId);
+    if (typingEl) typingEl.remove();
     if (chat) {
       const agentDiv = document.createElement('div');
       agentDiv.className = 'orchMsgAgent';
       agentDiv.innerHTML = `
         <div class="orchBubbleAvatar">🧠</div>
         <div>
-          <div class="orchBubble">${reply}</div>
-          <div class="orchMsgMeta">Genesis Orchestrator · ${now} · Auto-Accept</div>
+          <div class="orchBubble">Chỉ thị đã ghi nhận tại Orchestrator Control Plane. Swarm đang tiếp nhận: <em>"${escapeHtml(text)}"</em>.</div>
+          <div class="orchMsgMeta">Genesis Orchestrator · ${now} · Local Fallback</div>
         </div>
       `;
       chat.appendChild(agentDiv);
       chat.scrollTop = chat.scrollHeight;
     }
-  }, 600);
+  }
+}
+
+async function loadOrchChatMessages() {
+  const chat = $('orchChatMessages');
+  if (!chat) return;
+
+  try {
+    const res = await fetch('/api/orch/messages');
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.messages && data.messages.length > 0) {
+        chat.innerHTML = data.messages.map(m => {
+          const isUser = m.author.includes('Ryan') || m.author.includes('Owner');
+          if (isUser) {
+            return `
+              <div class="orchMsgUser">
+                <div>
+                  <div class="orchBubble">${escapeHtml(m.body)}</div>
+                  <div class="orchMsgMeta" style="text-align:right">${escapeHtml(m.author)} · ${escapeHtml(m.time)}</div>
+                </div>
+              </div>
+            `;
+          } else {
+            return `
+              <div class="orchMsgAgent">
+                <div class="orchBubbleAvatar">🧠</div>
+                <div>
+                  <div class="orchBubble">${m.body}</div>
+                  <div class="orchMsgMeta">${escapeHtml(m.author)} · ${escapeHtml(m.time)}</div>
+                </div>
+              </div>
+            `;
+          }
+        }).join('');
+        chat.scrollTop = chat.scrollHeight;
+        return;
+      }
+    }
+  } catch (e) {
+    console.warn('[Orchestrator] Error loading chat history:', e);
+  }
+
+  if (chat.children.length === 0) {
+    const now = new Date().toLocaleTimeString('vi-VN', { hour12: false });
+    chat.innerHTML = `
+      <div class="orchMsgAgent">
+        <div class="orchBubbleAvatar">🧠</div>
+        <div>
+          <div class="orchBubble">
+            Xin chào Ryan! Tôi là <strong>Genesis Orchestrator</strong> — Trung tâm chỉ huy tối cao và điều phối toàn bộ Swarm.<br>
+            Tôi đã bootstrap toàn bộ ngữ cảnh từ Brain (<code>BOOTSTRAP.md</code>), sẵn sàng đẻ ra các worker chuyên môn theo nhu cầu của Plan hoặc nhận chỉ thị trực tiếp từ bạn qua Chat IDE này.
+          </div>
+          <div class="orchMsgMeta">Genesis Orchestrator · ${now} · SSOT Ready</div>
+        </div>
+      </div>
+    `;
+  }
 }
 
 function renderOrchMemory() {
@@ -4208,15 +4285,38 @@ function focusWorkerFromOrch(sid) {
   $('commandDeck')?.scrollIntoView({ behavior: 'smooth' });
 }
 
-function orchSpawnWorker() {
+async function orchSpawnWorker() {
   const role = prompt('Nhập tên vai trò Worker cần spawn (ví dụ: Data Pipeline Engineer, Security Pentester, v.v.):');
   if (!role || !role.trim()) return;
 
   const roleName = role.trim();
-  const sid = 'gw-' + roleName.toLowerCase().replace(/[^a-z0-9]/g, '-').slice(0, 15) + '-agy';
+  const mission = prompt('Nhập mục tiêu / chỉ thị cho worker này (để trống nếu dùng mặc định):') || '';
 
   showToast('⚡ Orchestrator đang cấp phát tài nguyên và khởi tạo worker: ' + roleName);
 
+  try {
+    const res = await fetch('/api/orch/spawn', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        role_name: roleName,
+        project_id: 'PRJ-GEN-WORKPLACE',
+        mission: mission
+      })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      await refreshTmuxSessions();
+      renderOrchSwarmCards();
+      showToast('✅ Đã spawn thành công worker: ' + roleName + ' (' + data.session_id + ')');
+      loadOrchChatMessages();
+      return;
+    }
+  } catch (e) {
+    console.warn('[Spawn Worker] Fallback to local:', e);
+  }
+
+  const sid = 'gw-' + roleName.toLowerCase().replace(/[^a-z0-9]/g, '-').slice(0, 15) + '-agy';
   if (!state.tmuxSessions) state.tmuxSessions = [];
   const exists = state.tmuxSessions.find(s => s.id === sid);
   if (!exists) {
@@ -5538,23 +5638,8 @@ setTimeout(() => {
     `;
   }
 
-  // Seed Orchestrator Chat IDE
-  const orchChatEl = $('orchChatMessages');
-  if (orchChatEl && orchChatEl.children.length === 0) {
-    const now = new Date().toLocaleTimeString('vi-VN', { hour12: false });
-    orchChatEl.innerHTML = `
-      <div class="orchMsgAgent">
-        <div class="orchBubbleAvatar">🧠</div>
-        <div>
-          <div class="orchBubble">
-            Xin chào Ryan! Tôi là <strong>Genesis Orchestrator</strong> — Trung tâm chỉ huy tối cao và điều phối toàn bộ Swarm.<br>
-            Tôi đã bootstrap toàn bộ ngữ cảnh từ Brain (<code>BOOTSTRAP.md</code>), sẵn sàng đẻ ra các worker chuyên môn theo nhu cầu của Plan hoặc nhận chỉ thị trực tiếp từ bạn qua Chat IDE này.
-          </div>
-          <div class="orchMsgMeta">Genesis Orchestrator · ${now} · SSOT Ready</div>
-        </div>
-      </div>
-    `;
-  }
+  // Load & Seed Orchestrator Chat IDE
+  loadOrchChatMessages();
 
   // Init subtop nav for current active screen
   const activeScreen = document.querySelector('.screen.active')?.id || 'implementation';

@@ -118,6 +118,13 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             self._send_json(200, {"profiles": profiles})
             return
 
+        # 6. API Lịch sử tin nhắn Orchestrator Chat IDE
+        if path == "/api/orch/messages":
+            prj_id = query.get("project", ["PRJ-GEN-WORKPLACE"])[0]
+            messages = db.get_orch_chat_messages(prj_id)
+            self._send_json(200, {"messages": messages})
+            return
+
         return super().do_GET()
 
     def do_POST(self):
@@ -310,6 +317,30 @@ class SwarmHandler(SimpleHTTPRequestHandler):
                 self._send_json(400, {"error": "Missing profile_id"})
             return
 
+        # 12. Gửi chỉ thị cho Orchestrator (Orchestrator Control Plane Chat)
+        if path == "/api/orch/chat":
+            message = data.get("message", "").strip()
+            project_id = data.get("project_id", "PRJ-GEN-WORKPLACE")
+            if message:
+                res = db.process_orch_instruction(message, project_id)
+                self._send_json(200, res)
+            else:
+                self._send_json(400, {"error": "Missing message"})
+            return
+
+        # 13. Sinh worker mới động (Dynamic Worker Spawning)
+        if path == "/api/orch/spawn":
+            role_name = data.get("role_name", "").strip()
+            project_id = data.get("project_id", "PRJ-GEN-WORKPLACE")
+            account_type = data.get("account_type", "owner_default")
+            mission = data.get("mission", "").strip()
+            scope = data.get("scope", "").strip()
+            if role_name:
+                res = db.spawn_worker(role_name, project_id, account_type, mission, scope)
+                self._send_json(200, res)
+            else:
+                self._send_json(400, {"error": "Missing role_name"})
+            return
 
         self.send_response(404)
         self.end_headers()
