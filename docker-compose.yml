@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   gen-workplace:
     build:
@@ -11,8 +9,12 @@ services:
     ports:
       - "8888:8888"
     volumes:
-      - gen-workplace-data:/app/data
-      - ./workspace:/workspace
+      - gen-workplace-data:/app/data:z
+      - ./workspace:/workspace:z
+      - ./frontend:/app/frontend:ro,z
+      - ./backend:/app/backend:z
+      - ./assets:/app/assets:ro,z
+      - ./docs:/app/docs:ro,z
     environment:
       - PORT=8888
       - DATA_DIR=/app/data
