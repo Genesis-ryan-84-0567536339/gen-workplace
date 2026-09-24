@@ -3111,12 +3111,11 @@ const state = {
     { id: 'ROLE-06', key: 'S', name: 'Security Auditor', cli: 'Codex Security CLI', scope: 'Phân quyền volume Docker, audit file permission, kiểm soát Vault', instruction: 'Kiểm tra an toàn SELinux, cô lập quyền hạn biến môi trường và thẩm định secret boundary.' }
   ],
   nodes: [
-    { id: 'NODE-01', title: 'Spec Ingestion', role: 'Lead Architect', status: 'done', x: 20, y: 42, input: 'Đặc tả gốc của Owner', output: 'docs/SSOT_ORIGINAL_SPEC.md', check: 'SSOT locked', handoff: '→ Docker Architecture', checklist: ['Lập repo gen-workplace', 'Ghi nguyên văn SSOT', 'Cam kết zero-drift'] },
-    { id: 'NODE-02', title: 'Container & Live Mount', role: 'DevOps Engineer', status: 'done', x: 260, y: 42, input: 'Dockerfile + docker-compose', output: 'gen-workplace-app (Live)', check: 'live bind mount verified', handoff: '→ TUI Installer', checklist: ['Docker build 3.11-slim', 'Live mount cờ :z SELinux', 'Port 8888 200 OK'] },
-    { id: 'NODE-03', title: 'TUI Installer & Icon', role: 'DevOps + Backend', status: 'done', x: 500, y: 42, input: 'install.sh + installer_tui.py', output: 'Gen-workplace.desktop', check: '1-command launch verified', handoff: '→ Database & Catalog', checklist: ['Thanh loading % trực quan', 'Pre-flight checks OS/Docker', 'Tạo Desktop Icon WebApp'] },
-    { id: 'NODE-04', title: 'Database & Catalog Engine', role: 'Backend & DB', status: 'live', x: 740, y: 42, input: 'SQLite FTS5 schema', output: 'Fast ID Catalog API', check: 'sub-ms query test', handoff: '→ Cross-Platform QA', checklist: ['SQLite WAL mode', 'Bảng FTS5 Catalog', 'Zero-audit token saving'] },
-    { id: 'NODE-05', title: 'Cross-Platform QA', role: 'QA Tester', status: 'wait', x: 980, y: 42, input: 'Installer test matrix', output: 'QA Sign-off report', check: 'zero install issue', handoff: '→ GitHub Release', checklist: ['Test Linux / Fedora / Ubuntu', 'Test macOS Docker Desktop', 'Test Windows WSL2'] },
-    { id: 'NODE-06', title: 'GitHub Release & Freeze', role: 'Lead Architect', status: 'wait', x: 500, y: 185, input: 'Clean git commits', output: 'GitHub Release v1.0', check: 'all issues resolved', handoff: '→ Community distribution', checklist: ['Gắn tag v1.0.0', 'Push to GitHub main', '1-command curl ready'] }
+    { id: 'NODE-01', title: 'Spec Ingestion & SSOT Freezing', role: 'Lead Architect', status: 'done', x: 20, y: 42, input: 'Yêu cầu bài toán từ Ryan', output: 'docs/SSOT_ORIGINAL_SPEC.md & master_ssot', check: 'SSOT locked, 0% drift', handoff: '→ Architecture Breakdown', checklist: ['Tiếp nhận yêu cầu nguyên văn', 'Khóa file SSOT_ORIGINAL_SPEC.md', 'Ghi nhận vào CSDL master_ssot'] },
+    { id: 'NODE-02', title: 'Architecture Breakdown & DAG', role: 'Lead Architect', status: 'done', x: 260, y: 42, input: 'SSOT gốc & Target Features', output: 'Roadmap RM-01..RM-05 & Todo DAG', check: 'depends_on chain locked', handoff: '→ Parallel 0-Conflict Build', checklist: ['Phân rã lộ trình theo mốc kiến trúc', 'Tạo Todo list gắn chặt depends_on', 'Ký kết Hợp đồng Giao diện I/O'] },
+    { id: 'NODE-03', title: 'Core Engine & Parallel Build', role: 'Backend & Frontend', status: 'live', x: 500, y: 42, input: 'API & Schema Contracts', output: 'Codebase sạch trong Allowed Paths', check: '0-Conflict, Atomic Mutex pass', handoff: '→ Dual-Gate Verification', checklist: ['Khóa độc quyền Task Mutex (/api/task/claim)', 'Xây dựng SQLite WAL DB & REST APIs', 'Hoàn thiện Mission Control SPA'] },
+    { id: 'NODE-04', title: 'Dual-Gate QA & Security Audit', role: 'QA & Security', status: 'wait', x: 740, y: 42, input: 'Mã nguồn & Artifacts', output: 'Chứng thư kiểm định & Test Logs', check: '100% test pass, 0 secret leak', handoff: '→ Packaging & Release', checklist: ['Kiểm toán bảo mật Vault & OAuth PKCE', 'Chạy tự động Test Suite & Auto-wake', 'Nghiệm thu bằng chứng (/api/task/complete)'] },
+    { id: 'NODE-05', title: 'Packaging, Release & Sleep', role: 'DevOps & Orchestrator', status: 'wait', x: 500, y: 185, input: 'Mã nguồn đã nghiệm thu', output: 'Docker Release v1.0 & BLUF Briefing', check: 'Container verified, 0MB RAM sleep', handoff: '→ Bàn giao cho Ryan', checklist: ['Đóng gói Docker Compose cờ :z SELinux', 'Kiểm tra installer_tui.py & desktop shortcut', 'Kích hoạt ngủ đông tiết kiệm & Báo cáo BLUF'] }
   ],
   runtimes: [
     {
@@ -4476,6 +4475,23 @@ function renderOrchDefinition() {
           <li><strong>Điều 5: Nghiệm thu bằng chứng (Evidence-Backed Completion):</strong> Cấm tự nhận "Done" bằng lời nói. Bắt buộc nộp commit hash hoặc artifact qua <code>/api/task/complete</code> mới được duyệt.</li>
           <li><strong>Điều 6: Vòng đời tiết kiệm & Chống Zombie:</strong> Tự động ngủ đông (0% CPU, 0MB RAM) khi rảnh rỗi. Thu hồi task nếu worker bị crash quá 5 phút không heartbeat.</li>
         </ul>
+      </div>
+    </div>
+
+    <div class="orchSection">
+      <div class="orchSectionHead">
+        <h4>🏛️ Cơ Cấu Đội Ngũ Chuẩn 5 Tầng & Ma Trận RACI (Standard Squad Charter)</h4>
+        <span class="orchToggle">SSOT Doc</span>
+      </div>
+      <div class="orchSectionBody">
+        <p style="margin-bottom:6px">Chi tiết hồ sơ và ma trận trách nhiệm lưu tại: <code>docs/STANDARD_SQUAD_AND_WORKFLOW.md</code></p>
+        <div style="font-size:11.5px;line-height:1.75;color:#cbd5e1;background:rgba(0,0,0,0.25);padding:10px;border-radius:6px;border:1px solid rgba(255,255,255,0.06)">
+          <div><strong>• Tầng 0 (Chiến Lược Toàn Cục):</strong> 👑 <strong>Gen</strong> (Core Orchestrator - Chief of Staff) · Quản trị tài nguyên & Vòng đời</div>
+          <div><strong>• Tầng 1 (Chỉ Huy Kỹ Thuật):</strong> 👑 <code>gw-lead-agy</code> (Lead Architect) · Khóa SSOT, Phân rã DAG & Ký duyệt nghiệm thu</div>
+          <div><strong>• Tầng 2 (Xây Dựng Cốt Lõi):</strong> 🗄️ <code>gw-backend-agy</code> (Backend & DB) · 🎨 <code>gw-frontend-agy</code> (Frontend UI)</div>
+          <div><strong>• Tầng 3 (Hạ Tầng & Đóng Gói):</strong> 🚢 <code>gw-devops-agy</code> (DevOps & Packaging) · Docker, TUI Installer & Desktop Shortcut</div>
+          <div><strong>• Tầng 4 (Kiểm Thẩm & Bảo Vệ):</strong> 🧪 <code>gw-qa-agy</code> (QA Tester) · 🛡️ <code>gw-security-agy</code> (Security Auditor)</div>
+        </div>
       </div>
     </div>
   `;

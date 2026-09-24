@@ -1747,24 +1747,29 @@ def process_orch_instruction(user_message, project_id="PRJ-GEN-WORKPLACE"):
 
         reply = f"Báo cáo tiến độ Swarm: Đã hoàn tất <strong>{done_cnt}</strong> tác vụ, còn <strong>{pending_cnt}</strong> tác vụ đang triển khai hoặc chờ xử lý.<br>Roadmap hiện tại: <em>{rm_text}</em>.<br>Tất cả worker đều tuân thủ chặt chẽ đặc tả SSOT gốc."
 
-    # 3. Ý định về Quy Chuẩn Xây Dự Án & Quản Trị Nhân Sự
-    elif any(k in lower for k in ["xây dự án", "quy chuẩn", "nhân sự", "qui cách", "quản trị", "điều chỉnh", "sop", "huấn luyện"]):
-        reply = """Tôi (Gen - Core Orchestrator) đã nắm vững và tuân thủ tuyệt đối <strong>Bộ Quy Chuẩn Kiến Thiết Dự Án & Quản Trị Nhân Sự AI Chuẩn Chỉnh</strong>:
+    # 3. Ý định về Quy Chuẩn Xây Dự Án, Đội Ngũ Chuẩn & Quy Trình Công Việc
+    elif any(k in lower for k in ["lập đội", "đội ngũ", "quy trình", "qui trình", "squad", "workflow", "công việc", "xây dự án", "quy chuẩn", "nhân sự", "qui cách", "quản trị", "raci", "sop"]):
+        reply = """Tôi (Gen - Core Orchestrator) đã thiết lập và ban hành <strong>Cơ Cấu Đội Ngũ Chuẩn & Quy Trình Công Việc Swarm (Standard Squad & Workflow Charter)</strong>:
 <br><br>
-<strong>🏗️ QUY TRÌNH 5 BƯỚC XÂY DỰ ÁN CHUẨN CHỈNH:</strong><br>
-1. <strong>Ingestion & Khóa SSOT:</strong> Tiếp nhận đặc tả gốc của Owner, lưu nguyên văn vào <code>docs/SSOT_ORIGINAL_SPEC.md</code> và bảng <code>master_ssot</code>.<br>
-2. <strong>Phân Rã Roadmap Tuần Tự:</strong> Chia bài toán thành các mốc Roadmap nối tiếp, mỗi mốc có tiêu chuẩn nghiệm thu rõ ràng.<br>
-3. <strong>Phát Sinh Todo List & Chuỗi Phụ Thuộc:</strong> Chẻ nhỏ việc cho từng Role, gắn chặt mã phụ thuộc <code>depends_on</code>.<br>
-4. <strong>Thiết Lập Live Workflow DAG:</strong> Vẽ sơ đồ luồng công việc giữa các Node, khóa Hợp đồng I/O Contract.<br>
-5. <strong>Đóng Gói All-In-One:</strong> Cấu hình Docker Compose (cờ <code>:z</code>), kịch bản cài đặt TUI và shortcut Desktop.<br>
+<strong>🏛️ CƠ CẤU ĐỘI NGŨ CHUẨN 5 TẦNG PHÂN LẬP (6 VỊ TRÍ TINH NHUỆ):</strong><br>
+• <strong>Tầng 0 (Chiến Lược Toàn Cục):</strong> 👑 <strong>Gen</strong> (Core Orchestrator - Chief of Staff) · Quản trị tài nguyên, cấp phát & vòng đời Swarm.<br>
+• <strong>Tầng 1 (Chỉ Huy Kỹ Thuật):</strong> 👑 <code>gw-lead-agy</code> (Lead Architect) · Bảo tồn SSOT, phân rã DAG & ký duyệt nghiệm thu.<br>
+• <strong>Tầng 2 (Xây Dựng Cốt Lõi):</strong><br>
+&nbsp;&nbsp;- 🗄️ <code>gw-backend-agy</code> (Backend & DB Specialist) · SQLite WAL, FTS5 catalog, REST API, Task Mutex.<br>
+&nbsp;&nbsp;- 🎨 <code>gw-frontend-agy</code> (Frontend Specialist) · Mission Control SPA UI, CSS Nocturne Slate, State sync.<br>
+• <strong>Tầng 3 (Hạ Tầng & Đóng Gói):</strong> 🚢 <code>gw-devops-agy</code> (DevOps & Packaging) · Docker Compose cờ <code>:z</code>, TUI installer, Desktop shortcut.<br>
+• <strong>Tầng 4 (Kiểm Thẩm & Bảo Vệ):</strong><br>
+&nbsp;&nbsp;- 🧪 <code>gw-qa-agy</code> (QA Tester) · Test tự động, auto-wake 68ms, stress test, nghiệm thu kỹ thuật.<br>
+&nbsp;&nbsp;- 🛡️ <code>gw-security-agy</code> (Security Auditor) · Kiểm toán mã nguồn, bảo vệ Vault, cô lập token OAuth PKCE.<br>
 <br>
-<strong>👥 QUY CÁCH 6 ĐIỀU LỆ QUẢN TRỊ NHÂN SỰ SWARM:</strong><br>
-1. <strong>Đúng việc mới sinh:</strong> Chỉ spawn khi có nhiệm vụ cụ thể chưa ai đảm nhận.<br>
-2. <strong>1 Profile = 1 Identity:</strong> Mỗi worker chạy profile OAuth riêng để không xung đột hạn ngạch (chống lỗi 429).<br>
-3. <strong>Khóa ranh giới 0-Conflict:</strong> Whitelist thư mục được sửa và Blacklist thư mục cấm (lưu trong <code>ROLE.md</code>).<br>
-4. <strong>Khóa độc quyền nhiệm vụ (Task Mutex):</strong> Không cho phép 2 worker cùng nhận 1 task qua <code>/api/task/claim</code>.<br>
-5. <strong>Nghiệm thu bằng chứng:</strong> Phải nộp commit hash hoặc artifact qua <code>/api/task/complete</code> mới được duyệt.<br>
-6. <strong>Vòng đời tiết kiệm:</strong> Tự động ngủ đông (0% CPU, 0MB RAM) khi rảnh rỗi và tự động thu hồi task nếu bị crash.
+<strong>🔄 QUY TRÌNH CÔNG VIỆC CHUẨN 5 GIAI ĐOẠN KHÉP KÍN (5-STAGE SOP):</strong><br>
+1. <strong>Giai đoạn 1: Tiếp nhận Đề bài & Khóa Bất Biến SSOT:</strong> Ghi nguyên văn yêu cầu của Ryan vào <code>docs/SSOT_ORIGINAL_SPEC.md</code> và bảng <code>master_ssot</code>. Cam kết 0% drift.<br>
+2. <strong>Giai đoạn 2: Phân Rã Kiến Trúc & Ký Kết Hợp Đồng I/O:</strong> Tạo Roadmap và Todo DAG với mã phụ thuộc <code>depends_on</code>. Khóa hợp đồng giao diện giữa các bên.<br>
+3. <strong>Giai đoạn 3: Thực Thi Song Song 0-Xung Đột (0-Conflict):</strong> Worker gọi <code>POST /api/task/claim</code> để khóa Task Mutex. Chỉ sửa file trong Whitelist (Allowed Paths).<br>
+4. <strong>Giai đoạn 4: Kiểm Thẩm Hai Lớp & Nghiệm Thu Bằng Chứng:</strong> Security quét bí mật, QA chạy test suite. Worker gọi <code>POST /api/task/complete</code> nộp commit hash hoặc artifact.<br>
+5. <strong>Giai đoạn 5: Đóng Gói Phân Phối & Ngủ Đông Tiết Kiệm:</strong> DevOps build bản release, hệ thống tự động đưa worker về ngủ đông (0% CPU, 0MB RAM) và báo cáo Ryan.<br>
+<br>
+<em>Tài liệu SSOT đầy đủ đã được lưu trữ bất biến tại: <code>docs/STANDARD_SQUAD_AND_WORKFLOW.md</code>.</em>
 """
 
     # 4. Ý định Truy vấn SSOT / Brain / Memory
