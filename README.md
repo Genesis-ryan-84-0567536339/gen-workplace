@@ -40,6 +40,7 @@ gen-workplace/
 ├── assets/
 │   └── icon.svg                 # Biểu tượng nhận diện ứng dụng
 ├── backend/
+│   ├── db.py                    # SQLite 3 WAL Core DB & FTS5 Fast Catalog
 │   └── main.py                  # Control Plane API & CLI Runner
 ├── frontend/
 │   └── index.html               # Giao diện WebApp chuẩn phong cách v1.1
