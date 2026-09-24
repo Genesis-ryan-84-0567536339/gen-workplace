@@ -1169,6 +1169,18 @@ def get_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
                 except Exception:
                     pass
             task_id = r["current_task_id"] if "current_task_id" in r.keys() else ""
+            task_title = ""
+            task_status = "idle"
+            task_roadmap = ""
+            evidence_ref = ""
+            if task_id:
+                cursor.execute("SELECT title, status, roadmap_id, evidence_ref FROM todos WHERE id = ? LIMIT 1", (task_id,))
+                t_row = cursor.fetchone()
+                if t_row:
+                    task_title = t_row["title"]
+                    task_status = t_row["status"]
+                    task_roadmap = t_row["roadmap_id"] or ""
+                    evidence_ref = t_row["evidence_ref"] or ""
 
             results.append({
                 "id": r["id"],
@@ -1190,6 +1202,10 @@ def get_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
                 "allowed_paths": allowed_p,
                 "blocked_paths": blocked_p,
                 "current_task_id": task_id,
+                "task_title": task_title,
+                "task_status": task_status,
+                "task_roadmap": task_roadmap,
+                "evidence_ref": evidence_ref,
                 "attach_cmd": f"docker exec -it gen-workplace-app tmux a -t {r['id']}",
                 "updated_at": r["updated_at"]
             })
