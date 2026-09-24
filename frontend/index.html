@@ -1411,97 +1411,130 @@ button { cursor: pointer; }
 }
 
 /* ═══════════════════════════════════════════════════
-   COGNITIVE STREAM & THINKING TIMELINE VIEW
-   Mô phỏng Dòng Chảy Nhận Thức & Chuỗi Suy Luận AI
+   COGNITIVE REASONING STUDIO — 2-COLUMN SPLIT CANVAS
+   Thiết kế giao diện Mạch Tư Duy chuẩn AI 2026:
+   Trục 5 giai đoạn bên trái + Không gian xem sâu bên phải
    ═══════════════════════════════════════════════════ */
-.thinkingDeckView {
-  padding: 16px;
+.thinkingStudio {
+  display: grid;
+  grid-template-columns: 290px minmax(0, 1fr);
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+}
+.thinkingStepsCol {
+  background: #0d1117;
+  border: 1px solid #1a2332;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.thinkingStepsHead {
+  padding: 10px 14px;
+  background: #111622;
+  border-bottom: 1px solid #1a2332;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+.thinkingStepsList {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.thinkingStepPod {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  background: #111722;
+  border: 1px solid #1a2536;
+  border-left: 3px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+.thinkingStepPod:hover {
+  background: #162030;
+  border-color: #2b3b52;
+  border-left-color: #60a5fa;
+  transform: translateX(2px);
+}
+.thinkingStepPod.active {
+  background: #142234;
+  border-color: #38bdf8;
+  border-left-color: #38bdf8;
+  box-shadow: 0 0 14px rgba(56, 189, 248, 0.18);
+}
+.thinkingPodIcon {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: #1a2538;
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+.thinkingPodInfo {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.thinkingPodTitle {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #f8fafc;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.thinkingPodMeta {
+  font-size: 10px;
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Detail Inspector Column */
+.thinkingDetailCol {
+  background: #0d1117;
+  border: 1px solid #1a2332;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.thinkingDetailHead {
+  padding: 10px 16px;
+  background: #111622;
+  border-bottom: 1px solid #1a2332;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.thinkingDetailBody {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 18px;
   display: flex;
   flex-direction: column;
   gap: 14px;
-  height: 100%;
 }
-.thinkingDeckHead {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-bottom: 12px;
-  border-bottom: 1px solid #1a222e;
-}
-.thinkingTimelineContainer {
-  position: relative;
-  padding-left: 32px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-.thinkingTimelineContainer::before {
-  content: '';
-  position: absolute;
-  top: 16px;
-  bottom: 24px;
-  left: 12px;
-  width: 2px;
-  background: linear-gradient(180deg, #38bdf8 0%, #818cf8 40%, #f59e0b 70%, #34d399 100%);
-  border-radius: 1px;
-}
-.thinkingStepNode {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-}
-.thinkingNodeAnchor {
-  position: absolute;
-  left: -32px;
-  top: 14px;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  background: #0d121a;
-  border: 2px solid #38bdf8;
-  display: grid;
-  place-items: center;
-  font-size: 13px;
-  color: #fff;
-  box-shadow: 0 0 12px rgba(56, 189, 248, 0.45);
-  z-index: 2;
-  transition: all 0.2s ease;
-}
-.thinkingStepNode:hover .thinkingNodeAnchor {
-  transform: scale(1.15);
-  box-shadow: 0 0 18px rgba(56, 189, 248, 0.7);
-}
-.thinkingCard {
-  background: #111620;
-  border: 1px solid #1e2634;
-  border-radius: 10px;
-  padding: 14px 16px;
-  transition: all 0.2s ease;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
-}
-.thinkingCard:hover {
-  background: #141b27;
-  border-color: #3b82f6;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
-}
-.thinkingCardTop {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.thinkingStageTitle {
-  font-size: 13px;
-  font-weight: 700;
-  color: #f8fafc;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
+
 .thinkingStageChip {
   font-size: 9.5px;
   font-family: var(--mono);
@@ -1518,32 +1551,33 @@ button { cursor: pointer; }
 .thinkingStageChip.conclude { background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.35); }
 
 .thinkingThoughtBody {
-  font-size: 12px;
+  font-size: 12.5px;
   color: #cbd5e1;
-  line-height: 1.65;
+  line-height: 1.7;
   background: rgba(0, 0, 0, 0.28);
-  padding: 10px 14px;
-  border-radius: 6px;
+  padding: 14px 16px;
+  border-radius: 8px;
   border-left: 3px solid #38bdf8;
   white-space: pre-wrap;
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 .thinkingToolCallBox {
   background: #080b0f;
   border: 1px solid #1c2534;
-  border-radius: 6px;
-  padding: 9px 12px;
+  border-radius: 8px;
+  padding: 10px 14px;
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 11.5px;
   color: #7dd3fc;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 6px;
 }
 .thinkingToolCallHead {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 10px;
+  font-size: 10.5px;
   color: #64748b;
   border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
   padding-bottom: 5px;
@@ -3260,62 +3294,94 @@ button { cursor: pointer; }
                 </div>
               </div>
 
-              <div class="deckPanel" id="deckPanel-thinking" style="display:none;flex:1;min-height:0;height:100%;overflow-y:auto;padding:16px">
-                <div class="thinkingContainer" style="max-width:960px;margin:0 auto;display:flex;flex-direction:column;gap:14px">
-                  
-                  <!-- Header Thông Số Mạch Tư Duy -->
-                  <div class="card" style="background:#111620;border:1px solid #1f2a3a;border-radius:10px;padding:14px 18px">
-                    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
-                      <div style="display:flex;align-items:center;gap:12px">
-                        <div style="width:38px;height:38px;border-radius:8px;background:rgba(56,189,248,0.12);border:1px solid rgba(56,189,248,0.3);display:grid;place-items:center;font-size:20px" id="thinkingAvatar">🧠</div>
-                        <div>
-                          <div style="display:flex;align-items:center;gap:8px">
-                            <h3 style="margin:0;font-size:14px;color:#fff" id="thinkingTitle">Mạch Tư Duy Nhận Thức (Cognitive Reasoning Stream)</h3>
-                            <span class="chip live" id="thinkingStatusChip" style="font-size:9.5px">● Logic Đã Hội Tụ</span>
-                          </div>
-                          <div style="font-size:11px;color:#94a3b8;margin-top:2px;display:flex;align-items:center;gap:8px">
-                            <span>Chuyên gia: <strong id="thinkingAgentRole" style="color:#f8fafc">Lead Architect</strong></span>
-                            <span>·</span>
-                            <span>Phiên: <code id="thinkingAgentSid" style="color:#38bdf8">gw-lead-agy</code></span>
-                            <span>·</span>
-                            <span>Mạch: <code id="thinkingAgentConv" style="color:#5eead4">conv-lead-architect</code></span>
-                          </div>
+              <div class="deckPanel" id="deckPanel-thinking" style="display:none;flex-direction:column;flex:1;min-height:0;height:100%;overflow:hidden;padding:12px;gap:10px">
+                <!-- Thanh Toolbar Nhận Thức Tinh Gọn -->
+                <div style="background:#111622;border:1px solid #1a2332;border-radius:8px;padding:8px 14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;flex-shrink:0">
+                  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:11px">
+                    <div style="display:flex;align-items:center;gap:6px">
+                      <span style="font-size:14px">🧠</span>
+                      <strong style="color:#f8fafc;font-size:12px" id="thinkingTitle">Chuỗi Suy Luận Nhận Thức</strong>
+                      <span class="chip live" id="thinkingStatusChip" style="font-size:9px;padding:1px 6px">● Logic Đã Hội Tụ</span>
+                    </div>
+                    <span style="color:#334155">|</span>
+                    <span style="color:#94a3b8">Model: <strong style="color:#38bdf8" id="thinkingModelName">Gemini 3.8 Flash</strong></span>
+                    <span style="color:#334155">·</span>
+                    <span style="color:#94a3b8">Latency: <code style="color:#4ade80;font-family:var(--mono)" id="thinkingLatency">184ms</code></span>
+                    <span style="color:#334155">·</span>
+                    <span style="color:#94a3b8">Tokens: <code style="color:#facc15;font-family:var(--mono)" id="thinkingTokens">1,428</code></span>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:6px">
+                    <button class="btn small" onclick="copyThinkingTrace()" title="Sao chép toàn bộ chuỗi suy luận">📋 Sao chép</button>
+                    <button class="btn small primary" onclick="simulateLiveThinking()" id="btnSimulateThinking" title="Kích hoạt mô phỏng dòng suy nghĩ thời gian thực">⚡ Tái suy luận (Stream)</button>
+                  </div>
+                </div>
+
+                <!-- BỐ CỤC 2 CỘT: TRỤC GIAI ĐOẠN (290px) + KHÔNG GIAN SUY LUẬN SÂU (FLEX 1) -->
+                <div class="thinkingStudio">
+                  <!-- Cột Trái (290px): Trục 5 Giai Đoạn Nhận Thức -->
+                  <div class="thinkingStepsCol">
+                    <div class="thinkingStepsHead">
+                      <span style="font-size:10.5px;font-weight:700;color:#7da8ff;text-transform:uppercase;letter-spacing:0.5px">Trục 5 Giai Đoạn</span>
+                      <span class="badge" style="font-size:9px;background:#1e293b;color:#38bdf8">5/5 Hoàn tất</span>
+                    </div>
+                    <div class="thinkingStepsList" id="thinkingStepsList">
+                      <!-- Render dynamically -->
+                    </div>
+                  </div>
+
+                  <!-- Cột Phải (Flex 1): Deep Reasoning Inspector -->
+                  <div class="thinkingDetailCol">
+                    <div class="thinkingDetailHead">
+                      <div style="display:flex;align-items:center;gap:8px">
+                        <span id="thinkingInspectorIcon" style="font-size:16px">🎯</span>
+                        <strong id="thinkingInspectorTitle" style="font-size:12.5px;color:#fff">Giai đoạn 01 · Phân Rã Mục Tiêu & Đặc Tả SSOT</strong>
+                        <span class="thinkingStageChip goal" id="thinkingInspectorChip">MỤC TIÊU VAI TRÒ</span>
+                      </div>
+                      <div style="display:flex;align-items:center;gap:8px">
+                        <span class="chip done" style="font-size:9px">✓ ĐÃ HỘI TỤ</span>
+                        <span style="font-family:var(--mono);font-size:10px;color:#94a3b8" id="thinkingInspectorDuration">+28ms</span>
+                      </div>
+                    </div>
+
+                    <div class="thinkingDetailBody">
+                      <!-- Khối 1: Dòng Suy Nghĩ Nội Tâm -->
+                      <div style="display:flex;flex-direction:column;gap:6px">
+                        <span style="font-size:10px;font-weight:700;color:#7da8ff;text-transform:uppercase;letter-spacing:0.5px">💡 Dòng Suy Nghĩ Nội Tâm (Agent Internal Monologue)</span>
+                        <div class="thinkingThoughtBody" id="thinkingInspectorThought">
+                          Đang tải dữ liệu suy luận...
                         </div>
                       </div>
 
-                      <!-- Action Tools -->
-                      <div style="display:flex;align-items:center;gap:8px">
-                        <button class="btn small" onclick="copyThinkingTrace()" title="Sao chép toàn bộ chuỗi suy luận">📋 Sao chép</button>
-                        <button class="btn small primary" onclick="simulateLiveThinking()" id="btnSimulateThinking" title="Kích hoạt mô phỏng dòng suy nghĩ thời gian thực">⚡ Tái suy luận (Stream)</button>
+                      <!-- Khối 2: Công Cụ & Lệnh Thực Thi Kèm Theo -->
+                      <div id="thinkingInspectorToolBox" style="display:none;flex-direction:column;gap:6px">
+                        <span style="font-size:10px;font-weight:700;color:#f59e0b;text-transform:uppercase;letter-spacing:0.5px">🛠️ Thao Tác Công Cụ Thực Thi (Tool Call & Evidence)</span>
+                        <div class="thinkingToolCallBox">
+                          <div class="thinkingToolCallHead">
+                            <span>Lệnh điều hành thực thi</span>
+                            <span style="color:#4ade80">● Status 200 OK</span>
+                          </div>
+                          <div id="thinkingInspectorToolCmd" style="color:#cbd5e1;font-weight:600">$ --</div>
+                          <div id="thinkingInspectorToolOutput" style="color:#64748b;font-size:10px;background:rgba(0,0,0,0.4);padding:5px 8px;border-radius:4px;overflow-x:auto">--</div>
+                        </div>
                       </div>
-                    </div>
 
-                    <!-- Quick Metrics Strip -->
-                    <div style="margin-top:12px;padding-top:10px;border-top:1px dashed rgba(255,255,255,0.08);display:flex;align-items:center;gap:16px;flex-wrap:wrap;font-size:11px">
-                      <div style="display:flex;align-items:center;gap:5px;color:#94a3b8">
-                        <span>🧠 Mô hình:</span>
-                        <span style="color:#38bdf8;font-weight:600" id="thinkingModelName">Gemini 3.8 Flash (Thinking 32k)</span>
+                      <!-- Khối 3: Thẩm Định Ranh Giới An Toàn -->
+                      <div style="display:flex;flex-direction:column;gap:6px;margin-top:auto;padding-top:10px;border-top:1px dashed rgba(255,255,255,0.08)">
+                        <span style="font-size:10px;font-weight:700;color:#34d399;text-transform:uppercase;letter-spacing:0.5px">🛡️ Thẩm Định Ranh Giới Bảo Mật (Safety Verification)</span>
+                        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11px;background:rgba(52,211,153,0.06);border:1px solid rgba(52,211,153,0.2);padding:8px 12px;border-radius:6px">
+                          <span style="color:#cbd5e1" id="thinkingInspectorSafety">🛡️ Ranh giới Whitelist: Tuân thủ 100% · Không conflict</span>
+                          <span style="color:#34d399;font-weight:700;font-family:var(--mono)">VERIFIED</span>
+                        </div>
                       </div>
-                      <div style="display:flex;align-items:center;gap:5px;color:#94a3b8">
-                        <span>⏱️ Latency:</span>
-                        <span style="color:#4ade80;font-family:var(--mono);font-weight:600" id="thinkingLatency">184ms</span>
-                      </div>
-                      <div style="display:flex;align-items:center;gap:5px;color:#94a3b8">
-                        <span>⚡ Thinking Tokens:</span>
-                        <span style="color:#facc15;font-family:var(--mono);font-weight:600" id="thinkingTokens">1,428 tokens</span>
-                      </div>
-                      <div style="display:flex;align-items:center;gap:5px;color:#94a3b8">
-                        <span>🛡️ Safety Verification:</span>
-                        <span style="color:#34d399;font-weight:600">PASS (0 Conflict)</span>
+
+                      <!-- Thanh Điều Hướng Bước Chân Trang -->
+                      <div style="display:flex;align-items:center;justify-content:space-between;padding-top:8px">
+                        <button class="btn small" onclick="stepThinkingPrev()" id="btnThinkingPrev">← Giai đoạn trước</button>
+                        <span style="font-size:10.5px;color:#94a3b8" id="thinkingStepIndicator">Giai đoạn 1 / 5</span>
+                        <button class="btn small" onclick="stepThinkingNext()" id="btnThinkingNext">Giai đoạn kế tiếp →</button>
                       </div>
                     </div>
                   </div>
-
-                  <!-- Timeline Mạch Suy Luận Dọc (Cognitive Chain Timeline) -->
-                  <div class="thinkingTimelineContainer" id="thinkingCardList">
-                    <!-- Dynamically rendered -->
-                  </div>
-
                 </div>
               </div>
 
@@ -5322,25 +5388,18 @@ async function sendWbTmuxCmd() {
   }
 }
 
-function renderThinkingCards() {
-  const list = $('thinkingCardList');
-  if (!list) return;
+let currentThinkingStepsData = [];
 
+function renderThinkingCards() {
   const current = state.tmuxSessions.find(s => s.id === state.selectedTmuxSessionId) || state.tmuxSessions[0];
   const sid = current ? current.id : 'gw-lead-agy';
   const roleName = current ? current.role_name : 'Lead Architect';
-  const avatar = ROLE_AVATARS[sid] || '🧠';
-  const convId = current?.conversation_id || ('conv-' + sid);
 
-  // Update Header Elements
-  if ($('thinkingAvatar')) $('thinkingAvatar').textContent = avatar;
-  if ($('thinkingTitle')) $('thinkingTitle').textContent = `Mạch Tư Duy Nhận Thức · ${roleName}`;
-  if ($('thinkingAgentRole')) $('thinkingAgentRole').textContent = roleName;
-  if ($('thinkingAgentSid')) $('thinkingAgentSid').textContent = sid;
-  if ($('thinkingAgentConv')) $('thinkingAgentConv').textContent = convId;
-  if ($('thinkingModelName')) $('thinkingModelName').textContent = current?.quota_gemini ? 'Gemini 3.8 Flash (Thinking 32k)' : 'Claude Sonnet 4.6 (Extended Thinking)';
-  if ($('thinkingLatency')) $('thinkingLatency').textContent = (Math.floor(Math.random() * 80) + 140) + 'ms';
-  if ($('thinkingTokens')) $('thinkingTokens').textContent = (Math.floor(Math.random() * 300) + 1350).toLocaleString() + ' tokens';
+  // Update Toolbar Elements
+  if ($('thinkingTitle')) $('thinkingTitle').textContent = `Mạch Tư Duy · ${roleName}`;
+  if ($('thinkingModelName')) $('thinkingModelName').textContent = current?.quota_gemini ? 'Gemini 3.8 Flash' : 'Claude Sonnet 4.6';
+  if ($('thinkingLatency')) $('thinkingLatency').textContent = (Math.floor(Math.random() * 50) + 150) + 'ms';
+  if ($('thinkingTokens')) $('thinkingTokens').textContent = (Math.floor(Math.random() * 200) + 1400).toLocaleString();
 
   const THINKING_DATA = {
     'gw-lead-agy': [
@@ -5646,35 +5705,99 @@ function renderThinkingCards() {
   };
 
   const steps = THINKING_DATA[sid] || THINKING_DATA['gw-lead-agy'];
+  currentThinkingStepsData = steps;
 
-  list.innerHTML = steps.map((s, idx) => `
-    <div class="thinkingStepNode" id="thinkingNode-${idx}">
-      <div class="thinkingNodeAnchor">${s.anchor}</div>
-      <div class="thinkingCard">
-        <div class="thinkingCardTop">
-          <div class="thinkingStageTitle">
-            <span class="thinkingStageChip ${s.stage}">${escapeHtml(s.stageLabel)}</span>
-            <span>${escapeHtml(s.title)}</span>
-          </div>
-          <div style="display:flex;align-items:center;gap:6px">
-            <span class="chip done" style="font-size:9px;font-family:var(--mono)">✓ ĐÃ XÁC THỰC</span>
-            <span style="font-family:var(--mono);font-size:10px;color:#94a3b8">${escapeHtml(s.duration)}</span>
-          </div>
-        </div>
-        <div class="thinkingThoughtBody">${escapeHtml(s.thought)}</div>
-        ${s.tool_call ? `
-          <div class="thinkingToolCallBox">
-            <div class="thinkingToolCallHead">
-              <span>🛠️ Tool Call: Executed</span>
-              <span style="color:#4ade80">● 200 OK</span>
+  if (typeof state.selectedThinkingStepIndex !== 'number' || state.selectedThinkingStepIndex >= steps.length) {
+    state.selectedThinkingStepIndex = 0;
+  }
+
+  // 1. Render Left Column (Trục 5 Giai Đoạn Pods)
+  const listEl = $('thinkingStepsList');
+  if (listEl) {
+    listEl.innerHTML = steps.map((s, idx) => {
+      const isActive = idx === state.selectedThinkingStepIndex;
+      const rawTitle = s.title.includes('·') ? s.title.split('·')[1].trim() : s.title;
+      return `
+        <div class="thinkingStepPod ${isActive ? 'active' : ''}" onclick="selectThinkingStep(${idx})">
+          <div class="thinkingPodIcon">${s.anchor}</div>
+          <div class="thinkingPodInfo">
+            <div class="thinkingPodTitle">${escapeHtml(rawTitle)}</div>
+            <div class="thinkingPodMeta">
+              <span class="thinkingStageChip ${s.stage}" style="font-size:8px;padding:1px 5px">${escapeHtml(s.stageLabel)}</span>
+              <span style="font-family:var(--mono);color:#94a3b8">${escapeHtml(s.duration)}</span>
             </div>
-            <div style="color:#cbd5e1;font-weight:600">$ ${escapeHtml(s.tool_call.cmd)}</div>
-            <div style="color:#64748b;font-size:10px;background:rgba(0,0,0,0.4);padding:4px 8px;border-radius:4px;overflow-x:auto">${escapeHtml(s.tool_call.output)}</div>
           </div>
-        ` : ''}
-      </div>
-    </div>
-  `).join('');
+          <span style="color:#22c55e;font-size:11px;font-weight:700">✓</span>
+        </div>
+      `;
+    }).join('');
+  }
+
+  // 2. Render Right Column (Detail Inspector cho bước đang chọn)
+  renderThinkingDetail(state.selectedThinkingStepIndex);
+}
+
+function selectThinkingStep(idx) {
+  state.selectedThinkingStepIndex = idx;
+  document.querySelectorAll('.thinkingStepPod').forEach((el, i) => {
+    el.classList.toggle('active', i === idx);
+  });
+  renderThinkingDetail(idx);
+}
+
+function renderThinkingDetail(idx) {
+  const steps = currentThinkingStepsData;
+  if (!steps || !steps[idx]) return;
+  const s = steps[idx];
+
+  if ($('thinkingInspectorIcon')) $('thinkingInspectorIcon').textContent = s.anchor;
+  if ($('thinkingInspectorTitle')) $('thinkingInspectorTitle').textContent = s.title;
+  if ($('thinkingInspectorChip')) {
+    $('thinkingInspectorChip').textContent = s.stageLabel;
+    $('thinkingInspectorChip').className = `thinkingStageChip ${s.stage}`;
+  }
+  if ($('thinkingInspectorDuration')) $('thinkingInspectorDuration').textContent = s.duration;
+  if ($('thinkingInspectorThought')) $('thinkingInspectorThought').textContent = s.thought;
+
+  // Tool Call box
+  const toolBox = $('thinkingInspectorToolBox');
+  if (toolBox) {
+    if (s.tool_call) {
+      toolBox.style.display = 'flex';
+      if ($('thinkingInspectorToolCmd')) $('thinkingInspectorToolCmd').textContent = '$ ' + s.tool_call.cmd;
+      if ($('thinkingInspectorToolOutput')) $('thinkingInspectorToolOutput').textContent = s.tool_call.output;
+    } else {
+      toolBox.style.display = 'none';
+    }
+  }
+
+  // Safety boundary
+  if ($('thinkingInspectorSafety')) {
+    $('thinkingInspectorSafety').textContent = `🛡️ Ranh giới Whitelist: Tuân thủ 100% · Không conflict (${s.stageLabel})`;
+  }
+
+  // Footer navigation
+  if ($('thinkingStepIndicator')) {
+    $('thinkingStepIndicator').textContent = `Giai đoạn ${idx + 1} / ${steps.length}`;
+  }
+  if ($('btnThinkingPrev')) {
+    $('btnThinkingPrev').disabled = idx <= 0;
+  }
+  if ($('btnThinkingNext')) {
+    $('btnThinkingNext').disabled = idx >= steps.length - 1;
+  }
+}
+
+function stepThinkingPrev() {
+  if (state.selectedThinkingStepIndex > 0) {
+    selectThinkingStep(state.selectedThinkingStepIndex - 1);
+  }
+}
+
+function stepThinkingNext() {
+  if (state.selectedThinkingStepIndex < currentThinkingStepsData.length - 1) {
+    selectThinkingStep(state.selectedThinkingStepIndex + 1);
+  }
 }
 
 function simulateLiveThinking() {
@@ -5682,43 +5805,31 @@ function simulateLiveThinking() {
   const chip = $('thinkingStatusChip');
   if (btn) {
     btn.disabled = true;
-    btn.textContent = '⏳ Đang tổng hợp suy luận...';
+    btn.textContent = '⏳ Đang tổng hợp...';
   }
   if (chip) {
     chip.textContent = '⚡ Đang suy luận trực tiếp...';
-    chip.className = 'chip live';
-    chip.style.background = 'rgba(234, 179, 8, 0.2)';
     chip.style.color = '#facc15';
-    chip.style.borderColor = 'rgba(234, 179, 8, 0.4)';
   }
 
-  const nodes = document.querySelectorAll('.thinkingStepNode');
-  nodes.forEach(n => { n.style.opacity = '0.3'; n.style.transform = 'translateY(4px)'; });
-
-  let cur = 0;
-  const interval = setInterval(() => {
-    if (cur < nodes.length) {
-      nodes[cur].style.transition = 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)';
-      nodes[cur].style.opacity = '1';
-      nodes[cur].style.transform = 'translateY(0)';
-      nodes[cur].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      cur++;
+  let idx = 0;
+  const timer = setInterval(() => {
+    if (idx < currentThinkingStepsData.length) {
+      selectThinkingStep(idx);
+      idx++;
     } else {
-      clearInterval(interval);
+      clearInterval(timer);
       if (btn) {
         btn.disabled = false;
         btn.textContent = '⚡ Tái suy luận (Stream)';
       }
       if (chip) {
         chip.textContent = '● Logic Đã Hội Tụ';
-        chip.className = 'chip live';
-        chip.style.background = '';
         chip.style.color = '';
-        chip.style.borderColor = '';
       }
-      showToast('Mạch tư duy đã hoàn tất chuỗi suy luận 5 bước!');
+      showToast('Đã hoàn tất duyệt chuỗi suy luận 5 giai đoạn!');
     }
-  }, 220);
+  }, 450);
 }
 
 function copyThinkingTrace() {
@@ -5726,13 +5837,15 @@ function copyThinkingTrace() {
   const sid = current ? current.id : 'gw-lead-agy';
   const roleName = current ? current.role_name : 'Lead Architect';
   
-  const cards = document.querySelectorAll('.thinkingStepNode');
   let fullText = `=== MẠCH TƯ DUY NHẬN THỨC · ${roleName} (${sid}) ===\nThời gian: ${new Date().toLocaleString()}\n\n`;
-  
-  cards.forEach((card, i) => {
-    const title = card.querySelector('.thinkingStageTitle')?.textContent?.trim() || `Bước ${i+1}`;
-    const body = card.querySelector('.thinkingThoughtBody')?.textContent?.trim() || '';
-    fullText += `[${i+1}] ${title}\n${body}\n\n`;
+  (currentThinkingStepsData || []).forEach((s, i) => {
+    fullText += `[Giai đoạn ${i+1}] ${s.title} (${s.stageLabel})\n`;
+    fullText += `Thời gian: ${s.duration}\n`;
+    fullText += `Suy nghĩ: ${s.thought}\n`;
+    if (s.tool_call) {
+      fullText += `Lệnh thực thi: $ ${s.tool_call.cmd}\nKết quả: ${s.tool_call.output}\n`;
+    }
+    fullText += `\n----------------------------------------\n\n`;
   });
 
   if (navigator.clipboard) {
