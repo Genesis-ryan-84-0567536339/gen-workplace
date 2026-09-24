@@ -1085,23 +1085,24 @@ button { cursor: pointer; }
   flex-wrap: wrap;
 }
 
-/* 6 Thẻ Hồ Sơ Chuyên Gia (Expert Squad Cards Grid - 3 Cột x 2 Hàng Thoáng Rộng Chuẩn Quản Trị) */
+/* 6 Thẻ Hồ Sơ Chuyên Gia (Expert Squad Cards - Danh Sách Cột Trái Chuẩn Cockpit) */
 .expertSquadGrid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-  margin-bottom: 16px;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;
+  margin-bottom: 0 !important;
 }
-@media (max-width: 1200px) {
-  .expertSquadGrid {
-    grid-template-columns: repeat(2, 1fr);
-  }
+.cockpitDetailPane.commandDeck {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  border-radius: var(--radius);
 }
-@media (max-width: 720px) {
-  .expertSquadGrid {
-    grid-template-columns: 1fr;
-  }
-}
+.commandDeckHead { flex-shrink: 0; }
+.deckGovernanceBar { flex-shrink: 0; }
+.commandDeckNav { flex-shrink: 0; }
+.deckPanel { flex: 1; overflow-y: auto; }
 
 .expertCard {
   background: #10141b;
@@ -2347,6 +2348,104 @@ button { cursor: pointer; }
     grid-template-columns: 1fr;
   }
 }
+
+/* ========================================================================= */
+/* UNIFIED MASTER COCKPIT FRAMEWORK (1 CHỈNH THỂ TOÀN CỤC) */
+/* ========================================================================= */
+.cockpitShell {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: 14px;
+  height: calc(100vh - 125px);
+  min-height: 560px;
+}
+.cockpitListPane {
+  background: #11151b;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  height: 100%;
+}
+.cockpitDetailPane {
+  background: #11151b;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  height: 100%;
+}
+.cockpitPaneHeader {
+  padding: 10px 14px;
+  background: #141922;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 44px;
+  flex-shrink: 0;
+}
+.cockpitPaneTitle {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #f1f5f9;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+.cockpitPaneScroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cockpitDetailTabs {
+  display: flex;
+  background: #141922;
+  border-bottom: 1px solid var(--line);
+  padding: 0 10px;
+  gap: 3px;
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+.cockpitTabBtn {
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  font-size: 11px;
+  padding: 10px 12px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+.cockpitTabBtn:hover { color: #edf1f5; }
+.cockpitTabBtn.active {
+  color: #38bdf8;
+  border-bottom-color: #38bdf8;
+  font-weight: 600;
+}
+.cockpitDetailBody {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+}
+@media (max-width: 1024px) {
+  .cockpitShell {
+    grid-template-columns: 1fr;
+    height: auto;
+    overflow: visible;
+  }
+}
 </style>
 </head>
 <body>
@@ -2840,13 +2939,20 @@ button { cursor: pointer; }
           </div>
         </div>
 
-        <div id="swarmBody">
-          <!-- Expert Squad Grid -->
-          <div class="expertSquadGrid" id="expertSquadGrid"></div>
+        <!-- BỐ CỤC 2 CỘT CHỈNH THỂ: 320px PODS TRÁI + FLEX 1 WORKBENCH PHẢI -->
+        <div class="cockpitShell" id="swarmBody">
+          <!-- Cột Trái: 6 Pods Chuyên Gia -->
+          <div class="cockpitListPane">
+            <div class="cockpitPaneHeader">
+              <span class="cockpitPaneTitle">🚀 Ban Chỉ Huy Swarm</span>
+              <span class="badge" style="font-size:9.5px;background:#1e293b;color:#38bdf8">6 Pods Online</span>
+            </div>
+            <div class="cockpitPaneScroll expertSquadGrid" id="expertSquadGrid"></div>
+          </div>
 
-            <!-- Command Deck -->
-            <div class="commandDeck" id="commandDeck">
-              <div class="commandDeckHead">
+          <!-- Cột Phải: Command Deck & Live Workbench -->
+          <div class="cockpitDetailPane commandDeck" id="commandDeck">
+            <div class="commandDeckHead">
                 <div class="deckSelectedAgentInfo">
                   <div class="deckAvatar" id="deckAgentAvatar">👑</div>
                   <div class="deckTitleBlock">
@@ -3221,49 +3327,66 @@ button { cursor: pointer; }
           </div>
         </div>
 
-        <!-- 4 Stats Cards -->
-        <div class="overviewStats" id="dashStatsCard">
-          <div class="stat"><b id="ovProjects">1</b><span>Dự án chính thức</span></div>
-          <div class="stat"><b id="ovRoadmap">5</b><span>Mục Roadmap</span></div>
-          <div class="stat"><b id="ovTodo">13</b><span>Todo tasks</span></div>
-          <div class="stat"><b id="ovActive">6</b><span>Runtimes online</span></div>
-        </div>
-
-        <div class="projectDashboard" id="dashProjectsCard">
-          <div class="card">
-            <div class="cardHead">
-              <strong>Các project đang quản trị</strong>
-              <span class="hint">chọn project để nạp workspace riêng</span>
+        <!-- BỐ CỤC 2 CỘT CHỈNH THỂ: 320px CHỈ SỐ TRÁI + FLEX 1 TIẾN TRÌNH PHẢI -->
+        <div class="cockpitShell">
+          <!-- Cột Trái: Chỉ số & Danh sách Workspace -->
+          <div class="cockpitListPane">
+            <div class="cockpitPaneHeader">
+              <span class="cockpitPaneTitle">📊 Chỉ Số & Dự Án</span>
+              <span class="badge" style="font-size:9.5px;background:#1e293b;color:#4ade80">Active</span>
             </div>
-            <div class="cardBody" id="dashboardProjectList"></div>
-          </div>
-
-          <div class="card">
-            <div class="cardHead">
-              <div>
-                <strong>Project đang chọn</strong>
-                <div class="hint" id="dashboardSelectedMeta">/workspace/LinuxDataA/gen-workplace</div>
+            <div class="cockpitPaneScroll">
+              <!-- 4 Stats Cards 2x2 -->
+              <div class="overviewStats" id="dashStatsCard" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px">
+                <div class="stat" style="padding:10px"><b id="ovProjects" style="font-size:16px">1</b><span style="font-size:10px">Dự án</span></div>
+                <div class="stat" style="padding:10px"><b id="ovRoadmap" style="font-size:16px">5</b><span style="font-size:10px">Roadmap</span></div>
+                <div class="stat" style="padding:10px"><b id="ovTodo" style="font-size:16px">13</b><span style="font-size:10px">Todo tasks</span></div>
+                <div class="stat" style="padding:10px"><b id="ovActive" style="font-size:16px">6</b><span style="font-size:10px">Runtimes</span></div>
               </div>
-              <span class="chip live">LIVE REPO</span>
-            </div>
-            <div class="cardBody" id="dashboardSelected"></div>
-          </div>
-        </div>
 
-        <div class="overviewMain" id="dashProgressCard">
-          <div class="card">
-            <div class="cardHead">
-              <strong>Tiến trình thực thi Swarm</strong>
-              <span class="chip live">TRỰC TIẾP</span>
+              <!-- Danh mục dự án -->
+              <div class="card" id="dashProjectsCard" style="border:none;background:transparent">
+                <div style="font-size:10.5px;text-transform:uppercase;color:var(--muted2);font-weight:700;margin-bottom:8px">Dự án đang quản trị</div>
+                <div id="dashboardProjectList"></div>
+              </div>
             </div>
-            <div class="cardBody" id="overviewSteps"></div>
           </div>
-          <div class="card">
-            <div class="cardHead">
-              <strong>Agent Roles đang giữ việc</strong>
-              <span class="hint">theo runtime</span>
+
+          <!-- Cột Phải: Workspace Detail & Tiến Trình Swarm -->
+          <div class="cockpitDetailPane">
+            <div class="cockpitPaneHeader">
+              <span class="cockpitPaneTitle">📁 Chi Tiết Workspace & Tiến Trình Thực Thi</span>
+              <span class="chip live" style="font-size:9.5px">LIVE REPO</span>
             </div>
-            <div class="cardBody" id="overviewAgents"></div>
+            <div class="cockpitDetailBody" style="gap:12px">
+              <div class="card" style="margin-bottom:0">
+                <div class="cardHead">
+                  <div>
+                    <strong>Project đang chọn: gen-workplace</strong>
+                    <div class="hint" id="dashboardSelectedMeta">/workspace/LinuxDataA/gen-workplace</div>
+                  </div>
+                  <span class="chip done">Branch main · Clean</span>
+                </div>
+                <div class="cardBody" id="dashboardSelected"></div>
+              </div>
+
+              <div class="overviewMain" id="dashProgressCard" style="grid-template-columns:1fr 1fr;gap:12px;display:grid">
+                <div class="card" style="margin-bottom:0">
+                  <div class="cardHead">
+                    <strong>Tiến trình thực thi Swarm</strong>
+                    <span class="chip live">TRỰC TIẾP</span>
+                  </div>
+                  <div class="cardBody" id="overviewSteps"></div>
+                </div>
+                <div class="card" style="margin-bottom:0">
+                  <div class="cardHead">
+                    <strong>Agent Roles đang giữ việc</strong>
+                    <span class="hint">theo runtime</span>
+                  </div>
+                  <div class="cardBody" id="overviewAgents"></div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -3284,87 +3407,91 @@ button { cursor: pointer; }
           </div>
         </div>
 
-        <div class="memoryGrid" id="memGridCard">
-          <!-- Cột 1: Memory Tổng (SSOT Toàn Dự Án) -->
-          <div class="card">
-            <div class="cardHead">
-              <div>
-                <strong>Memory Tổng · Master SSOT Toàn Dự Án</strong>
-                <div class="hint">nguồn tham chiếu bắt buộc của mọi runtime trong tiến trình công việc</div>
+        <!-- BỐ CỤC 2 CỘT CHỈNH THỂ: 320px TRA CỨU TRÁI + FLEX 1 BỘ NHỚ SSOT PHẢI -->
+        <div class="cockpitShell">
+          <!-- Cột Trái: Tra cứu nhanh ID FTS5 & Sự kiện chờ thẩm định -->
+          <div class="cockpitListPane">
+            <div class="cockpitPaneHeader">
+              <span class="cockpitPaneTitle">⚡ Tra Cứu Nhanh & Sự Kiện</span>
+              <span class="badge" style="font-size:9.5px;background:#1e293b;color:#38bdf8">FTS5 Engine</span>
+            </div>
+            <div class="cockpitPaneScroll">
+              <!-- Bảng Catalog Tra Cứu Nhanh ID Toàn Cục -->
+              <div class="card memoryIndex" id="memCatalogCard" style="border:none;background:transparent;padding:0">
+                <div style="font-size:10.5px;font-weight:700;color:#f1f5f9;margin-bottom:6px">Tra cứu nhanh ID (Catalog)</div>
+                <div class="indexToolbar" style="margin-bottom:8px">
+                  <input class="searchBox" placeholder="Tìm mã ID, sự kiện, vault, mcp tool, file..." oninput="filterRefs(this.value)">
+                </div>
+                <div style="max-height:220px;overflow-y:auto;border:1px solid var(--line);border-radius:6px">
+                  <table class="eventTable" style="margin:0">
+                    <thead>
+                      <tr>
+                        <th>Mã ID</th>
+                        <th>Loại</th>
+                        <th>Target</th>
+                      </tr>
+                    </thead>
+                    <tbody id="refRows"></tbody>
+                  </table>
+                </div>
               </div>
+
+              <!-- Event Register: Bảng Xác Thực Sự Kiện -->
+              <div class="card" id="memEventCard" style="border:none;background:transparent;padding:0;margin-top:10px">
+                <div style="font-size:10.5px;font-weight:700;color:#f1f5f9;margin-bottom:6px">Sự kiện chờ thẩm định (Events)</div>
+                <div style="max-height:220px;overflow-y:auto;border:1px solid var(--line);border-radius:6px">
+                  <table class="eventTable" style="margin:0">
+                    <thead>
+                      <tr>
+                        <th>ID</th>
+                        <th>Role</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody id="eventRows"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Cột Phải: Không Gian Bộ Nhớ SSOT (Master SSOT Facts & Role Memory) -->
+          <div class="cockpitDetailPane">
+            <div class="cockpitPaneHeader">
+              <span class="cockpitPaneTitle">🧠 Bộ Nhớ SSOT Toàn Dự Án & Memory Từng Role</span>
               <span class="chip done" id="ssotCount">4 verified</span>
             </div>
-            <div class="cardBody">
-              <div class="ssotList" id="ssotList"></div>
-            </div>
-          </div>
+            <div class="cockpitDetailBody" style="gap:14px">
+              <div class="memoryGrid" id="memGridCard" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:0">
+                <!-- Cột 1: Memory Tổng (SSOT Toàn Dự Án) -->
+                <div class="card" style="margin-bottom:0">
+                  <div class="cardHead">
+                    <div>
+                      <strong>Master SSOT Toàn Dự Án</strong>
+                      <div class="hint">nguồn tham chiếu bắt buộc của mọi runtime</div>
+                    </div>
+                  </div>
+                  <div class="cardBody">
+                    <div class="ssotList" id="ssotList"></div>
+                  </div>
+                </div>
 
-          <!-- Cột 2: Memory Từng Role (Sync Realtime) -->
-          <div class="card">
-            <div class="cardHead">
-              <div>
-                <strong>Memory Từng Role</strong>
-                <div class="hint">sync từ memory của từng role runtime đang chạy</div>
+                <!-- Cột 2: Memory Từng Role (Sync Realtime) -->
+                <div class="card" style="margin-bottom:0">
+                  <div class="cardHead">
+                    <div>
+                      <strong>Memory Từng Role</strong>
+                      <div class="hint">đồng bộ trực tiếp từ các phiên runtime</div>
+                    </div>
+                    <span class="hint">6 roles</span>
+                  </div>
+                  <div class="cardBody">
+                    <div class="memoryList" id="roleMemoryList"></div>
+                    <div class="memoryDetail" id="memoryDetail"></div>
+                  </div>
+                </div>
               </div>
-              <span class="hint">6 roles</span>
             </div>
-            <div class="cardBody">
-              <div class="memoryList" id="roleMemoryList"></div>
-              <div class="memoryDetail" id="memoryDetail"></div>
-            </div>
-          </div>
-
-          <!-- Bảng Catalog Tra Cứu Nhanh ID Toàn Cục (Không cần audit toàn cục) -->
-          <div class="card memoryIndex" id="memCatalogCard">
-            <div class="cardHead">
-              <div>
-                <strong>Catalog Tra Cứu Nhanh ID Dữ Kiện (Quick ID Lookup Database)</strong>
-                <div class="hint">Nơi agent tra nhanh ID để lấy dữ kiện database / mã nguồn mà không cần audit toàn cục mỗi phiên</div>
-              </div>
-              <span class="hint">Event · Vault · MCP · Tool · Credential · File · DB</span>
-            </div>
-            <div class="cardBody">
-              <div class="indexToolbar">
-                <input class="searchBox" placeholder="Tìm mã ID, tên sự kiện, vault, mcp tool, file..." oninput="filterRefs(this.value)">
-              </div>
-              <table class="eventTable">
-                <thead>
-                  <tr>
-                    <th>Mã ID</th>
-                    <th>Phân loại</th>
-                    <th>Đối tượng / Khóa Target</th>
-                    <th>Mô tả ngắn & Dữ kiện trọng yếu</th>
-                  </tr>
-                </thead>
-                <tbody id="refRows"></tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
-        <!-- Event Register: Nơi Lead thẩm định sự kiện đã xác thực -->
-        <div class="card sectionCard" id="memEventCard">
-          <div class="cardHead">
-            <div>
-              <strong>Event Register · Bảng Xác Thực Sự Kiện</strong>
-              <div class="hint">Trưởng nhóm thẩm định evidence: xác thực nâng thành SSOT hoặc yêu cầu Role làm rõ.</div>
-            </div>
-            <span class="hint">nguồn sự thật trước khi commit vào Master Memory</span>
-          </div>
-          <div class="cardBody">
-            <table class="eventTable">
-              <thead>
-                <tr>
-                  <th>Event ID</th>
-                  <th>Runtime / Role</th>
-                  <th>Yêu cầu / Kết luận</th>
-                  <th>Evidence</th>
-                  <th>Trạng thái</th>
-                  <th>Hành động</th>
-                </tr>
-              </thead>
-              <tbody id="eventRows"></tbody>
-            </table>
           </div>
         </div>
       </section>
@@ -3383,12 +3510,39 @@ button { cursor: pointer; }
           </div>
         </div>
 
-        <div class="dataTabs">
-          <button class="dataTab active" onclick="switchData('repo', this)">Repo & Worktrees</button>
-          <button class="dataTab" onclick="switchData('db', this)">Database Explorer</button>
-          <button class="dataTab" onclick="switchData('vault', this)">Vault & Secrets</button>
-          <button class="dataTab" onclick="switchData('files', this)">File Manager & Artifacts</button>
-        </div>
+        <!-- BỐ CỤC 2 CỘT CHỈNH THỂ: 320px TÀI NGUYÊN TRÁI + FLEX 1 CHI TIẾT PHẢI -->
+        <div class="cockpitShell">
+          <!-- Cột Trái: Danh Mục 4 Nguồn Dữ Liệu -->
+          <div class="cockpitListPane">
+            <div class="cockpitPaneHeader">
+              <span class="cockpitPaneTitle">▦ Danh Mục Dữ Liệu</span>
+              <span class="badge" style="font-size:9.5px;background:#1e293b;color:#38bdf8">Live Index</span>
+            </div>
+            <div class="cockpitPaneScroll">
+              <div class="dataTabs" style="display:flex;flex-direction:column;gap:6px;padding:0">
+                <button class="dataTab active" onclick="switchData('repo', this)" style="text-align:left;padding:10px 12px;border-radius:6px;width:100%;border:1px solid transparent;background:#141921">
+                  <div style="font-weight:600;font-size:12px;color:#f1f5f9">🌿 Git Repo & Commits</div>
+                  <div style="font-size:10px;color:var(--muted)">Lịch sử commit, worktree và branch scope</div>
+                </button>
+                <button class="dataTab" onclick="switchData('db', this)" style="text-align:left;padding:10px 12px;border-radius:6px;width:100%;border:1px solid transparent;background:#141921">
+                  <div style="font-weight:600;font-size:12px;color:#f1f5f9">🗄️ Database Explorer</div>
+                  <div style="font-size:10px;color:var(--muted)">SQLite 3 WAL Schemas & FTS5 Tables</div>
+                </button>
+                <button class="dataTab" onclick="switchData('vault', this)" style="text-align:left;padding:10px 12px;border-radius:6px;width:100%;border:1px solid transparent;background:#141921">
+                  <div style="font-weight:600;font-size:12px;color:#f1f5f9">🔐 Vault & Secrets</div>
+                  <div style="font-size:10px;color:var(--muted)">Biến môi trường, credentials an toàn</div>
+                </button>
+                <button class="dataTab" onclick="switchData('files', this)" style="text-align:left;padding:10px 12px;border-radius:6px;width:100%;border:1px solid transparent;background:#141921">
+                  <div style="font-weight:600;font-size:12px;color:#f1f5f9">📁 File Manager & Artifacts</div>
+                  <div style="font-size:10px;color:var(--muted)">Mã nguồn thật, specs và cây file</div>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Cột Phải: Trình Xem Chi Tiết Nguồn Dữ Liệu -->
+          <div class="cockpitDetailPane">
+            <div class="cockpitDetailBody" style="padding:14px;overflow-y:auto">
 
         <!-- Tab 1: Repo -->
         <div class="dataPane active" id="data-repo">
@@ -3533,6 +3687,9 @@ button { cursor: pointer; }
             </div>
           </div>
         </div>
+            </div><!-- /cockpitDetailBody -->
+          </div><!-- /cockpitDetailPane -->
+        </div><!-- /cockpitShell -->
       </section>
 
     </div>
