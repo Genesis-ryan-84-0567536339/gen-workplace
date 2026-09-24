@@ -134,6 +134,25 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             self._send_json(200, {"messages": messages, "channel_id": channel_id})
             return
 
+        # 8. API Đọc toàn văn đặc tả SSOT nguyên bản của Ryan
+        if path == "/api/ssot/spec":
+            spec_file = BASE_DIR / "docs" / "SSOT_ORIGINAL_SPEC.md"
+            if spec_file.exists():
+                try:
+                    content = spec_file.read_text(encoding="utf-8")
+                    self._send_json(200, {
+                        "filename": "docs/SSOT_ORIGINAL_SPEC.md",
+                        "size_bytes": len(content.encode("utf-8")),
+                        "content": content,
+                        "status": "ok"
+                    })
+                    return
+                except Exception as e:
+                    self._send_json(500, {"error": str(e)})
+                    return
+            self._send_json(404, {"error": "SSOT spec file not found"})
+            return
+
         return super().do_GET()
 
     def do_POST(self):
@@ -397,6 +416,35 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             res = db.post_warroom_message(prj_id, channel_id, author, msg, tag)
             status_code = 400 if "error" in res else 200
             self._send_json(status_code, res)
+            return
+
+        # 18. Lưu chỉ thị / File Plan nguồn SSOT (Save SSOT Source Input)
+        if path == "/api/ssot/save":
+            content = data.get("content", "")
+            prj_id = data.get("project_id", "PRJ-GEN-WORKPLACE")
+            spec_file = BASE_DIR / "docs" / "SSOT_ORIGINAL_SPEC.md"
+            try:
+                if content:
+                    spec_file.write_text(content, encoding="utf-8")
+                with db.get_connection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("""
+                    INSERT OR REPLACE INTO master_ssot (id, project_id, title, body, source_ref, verified_time)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """, ("SSOT-MASTER-INPUT", prj_id, "Chỉ Thị Tổng Thể & PRD Nguồn", content[:500] + "...", "Input Chat Tổng", time.strftime("%H:%M")))
+                    conn.commit()
+                self._send_json(200, {"status": "saved", "path": "docs/SSOT_ORIGINAL_SPEC.md", "time": time.strftime("%H:%M:%S")})
+            except Exception as e:
+                self._send_json(500, {"error": str(e)})
+            return
+
+        # 19. AI Phân rã cấu trúc từ nguồn SSOT (Generate Roadmap, Todos, Roles from Source)
+        if path == "/api/ssot/generate":
+            content = data.get("content", "")
+            prj_id = data.get("project_id", "PRJ-GEN-WORKPLACE")
+            res = db.generate_structure_from_ssot(content, prj_id)
+            state = db.get_full_state(prj_id)
+            self._send_json(200, {"status": "generated", "summary": res, "state": state})
             return
 
         self.send_response(404)

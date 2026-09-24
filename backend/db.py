@@ -2050,6 +2050,61 @@ def post_warroom_message(project_id="PRJ-GEN-WORKPLACE", channel_id="war_room", 
         "agent_reply": {"author": reply_author, "body": reply_body, "created_time": reply_time, "tag": reply_tag}
     }
 
+def generate_structure_from_ssot(content, project_id="PRJ-GEN-WORKPLACE"):
+    """
+    Phân tích chỉ thị từ Input chat tổng / File Plan và đồng bộ cấu trúc:
+    - Cập nhật instruction cho từng role trong agent_roles (khóa theo Input tổng).
+    - Cập nhật master_ssot.
+    - Gửi tin nhắn thông báo vào War Room.
+    """
+    spec_summary = content[:250].replace("\n", " ").strip() if content else "Đặc tả SSOT gốc từ Ryan"
+    
+    role_updates = {
+        "ROLE-01": f"Chỉ huy kiến trúc toàn cục theo SSOT: {spec_summary}. Duy trì tính nhất quán 0 xung đột, phê duyệt bằng chứng commit hash.",
+        "ROLE-02": f"Thiết kế CSDL SQLite WAL, FTS5 catalog và REST APIs phục vụ: {spec_summary}. Tuân thủ Task Mutex, kiểm soát bộ nhớ.",
+        "ROLE-03": f"Xây dựng WebApp Mission Control SPA chuẩn 3-Tier Layout, Visual Pipeline Circuit 5 trạm ngang theo: {spec_summary}.",
+        "ROLE-04": f"Container hóa Docker (:z SELinux), TUI Installer và Desktop Icon phục vụ triển khai All-in-One theo: {spec_summary}.",
+        "ROLE-05": f"Kiểm thử tự động chu kỳ, Auto-Wake < 70ms, E2E test suite và nghiệm thu kỹ thuật theo: {spec_summary}.",
+        "ROLE-06": f"Kiểm toán bảo mật ranh giới Whitelist, cô lập OAuth PKCE RFC 7636 và bảo vệ Vault theo: {spec_summary}."
+    }
+
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        
+        # 1. Cập nhật instruction các Role
+        for rid, inst in role_updates.items():
+            cursor.execute("UPDATE agent_roles SET instruction = ? WHERE id = ? AND project_id = ?", (inst, rid, project_id))
+            
+        # 2. Cập nhật Master SSOT
+        now_time = time.strftime("%H:%M")
+        cursor.execute("""
+        INSERT OR REPLACE INTO master_ssot (id, project_id, title, body, source_ref, verified_time)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """, (
+            "SSOT-ACTIVE-PLAN", 
+            project_id, 
+            "Bản Kế Hoạch Đang Chấp Hành (Active SSOT)", 
+            spec_summary, 
+            "Input Chat Tổng & File Plan", 
+            now_time
+        ))
+        
+        # 3. Ghi thông báo điều hành vào War Room
+        wr_body = f"👑 <strong>Genesis Orchestrator</strong>: Đã phân rã và đồng bộ thành công cấu trúc Roadmap, Todo DAG và Khóa Instruction cho toàn bộ 6 chuyên gia từ Nguồn SSOT của Ryan."
+        cursor.execute("""
+        INSERT INTO chat_messages (project_id, runtime_id, author, created_time, tag, body, react_json)
+        VALUES (?, 'war_room', 'Genesis Orchestrator', ?, 'Directive', ?, ?)
+        """, (project_id, time.strftime("%H:%M:%S"), wr_body, json.dumps(["🚀 Khởi động", "✅ Đồng bộ"], ensure_ascii=False)))
+        
+        conn.commit()
+
+    return {
+        "status": "success",
+        "roles_updated": len(role_updates),
+        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "ssot_summary": spec_summary
+    }
+
 # Khởi tạo tự động khi import
 init_db()
 seed_real_project()

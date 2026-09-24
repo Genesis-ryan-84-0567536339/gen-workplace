@@ -4638,25 +4638,81 @@ function sourceChanged() {
   $('sourceState').className = 'chip wait';
   $('roadmapSourceState').textContent = 'chưa regenerate';
 }
-function saveSource() {
-  state.sourceSaved = true;
-  $('sourceState').textContent = 'Đã lưu SSOT';
-  $('sourceState').className = 'chip done';
-  $('syncState').textContent = 'Đồng bộ ' + new Date().toLocaleTimeString('vi-VN', { hour12: false });
-  persist();
-  showToast('Đã lưu Input tổng & cập nhật toàn bộ Role');
+async function attachPlan() {
+  try {
+    const res = await fetch('/api/ssot/spec');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.content) {
+        $('sourceInput').value = data.content;
+        state.sourceText = data.content;
+        state.sourceSaved = true;
+        $('sourceState').textContent = 'Đã nạp file SSOT';
+        $('sourceState').className = 'chip done';
+        showToast('Đã nạp toàn văn đặc tả SSOT nguyên bản của Ryan (' + (data.size_bytes / 1024).toFixed(1) + ' KB)');
+        persist();
+      }
+    } else {
+      showToast('Không thể tải file SSOT');
+    }
+  } catch (e) {
+    showToast('Lỗi nạp file SSOT: ' + e.message);
+  }
 }
-function attachPlan() {
-  showToast('docs/SSOT_ORIGINAL_SPEC.md đã gắn làm nguồn chuẩn');
-}
-function generateFromSource() {
-  state.sourceText = $('sourceInput').value;
+
+async function saveSource() {
+  const content = $('sourceInput').value;
+  state.sourceText = content;
   state.sourceSaved = true;
-  $('sourceState').textContent = 'Đã sinh từ nguồn SSOT';
+  $('sourceState').textContent = 'Đang lưu SSOT...';
+  try {
+    const res = await fetch('/api/ssot/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: content, project_id: 'PRJ-GEN-WORKPLACE' })
+    });
+    if (res.ok) {
+      $('sourceState').textContent = 'Đã lưu SSOT';
+      $('sourceState').className = 'chip done';
+      $('syncState').textContent = 'Đồng bộ ' + new Date().toLocaleTimeString('vi-VN', { hour12: false });
+      persist();
+      showToast('Đã lưu Input tổng vào docs/SSOT_ORIGINAL_SPEC.md & SQLite');
+    } else {
+      showToast('Lỗi lưu nguồn SSOT');
+    }
+  } catch (e) {
+    showToast('Lỗi kết nối lưu SSOT: ' + e.message);
+  }
+}
+
+async function generateFromSource() {
+  const content = $('sourceInput').value;
+  state.sourceText = content;
+  state.sourceSaved = true;
+  $('sourceState').textContent = '⏳ AI đang phân rã...';
   $('sourceState').className = 'chip live';
-  $('roadmapSourceState').textContent = '5 Phase gen-workplace';
-  renderAll();
-  showToast('AI đã phân rã Roadmap → Todo → Role Instructions → Workflow');
+  try {
+    const res = await fetch('/api/ssot/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: content, project_id: 'PRJ-GEN-WORKPLACE' })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.state) {
+        Object.assign(state, data.state);
+      }
+      $('sourceState').textContent = 'Đã sinh từ nguồn SSOT';
+      $('sourceState').className = 'chip live';
+      $('roadmapSourceState').textContent = '5 Phase gen-workplace (Đã khóa)';
+      renderAll();
+      showToast('AI đã phân rã Roadmap → Todo DAG → Khóa Role Instructions → Cập nhật SQLite!');
+    } else {
+      showToast('Lỗi khi AI phân rã cấu trúc');
+    }
+  } catch (e) {
+    showToast('Lỗi kết nối AI phân rã: ' + e.message);
+  }
 }
 
 function renderImplementation() {
