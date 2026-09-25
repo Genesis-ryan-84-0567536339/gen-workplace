@@ -102,10 +102,15 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             for s in sessions:
                 sid = s["id"]
                 try:
-                    res = subprocess.run(["tmux", "capture-pane", "-t", sid, "-p", "-S", "-30"],
+                    res = subprocess.run(["tmux", "capture-pane", "-t", sid, "-p", "-S", "-200"],
                                          capture_output=True, text=True, timeout=1.5)
                     if res.returncode == 0 and res.stdout.strip():
-                        s["terminal_output"] = res.stdout
+                        # Cắt bỏ toàn bộ các dòng trống ở đuôi (tránh đen màn hình khi auto-scroll)
+                        raw_lines = res.stdout.splitlines()
+                        while raw_lines and not raw_lines[-1].strip():
+                            raw_lines.pop()
+                        if raw_lines:
+                            s["terminal_output"] = "\n".join(raw_lines)
                 except Exception:
                     pass
 
@@ -295,6 +300,18 @@ class SwarmHandler(SimpleHTTPRequestHandler):
                 "action": action,
                 "target": session_id,
                 "results": results
+            })
+            return
+
+        # 6.2. Truyền lệnh / Điều phối luồng làm việc đồng loạt cho 6 Agent Swarm
+        if path == "/api/swarm/dispatch":
+            project_id = data.get("project_id", "PRJ-GEN-WORKPLACE")
+            results = db.dispatch_swarm_workflow(project_id)
+            self._send_json(200, {
+                "status": "dispatched",
+                "project_id": project_id,
+                "results": results,
+                "time": time.strftime("%H:%M:%S")
             })
             return
 

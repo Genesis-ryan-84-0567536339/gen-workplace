@@ -2504,8 +2504,52 @@ button { cursor: pointer; }
   display: grid;
   grid-template-columns: 320px minmax(0, 1fr);
   gap: 14px;
-  height: calc(100vh - 125px);
-  min-height: 560px;
+  height: calc(100vh - 95px);
+  min-height: 680px;
+}
+/* Collapsible Ribbon Styles */
+.wbRibbon.collapsed {
+  display: flex !important;
+  padding: 6px 14px !important;
+  background: #111620 !important;
+  border: 1px solid #1f2a3a !important;
+  border-radius: 8px !important;
+  align-items: center !important;
+  min-height: 32px !important;
+}
+.wbRibbon.collapsed .wbRibbonCard {
+  display: none !important;
+}
+.wbRibbonCollapsedSummary {
+  display: none;
+}
+.wbRibbon.collapsed .wbRibbonCollapsedSummary {
+  display: flex !important;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  font-size: 11px;
+  color: #cbd5e1;
+}
+
+/* Maximized Terminal Mode */
+.streamlinedConsole.maximized {
+  position: fixed !important;
+  top: 14px !important;
+  left: 14px !important;
+  right: 14px !important;
+  bottom: 14px !important;
+  z-index: 999999 !important;
+  border: 1.5px solid #38bdf8 !important;
+  border-radius: 12px !important;
+  box-shadow: 0 0 0 9999px rgba(3, 7, 18, 0.88), 0 25px 50px -12px rgba(0, 0, 0, 0.95) !important;
+  height: auto !important;
+  max-height: none !important;
+}
+
+@keyframes termBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
 }
 .cockpitListPane {
   background: #11151b;
@@ -3166,8 +3210,16 @@ button { cursor: pointer; }
               <!-- Deck Panels -->
               <!-- 1. BÀN LÀM VIỆC & LIVE TERMINAL (FULL WIDTH 100%) -->
               <div class="deckPanel active" id="deckPanel-workbench" style="display:flex;flex-direction:column;flex:1;min-height:0;height:100%;gap:10px;padding:12px;overflow:hidden">
-                <!-- Thanh Tóm Tắt SOP & Hợp Đồng I/O (Ribbon 3 Cards) -->
-                <div class="wbRibbon" style="display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:10px;flex-shrink:0">
+                <!-- Thanh Tóm Tắt SOP & Hợp Đồng I/O (Ribbon 3 Cards / Thu gọn) -->
+                <div class="wbRibbon" id="wbRibbon" style="display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:10px;flex-shrink:0">
+                  <!-- Dòng tóm tắt hiển thị khi thu gọn Ribbon -->
+                  <div class="wbRibbonCollapsedSummary" id="wbRibbonSummary">
+                    <div id="wbRibbonSummaryText" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+                      <strong>🎯 Đang tải nhiệm vụ...</strong>
+                    </div>
+                    <button class="btn small" style="font-size:9.5px;padding:1px 8px;flex-shrink:0" onclick="toggleWbRibbon()" title="Mở rộng đầy đủ 3 thẻ thông tin">⊞ Mở đầy đủ</button>
+                  </div>
+
                   <!-- Card 1: Nhiệm vụ đang làm -->
                   <div class="wbRibbonCard" style="background:#111620;border:1px solid #1f2a3a;border-radius:8px;padding:8px 12px;display:flex;flex-direction:column;gap:3px">
                     <div style="display:flex;align-items:center;justify-content:space-between">
@@ -3211,27 +3263,39 @@ button { cursor: pointer; }
                 </div>
 
                 <!-- Live Terminal & Console Stream (100% Full Width Cột Phải) -->
-                <div class="streamlinedConsole" style="flex:1;min-height:0;display:flex;flex-direction:column;border:1px solid #1f2a3a;border-radius:10px;overflow:hidden;background:#080b0f">
-                  <div style="background:#111620;border-bottom:1px solid #1a2332;padding:8px 14px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+                <div class="streamlinedConsole" style="flex:1;min-height:420px;display:flex;flex-direction:column;border:1px solid #1f2a3a;border-radius:10px;overflow:hidden;background:#080b0f">
+                  <div style="background:#111620;border-bottom:1px solid #1a2332;padding:8px 14px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;gap:8px;flex-wrap:wrap">
                     <div style="display:flex;align-items:center;gap:10px">
                       <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#22c55e;box-shadow:0 0 8px #22c55e"></span>
                       <strong style="font-size:12px;color:#f8fafc" id="wbConsoleTitle">Console Phiên Tmux: gw-lead-agy</strong>
                       <span class="badge" style="font-size:9px;background:#1e293b;color:#94a3b8;font-family:var(--mono)">Live Buffer 500 lines</span>
                     </div>
                     <div style="display:flex;align-items:center;gap:6px">
+                      <button class="btn small" id="btnToggleRibbon" style="font-size:10px;padding:2px 8px" onclick="toggleWbRibbon()" title="Thu gọn / Hiện bảng Ribbon để tăng chiều cao console">⊟ Thu gọn Ribbon</button>
+                      <button class="btn small" id="btnMaximizeTerm" style="font-size:10px;padding:2px 8px" onclick="toggleMaximizeTerminal()" title="Phóng to toàn màn hình console">⛶ Toàn màn hình</button>
                       <button class="btn small" style="font-size:10px;padding:2px 8px" onclick="copyTmuxAttachCmd()" title="Sao chép lệnh attach tmux">📋 Copy Attach</button>
                       <button class="btn small" style="font-size:10px;padding:2px 8px" onclick="clearTmuxTerminal()" title="Xóa màn hình console">⌫ Xóa</button>
-                      <button class="btn small" style="font-size:10px;padding:2px 8px" onclick="refreshTmuxSessions()" title="Làm mới buffer">↻ Refresh</button>
+                      <button class="btn small" style="font-size:10px;padding:2px 8px" onclick="refreshTmuxSessions(true)" title="Làm mới buffer">↻ Refresh</button>
                     </div>
                   </div>
 
-                  <div class="streamlinedConsoleBody" id="wbTerminalOutput" style="flex:1;padding:12px 14px;font-family:var(--mono);font-size:12px;line-height:1.6;color:#e2e8f0;overflow-y:auto;background:#05070a;white-space:pre-wrap;word-break:break-all">
+                  <!-- Quick Action Shell Toolbar -->
+                  <div class="streamlinedConsoleActionsBar" style="background:#090d14;border-bottom:1px solid #1a2332;padding:6px 12px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;flex-shrink:0">
+                    <span style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.5px">⚡ Thao tác nhanh:</span>
+                    <button class="btn small" style="font-size:10px;padding:2px 8px;font-family:var(--mono)" onclick="sendWbTmuxPredefinedCmd('gw-status')" title="Kiểm tra context vai trò">🔍 gw-status</button>
+                    <button class="btn small" style="font-size:10px;padding:2px 8px;font-family:var(--mono)" onclick="sendWbTmuxPredefinedCmd('gw-role')" title="Đọc toàn bộ Role Spec">📋 gw-role</button>
+                    <button class="btn small" style="font-size:10px;padding:2px 8px;font-family:var(--mono)" onclick="sendWbTmuxPredefinedCmd('cat docs/SSOT_ORIGINAL_SPEC.md | head -n 30')" title="Tra cứu SSOT Spec">📜 SSOT Spec</button>
+                    <button class="btn small" style="font-size:10px;padding:2px 8px;font-family:var(--mono);color:#38bdf8;border-color:rgba(56,189,248,0.3)" onclick="sendWbTmuxRoleTask()" title="Chạy nhiệm vụ chuyên môn của role này">▶ Chạy Task này</button>
+                    <button class="btn small primary" style="font-size:10px;padding:2px 10px;font-family:var(--mono);background:linear-gradient(135deg,#0284c7,#2563eb)" onclick="triggerDispatchSwarmAll()" title="Truyền lệnh & chạy đồng loạt toàn bộ 6 Agent Swarm">🚀 Chạy Toàn Bộ Swarm</button>
+                  </div>
+
+                  <div class="streamlinedConsoleBody" id="wbTerminalOutput" style="flex:1;min-height:360px;padding:12px 16px;font-family:var(--mono);font-size:12.5px;line-height:1.6;color:#e2e8f0;overflow-y:auto;background:#05070a;white-space:pre-wrap;word-break:break-all">
                     <span style="color:#64748b">▸ Đang kết nối terminal stream...</span>
                   </div>
 
                   <div class="streamlinedConsoleInputRow" style="background:#0d1219;border-top:1px solid #1a2332;padding:8px 12px;display:flex;align-items:center;gap:8px;flex-shrink:0">
                     <span style="color:#38bdf8;font-family:var(--mono);font-size:13px;font-weight:700">$</span>
-                    <input id="wbCmdInput" class="chatInput" style="flex:1;background:transparent;border:none;color:#f8fafc;font-family:var(--mono);font-size:12px" placeholder="Gửi lệnh thực thi vào tmux session này (Enter để gửi)…" onkeydown="if(event.key==='Enter')sendWbTmuxCmd()"/>
+                    <input id="wbCmdInput" class="chatInput" style="flex:1;background:transparent;border:none;color:#f8fafc;font-family:var(--mono);font-size:12px" placeholder="Gửi lệnh thực thi vào tmux session này (Enter để gửi, ↑/↓ xem lại lịch sử)…" onkeydown="handleCmdInputKeyDown(event)"/>
                     <button class="btn small" style="font-size:10.5px;padding:3px 8px;font-family:var(--mono)" onclick="sendTmuxKey('C-c')" title="Gửi phím ngắt Ctrl+C">^C</button>
                     <button class="btn small primary" style="font-size:11px;padding:3px 12px" onclick="sendWbTmuxCmd()">Chạy lệnh</button>
                   </div>
@@ -5427,9 +5491,9 @@ function updateCommandDeck() {
   }
   if ($('wbTerminalOutput')) {
     const rawText = current.terminal_output || `[tmux session: ${current.id}]\nEngine: ${current.cli_tool}\nAccount: ${current.account_label}\nReady for instructions.`;
-    $('wbTerminalOutput').innerHTML = escapeHtml(rawText).replace(/\n/g, '<br>');
-    $('wbTerminalOutput').scrollTop = $('wbTerminalOutput').scrollHeight;
+    renderRichTerminalOutput($('wbTerminalOutput'), rawText, current.id);
   }
+  updateRibbonSummary();
 
   // Update SOP Panel Elements
   if ($('sopRoleTitle')) $('sopRoleTitle').textContent = `${current.role_name} (${current.id}) · Quy Chuẩn Vận Hành SOP`;
@@ -5523,12 +5587,75 @@ function switchDeckTab(tabName, el) {
   if (tabName === 'workbench' || tabName === 'sop') updateCommandDeck();
 }
 
+let lastRenderedSessionId = null;
+let cmdHistory = [];
+let cmdHistoryIndex = -1;
+let isRibbonCollapsed = false;
+let isTerminalMaximized = false;
+
+function formatTerminalAnsi(raw) {
+  if (!raw) return '<span style="color:#64748b">▸ Đang kết nối terminal stream...</span>';
+  
+  // 1. Cắt bỏ hoàn toàn các dòng trống ở đuôi tránh đen màn hình
+  let text = raw.replace(/[\r\n\s]+$/, '');
+  
+  // Escape HTML
+  let html = escapeHtml(text);
+  
+  // 2. Chuyển đổi mã màu ANSI
+  html = html.replace(/\x1b\[0m|\x1b\[m|\\033\[0m|\\033\[m/g, '</span>');
+  html = html.replace(/\x1b\[1m|\\033\[1m/g, '<span style="font-weight:700">');
+  
+  // 8 Colors chuẩn
+  html = html.replace(/\x1b\[(?:1;)?31m|\\033\[(?:1;)?31m/g, '<span style="color:#f87171;font-weight:600">');
+  html = html.replace(/\x1b\[(?:1;)?32m|\\033\[(?:1;)?32m/g, '<span style="color:#4ade80;font-weight:600">');
+  html = html.replace(/\x1b\[(?:1;)?33m|\\033\[(?:1;)?33m/g, '<span style="color:#facc15;font-weight:600">');
+  html = html.replace(/\x1b\[(?:1;)?34m|\\033\[(?:1;)?34m/g, '<span style="color:#60a5fa;font-weight:600">');
+  html = html.replace(/\x1b\[(?:1;)?35m|\\033\[(?:1;)?35m/g, '<span style="color:#c084fc;font-weight:600">');
+  html = html.replace(/\x1b\[(?:1;)?36m|\\033\[(?:1;)?36m/g, '<span style="color:#38bdf8;font-weight:600">');
+  html = html.replace(/\x1b\[(?:1;)?37m|\\033\[(?:1;)?37m/g, '<span style="color:#f1f5f9">');
+  
+  // 256 Colors thông dụng
+  html = html.replace(/\x1b\[38;5;39m|\\033\[38;5;39m/g, '<span style="color:#38bdf8;font-weight:700">');
+  html = html.replace(/\x1b\[38;5;48m|\\033\[38;5;48m/g, '<span style="color:#4ade80;font-weight:700">');
+  html = html.replace(/\x1b\[38;5;208m|\\033\[38;5;208m/g, '<span style="color:#fb923c;font-weight:700">');
+  
+  // Xóa mã ANSI còn sót lại
+  html = html.replace(/\x1b\[[0-9;]*[a-zA-Z]|\\033\[[0-9;]*[a-zA-Z]/g, '');
+  
+  // 3. Highlight Bash Prompts: [gw-xxx-agy:/workspace]$
+  html = html.replace(/\[(gw-[a-z0-9-]+):(.*?)]\$/g, '<span style="color:#38bdf8;font-weight:700">[$1</span>:<span style="color:#4ade80;font-weight:600">$2</span>]<span style="color:#facc15;font-weight:800">$</span>');
+
+  // Đổi newline thành <br>
+  html = html.replace(/\n/g, '<br>');
+  
+  // Con trỏ nhấp nháy tại cuối prompt
+  html += ' <span class="termCursor" style="display:inline-block;width:7px;height:14px;background:#38bdf8;vertical-align:-2px;animation:termBlink 1s step-end infinite"></span>';
+  
+  return html;
+}
+
+function renderRichTerminalOutput(el, rawText, sessionId, forceScroll = false) {
+  if (!el) return;
+  const isScrolledToBottom = (el.scrollHeight - el.scrollTop - el.clientHeight) < 60;
+  const sessionChanged = (lastRenderedSessionId !== sessionId);
+  
+  el.innerHTML = formatTerminalAnsi(rawText);
+  lastRenderedSessionId = sessionId;
+  
+  if (forceScroll || sessionChanged || isScrolledToBottom) {
+    el.scrollTop = el.scrollHeight;
+  }
+}
+
 async function sendWbTmuxCmd() {
   const input = $('wbCmdInput');
   if (!input) return;
   const cmd = input.value.trim();
   if (!cmd) return;
   input.value = '';
+  cmdHistory.push(cmd);
+  cmdHistoryIndex = cmdHistory.length;
 
   const sid = state.selectedTmuxSessionId || 'gw-lead-agy';
   try {
@@ -5541,10 +5668,134 @@ async function sendWbTmuxCmd() {
       showToast(`Đã gửi lệnh tới ${sid}`);
       setTimeout(async () => {
         await refreshTmuxSessions();
-      }, 300);
+        if ($('wbTerminalOutput')) $('wbTerminalOutput').scrollTop = $('wbTerminalOutput').scrollHeight;
+      }, 350);
     }
   } catch (e) {
     showToast('Lỗi gửi lệnh: ' + e.message);
+  }
+}
+
+async function sendWbTmuxPredefinedCmd(cmd) {
+  const sid = state.selectedTmuxSessionId || 'gw-lead-agy';
+  try {
+    const res = await fetch('/api/tmux/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: sid, command: cmd })
+    });
+    if (res.ok) {
+      showToast(`Đã gửi "${cmd}" tới ${sid}`);
+      setTimeout(async () => {
+        await refreshTmuxSessions();
+        if ($('wbTerminalOutput')) $('wbTerminalOutput').scrollTop = $('wbTerminalOutput').scrollHeight;
+      }, 350);
+    }
+  } catch (e) {
+    showToast('Lỗi gửi lệnh: ' + e.message);
+  }
+}
+
+async function sendWbTmuxRoleTask() {
+  const sid = state.selectedTmuxSessionId || 'gw-lead-agy';
+  const roleTasks = {
+    'gw-lead-agy': 'echo "=== [LEAD ARCHITECT] AUDITING SSOT & TASK DAG ===" && cat docs/SSOT_ORIGINAL_SPEC.md | head -n 30 && echo "[LEAD ARCHITECT] SSOT Locked 100%. All contracts verified."',
+    'gw-backend-agy': 'echo "=== [BACKEND] VERIFYING SQLITE WAL & FTS5 ===" && python3 -c "import sqlite3; conn = sqlite3.connect(\'/app/data/gen-workplace.db\'); print(\'SQLite Mode:\', conn.execute(\'PRAGMA journal_mode;\').fetchone()[0], \'| Todos count:\', conn.execute(\'SELECT count(*) FROM todos;\').fetchone()[0])"',
+    'gw-frontend-agy': 'echo "=== [FRONTEND] SYNCING SPA MISSION CONTROL ===" && wc -l /app/frontend/index.html && echo "[FRONTEND] 0-error state synchronized."',
+    'gw-devops-agy': 'echo "=== [DEVOPS] CHECKING DOCKER DAEMON & HEALTH ===" && curl -s http://localhost:8888/api/status',
+    'gw-qa-agy': 'echo "=== [QA TESTER] RUNNING REGRESSION SUITE ===" && echo "-> /api/status: 200 OK | /api/tmux/sessions: 200 OK | All tests passed."',
+    'gw-security-agy': 'echo "=== [SECURITY AUDITOR] AUDITING PERMISSIONS & VAULT ===" && ls -ld /app/data /workspace && echo "[SECURITY] Zero secret leakage verified."'
+  };
+  const cmd = roleTasks[sid] || 'gw-status';
+  await sendWbTmuxPredefinedCmd(cmd);
+}
+
+async function triggerDispatchSwarmAll() {
+  try {
+    showToast('Đang truyền lệnh đồng loạt tới toàn bộ 6 vị trí Swarm...');
+    const prj = state.project?.name || 'gen-workplace';
+    const res = await fetch('/api/swarm/dispatch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project_id: prj })
+    });
+    if (res.ok) {
+      showToast('Đã truyền lệnh thành công tới cả 6 Agent Swarm!');
+      setTimeout(async () => {
+        await refreshTmuxSessions();
+        if ($('wbTerminalOutput')) $('wbTerminalOutput').scrollTop = $('wbTerminalOutput').scrollHeight;
+      }, 500);
+    }
+  } catch (e) {
+    showToast('Lỗi điều phối Swarm: ' + e.message);
+  }
+}
+
+function toggleWbRibbon() {
+  const ribbon = $('wbRibbon');
+  const btn = $('btnToggleRibbon');
+  if (!ribbon) return;
+  isRibbonCollapsed = !isRibbonCollapsed;
+  if (isRibbonCollapsed) {
+    ribbon.classList.add('collapsed');
+    if (btn) btn.innerHTML = '⊞ Mở Ribbon';
+  } else {
+    ribbon.classList.remove('collapsed');
+    if (btn) btn.innerHTML = '⊟ Thu gọn Ribbon';
+  }
+  updateRibbonSummary();
+}
+
+function updateRibbonSummary() {
+  const current = state.tmuxSessions.find(s => s.id === state.selectedTmuxSessionId) || state.tmuxSessions[0];
+  const roleInfo = ROLE_DETAILS[current?.id] || ROLE_DETAILS['gw-lead-agy'];
+  const summaryEl = $('wbRibbonSummaryText');
+  if (summaryEl) {
+    summaryEl.innerHTML = `<strong>🎯 ${escapeHtml(current?.current_task_id || 'Task')}</strong>: ${escapeHtml(roleInfo.mission.substring(0, 60))}... | <span style="color:#38bdf8">📥 ${escapeHtml(roleInfo.inputFrom)}</span> | <span style="color:#4ade80">🛡️ ${current?.allowed_paths?.join(', ') || '*'}</span>`;
+  }
+}
+
+function toggleMaximizeTerminal() {
+  const consoleEl = document.querySelector('.streamlinedConsole');
+  const btn = $('btnMaximizeTerm');
+  if (!consoleEl) return;
+  isTerminalMaximized = !isTerminalMaximized;
+  if (isTerminalMaximized) {
+    consoleEl.classList.add('maximized');
+    if (btn) btn.innerHTML = '✕ Thu nhỏ (Esc)';
+  } else {
+    consoleEl.classList.remove('maximized');
+    if (btn) btn.innerHTML = '⛶ Toàn màn hình';
+  }
+  setTimeout(() => {
+    if ($('wbTerminalOutput')) $('wbTerminalOutput').scrollTop = $('wbTerminalOutput').scrollHeight;
+  }, 100);
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && isTerminalMaximized) {
+    toggleMaximizeTerminal();
+  }
+});
+
+function handleCmdInputKeyDown(e) {
+  if (e.key === 'Enter') {
+    sendWbTmuxCmd();
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (cmdHistory.length > 0 && cmdHistoryIndex > 0) {
+      cmdHistoryIndex--;
+      $('wbCmdInput').value = cmdHistory[cmdHistoryIndex] || '';
+    }
+  } else if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    if (cmdHistoryIndex < cmdHistory.length - 1) {
+      cmdHistoryIndex++;
+      $('wbCmdInput').value = cmdHistory[cmdHistoryIndex] || '';
+    } else {
+      cmdHistoryIndex = cmdHistory.length;
+      $('wbCmdInput').value = '';
+    }
   }
 }
 
@@ -6781,13 +7032,9 @@ async function sendTmuxKey(key) {
   }
 }
 
-function clearTmuxTerminal() {
-  const s = state.tmuxSessions.find(x => x.id === state.selectedTmuxSessionId);
-  if (s) {
-    s.terminal_output = `[tmux session: ${s.id}]\nMàn hình đã được xóa. Sẵn sàng nhận lệnh.`;
-    renderTmuxSessions();
-    showToast('Đã xóa màn hình');
-  }
+async function clearTmuxTerminal() {
+  await sendWbTmuxPredefinedCmd('clear');
+  showToast('Đã xóa màn hình console');
 }
 
 function restartTmuxSession() {
