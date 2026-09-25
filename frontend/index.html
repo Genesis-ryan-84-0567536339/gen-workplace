@@ -3494,8 +3494,8 @@ button { cursor: pointer; }
       <section class="screen" id="implementation">
         <div class="pageHead">
           <div>
-            <h1>◈ Kế Hoạch & Quy Trình Thực Thi</h1>
-            <p>Chuyển hóa Input tổng + File Plan thành Roadmap, phân rã Todo DAG, định tuyến CLI Engine và giám sát đồ thị Workflow 5 giai đoạn.</p>
+            <h1>◈ Kế Hoạch & Tiến Độ Thực Thi</h1>
+            <p>Chuyển hóa Input tổng + File Plan thành Roadmap 5 Phase, phân rã Todo DAG và cấu hình Model AI cho từng Role chuyên môn.</p>
           </div>
           <div class="actions">
             <span class="chip done" id="sourceState">Nguồn đồng bộ SSOT</span>
@@ -3505,14 +3505,14 @@ button { cursor: pointer; }
         </div>
 
         <div class="genBar">
-          <div class="genPill done">01 · Input & Chat tổng</div>
+          <div class="genPill done">01 · Input & Chỉ Thị Tổng</div>
           <div class="genPill done">02 · File Plan: docs/SSOT_ORIGINAL_SPEC.md</div>
-          <div class="genPill done">03 · Roadmap đã phân rã</div>
-          <div class="genPill live">04 · Todo & Runtimes</div>
-          <div class="genPill live">05 · Workflow live nodes</div>
+          <div class="genPill done">03 · Roadmap Đã Phân Rã (5 Phase)</div>
+          <div class="genPill live">04 · Todo DAG Tasks</div>
+          <div class="genPill live">05 · Cấu Hình Model AI Cho Role</div>
         </div>
 
-        <!-- CẤU TRÚC 3 HÀNG CHUẨN 100% SSOT CỦA RYAN -->
+        <!-- CẤU TRÚC CHUẨN SSOT CỦA RYAN: HÀNG 01 (3 CỘT INPUT - ROADMAP - TODO) + HÀNG 02 (BẢNG ROLES & ĐỔI MODEL) -->
         <div class="implMasterTierStack">
           <!-- HÀNG 01: 1 HÀNG 3 CỘT CÂN XỨNG (INPUT/PLAN ➔ ROADMAP ➔ TODO DAG) -->
           <div class="implRow1_ThreeCols">
@@ -3544,7 +3544,7 @@ button { cursor: pointer; }
                 </div>
                 <span class="hint" id="roadmapSourceState" style="font-size:10px">5 giai đoạn</span>
               </div>
-              <div class="cardBody" style="overflow-y:auto;flex:1;max-height:280px">
+              <div class="cardBody" style="overflow-y:auto;flex:1;max-height:360px">
                 <div class="roadmapList" id="roadmapList"></div>
               </div>
             </div>
@@ -3558,20 +3558,20 @@ button { cursor: pointer; }
                 </div>
                 <span class="hint" id="selectedRoadmapTitle" style="font-size:10px">Phase hiện tại</span>
               </div>
-              <div class="cardBody" style="overflow-y:auto;flex:1;max-height:280px">
+              <div class="cardBody" style="overflow-y:auto;flex:1;max-height:360px">
                 <div class="todoList" id="todoList"></div>
               </div>
             </div>
           </div>
 
-          <!-- HÀNG 02: BẢNG AGENT ROLES & LỰA CHỌN CLI ENGINE (TOÀN CHIỀU RỘNG) -->
+          <!-- HÀNG 02: BẢNG AGENT ROLES & ĐỔI MODEL CHO ROLE (TOÀN CHIỀU RỘNG) -->
           <div class="card implRow2_Roles">
             <div class="cardHead">
               <div style="display:flex;align-items:center;gap:8px">
-                <span style="font-size:16px">⚙️</span>
+                <span style="font-size:16px">🤖</span>
                 <div>
-                  <strong style="font-size:12.5px;color:#f8fafc">Hàng 02 · Danh Sách Agent Roles & Lựa Chọn CLI Engine</strong>
-                  <div class="hint" style="font-size:10.5px">Owner trực tiếp chọn CLI Engine phù hợp cho từng Role. Instruction khóa bất biến theo Input Chat Tổng.</div>
+                  <strong style="font-size:12.5px;color:#f8fafc">Danh Sách Agent Roles & Cấu Hình Model AI Cho Role</strong>
+                  <div class="hint" style="font-size:10.5px">Owner trực tiếp chỉ định Model AI tối ưu cho từng vai trò chuyên môn. Instruction khóa bất biến theo SSOT.</div>
                 </div>
               </div>
               <button class="btn small" onclick="openRoleSource()">Sửa từ Input tổng</button>
@@ -3581,7 +3581,7 @@ button { cursor: pointer; }
                 <thead>
                   <tr>
                     <th>Role Chuyên Trách</th>
-                    <th>Lựa Chọn CLI Engine</th>
+                    <th>Model AI Được Chỉ Định</th>
                     <th>Phạm Vi Nhiệm Vụ</th>
                     <th>Instruction Khóa SSOT</th>
                     <th>Trạng Thái</th>
@@ -3590,38 +3590,6 @@ button { cursor: pointer; }
                 </thead>
                 <tbody id="roleRows"></tbody>
               </table>
-            </div>
-          </div>
-
-          <!-- HÀNG 03: SƠ ĐỒ LIVE WORKFLOW TỪNG NODE (TOÀN CHIỀU RỘNG CANVAS) -->
-          <div class="card implRow3_Workflow">
-            <div class="cardHead">
-              <div style="display:flex;align-items:center;gap:8px">
-                <span style="font-size:16px">🔀</span>
-                <div>
-                  <strong style="font-size:12.5px;color:#f8fafc">Hàng 03 · Sơ Đồ Live Workflow Từng Node (Step-by-Step DAG)</strong>
-                  <div class="hint" style="font-size:10.5px">Trực quan hóa luồng công việc step-by-step giữa các chuyên gia, kiểm soát checklist INPUT/OUTPUT và checkpoint bàn giao.</div>
-                </div>
-              </div>
-              <div class="wfToolbar">
-                <span class="chip live" id="wfRunStatus">ĐANG CHẠY</span>
-                <button class="btn small" onclick="resetWorkflow()">Đặt lại</button>
-                <button class="btn small primary" onclick="advanceWorkflow()">Bước tiếp →</button>
-              </div>
-            </div>
-            <div class="cardBody" style="display:flex;flex-direction:column;gap:12px;padding:14px">
-              <div class="wfWrap" style="padding:0">
-                <div class="wfScroll">
-                  <div class="wf" id="workflowCanvas"></div>
-                </div>
-                <div class="wfLegend" style="margin-top:8px">
-                  <span>● hoàn thành</span>
-                  <span>● đang chạy</span>
-                  <span>● chờ dependency</span>
-                  <span>● blocked</span>
-                </div>
-                <div class="nodeDetail" id="nodeDetail" style="margin-top:10px"></div>
-              </div>
             </div>
           </div>
         </div>
@@ -3683,6 +3651,31 @@ button { cursor: pointer; }
                   <span class="chip done">Branch main · Clean</span>
                 </div>
                 <div class="cardBody" id="dashboardSelected"></div>
+              </div>
+
+              <!-- KANBAN BOARD CÁC ROLE TEAM -->
+              <div class="card" id="dashKanbanCard" style="margin-bottom:0;display:flex;flex-direction:column">
+                <div class="cardHead" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <span style="font-size:16px">📋</span>
+                    <div>
+                      <strong style="font-size:12.5px;color:#f8fafc">Bảng Kanban Công Việc Các Role Team</strong>
+                      <div class="hint" style="font-size:10px">Trực quan hóa phân công nhiệm vụ, tiến độ và bàn giao giữa 6 đội ngũ chuyên gia</div>
+                    </div>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:6px">
+                    <div class="tabPills" style="display:flex;background:#0b0f17;padding:2px;border-radius:6px;border:1px solid #1a2332">
+                      <button class="tabPill active" id="tabDashKanbanRoles" onclick="switchDashKanbanView('roles')" style="font-size:10px;padding:3px 9px;border:none;border-radius:4px;cursor:pointer;background:#1e293b;color:#38bdf8">👥 Theo 6 Role Teams</button>
+                      <button class="tabPill" id="tabDashKanbanStages" onclick="switchDashKanbanView('stages')" style="font-size:10px;padding:3px 9px;border:none;border-radius:4px;cursor:pointer;background:transparent;color:#94a3b8">📊 Theo 4 Trạng Thái</button>
+                    </div>
+                    <button class="btn small" onclick="renderDashboardKanban()" title="Làm mới bảng Kanban">↻</button>
+                  </div>
+                </div>
+                <div class="cardBody" style="padding:10px;overflow-x:auto">
+                  <div id="dashRoleKanbanBoard" style="display:grid;gap:10px;min-width:760px">
+                    <!-- Dynamic rendering by renderDashboardKanban() -->
+                  </div>
+                </div>
               </div>
 
               <div class="overviewMain" id="dashProgressCard" style="grid-template-columns:1fr 1fr;gap:12px;display:grid">
@@ -4308,12 +4301,12 @@ const state = {
     ]
   ],
   roles: [
-    { id: 'ROLE-01', key: 'L', name: 'Lead Architect', cli: 'Gemini CLI (agy --effort high)', scope: 'Quản trị SSOT, điều phối toàn bộ tiến trình gen-workplace', instruction: 'Chịu trách nhiệm bảo toàn SSOT đặc tả gốc, thẩm định evidence từ các role và điều phối live workflow.' },
-    { id: 'ROLE-02', key: 'B', name: 'Backend & DB Specialist', cli: 'Claude Code CLI', scope: 'Python daemon, SQLite WAL, FTS5 catalog và runner', instruction: 'Thực thi API control plane, tối ưu truy vấn FTS5 catalog sub-ms và stream log terminal.' },
-    { id: 'ROLE-03', key: 'F', name: 'Frontend Specialist', cli: 'Cursor CLI', scope: 'Web console UI, CSS Gen-workplace v1.1, real-time sync', instruction: 'Duy trì phong cách thiết kế tối kỹ thuật v1.1, bind dữ liệu thật từ backend và tối ưu UX.' },
-    { id: 'ROLE-04', key: 'D', name: 'DevOps & Packaging', cli: 'Gemini CLI (agy --agent devops)', scope: 'Docker, SELinux bind mounts, TUI installer, desktop shortcut', instruction: 'Đảm bảo môi trường container chạy ổn định trên Linux, macOS và Windows, script 1-command installer hoàn hảo.' },
-    { id: 'ROLE-05', key: 'Q', name: 'QA Tester', cli: 'Gemini CLI (agy)', scope: 'Kiểm thử cross-platform, test API /api/status, xác thực installer', instruction: 'Chạy regression tests, nghiệm thu thanh loading % của installer và báo cáo phản hồi.' },
-    { id: 'ROLE-06', key: 'S', name: 'Security Auditor', cli: 'Codex Security CLI', scope: 'Phân quyền volume Docker, audit file permission, kiểm soát Vault', instruction: 'Kiểm tra an toàn SELinux, cô lập quyền hạn biến môi trường và thẩm định secret boundary.' }
+    { id: 'ROLE-01', key: 'L', name: 'Lead Architect', model: 'Gemini 2.5 Pro (Thinking)', cli: 'Gemini CLI (agy --effort high)', scope: 'Quản trị SSOT, điều phối toàn bộ tiến trình gen-workplace', instruction: 'Chịu trách nhiệm bảo toàn SSOT đặc tả gốc, thẩm định evidence từ các role và điều phối live workflow.' },
+    { id: 'ROLE-02', key: 'B', name: 'Backend & DB Specialist', model: 'Gemini 2.5 Pro (Thinking)', cli: 'Claude Code CLI', scope: 'Python daemon, SQLite WAL, FTS5 catalog và runner', instruction: 'Thực thi API control plane, tối ưu truy vấn FTS5 catalog sub-ms và stream log terminal.' },
+    { id: 'ROLE-03', key: 'F', name: 'Frontend Specialist', model: 'Gemini 2.5 Flash', cli: 'Cursor CLI', scope: 'Web console UI, CSS Gen-workplace v1.1, real-time sync', instruction: 'Duy trì phong cách thiết kế tối kỹ thuật v1.1, bind dữ liệu thật từ backend và tối ưu UX.' },
+    { id: 'ROLE-04', key: 'D', name: 'DevOps & Packaging', model: 'Gemini 2.5 Flash', cli: 'Gemini CLI (agy --agent devops)', scope: 'Docker, SELinux bind mounts, TUI installer, desktop shortcut', instruction: 'Đảm bảo môi trường container chạy ổn định trên Linux, macOS và Windows, script 1-command installer hoàn hảo.' },
+    { id: 'ROLE-05', key: 'Q', name: 'QA Tester', model: 'Gemini 2.5 Flash Thinking', cli: 'Gemini CLI (agy)', scope: 'Kiểm thử cross-platform, test API /api/status, xác thực installer', instruction: 'Chạy regression tests, nghiệm thu thanh loading % của installer và báo cáo phản hồi.' },
+    { id: 'ROLE-06', key: 'S', name: 'Security Auditor', model: 'Claude 3.7 Sonnet (Thinking)', cli: 'Codex Security CLI', scope: 'Phân quyền volume Docker, audit file permission, kiểm soát Vault', instruction: 'Kiểm tra an toàn SELinux, cô lập quyền hạn biến môi trường và thẩm định secret boundary.' }
   ],
   nodes: [
     { id: 'NODE-01', title: 'Spec Ingestion & SSOT Freezing', role: 'Lead Architect', status: 'done', x: 20, y: 42, input: 'Yêu cầu bài toán từ Ryan', output: 'docs/SSOT_ORIGINAL_SPEC.md & master_ssot', check: 'SSOT locked, 0% drift', handoff: '→ Architecture Breakdown', checklist: ['Tiếp nhận yêu cầu nguyên văn', 'Khóa file SSOT_ORIGINAL_SPEC.md', 'Ghi nhận vào CSDL master_ssot'] },
@@ -4466,11 +4459,10 @@ const SUBTAB_CONFIG = {
   },
   implementation: {
     icon: '◈',
-    name: 'Kế Hoạch & Quy Trình Chuẩn',
+    name: 'Kế Hoạch & Tiến Độ',
     tabs: [
-      { id: 'imp-plan', label: 'Hàng 01 · 3 Cột (Input ➔ Roadmap ➔ Todo)', target: '#impRow1' },
-      { id: 'imp-roles', label: 'Hàng 02 · Bảng Roles & CLI Engine', target: '.implRow2_Roles' },
-      { id: 'imp-wf', label: 'Hàng 03 · Sơ Đồ Live Workflow DAG', target: '.implRow3_Workflow' }
+      { id: 'imp-plan', label: '01 · 3 Cột (Input ➔ Roadmap ➔ Todo)', target: '#impRow1' },
+      { id: 'imp-roles', label: '02 · Bảng Roles & Đổi Model AI', target: '.implRow2_Roles' }
     ]
   },
   dashboard: {
@@ -4478,7 +4470,7 @@ const SUBTAB_CONFIG = {
     name: 'Tổng Quan Dashboard',
     tabs: [
       { id: 'dash-overview', label: '📊 Tổng quan & Chỉ số', target: '#dashStatsCard' },
-      { id: 'dash-projects', label: '📁 Quản trị Workspace', target: '#dashProjectsCard' },
+      { id: 'dash-kanban', label: '📋 Kanban 6 Role Teams', target: '#dashKanbanCard' },
       { id: 'dash-progress', label: '🚀 Tiến trình Swarm & Roles', target: '#dashProgressCard' }
     ]
   },
@@ -4587,6 +4579,7 @@ function go(id, el) {
   } else if (id === 'dashboard') {
     renderOverview();
     renderDashboardProjects();
+    renderDashboardKanban();
   } else if (id === 'data') {
     switchData('repo');
   }
@@ -4715,9 +4708,6 @@ function renderProjectList() {
 function switchImplTab(tabKey) {
   if (tabKey === 'roles') {
     scrollToTarget('.implRow2_Roles');
-  } else if (tabKey === 'workflow') {
-    scrollToTarget('.implRow3_Workflow');
-    renderWorkflow();
   } else {
     scrollToTarget('#impRow1');
   }
@@ -4857,8 +4847,19 @@ function renderImplementation() {
     </div>
   `).join('');
 
-  // 3. Roles Table (Owner chọn CLI, Instruction khóa theo Input tổng)
-  $('roleRows').innerHTML = state.roles.map((r, i) => `
+  // 3. Roles Table (Owner chọn Model AI, Instruction khóa theo SSOT)
+  const AVAILABLE_MODELS = [
+    'Gemini 2.5 Pro (Thinking)',
+    'Gemini 2.5 Flash',
+    'Gemini 2.5 Flash Thinking',
+    'Claude 3.7 Sonnet (Thinking)',
+    'Claude 3.5 Sonnet',
+    'GPT-4.5 Preview'
+  ];
+
+  $('roleRows').innerHTML = state.roles.map((r, i) => {
+    const curModel = r.model || r.cli || 'Gemini 2.5 Pro (Thinking)';
+    return `
     <tr>
       <td>
         <div class="roleName">
@@ -4870,24 +4871,27 @@ function renderImplementation() {
         </div>
       </td>
       <td>
-        <select class="select" onchange="changeCli(${i}, this.value)">
-          ${['Gemini CLI (agy --effort high)', 'Gemini CLI (agy)', 'Claude Code CLI', 'Cursor CLI', 'Codex Security CLI', 'Gemini CLI (agy --agent devops)'].map(x => `<option ${x === r.cli ? 'selected' : ''}>${x}</option>`).join('')}
+        <select class="select" onchange="changeRoleModel(${i}, this.value)" style="min-width:180px;background:#0d1219;color:#38bdf8;font-weight:600;border:1px solid #1a2332;padding:4px 8px;border-radius:4px">
+          ${AVAILABLE_MODELS.map(m => `<option value="${m}" ${curModel.includes(m.split(' ')[0]) || curModel === m ? 'selected' : ''}>${m}</option>`).join('')}
         </select>
       </td>
       <td>${escapeHtml(r.scope)}</td>
-      <td class="roleInst">${escapeHtml(r.instruction)} <span class="lock">🔒 khóa theo Input tổng</span></td>
+      <td class="roleInst">${escapeHtml(r.instruction)} <span class="lock">🔒 khóa theo SSOT</span></td>
       <td>
         <span class="chip ${r.name.includes('Backend') ? 'live' : r.name.includes('Lead') ? 'done' : r.name.includes('QA') ? 'wait' : 'done'}">
           ${r.name.includes('Backend') ? 'running' : r.name.includes('Lead') ? 'ready' : r.name.includes('QA') ? 'waiting' : 'ready'}
         </span>
       </td>
       <td>
-        <button class="btn" onclick="openRoleSource('${r.name}')">Chỉnh từ Source</button>
+        <button class="btn small" onclick="openRoleSource('${escapeHtml(r.name)}')">Chỉnh từ Source</button>
       </td>
     </tr>
-  `).join('');
+  `;
+  }).join('');
 
-  renderWorkflow();
+  if ($('workflowCanvas')) {
+    renderWorkflow();
+  }
 }
 
 function selectRoadmap(i) {
@@ -4904,15 +4908,31 @@ function openRoleSource(role = 'Role') {
   showToast(role + ' instruction được đồng bộ từ Input tổng');
 }
 
-function changeCli(i, v) {
-  state.roles[i].cli = v;
+async function changeRoleModel(i, v) {
+  state.roles[i].model = v;
   persist();
-  showToast(state.roles[i].name + ' engine → ' + v);
+  showToast(`✅ Đã đổi model ${state.roles[i].name} → ${v}`);
+  try {
+    await fetch('/api/role/model', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role_id: state.roles[i].id, model: v, project_id: 'PRJ-GEN-WORKPLACE' })
+    });
+  } catch (e) {
+    console.warn('Lỗi lưu model lên server:', e);
+  }
+  renderOverview();
+  renderDashboardKanban();
 }
 
-// Workflow Canvas & Detail
+function changeCli(i, v) {
+  changeRoleModel(i, v);
+}
+
+// Workflow Canvas & Detail (safe fallback)
 function renderWorkflow() {
   const c = $('workflowCanvas');
+  if (!c) return;
   const ns = state.nodes;
   let html = '';
   for (let i = 0; i < ns.length - 1; i++) {
@@ -5063,18 +5083,24 @@ function renderOverview() {
     </div>
   `).join('');
 
-  $('overviewAgents').innerHTML = state.runtimes.map(r => `
+  $('overviewAgents').innerHTML = state.runtimes.map(r => {
+    const matchedRole = (state.roles || []).find(x => x.name.toLowerCase().includes(r.role.split(' ')[0].toLowerCase())) || {};
+    const modelTag = matchedRole.model || r.cli || 'Gemini 2.5 Pro';
+    return `
     <div class="resource">
       <div class="resLeft">
         <div class="resIcon">${r.role[0]}</div>
         <div>
           <b>${escapeHtml(r.role)}</b>
-          <small>${escapeHtml(r.task)} · ${escapeHtml(r.cli)}</small>
+          <small>${escapeHtml(r.task)} · <span style="color:#38bdf8">🤖 ${escapeHtml(modelTag)}</span></small>
         </div>
       </div>
       <span class="chip ${r.status === 'running' ? 'live' : r.status === 'done' ? 'done' : 'wait'}">${r.status}</span>
     </div>
-  `).join('');
+  `;
+  }).join('');
+
+  renderDashboardKanban();
 
   // Repo commits view
   $('repoList').innerHTML = `
@@ -5092,6 +5118,132 @@ Branch: main (Clean)
 Docker Container: gen-workplace-app (Live mount: ./frontend, ./backend, ./docs)
 Desktop Entry: /workspace/Desktop/Gen-workplace.desktop
 Web Endpoint: http://localhost:8888`;
+}
+
+let dashKanbanCurrentView = 'roles'; // 'roles' | 'stages'
+
+function switchDashKanbanView(view) {
+  dashKanbanCurrentView = view;
+  const btnRoles = $('tabDashKanbanRoles');
+  const btnStages = $('tabDashKanbanStages');
+  if (btnRoles && btnStages) {
+    if (view === 'roles') {
+      btnRoles.style.background = '#1e293b';
+      btnRoles.style.color = '#38bdf8';
+      btnStages.style.background = 'transparent';
+      btnStages.style.color = '#94a3b8';
+    } else {
+      btnStages.style.background = '#1e293b';
+      btnStages.style.color = '#38bdf8';
+      btnRoles.style.background = 'transparent';
+      btnRoles.style.color = '#94a3b8';
+    }
+  }
+  renderDashboardKanban();
+}
+
+function renderDashboardKanban() {
+  const container = $('dashRoleKanbanBoard');
+  if (!container) return;
+
+  const allTodos = (state.todos || []).flat();
+
+  if (dashKanbanCurrentView === 'roles') {
+    const roleTeams = [
+      { key: 'lead', name: 'Lead Architect', sid: 'gw-lead-agy', icon: '👑', match: ['lead'] },
+      { key: 'backend', name: 'Backend Specialist', sid: 'gw-backend-agy', icon: '🗄️', match: ['backend'] },
+      { key: 'frontend', name: 'Frontend Specialist', sid: 'gw-frontend-agy', icon: '🎨', match: ['frontend'] },
+      { key: 'devops', name: 'DevOps & Packaging', sid: 'gw-devops-agy', icon: '🚢', match: ['devops', 'docker'] },
+      { key: 'qa', name: 'QA Tester', sid: 'gw-qa-agy', icon: '🧪', match: ['qa', 'test'] },
+      { key: 'security', name: 'Security Auditor', sid: 'gw-security-agy', icon: '🛡️', match: ['security', 'audit'] }
+    ];
+
+    container.style.gridTemplateColumns = 'repeat(auto-fit, minmax(230px, 1fr))';
+    container.innerHTML = roleTeams.map(rt => {
+      const roleTodos = allTodos.filter(t => {
+        const rName = (t.role || '').toLowerCase();
+        return rt.match.some(m => rName.includes(m));
+      });
+      const doneCount = roleTodos.filter(t => t.status === 'done').length;
+      const totalCount = roleTodos.length;
+      
+      const rObj = (state.roles || []).find(x => rt.match.some(m => (x.name || '').toLowerCase().includes(m))) || {};
+      const modelName = rObj.model || 'Gemini 2.5 Pro (Thinking)';
+
+      return `
+        <div style="background:#0e131b;border:1px solid #1a2332;border-radius:8px;display:flex;flex-direction:column;min-height:220px;overflow:hidden">
+          <div style="background:#131a24;border-bottom:1px solid #1a2332;padding:8px 10px;display:flex;align-items:center;justify-content:space-between">
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="font-size:15px">${rt.icon}</span>
+              <div>
+                <strong style="font-size:11.5px;color:#f8fafc;display:block;line-height:1.2">${rt.name}</strong>
+                <span style="font-size:9.5px;color:#38bdf8;font-family:var(--mono)">${rt.sid}</span>
+              </div>
+            </div>
+            <span class="badge" style="font-size:9.5px;background:#1e293b;color:${doneCount === totalCount && totalCount > 0 ? '#4ade80' : '#38bdf8'}">${doneCount}/${totalCount}</span>
+          </div>
+
+          <div style="padding:5px 10px;background:#090d14;border-bottom:1px solid #141b26;display:flex;align-items:center;justify-content:space-between">
+            <span style="font-size:9.5px;color:#94a3b8">Model AI:</span>
+            <span style="font-size:9.5px;font-weight:600;color:#cbd5e1;background:rgba(56,189,248,0.08);padding:1px 6px;border-radius:3px;border:1px solid rgba(56,189,248,0.2)">🤖 ${escapeHtml(modelName.split(' ')[0] + ' ' + (modelName.split(' ')[1] || ''))}</span>
+          </div>
+
+          <div style="padding:8px;display:flex;flex-direction:column;gap:6px;flex:1;overflow-y:auto;max-height:280px">
+            ${roleTodos.length === 0 ? `<div style="color:#64748b;font-size:10.5px;text-align:center;padding:16px 0">Sẵn sàng nhận task</div>` : ''}
+            ${roleTodos.map(t => {
+              const isDone = t.status === 'done';
+              const isLive = t.status === 'live' || t.status === 'running' || t.status === 'in_progress';
+              return `
+                <div style="background:${isLive ? 'rgba(56,189,248,0.06)' : '#121822'};border:1px solid ${isLive ? '#0284c7' : isDone ? 'rgba(74,222,128,0.2)' : '#1e293b'};border-radius:6px;padding:7px 9px;display:flex;flex-direction:column;gap:4px">
+                  <div style="display:flex;align-items:center;justify-content:space-between">
+                    <span style="font-family:var(--mono);font-size:10px;font-weight:700;color:${isDone ? '#4ade80' : isLive ? '#38bdf8' : '#94a3b8'}">${escapeHtml(t.id)}</span>
+                    <span class="chip ${isDone ? 'done' : isLive ? 'live' : 'wait'}" style="font-size:8.5px;padding:0 5px">${isDone ? '✓ Xong' : isLive ? '⚙️ Đang chạy' : 'Chờ'}</span>
+                  </div>
+                  <div style="font-size:11px;color:#e2e8f0;line-height:1.35;font-weight:500">${escapeHtml(t.title)}</div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+          <div style="padding:6px 8px;border-top:1px solid #141b26;background:#0b0f17">
+            <button class="btn small" style="width:100%;font-size:9.5px;padding:2px 0;justify-content:center" onclick="selectTmuxSession('${rt.sid}');go('runtimes')">Mở Console ➔</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  } else {
+    // Stage-based view (Workflow 4 stages)
+    const stages = [
+      { key: 'backlog', title: '📥 Backlog', filter: t => !t.status || t.status === 'backlog' },
+      { key: 'ready', title: '⏳ In Queue / Sẵn Sàng', filter: t => t.status === 'wait' || t.status === 'queued' || t.status === 'ready' },
+      { key: 'progress', title: '⚙️ Đang Thực Thi', filter: t => t.status === 'live' || t.status === 'running' || t.status === 'in_progress' },
+      { key: 'done', title: '✅ Đã Nghiệm Thu', filter: t => t.status === 'done' }
+    ];
+
+    container.style.gridTemplateColumns = 'repeat(4, minmax(200px, 1fr))';
+    container.innerHTML = stages.map(st => {
+      const items = allTodos.filter(st.filter);
+      return `
+        <div style="background:#0e131b;border:1px solid #1a2332;border-radius:8px;display:flex;flex-direction:column;min-height:220px;overflow:hidden">
+          <div style="background:#131a24;border-bottom:1px solid #1a2332;padding:8px 10px;display:flex;align-items:center;justify-content:space-between">
+            <strong style="font-size:11px;color:#f8fafc">${st.title}</strong>
+            <span class="badge" style="font-size:9.5px;background:#1e293b;color:#38bdf8">${items.length}</span>
+          </div>
+          <div style="padding:8px;display:flex;flex-direction:column;gap:6px;flex:1;overflow-y:auto;max-height:280px">
+            ${items.length === 0 ? `<div style="color:#64748b;font-size:10px;text-align:center;padding:16px 0">Trống</div>` : ''}
+            ${items.map(t => `
+              <div style="background:#121822;border:1px solid #1e293b;border-radius:6px;padding:7px 9px;display:flex;flex-direction:column;gap:4px">
+                <div style="display:flex;align-items:center;justify-content:space-between">
+                  <span style="font-family:var(--mono);font-size:10px;font-weight:700;color:#cbd5e1">${escapeHtml(t.id)}</span>
+                  <span class="badge" style="font-size:8.5px;background:#1e293b;color:#38bdf8">${escapeHtml(t.role?.split(' ')[0] || '')}</span>
+                </div>
+                <div style="font-size:11px;color:#e2e8f0;line-height:1.35">${escapeHtml(t.title)}</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
 }
 
 // =========================================================================

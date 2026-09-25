@@ -220,6 +220,18 @@ class SwarmHandler(SimpleHTTPRequestHandler):
                 self._send_json(400, {"error": "Missing id or instruction"})
             return
 
+        # 3b. Cập nhật Model AI cho Role
+        if path == "/api/role/model":
+            role_id = data.get("id") or data.get("role_id")
+            model = data.get("model") or data.get("model_name")
+            project_id = data.get("project_id", "PRJ-GEN-WORKPLACE")
+            if role_id and model:
+                success = db.update_role_model(role_id, model, project_id)
+                self._send_json(200, {"status": "model_updated", "id": role_id, "model": model, "success": success})
+            else:
+                self._send_json(400, {"error": "Missing id or model"})
+            return
+
         # 4. Điều phối lệnh thực thi (Execution Dispatcher)
         if path == "/api/execute":
             command = data.get("command", "")

@@ -270,6 +270,12 @@ def init_db():
             except Exception:
                 pass
 
+        # Di trú cột model_name cho agent_roles
+        try:
+            cursor.execute("ALTER TABLE agent_roles ADD COLUMN model_name TEXT DEFAULT '';")
+        except Exception:
+            pass
+
         conn.commit()
 
 
@@ -522,11 +528,13 @@ def get_full_state(project_id="PRJ-GEN-WORKPLACE"):
         cursor.execute("SELECT * FROM agent_roles WHERE project_id = ? ORDER BY id ASC", (project_id,))
         roles = []
         for rl in cursor.fetchall():
+            m_name = rl["model_name"] if "model_name" in rl.keys() and rl["model_name"] else get_default_model_for_role(rl["name"])
             roles.append({
                 "id": rl["id"],
                 "key": rl["role_key"],
                 "name": rl["name"],
                 "cli": rl["cli_tool"],
+                "model": m_name,
                 "scope": rl["scope"],
                 "instruction": rl["instruction"]
             })
@@ -2230,6 +2238,34 @@ def generate_structure_from_ssot(content, project_id="PRJ-GEN-WORKPLACE"):
         "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
         "ssot_summary": spec_summary
     }
+
+def get_default_model_for_role(role_name):
+    rn = (role_name or "").lower()
+    if "lead" in rn or "architect" in rn:
+        return "Gemini 2.5 Pro (Thinking)"
+    if "backend" in rn or "db" in rn:
+        return "Gemini 2.5 Pro (Thinking)"
+    if "frontend" in rn:
+        return "Gemini 2.5 Flash"
+    if "devops" in rn or "docker" in rn:
+        return "Gemini 2.5 Flash"
+    if "qa" in rn or "test" in rn:
+        return "Gemini 2.5 Flash Thinking"
+    if "security" in rn or "audit" in rn:
+        return "Claude 3.7 Sonnet (Thinking)"
+    return "Gemini 2.5 Pro"
+
+def update_role_model(role_id, model_name, project_id="PRJ-GEN-WORKPLACE"):
+    project_id = normalize_project_id(project_id)
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+        UPDATE agent_roles
+        SET model_name = ?
+        WHERE (id = ? OR name = ? OR role_key = ?) AND project_id = ?
+        """, (model_name, role_id, role_id, role_id, project_id))
+        conn.commit()
+        return cursor.rowcount > 0
 
 # Khởi tạo tự động khi import
 init_db()
