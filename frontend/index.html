@@ -3263,7 +3263,7 @@ button { cursor: pointer; }
                 </div>
 
                 <!-- Live Terminal & Console Stream (100% Full Width Cột Phải) -->
-                <div class="streamlinedConsole" style="flex:1;min-height:420px;display:flex;flex-direction:column;border:1px solid #1f2a3a;border-radius:10px;overflow:hidden;background:#080b0f">
+                <div class="streamlinedConsole" id="workbenchConsole" style="flex:1;min-height:420px;display:flex;flex-direction:column;border:1px solid #1f2a3a;border-radius:10px;overflow:hidden;background:#080b0f">
                   <div style="background:#111620;border-bottom:1px solid #1a2332;padding:8px 14px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;gap:8px;flex-wrap:wrap">
                     <div style="display:flex;align-items:center;gap:10px">
                       <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#22c55e;box-shadow:0 0 8px #22c55e"></span>
@@ -3280,22 +3280,26 @@ button { cursor: pointer; }
                   </div>
 
                   <!-- Quick Action Shell Toolbar -->
-                  <div class="streamlinedConsoleActionsBar" style="background:#090d14;border-bottom:1px solid #1a2332;padding:6px 12px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;flex-shrink:0">
-                    <span style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.5px">⚡ Thao tác nhanh:</span>
-                    <button class="btn small" style="font-size:10px;padding:2px 8px;font-family:var(--mono)" onclick="sendWbTmuxPredefinedCmd('gw-status')" title="Kiểm tra context vai trò">🔍 gw-status</button>
-                    <button class="btn small" style="font-size:10px;padding:2px 8px;font-family:var(--mono)" onclick="sendWbTmuxPredefinedCmd('gw-role')" title="Đọc toàn bộ Role Spec">📋 gw-role</button>
-                    <button class="btn small" style="font-size:10px;padding:2px 8px;font-family:var(--mono)" onclick="sendWbTmuxPredefinedCmd('cat docs/SSOT_ORIGINAL_SPEC.md | head -n 30')" title="Tra cứu SSOT Spec">📜 SSOT Spec</button>
-                    <button class="btn small" style="font-size:10px;padding:2px 8px;font-family:var(--mono);color:#38bdf8;border-color:rgba(56,189,248,0.3)" onclick="sendWbTmuxRoleTask()" title="Chạy nhiệm vụ chuyên môn của role này">▶ Chạy Task này</button>
-                    <button class="btn small primary" style="font-size:10px;padding:2px 10px;font-family:var(--mono);background:linear-gradient(135deg,#0284c7,#2563eb)" onclick="triggerDispatchSwarmAll()" title="Truyền lệnh & chạy đồng loạt toàn bộ 6 Agent Swarm">🚀 Chạy Toàn Bộ Swarm</button>
+                  <div class="streamlinedConsoleActionsBar" style="background:#090d14;border-bottom:1px solid #1a2332;padding:6px 12px;display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;flex-shrink:0">
+                    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                      <span style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.5px">⚡ Thao tác nhanh:</span>
+                      <button class="btn small" style="font-size:10px;padding:2px 8px;font-family:var(--mono)" onclick="sendWbTmuxPredefinedCmd('gw-status')" title="Kiểm tra context vai trò">🔍 gw-status</button>
+                      <button class="btn small" style="font-size:10px;padding:2px 8px;font-family:var(--mono)" onclick="sendWbTmuxPredefinedCmd('gw-role')" title="Đọc toàn bộ Role Spec">📋 gw-role</button>
+                      <button class="btn small" style="font-size:10px;padding:2px 8px;font-family:var(--mono)" onclick="sendWbTmuxPredefinedCmd('cat docs/SSOT_ORIGINAL_SPEC.md | head -n 30')" title="Tra cứu SSOT Spec">📜 SSOT Spec</button>
+                      <button class="btn small" style="font-size:10px;padding:2px 8px;font-family:var(--mono);color:#38bdf8;border-color:rgba(56,189,248,0.3)" onclick="sendWbTmuxRoleTask()" title="Chạy nhiệm vụ chuyên môn của role này">▶ Chạy Task này</button>
+                    </div>
+                    <div>
+                      <button class="btn small primary" style="font-size:10px;padding:2px 10px;font-family:var(--mono);background:linear-gradient(135deg,#0284c7,#2563eb);border:none" onclick="triggerDispatchSwarmAll()" title="Truyền lệnh & chạy đồng loạt toàn bộ 6 Agent Swarm">🚀 Chạy Toàn Bộ Swarm</button>
+                    </div>
                   </div>
 
-                  <div class="streamlinedConsoleBody" id="wbTerminalOutput" style="flex:1;min-height:360px;padding:12px 16px;font-family:var(--mono);font-size:12.5px;line-height:1.6;color:#e2e8f0;overflow-y:auto;background:#05070a;white-space:pre-wrap;word-break:break-all">
+                  <div class="streamlinedConsoleBody" id="wbTerminalOutput" style="flex:1;min-height:360px;padding:12px 16px;font-family:ui-monospace,SFMono-Regular,'JetBrains Mono',Menlo,Consolas,monospace;font-size:12px;line-height:1.65;color:#e2e8f0;overflow-y:auto;background:#05070a;white-space:pre-wrap;word-break:normal;overflow-wrap:break-word">
                     <span style="color:#64748b">▸ Đang kết nối terminal stream...</span>
                   </div>
 
                   <div class="streamlinedConsoleInputRow" style="background:#0d1219;border-top:1px solid #1a2332;padding:8px 12px;display:flex;align-items:center;gap:8px;flex-shrink:0">
-                    <span style="color:#38bdf8;font-family:var(--mono);font-size:13px;font-weight:700">$</span>
-                    <input id="wbCmdInput" class="chatInput" style="flex:1;background:transparent;border:none;color:#f8fafc;font-family:var(--mono);font-size:12px" placeholder="Gửi lệnh thực thi vào tmux session này (Enter để gửi, ↑/↓ xem lại lịch sử)…" onkeydown="handleCmdInputKeyDown(event)"/>
+                    <span style="color:#38bdf8;font-family:var(--mono);font-size:12px;font-weight:700;white-space:nowrap" id="wbPromptPrefix">[gw-lead-agy] $</span>
+                    <input id="wbCmdInput" class="chatInput" style="flex:1;background:transparent;border:none;color:#f8fafc;font-family:ui-monospace,SFMono-Regular,'JetBrains Mono',Menlo,Consolas,monospace;font-size:12px;outline:none" placeholder="Gửi lệnh thực thi vào tmux session này (Enter để gửi, ↑/↓ xem lại lịch sử)…" onkeydown="handleCmdInputKeyDown(event)"/>
                     <button class="btn small" style="font-size:10.5px;padding:3px 8px;font-family:var(--mono)" onclick="sendTmuxKey('C-c')" title="Gửi phím ngắt Ctrl+C">^C</button>
                     <button class="btn small primary" style="font-size:11px;padding:3px 12px" onclick="sendWbTmuxCmd()">Chạy lệnh</button>
                   </div>
@@ -3468,24 +3472,11 @@ button { cursor: pointer; }
                 </div>
               </div>
 
-              <div class="deckPanel" id="deckPanel-kanban">
+              <div class="deckPanel" id="deckPanel-kanban" style="display:none;flex:1;padding:12px;overflow-x:auto">
                 <div class="kanban" id="kanban" style="padding:12px;overflow-x:auto"></div>
               </div>
 
-              <div class="deckPanel" id="deckPanel-console">
-                <div class="streamlinedConsole">
-                  <div class="streamlinedConsoleBody" id="tmuxTerminalOutput">
-                    <span style="color:#4b5563">▸ Chọn một worker card để xem console output...</span>
-                  </div>
-                  <div class="streamlinedConsoleInputRow">
-                    <span style="color:#7c3aed;font-family:var(--mono);font-size:12px">$</span>
-                    <input id="tmuxCmdInput" class="chatInput" style="flex:1;background:transparent;border:none;color:#e5e7eb;font-family:var(--mono);font-size:12px" placeholder="gửi lệnh đến session tmux hiện tại…" onkeydown="if(event.key==='Enter')sendTmuxCmd()"/>
-                    <button class="btn small primary" onclick="sendTmuxCmd()">Gửi</button>
-                  </div>
-                </div>
-              </div>
-
-              <div class="deckPanel" id="deckPanel-oauth">
+              <div class="deckPanel" id="deckPanel-oauth" style="display:none;flex:1;padding:16px;overflow-y:auto">
                 <div style="padding:16px" id="deckOauthContent">
                   <!-- rendered by renderOauthProfiles() -->
                 </div>
@@ -5547,17 +5538,8 @@ function updateCommandDeck() {
     }
   }
 
-  // Update Console Tab labels
-  if ($('consoleSidLabel')) $('consoleSidLabel').textContent = current.id;
-  if ($('tmuxPromptLabel')) $('tmuxPromptLabel').textContent = current.id + ' >';
-
-  // Update Terminal Output in Console Tab
-  const outBox = $('tmuxTerminalOutput');
-  if (outBox) {
-    const rawText = current.terminal_output || `[tmux session: ${current.id}]\nEngine: ${current.cli_tool}\nAccount: ${current.account_label}\nReady for instructions.`;
-    outBox.innerHTML = escapeHtml(rawText).replace(/\n/g, '<br>');
-    outBox.scrollTop = outBox.scrollHeight;
-  }
+  // Update Prompt Prefix in Workbench Console
+  if ($('wbPromptPrefix')) $('wbPromptPrefix').textContent = `[${current.id}] $`;
 
   // Update Chat title
   if ($('chatTitle')) $('chatTitle').textContent = `${current.role_name} · ${current.id}`;
@@ -5576,9 +5558,9 @@ function switchDeckTab(tabName, el) {
   if (el) el.classList.add('active');
   else document.querySelector(`.deckNavTab[data-decktab="${tabName}"]`)?.classList.add('active');
 
-  ['workbench', 'sop', 'chat', 'thinking', 'kanban', 'console', 'oauth'].forEach(tab => {
+  ['workbench', 'sop', 'chat', 'thinking', 'kanban', 'oauth'].forEach(tab => {
     const p = $('deckPanel-' + tab);
-    if (p) p.style.display = (tab === tabName) ? (tab === 'chat' || tab === 'console' || tab === 'workbench' || tab === 'thinking' ? 'flex' : 'block') : 'none';
+    if (p) p.style.display = (tab === tabName) ? (tab === 'chat' || tab === 'workbench' || tab === 'thinking' ? 'flex' : 'block') : 'none';
   });
 
   if (tabName === 'kanban') renderKanban();
@@ -5625,6 +5607,14 @@ function formatTerminalAnsi(raw) {
   
   // 3. Highlight Bash Prompts: [gw-xxx-agy:/workspace]$
   html = html.replace(/\[(gw-[a-z0-9-]+):(.*?)]\$/g, '<span style="color:#38bdf8;font-weight:700">[$1</span>:<span style="color:#4ade80;font-weight:600">$2</span>]<span style="color:#facc15;font-weight:800">$</span>');
+
+  // 4. Subtle Dividers
+  html = html.replace(/={30,}/g, '<span style="color:#334155;letter-spacing:1px;user-select:none">════════════════════════════════════════════════════════════════════════════════</span>');
+  html = html.replace(/-{30,}/g, '<span style="color:#1e293b;letter-spacing:1px;user-select:none">────────────────────────────────────────────────────────────────────────────────</span>');
+
+  // 5. Status Badges
+  html = html.replace(/\b(PASS|200 OK|Locked 100%|Active)\b/g, '<span style="color:#4ade80;font-weight:700">$1</span>');
+  html = html.replace(/\b(FAIL|ERROR|FATAL)\b/g, '<span style="color:#f87171;font-weight:700">$1</span>');
 
   // Đổi newline thành <br>
   html = html.replace(/\n/g, '<br>');
@@ -6965,13 +6955,13 @@ function selectTmuxSession(sid) {
 }
 
 async function sendTmuxCmd() {
-  const input = $('tmuxCmdInput');
+  const input = $('wbCmdInput') || $('tmuxCmdInput');
   if (!input) return;
   const cmd = input.value.trim();
   if (!cmd) return;
   input.value = '';
 
-  const sid = state.selectedTmuxSessionId;
+  const sid = state.selectedTmuxSessionId || 'gw-lead-agy';
   const s = state.tmuxSessions.find(x => x.id === sid);
   if (s) {
     s.terminal_output = (s.terminal_output || '') + '\n$ ' + cmd + '\n[Đang gửi lệnh...]';
@@ -7016,7 +7006,7 @@ async function sendGridCmd(sid) {
 }
 
 async function sendTmuxKey(key) {
-  const sid = state.selectedTmuxSessionId;
+  const sid = state.selectedTmuxSessionId || 'gw-lead-agy';
   try {
     const res = await fetch('/api/tmux/send', {
       method: 'POST',
@@ -7038,13 +7028,13 @@ async function clearTmuxTerminal() {
 }
 
 function restartTmuxSession() {
-  const sid = state.selectedTmuxSessionId;
+  const sid = state.selectedTmuxSessionId || 'gw-lead-agy';
   sendTmuxKey('C-c');
   showToast('Đã gửi tín hiệu khởi động lại phiên ' + sid);
 }
 
 function insertTmuxCmd(text) {
-  const input = $('tmuxCmdInput');
+  const input = $('wbCmdInput') || $('tmuxCmdInput');
   if (input) {
     input.value = text;
     input.focus();

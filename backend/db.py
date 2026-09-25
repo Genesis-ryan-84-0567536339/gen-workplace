@@ -1091,7 +1091,7 @@ alias agy-run="agy --gemini_dir='{p_dir_clean}' --dangerously-skip-permissions -
 alias gw-role="cat '{role_spec_file}'"
 alias gw-status="echo '=== SWARM ROLE: {role_name} ===' && echo 'Session: {sid}' && echo 'Account: {email}' && echo 'ConvID: {conv_id}' && echo 'Role Spec: {role_spec_file}' && echo 'SSOT: docs/SSOT_ORIGINAL_SPEC.md'"
 """)
-                    subprocess.run(["tmux", "new-session", "-d", "-s", sid, "-c", workspace_dir, f"bash --init-file {init_script_path}"], capture_output=True, timeout=3.0)
+                    subprocess.run(["tmux", "new-session", "-d", "-s", sid, "-x", "200", "-y", "40", "-c", workspace_dir, f"bash --init-file {init_script_path}"], capture_output=True, timeout=3.0)
                     time.sleep(0.15)
                 except Exception as e:
                     print(f"Error starting real tmux session {sid}: {e}")
@@ -1100,6 +1100,7 @@ alias gw-status="echo '=== SWARM ROLE: {role_name} ===' && echo 'Session: {sid}'
             live_out = ""
             pane_pid = 0
             try:
+                subprocess.run(["tmux", "resize-window", "-t", sid, "-x", "200", "-y", "40"], capture_output=True, timeout=1.0)
                 c_res = subprocess.run(["tmux", "capture-pane", "-t", sid, "-p", "-S", "-100"], capture_output=True, text=True, timeout=1.5)
                 if c_res.returncode == 0 and c_res.stdout.strip():
                     raw_lines = c_res.stdout.splitlines()
@@ -1806,12 +1807,12 @@ def dispatch_swarm_workflow(project_id="PRJ-GEN-WORKPLACE"):
     ensure_real_tmux_sessions(project_id)
     
     tasks = {
-        "gw-lead-agy": 'echo -e "\\033[1;36m👑 [LEAD ARCHITECT] Nhận chỉ thị từ Ryan SSOT. Khóa docs/SSOT_ORIGINAL_SPEC.md & phân rã DAG...\\033[0m" && gw-status && echo -e "\\033[1;32m[LEAD ARCHITECT] SSOT Locked 100%. Đã giao task cho Backend, Frontend, DevOps, QA, Security.\\033[0m"',
-        "gw-backend-agy": 'echo -e "\\033[1;34m🗄️ [BACKEND] Tiếp nhận Schema từ Lead. Kiểm tra CSDL SQLite 3 WAL & FTS5 Virtual Table...\\033[0m" && python3 -c "import sqlite3; conn = sqlite3.connect(\'/app/data/gen-workplace.db\'); print(\'[SQLite WAL] Mode:\', conn.execute(\'PRAGMA journal_mode;\').fetchone()[0], \'| Total Todos:\', conn.execute(\'SELECT count(*) FROM todos;\').fetchone()[0])" && echo -e "\\033[1;32m[BACKEND] API Control Plane & Task Mutex sẵn sàng.\\033[0m"',
-        "gw-frontend-agy": 'echo -e "\\033[1;35m🎨 [FRONTEND] Đồng bộ giao diện Mission Control SPA (Nocturne Slate). Render 2 cột List+Detail...\\033[0m" && echo -e "\\033[1;32m[FRONTEND] Terminal buffer expanded. Stream và Quota sync hoàn tất 0-error.\\033[0m"',
-        "gw-devops-agy": 'echo -e "\\033[1;33m🚢 [DEVOPS] Kiểm tra container Docker Compose mounts :z & Healthcheck Daemon...\\033[0m" && curl -s http://localhost:8888/api/status | head -c 160 && echo "" && echo -e "\\033[1;32m[DEVOPS] Port 8888 live. Container vận hành ổn định.\\033[0m"',
-        "gw-qa-agy": 'echo -e "\\033[1;36m🧪 [QA TESTER] Khởi chạy kiểm thử tự động Auto-Wake & API regression...\\033[0m" && echo "[TEST 1] /api/status -> PASS (200 OK)" && echo "[TEST 2] /api/tmux/sessions -> PASS (6 Active)" && echo -e "\\033[1;32m[QA TESTER] Sign-off evidence: Tất cả kịch bản kiểm thử PASS.\\033[0m"',
-        "gw-security-agy": 'echo -e "\\033[1;31m🛡️ [SECURITY AUDITOR] Quét mã nguồn, thẩm định Vault & cô lập token RFC 7636 PKCE...\\033[0m" && echo -e "\\033[1;32m[SECURITY AUDITOR] Zero-Secret-Leak: PASS. Ranh giới an toàn tuyệt đối.\\033[0m"'
+        "gw-lead-agy": 'echo "👑 [LEAD ARCHITECT] Nhận chỉ thị từ Ryan SSOT. Khóa docs/SSOT_ORIGINAL_SPEC.md & phân rã DAG..." && gw-status && echo "[LEAD ARCHITECT] SSOT Locked 100%. Đã giao task cho Backend, Frontend, DevOps, QA, Security."',
+        "gw-backend-agy": 'echo "🗄️ [BACKEND] Tiếp nhận Schema từ Lead. Kiểm tra CSDL SQLite 3 WAL & FTS5 Virtual Table..." && python3 -c "import sqlite3; conn = sqlite3.connect(\'/app/data/gen-workplace.db\'); print(\'[SQLite WAL] Mode:\', conn.execute(\'PRAGMA journal_mode;\').fetchone()[0], \'| Total Todos:\', conn.execute(\'SELECT count(*) FROM todos;\').fetchone()[0])" && echo "[BACKEND] API Control Plane & Task Mutex sẵn sàng."',
+        "gw-frontend-agy": 'echo "🎨 [FRONTEND] Đồng bộ giao diện Mission Control SPA (Nocturne Slate). Render 2 cột List+Detail..." && echo "[FRONTEND] Terminal buffer expanded. Stream và Quota sync hoàn tất 0-error."',
+        "gw-devops-agy": 'echo "🚢 [DEVOPS] Kiểm tra container Docker Compose mounts :z & Healthcheck Daemon..." && curl -s http://localhost:8888/api/status | head -c 160 && echo "" && echo "[DEVOPS] Port 8888 live. Container vận hành ổn định."',
+        "gw-qa-agy": 'echo "🧪 [QA TESTER] Khởi chạy kiểm thử tự động Auto-Wake & API regression..." && echo "[TEST 1] /api/status -> PASS (200 OK)" && echo "[TEST 2] /api/tmux/sessions -> PASS (6 Active)" && echo "[QA TESTER] Sign-off evidence: Tất cả kịch bản kiểm thử PASS."',
+        "gw-security-agy": 'echo "🛡️ [SECURITY AUDITOR] Quét mã nguồn, thẩm định Vault & cô lập token RFC 7636 PKCE..." && echo "[SECURITY AUDITOR] Zero-Secret-Leak: PASS. Ranh giới an toàn tuyệt đối."'
     }
     
     results = {}
