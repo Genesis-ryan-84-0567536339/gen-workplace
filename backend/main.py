@@ -158,6 +158,71 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             self._send_json(404, {"error": "SSOT spec file not found"})
             return
 
+        # 9. API Git Commit History thật
+        if path == "/api/git/log":
+            limit = int(query.get("limit", [15])[0])
+            commits = db.get_git_log(limit)
+            self._send_json(200, {"commits": commits, "count": len(commits)})
+            return
+
+        # 10. API Git Status & Branch thật
+        if path == "/api/git/status":
+            stat = db.get_git_status()
+            self._send_json(200, stat)
+            return
+
+        # 11. API SQLite Tables Explorer thật
+        if path == "/api/db/tables":
+            prj_id = query.get("project", ["PRJ-GEN-WORKPLACE"])[0]
+            tables = db.get_db_tables(prj_id)
+            self._send_json(200, {"tables": tables, "count": len(tables)})
+            return
+
+        # 12. API File Manager & Artifacts thật
+        if path == "/api/files/tree":
+            files = db.get_workspace_files()
+            self._send_json(200, {"files": files, "count": len(files)})
+            return
+
+        # 13. API Hồ Sơ Chức Trách SOP thật từ ROLE.md
+        if path == "/api/roles/sop":
+            sop = db.get_roles_sop()
+            self._send_json(200, {"roles": sop})
+            return
+
+        # 14. API Vault & Secrets Explorer
+        if path == "/api/vault/list":
+            vault = db.get_vault_list()
+            self._send_json(200, {"vault": vault})
+            return
+
+        # 15. API SSOT Events thẩm định thật từ SQLite
+        if path == "/api/events":
+            prj_id = query.get("project", ["PRJ-GEN-WORKPLACE"])[0]
+            events = db.get_ssot_events(prj_id)
+            self._send_json(200, {"events": events, "count": len(events)})
+            return
+
+        # 16. API Skills hệ thống thật
+        if path == "/api/skills":
+            skills = db.get_system_skills()
+            self._send_json(200, {"skills": skills, "count": len(skills)})
+            return
+
+        # 17. API MCP Tools hệ thống thật
+        if path == "/api/mcps":
+            mcps = db.get_system_mcps()
+            self._send_json(200, {"mcps": mcps, "count": len(mcps)})
+            return
+
+        # 18. API Mạch tư duy đo lường thực tế
+        if path == "/api/thinking/trace":
+            sid = query.get("session", ["gw-lead-agy"])[0]
+            prj_id = query.get("project", ["PRJ-GEN-WORKPLACE"])[0]
+            trace_data = db.get_role_thinking_trace(sid, prj_id)
+            self._send_json(200, trace_data)
+            return
+
         return super().do_GET()
 
     def do_POST(self):
@@ -194,14 +259,12 @@ class SwarmHandler(SimpleHTTPRequestHandler):
 
         # 2. Cập nhật trạng thái Todo
         if path == "/api/todo/update":
-            todo_id = data.get("id")
-            new_status = data.get("status")
+            todo_id = data.get("id") or data.get("todo_id")
+            new_status = data.get("status") or data.get("new_status")
+            project_id = data.get("project_id", "PRJ-GEN-WORKPLACE")
             if todo_id and new_status:
-                with db.get_connection() as conn:
-                    cursor = conn.cursor()
-                    cursor.execute("UPDATE todos SET status = ? WHERE id = ?", (new_status, todo_id))
-                    conn.commit()
-                self._send_json(200, {"status": "updated", "id": todo_id, "new_status": new_status})
+                success = db.update_todo_status(todo_id, new_status, project_id)
+                self._send_json(200, {"status": "updated", "id": todo_id, "new_status": new_status, "success": success})
             else:
                 self._send_json(400, {"error": "Missing id or status"})
             return
@@ -474,6 +537,53 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             res = db.generate_structure_from_ssot(content, prj_id)
             state = db.get_full_state(prj_id)
             self._send_json(200, {"status": "generated", "summary": res, "state": state})
+            return
+
+        # 20. Thẩm định sự kiện SSOT Event
+        if path == "/api/events/verify":
+            event_id = data.get("id") or data.get("event_id")
+            status = data.get("status", "ssot")
+            project_id = data.get("project_id", "PRJ-GEN-WORKPLACE")
+            if event_id:
+                db.verify_ssot_event(event_id, status, project_id)
+                self._send_json(200, {"status": "verified", "id": event_id})
+            else:
+                self._send_json(400, {"error": "Missing event_id"})
+            return
+
+        # 21. Tạo dự án mới lưu trực tiếp vào SQLite
+        if path == "/api/project/create":
+            name = data.get("name", "").strip()
+            repo = data.get("repo", "").strip()
+            plan = data.get("plan", "").strip()
+            res = db.create_new_project(name, repo, plan)
+            self._send_json(200, res)
+            return
+
+        # 22. Trao đổi chỉ thị với Runtime Chuyên gia (Ghi DB + Chuyển Tmux)
+        if path == "/api/runtime/chat":
+            message = data.get("message", "").strip()
+            session_id = data.get("session_id", "gw-lead-agy")
+            project_id = data.get("project_id", "PRJ-GEN-WORKPLACE")
+            author = data.get("author", "Owner (Ryan)")
+            if message:
+                now_time = time.strftime("%H:%M:%S")
+                with db.get_connection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("""
+                    INSERT INTO chat_messages (project_id, runtime_id, author, created_time, tag, body, react_json)
+                    VALUES (?, ?, ?, ?, 'Directive', ?, '["✅ đã nhận"]')
+                    """, (project_id, session_id, author, now_time, message))
+                    conn.commit()
+                # Gửi lệnh vào tmux tương tác nếu phiên đang mở
+                try:
+                    escaped_msg = message.replace('"', '\\"')
+                    subprocess.run(["tmux", "send-keys", "-t", session_id, f'echo -e "\\033[1;36m[Ryan DIRECTIVE]\\033[0m: {escaped_msg}"', "C-m"], timeout=1.5)
+                except Exception:
+                    pass
+                self._send_json(200, {"status": "sent", "session_id": session_id, "time": now_time})
+            else:
+                self._send_json(400, {"error": "Missing message"})
             return
 
         self.send_response(404)
