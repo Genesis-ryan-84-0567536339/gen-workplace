@@ -20,6 +20,12 @@ DATA_DIR = Path(os.environ.get("DATA_DIR", default_data))
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 DB_PATH = DATA_DIR / "gen-workplace.db"
 
+def normalize_project_id(pid):
+    """Chuẩn hóa ID dự án linh hoạt: gen-workplace -> PRJ-GEN-WORKPLACE."""
+    if not pid or str(pid).strip() in ("gen-workplace", "PRJ-GEN-WORKPLACE", "default", "PRJ-DEFAULT"):
+        return "PRJ-GEN-WORKPLACE"
+    return str(pid).strip()
+
 def get_connection():
     """Tạo kết nối SQLite tối ưu với WAL mode và Foreign Keys."""
     conn = sqlite3.connect(str(DB_PATH), timeout=15.0)
@@ -455,6 +461,7 @@ def seed_real_project():
 
 def get_full_state(project_id="PRJ-GEN-WORKPLACE"):
     """Lấy toàn bộ trạng thái hệ thống theo đúng định dạng state của WebApp."""
+    project_id = normalize_project_id(project_id)
     with get_connection() as conn:
         cursor = conn.cursor()
 
@@ -641,6 +648,7 @@ def get_full_state(project_id="PRJ-GEN-WORKPLACE"):
 
 def search_catalog_fts(query_str, project_id="PRJ-GEN-WORKPLACE"):
     """Tra cứu siêu tốc ID trong Catalog bằng FTS5 (Full-Text Search)."""
+    project_id = normalize_project_id(project_id)
     with get_connection() as conn:
         cursor = conn.cursor()
         clean_q = "".join(c for c in query_str if c.isalnum() or c in " -_#").strip()
@@ -978,6 +986,7 @@ def ensure_real_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
     Mỗi phiên là 1 tiến trình bash tương tác độc lập, được inject sẵn SSOT context,
     conversation ID continuity, profile xác thực và alias gọi agy CLI trực tiếp.
     """
+    project_id = normalize_project_id(project_id)
     live_sessions = set()
     try:
         res = subprocess.run(["tmux", "list-sessions", "-F", "#{session_name}"], capture_output=True, text=True, timeout=2.0)
@@ -1079,6 +1088,7 @@ alias gw-status="echo '=== SWARM ROLE: {role_name} ===' && echo 'Session: {sid}'
 
 def seed_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
     """Điền và đồng bộ cấu hình 6 phiên Swarm Runtimes trong SQLite Core DB."""
+    project_id = normalize_project_id(project_id)
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) FROM tmux_sessions WHERE project_id = ?", (project_id,))
@@ -1125,6 +1135,7 @@ def seed_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
 
 def get_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
     """Lấy danh sách các phiên Tmux với đầy đủ thông tin Account, Quota và Output thời gian thực."""
+    project_id = normalize_project_id(project_id)
     ensure_real_tmux_sessions(project_id)
     oauth_map = {p["id"]: p for p in get_oauth_profiles()}
 
@@ -1465,6 +1476,7 @@ alias gw-status="echo '=== SWARM ROLE: {role_name} ===' && echo 'Session: {sessi
 
 def manage_tmux_swarm_lifecycle(action, target_id="all", project_id="PRJ-GEN-WORKPLACE"):
     """Quản trị vòng đời hàng loạt cho các phiên Swarm."""
+    project_id = normalize_project_id(project_id)
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT id, status FROM tmux_sessions WHERE project_id = ?", (project_id,))
@@ -1635,6 +1647,7 @@ def logout_oauth_profile(profile_id):
 
 def get_orch_chat_messages(project_id="PRJ-GEN-WORKPLACE"):
     """Lấy danh sách tin nhắn giữa Owner và Orchestrator."""
+    project_id = normalize_project_id(project_id)
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
@@ -1657,6 +1670,7 @@ def get_orch_chat_messages(project_id="PRJ-GEN-WORKPLACE"):
 
 def save_orch_chat_message(author, body, tag="Orchestrator", project_id="PRJ-GEN-WORKPLACE"):
     """Lưu tin nhắn của Owner hoặc Orchestrator vào SQLite."""
+    project_id = normalize_project_id(project_id)
     with get_connection() as conn:
         cursor = conn.cursor()
         now_time = time.strftime("%H:%M:%S")
@@ -1673,6 +1687,7 @@ def spawn_worker(role_name, project_id="PRJ-GEN-WORKPLACE", account_type="owner_
     Tạo hồ sơ trong agent_roles, cấu hình phiên trong tmux_sessions,
     sinh file bootstrap ngữ cảnh vai trò (Role Spec) và khởi tạo tmux session thật.
     """
+    project_id = normalize_project_id(project_id)
     role_slug = role_name.lower().replace(" ", "-").replace("&", "").replace("/", "-")
     role_slug = "".join(c for c in role_slug if c.isalnum() or c == "-")[:16].strip("-")
     sid = f"gw-{role_slug}-agy"
@@ -1745,6 +1760,7 @@ def process_orch_instruction(user_message, project_id="PRJ-GEN-WORKPLACE"):
     - Sinh câu trả lời thông minh kèm hành động thực tế.
     - Lưu câu trả lời của Orchestrator.
     """
+    project_id = normalize_project_id(project_id)
     user_time = save_orch_chat_message("Owner (Ryan)", user_message, tag="Instruction", project_id=project_id)
     lower = user_message.lower().strip()
     action_taken = None
@@ -1831,6 +1847,7 @@ def claim_task(session_id, todo_id, project_id="PRJ-GEN-WORKPLACE"):
     - Kiểm tra ràng buộc tiền đề (depends_on): chỉ cho nhận khi task phụ thuộc đã hoàn tất.
     - Cập nhật thời điểm khóa (locked_at) và gán task cho session.
     """
+    project_id = normalize_project_id(project_id)
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT id, status, assigned_session_id, depends_on FROM todos WHERE id = ? AND project_id = ?", (todo_id, project_id))
@@ -1872,6 +1889,7 @@ def complete_task(session_id, todo_id, evidence_ref, verified_by="Lead Architect
     - Cần chữ ký nghiệm thu của Role chỉ huy (Lead Architect / Orchestrator).
     - Tự động nhả khóa session để sẵn sàng nhận nhiệm vụ tiếp theo.
     """
+    project_id = normalize_project_id(project_id)
     if not evidence_ref or not evidence_ref.strip():
         return {"error": "Cannot complete task without verified evidence_ref (commit hash, artifact path or test log)"}
 
@@ -1898,6 +1916,7 @@ def reclaim_stalled_tasks(timeout_seconds=300, project_id="PRJ-GEN-WORKPLACE"):
     - Quét các task 'in_progress' bị giữ quá timeout mà session không gửi heartbeat.
     - Nhả task về lại trạng thái 'queued' để worker khác nhận việc.
     """
+    project_id = normalize_project_id(project_id)
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
@@ -1912,6 +1931,7 @@ def reclaim_stalled_tasks(timeout_seconds=300, project_id="PRJ-GEN-WORKPLACE"):
 
 def get_warroom_messages(channel_id="war_room", project_id="PRJ-GEN-WORKPLACE", limit=60):
     """Lấy danh sách tin nhắn phòng giao ban theo kênh."""
+    project_id = normalize_project_id(project_id)
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
@@ -1975,6 +1995,7 @@ def get_warroom_messages(channel_id="war_room", project_id="PRJ-GEN-WORKPLACE", 
 
 def post_warroom_message(project_id="PRJ-GEN-WORKPLACE", channel_id="war_room", author="Ryan (Owner)", message="", tag="Directive"):
     """Lưu tin nhắn người gửi và tự động sinh phản hồi AI bằng tiếng Việt theo phân vai."""
+    project_id = normalize_project_id(project_id)
     if not message or not message.strip():
         return {"error": "Message is empty"}
 
@@ -2073,6 +2094,7 @@ def generate_structure_from_ssot(content, project_id="PRJ-GEN-WORKPLACE"):
     - Cập nhật master_ssot.
     - Gửi tin nhắn thông báo vào War Room.
     """
+    project_id = normalize_project_id(project_id)
     spec_summary = content[:250].replace("\n", " ").strip() if content else "Đặc tả SSOT gốc từ Ryan"
     
     role_updates = {
