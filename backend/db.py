@@ -2242,18 +2242,18 @@ def generate_structure_from_ssot(content, project_id="PRJ-GEN-WORKPLACE"):
 def get_default_model_for_role(role_name):
     rn = (role_name or "").lower()
     if "lead" in rn or "architect" in rn:
-        return "Gemini 2.5 Pro (Thinking)"
+        return "Gemini 3.1 Pro (High)"
     if "backend" in rn or "db" in rn:
-        return "Gemini 2.5 Pro (Thinking)"
+        return "Gemini 3.1 Pro (High)"
     if "frontend" in rn:
-        return "Gemini 2.5 Flash"
+        return "Gemini 3.8 Flash (High)"
     if "devops" in rn or "docker" in rn:
-        return "Gemini 2.5 Flash"
+        return "Gemini 3.8 Flash (Medium)"
     if "qa" in rn or "test" in rn:
-        return "Gemini 2.5 Flash Thinking"
+        return "Gemini 3.7 Flash (High)"
     if "security" in rn or "audit" in rn:
-        return "Claude 3.7 Sonnet (Thinking)"
-    return "Gemini 2.5 Pro"
+        return "Claude Sonnet 4.6 (Thinking)"
+    return "Gemini 3.1 Pro (High)"
 
 def update_role_model(role_id, model_name, project_id="PRJ-GEN-WORKPLACE"):
     project_id = normalize_project_id(project_id)

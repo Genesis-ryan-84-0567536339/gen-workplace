@@ -3610,90 +3610,70 @@ button { cursor: pointer; }
           </div>
         </div>
 
-        <!-- BỐ CỤC 2 CỘT CHỈNH THỂ: 320px CHỈ SỐ TRÁI + FLEX 1 TIẾN TRÌNH PHẢI -->
-        <div class="cockpitShell">
-          <!-- Cột Trái: Chỉ số & Danh sách Workspace -->
-          <div class="cockpitListPane">
-            <div class="cockpitPaneHeader">
-              <span class="cockpitPaneTitle">📊 Chỉ Số & Dự Án</span>
-              <span class="badge" style="font-size:9.5px;background:#1e293b;color:#4ade80">Active</span>
+        <div style="display:flex;flex-direction:column;gap:14px;width:100%">
+          <!-- HÀNG 01: CHỈ SỐ STATS & CHI TIẾT WORKSPACE -->
+          <div style="display:grid;grid-template-columns:360px minmax(0, 1fr);gap:12px">
+            <!-- 4 Stats Cards 2x2 -->
+            <div class="overviewStats" id="dashStatsCard" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              <div class="stat" style="padding:10px 14px"><b id="ovProjects" style="font-size:18px">1</b><span style="font-size:10.5px">Dự án</span></div>
+              <div class="stat" style="padding:10px 14px"><b id="ovRoadmap" style="font-size:18px">5</b><span style="font-size:10.5px">Roadmap Phase</span></div>
+              <div class="stat" style="padding:10px 14px"><b id="ovTodo" style="font-size:18px">17</b><span style="font-size:10.5px">Todo tasks</span></div>
+              <div class="stat" style="padding:10px 14px"><b id="ovActive" style="font-size:18px">6</b><span style="font-size:10.5px">Runtimes Swarm</span></div>
             </div>
-            <div class="cockpitPaneScroll">
-              <!-- 4 Stats Cards 2x2 -->
-              <div class="overviewStats" id="dashStatsCard" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px">
-                <div class="stat" style="padding:10px"><b id="ovProjects" style="font-size:16px">1</b><span style="font-size:10px">Dự án</span></div>
-                <div class="stat" style="padding:10px"><b id="ovRoadmap" style="font-size:16px">5</b><span style="font-size:10px">Roadmap</span></div>
-                <div class="stat" style="padding:10px"><b id="ovTodo" style="font-size:16px">13</b><span style="font-size:10px">Todo tasks</span></div>
-                <div class="stat" style="padding:10px"><b id="ovActive" style="font-size:16px">6</b><span style="font-size:10px">Runtimes</span></div>
-              </div>
 
-              <!-- Danh mục dự án -->
-              <div class="card" id="dashProjectsCard" style="border:none;background:transparent">
-                <div style="font-size:10.5px;text-transform:uppercase;color:var(--muted2);font-weight:700;margin-bottom:8px">Dự án đang quản trị</div>
-                <div id="dashboardProjectList"></div>
+            <!-- Workspace Detail -->
+            <div class="card" style="margin-bottom:0">
+              <div class="cardHead" style="padding:8px 14px">
+                <div>
+                  <strong style="font-size:12.5px;color:#f8fafc">Project đang chọn: gen-workplace</strong>
+                  <div class="hint" id="dashboardSelectedMeta" style="font-size:10.5px">/workspace/LinuxDataA/gen-workplace</div>
+                </div>
+                <span class="chip done">Branch main · Clean</span>
+              </div>
+              <div class="cardBody" id="dashboardSelected" style="padding:8px 14px"></div>
+            </div>
+          </div>
+
+          <!-- HÀNG 02: BẢNG KANBAN CÁC ROLE TEAM (100% FULL HÀNG NGANG TOÀN MÀN HÌNH) -->
+          <div class="card" id="dashKanbanCard" style="margin-bottom:0;display:flex;flex-direction:column;width:100%">
+            <div class="cardHead" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding:10px 16px">
+              <div style="display:flex;align-items:center;gap:10px">
+                <span style="font-size:18px">📋</span>
+                <div>
+                  <strong style="font-size:13px;color:#f8fafc">Bảng Kanban Công Việc Các Role Team (Toàn Hàng 100%)</strong>
+                  <div class="hint" style="font-size:10.5px">Trực quan hóa phân rã nhiệm vụ, tiến độ và bàn giao giữa 6 đội ngũ chuyên gia Swarm</div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px">
+                <div class="tabPills" style="display:flex;background:#0b0f17;padding:2px;border-radius:6px;border:1px solid #1a2332">
+                  <button class="tabPill active" id="tabDashKanbanRoles" onclick="switchDashKanbanView('roles')" style="font-size:10.5px;padding:4px 12px;border:none;border-radius:4px;cursor:pointer;background:#1e293b;color:#38bdf8;font-weight:600">👥 Theo 6 Role Teams</button>
+                  <button class="tabPill" id="tabDashKanbanStages" onclick="switchDashKanbanView('stages')" style="font-size:10.5px;padding:4px 12px;border:none;border-radius:4px;cursor:pointer;background:transparent;color:#94a3b8;font-weight:600">📊 Theo 4 Trạng Thái</button>
+                </div>
+                <button class="btn small" onclick="renderDashboardKanban()" title="Làm mới bảng Kanban">↻ Làm mới</button>
+              </div>
+            </div>
+            <div class="cardBody" style="padding:12px;overflow-x:auto;width:100%">
+              <div id="dashRoleKanbanBoard" style="display:grid;gap:10px;width:100%">
+                <!-- Dynamic rendering by renderDashboardKanban() -->
               </div>
             </div>
           </div>
 
-          <!-- Cột Phải: Workspace Detail & Tiến Trình Swarm -->
-          <div class="cockpitDetailPane">
-            <div class="cockpitPaneHeader">
-              <span class="cockpitPaneTitle">📁 Chi Tiết Workspace & Tiến Trình Thực Thi</span>
-              <span class="chip live" style="font-size:9.5px">LIVE REPO</span>
+          <!-- HÀNG 03: TIẾN TRÌNH THỰC THI & QUẢN TRỊ WORKSPACE -->
+          <div class="overviewMain" id="dashProgressCard" style="grid-template-columns:360px minmax(0, 1fr);gap:12px;display:grid">
+            <div class="card" id="dashProjectsCard" style="margin-bottom:0">
+              <div class="cardHead">
+                <strong style="font-size:12px">Dự án đang quản trị</strong>
+                <span class="badge" style="font-size:9.5px;background:#1e293b;color:#4ade80">Active</span>
+              </div>
+              <div class="cardBody" id="dashboardProjectList" style="padding:10px"></div>
             </div>
-            <div class="cockpitDetailBody" style="gap:12px">
-              <div class="card" style="margin-bottom:0">
-                <div class="cardHead">
-                  <div>
-                    <strong>Project đang chọn: gen-workplace</strong>
-                    <div class="hint" id="dashboardSelectedMeta">/workspace/LinuxDataA/gen-workplace</div>
-                  </div>
-                  <span class="chip done">Branch main · Clean</span>
-                </div>
-                <div class="cardBody" id="dashboardSelected"></div>
+            <div class="card" style="margin-bottom:0">
+              <div class="cardHead">
+                <strong>Tiến trình thực thi Swarm</strong>
+                <span class="chip live">TRỰC TIẾP</span>
               </div>
-
-              <!-- KANBAN BOARD CÁC ROLE TEAM -->
-              <div class="card" id="dashKanbanCard" style="margin-bottom:0;display:flex;flex-direction:column">
-                <div class="cardHead" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-                  <div style="display:flex;align-items:center;gap:8px">
-                    <span style="font-size:16px">📋</span>
-                    <div>
-                      <strong style="font-size:12.5px;color:#f8fafc">Bảng Kanban Công Việc Các Role Team</strong>
-                      <div class="hint" style="font-size:10px">Trực quan hóa phân công nhiệm vụ, tiến độ và bàn giao giữa 6 đội ngũ chuyên gia</div>
-                    </div>
-                  </div>
-                  <div style="display:flex;align-items:center;gap:6px">
-                    <div class="tabPills" style="display:flex;background:#0b0f17;padding:2px;border-radius:6px;border:1px solid #1a2332">
-                      <button class="tabPill active" id="tabDashKanbanRoles" onclick="switchDashKanbanView('roles')" style="font-size:10px;padding:3px 9px;border:none;border-radius:4px;cursor:pointer;background:#1e293b;color:#38bdf8">👥 Theo 6 Role Teams</button>
-                      <button class="tabPill" id="tabDashKanbanStages" onclick="switchDashKanbanView('stages')" style="font-size:10px;padding:3px 9px;border:none;border-radius:4px;cursor:pointer;background:transparent;color:#94a3b8">📊 Theo 4 Trạng Thái</button>
-                    </div>
-                    <button class="btn small" onclick="renderDashboardKanban()" title="Làm mới bảng Kanban">↻</button>
-                  </div>
-                </div>
-                <div class="cardBody" style="padding:10px;overflow-x:auto">
-                  <div id="dashRoleKanbanBoard" style="display:grid;gap:10px;min-width:760px">
-                    <!-- Dynamic rendering by renderDashboardKanban() -->
-                  </div>
-                </div>
-              </div>
-
-              <div class="overviewMain" id="dashProgressCard" style="grid-template-columns:1fr 1fr;gap:12px;display:grid">
-                <div class="card" style="margin-bottom:0">
-                  <div class="cardHead">
-                    <strong>Tiến trình thực thi Swarm</strong>
-                    <span class="chip live">TRỰC TIẾP</span>
-                  </div>
-                  <div class="cardBody" id="overviewSteps"></div>
-                </div>
-                <div class="card" style="margin-bottom:0">
-                  <div class="cardHead">
-                    <strong>Agent Roles đang giữ việc</strong>
-                    <span class="hint">theo runtime</span>
-                  </div>
-                  <div class="cardBody" id="overviewAgents"></div>
-                </div>
-              </div>
+              <div class="cardBody" id="overviewSteps"></div>
             </div>
           </div>
         </div>
@@ -4849,16 +4829,18 @@ function renderImplementation() {
 
   // 3. Roles Table (Owner chọn Model AI, Instruction khóa theo SSOT)
   const AVAILABLE_MODELS = [
-    'Gemini 2.5 Pro (Thinking)',
-    'Gemini 2.5 Flash',
-    'Gemini 2.5 Flash Thinking',
-    'Claude 3.7 Sonnet (Thinking)',
-    'Claude 3.5 Sonnet',
-    'GPT-4.5 Preview'
+    'Gemini 3.1 Pro (High)',
+    'Gemini 3.8 Flash (High)',
+    'Gemini 3.8 Flash (Medium)',
+    'Gemini 3.7 Flash (High)',
+    'Gemini 3.6 Flash (High)',
+    'Claude Sonnet 4.6 (Thinking)',
+    'Claude Opus 4.6 (Thinking)',
+    'GPT-OSS 120B (Medium)'
   ];
 
   $('roleRows').innerHTML = state.roles.map((r, i) => {
-    const curModel = r.model || r.cli || 'Gemini 2.5 Pro (Thinking)';
+    const curModel = r.model || getRoleDefaultModel(r.name);
     return `
     <tr>
       <td>
@@ -4871,8 +4853,8 @@ function renderImplementation() {
         </div>
       </td>
       <td>
-        <select class="select" onchange="changeRoleModel(${i}, this.value)" style="min-width:180px;background:#0d1219;color:#38bdf8;font-weight:600;border:1px solid #1a2332;padding:4px 8px;border-radius:4px">
-          ${AVAILABLE_MODELS.map(m => `<option value="${m}" ${curModel.includes(m.split(' ')[0]) || curModel === m ? 'selected' : ''}>${m}</option>`).join('')}
+        <select class="select" onchange="changeRoleModel(${i}, this.value)" style="min-width:230px;background:#0d1219;color:#38bdf8;font-weight:600;border:1px solid #1a2332;padding:5px 8px;border-radius:5px;font-family:var(--mono);font-size:11.5px">
+          ${AVAILABLE_MODELS.map(m => `<option value="${m}" ${curModel === m ? 'selected' : ''}>${m}</option>`).join('')}
         </select>
       </td>
       <td>${escapeHtml(r.scope)}</td>
@@ -5142,6 +5124,17 @@ function switchDashKanbanView(view) {
   renderDashboardKanban();
 }
 
+function getRoleDefaultModel(roleName) {
+  const rn = (roleName || '').toLowerCase();
+  if (rn.includes('lead') || rn.includes('architect')) return 'Gemini 3.1 Pro (High)';
+  if (rn.includes('backend') || rn.includes('db')) return 'Gemini 3.1 Pro (High)';
+  if (rn.includes('frontend')) return 'Gemini 3.8 Flash (High)';
+  if (rn.includes('devops') || rn.includes('docker')) return 'Gemini 3.8 Flash (Medium)';
+  if (rn.includes('qa') || rn.includes('test')) return 'Gemini 3.7 Flash (High)';
+  if (rn.includes('security') || rn.includes('audit')) return 'Claude Sonnet 4.6 (Thinking)';
+  return 'Gemini 3.1 Pro (High)';
+}
+
 function renderDashboardKanban() {
   const container = $('dashRoleKanbanBoard');
   if (!container) return;
@@ -5158,7 +5151,8 @@ function renderDashboardKanban() {
       { key: 'security', name: 'Security Auditor', sid: 'gw-security-agy', icon: '🛡️', match: ['security', 'audit'] }
     ];
 
-    container.style.gridTemplateColumns = 'repeat(auto-fit, minmax(230px, 1fr))';
+    container.style.gridTemplateColumns = 'repeat(6, minmax(180px, 1fr))';
+    container.style.width = '100%';
     container.innerHTML = roleTeams.map(rt => {
       const roleTodos = allTodos.filter(t => {
         const rName = (t.role || '').toLowerCase();
@@ -5168,7 +5162,7 @@ function renderDashboardKanban() {
       const totalCount = roleTodos.length;
       
       const rObj = (state.roles || []).find(x => rt.match.some(m => (x.name || '').toLowerCase().includes(m))) || {};
-      const modelName = rObj.model || 'Gemini 2.5 Pro (Thinking)';
+      const modelName = rObj.model || getRoleDefaultModel(rt.name);
 
       return `
         <div style="background:#0e131b;border:1px solid #1a2332;border-radius:8px;display:flex;flex-direction:column;min-height:220px;overflow:hidden">
@@ -5183,12 +5177,12 @@ function renderDashboardKanban() {
             <span class="badge" style="font-size:9.5px;background:#1e293b;color:${doneCount === totalCount && totalCount > 0 ? '#4ade80' : '#38bdf8'}">${doneCount}/${totalCount}</span>
           </div>
 
-          <div style="padding:5px 10px;background:#090d14;border-bottom:1px solid #141b26;display:flex;align-items:center;justify-content:space-between">
-            <span style="font-size:9.5px;color:#94a3b8">Model AI:</span>
-            <span style="font-size:9.5px;font-weight:600;color:#cbd5e1;background:rgba(56,189,248,0.08);padding:1px 6px;border-radius:3px;border:1px solid rgba(56,189,248,0.2)">🤖 ${escapeHtml(modelName.split(' ')[0] + ' ' + (modelName.split(' ')[1] || ''))}</span>
+          <div style="padding:5px 8px;background:#090d14;border-bottom:1px solid #141b26;display:flex;align-items:center;justify-content:space-between;gap:4px">
+            <span style="font-size:9px;color:#94a3b8;white-space:nowrap">Model:</span>
+            <span style="font-size:9.5px;font-weight:600;color:#cbd5e1;background:rgba(56,189,248,0.08);padding:1px 5px;border-radius:3px;border:1px solid rgba(56,189,248,0.2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(modelName)}">🤖 ${escapeHtml(modelName)}</span>
           </div>
 
-          <div style="padding:8px;display:flex;flex-direction:column;gap:6px;flex:1;overflow-y:auto;max-height:280px">
+          <div style="padding:8px;display:flex;flex-direction:column;gap:6px;flex:1;overflow-y:auto;max-height:300px">
             ${roleTodos.length === 0 ? `<div style="color:#64748b;font-size:10.5px;text-align:center;padding:16px 0">Sẵn sàng nhận task</div>` : ''}
             ${roleTodos.map(t => {
               const isDone = t.status === 'done';
@@ -5220,6 +5214,7 @@ function renderDashboardKanban() {
     ];
 
     container.style.gridTemplateColumns = 'repeat(4, minmax(200px, 1fr))';
+    container.style.width = '100%';
     container.innerHTML = stages.map(st => {
       const items = allTodos.filter(st.filter);
       return `
