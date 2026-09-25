@@ -1181,6 +1181,22 @@ def get_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
                     task_status = t_row["status"]
                     task_roadmap = t_row["roadmap_id"] or ""
                     evidence_ref = t_row["evidence_ref"] or ""
+            else:
+                # Tìm task gần nhất đã hoàn tất của chuyên gia này để thể hiện bằng chứng nghiệm thu thực tế
+                role_first_word = r["role_name"].split()[0]
+                cursor.execute("""
+                SELECT id, title, status, roadmap_id, evidence_ref 
+                FROM todos 
+                WHERE (assigned_role = ? OR assigned_role LIKE ?) AND status = 'done'
+                ORDER BY id DESC LIMIT 1
+                """, (r["role_name"], f"%{role_first_word}%"))
+                last_t = cursor.fetchone()
+                if last_t:
+                    task_id = last_t["id"]
+                    task_title = last_t["title"]
+                    task_status = "done"
+                    task_roadmap = last_t["roadmap_id"] or ""
+                    evidence_ref = last_t["evidence_ref"] or ""
 
             results.append({
                 "id": r["id"],

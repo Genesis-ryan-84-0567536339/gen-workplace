@@ -5185,7 +5185,19 @@ function renderExpertSquadGrid() {
     const statusDotColor = isHib ? '#64748b' : (isPaused ? '#facc15' : '#22c55e');
     const statusTitle = isHib ? 'Ngủ đông' : (isPaused ? 'Tạm dừng' : 'Đang chạy');
     const roleInfo = ROLE_DETAILS[s.id] || { mission: 'Thực thi các tác vụ theo phân công SSOT' };
-    const taskText = s.current_task_id ? `${s.current_task_id}: ${s.task_title || ''}` : 'Rảnh rỗi (Chưa nhận việc)';
+    
+    const isDone = s.task_status === 'done';
+    const isRunning = s.task_status === 'in_progress';
+    let taskHtml = '';
+    if (isDone) {
+      taskHtml = `<span style="color:#4ade80;font-weight:700">✓ DUYỆT</span> <span style="color:#f1f5f9">${escapeHtml(s.current_task_id)}</span> <span style="color:#94a3b8">· ${escapeHtml(s.task_title || '')}</span>`;
+    } else if (isRunning) {
+      taskHtml = `<span style="color:#38bdf8;font-weight:700">⚙️ CHẠY</span> <span style="color:#f1f5f9">${escapeHtml(s.current_task_id)}</span> <span style="color:#94a3b8">· ${escapeHtml(s.task_title || '')}</span>`;
+    } else if (s.current_task_id) {
+      taskHtml = `<span style="color:#38bdf8;font-weight:700">📌</span> <span style="color:#f1f5f9">${escapeHtml(s.current_task_id)}</span> <span style="color:#94a3b8">· ${escapeHtml(s.task_title || '')}</span>`;
+    } else {
+      taskHtml = `<span style="color:#94a3b8">☕ Sẵn sàng nhận việc</span>`;
+    }
 
     return `
       <div class="expertCard ${isSel ? 'active' : ''} ${isHib ? 'hibernated' : ''}" onclick="selectTmuxSession('${escapeHtml(s.id)}')">
@@ -5216,8 +5228,8 @@ function renderExpertSquadGrid() {
 
         <!-- Hàng 2: Task tag ngắn gọn & Quota chip -->
         <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:10px">
-          <div style="min-width:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#cbd5e1;background:rgba(255,255,255,0.03);padding:2px 6px;border-radius:4px;border:1px solid rgba(255,255,255,0.06)" title="${escapeHtml(taskText)}">
-            <span style="color:#38bdf8;font-weight:700">📌</span> ${escapeHtml(taskText)}
+          <div style="min-width:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#cbd5e1;background:rgba(255,255,255,0.03);padding:2px 6px;border-radius:4px;border:1px solid rgba(255,255,255,0.06)" title="${escapeHtml(s.current_task_id ? `${s.current_task_id}: ${s.task_title || ''} (${s.evidence_ref || 'Verified'})` : 'Sẵn sàng')}">
+            ${taskHtml}
           </div>
           <div style="font-family:var(--mono);color:#94a3b8;font-size:9.5px;flex-shrink:0;background:rgba(0,0,0,0.3);padding:2px 5px;border-radius:4px" title="Quota: Gemini ${qG.percent || 72}% · Claude ${qA.percent || 89}%">
             💎${qG.percent || 72}% ⚡${qA.percent || 89}%
@@ -5259,13 +5271,19 @@ function updateCommandDeck() {
   // Governance Sub-bar Elements
   const taskEl = $('deckAgentActiveTask');
   if (taskEl) {
-    if (current.current_task_id && current.current_task_id.trim()) {
-      taskEl.textContent = `${current.current_task_id}: ${current.task_title || ''}`;
+    if (current.task_status === 'done') {
+      const evText = current.evidence_ref ? ` (${current.evidence_ref})` : '';
+      taskEl.innerHTML = `<span style="color:#4ade80;font-weight:700">✅ ĐÃ NGHIỆM THU:</span> ${escapeHtml(current.current_task_id)} · ${escapeHtml(current.task_title || '')} <span class="chip done" style="font-size:9px;padding:1px 6px;margin-left:6px" title="${escapeHtml(current.evidence_ref || 'Verified')}">✓ Bằng chứng commit: ${escapeHtml(current.evidence_ref ? current.evidence_ref.slice(0, 32) : 'verified')}</span>`;
+      taskEl.style.color = '#4ade80';
+      taskEl.style.background = 'rgba(34,197,94,0.12)';
+      taskEl.style.borderColor = 'rgba(34,197,94,0.35)';
+    } else if (current.current_task_id && current.current_task_id.trim()) {
+      taskEl.innerHTML = `<span style="color:#38bdf8;font-weight:700">⚙️ ĐANG CHẤP HÀNH:</span> ${escapeHtml(current.current_task_id)} · ${escapeHtml(current.task_title || '')}`;
       taskEl.style.color = '#38bdf8';
       taskEl.style.background = 'rgba(56,189,248,0.15)';
       taskEl.style.borderColor = 'rgba(56,189,248,0.4)';
     } else {
-      taskEl.textContent = '☕ Rảnh rỗi (Chưa nhận việc)';
+      taskEl.textContent = '☕ Sẵn sàng nhận việc';
       taskEl.style.color = '#94a3b8';
       taskEl.style.background = 'rgba(148,163,184,0.1)';
       taskEl.style.borderColor = 'rgba(148,163,184,0.2)';
@@ -5303,7 +5321,8 @@ function updateCommandDeck() {
 
   // 1. UPDATE LIVE WORKBENCH PANEL ELEMENTS
   if ($('wbTaskTitle')) {
-    $('wbTaskTitle').textContent = current.task_title || roleInfo.mission;
+    const isDone = current.task_status === 'done';
+    $('wbTaskTitle').innerHTML = (isDone ? '<span style="color:#4ade80;font-weight:700">[ĐÃ NGHIỆM THU] </span>' : '') + escapeHtml(current.task_title || roleInfo.mission);
   }
   if ($('wbTaskId')) {
     $('wbTaskId').textContent = current.current_task_id || 'CHƯA NHẬN VIỆC';
@@ -5312,8 +5331,19 @@ function updateCommandDeck() {
     $('wbTaskRoadmap').textContent = current.task_roadmap || 'RM-04';
   }
   if ($('wbTaskStatusChip')) {
-    $('wbTaskStatusChip').textContent = isHib ? '😴 Ngủ đông' : (isPaused ? '⏸ Tạm dừng' : '● Đang triển khai');
-    $('wbTaskStatusChip').className = `expertStatusChip ${isHib ? 'sleep' : (isPaused ? 'paused' : 'live')}`;
+    if (current.task_status === 'done') {
+      $('wbTaskStatusChip').textContent = '✓ Đã nghiệm thu';
+      $('wbTaskStatusChip').className = 'expertStatusChip live';
+      $('wbTaskStatusChip').style.background = 'rgba(34,197,94,0.2)';
+      $('wbTaskStatusChip').style.color = '#4ade80';
+      $('wbTaskStatusChip').style.borderColor = '#22c55e';
+    } else {
+      $('wbTaskStatusChip').textContent = isHib ? '😴 Ngủ đông' : (isPaused ? '⏸ Tạm dừng' : '● Đang triển khai');
+      $('wbTaskStatusChip').className = `expertStatusChip ${isHib ? 'sleep' : (isPaused ? 'paused' : 'live')}`;
+      $('wbTaskStatusChip').style.background = '';
+      $('wbTaskStatusChip').style.color = '';
+      $('wbTaskStatusChip').style.borderColor = '';
+    }
   }
   if ($('wbInputFrom')) {
     $('wbInputFrom').textContent = roleInfo.inputFrom;
@@ -7799,6 +7829,8 @@ function refreshAll() {
   refreshTmuxSessions();
   refreshOauthProfiles();
   renderOrchSwarmCards();
+  renderKanban();
+  updateCommandDeck();
 }
 
 // Keyboard shortcuts
@@ -8058,6 +8090,50 @@ setTimeout(() => {
   const activeScreen = document.querySelector('.screen.active')?.id || 'warroom';
   updateSubtopNav(activeScreen);
 }, 200);
+
+// =========================================================================
+// REAL-TIME AUTO-POLL & LIVE SYNCHRONIZATION ENGINE (MỖI 2.5 GIÂY)
+// Tự động kéo dữ liệu mới nhất từ SQLite: War Room chat, Task Mutex, Chuyên gia & Kanban
+// =========================================================================
+let autoSyncRunning = false;
+setInterval(async () => {
+  if (autoSyncRunning) return;
+  autoSyncRunning = true;
+  try {
+    // 1. Tự động đồng bộ tin nhắn War Room nếu đang ở màn hình War Room
+    if (document.querySelector('.screen.active')?.id === 'warroom') {
+      await loadWarRoomMessages(true);
+    }
+    // 2. Tự động đồng bộ trạng thái SQLite State & Tmux Sessions
+    const res = await fetch('/api/state');
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.project && data.project.name === 'gen-workplace') {
+        if (data.kanban) state.kanban = data.kanban;
+        if (data.todos) state.todos = data.todos;
+        if (data.roadmap) state.roadmap = data.roadmap;
+        if (data.ssot) state.ssot = data.ssot;
+        if (data.roles) state.roles = data.roles;
+      }
+    }
+    // 3. Tự động đồng bộ phiên Chuyên gia (task_status, terminal_output, quota)
+    const sRes = await fetch('/api/tmux/sessions?project=gen-workplace');
+    if (sRes.ok) {
+      const sData = await sRes.json();
+      if (sData && Array.isArray(sData.sessions) && sData.sessions.length > 0) {
+        state.tmuxSessions = sData.sessions;
+      }
+    }
+    // 4. Render lại giao diện trực quan ngay lập tức
+    renderExpertSquadGrid();
+    updateCommandDeck();
+    if (state.currentDeckTab === 'kanban') renderKanban();
+  } catch (e) {
+    // ignore network tick
+  } finally {
+    autoSyncRunning = false;
+  }
+}, 2500);
 
 </script>
 </body>
