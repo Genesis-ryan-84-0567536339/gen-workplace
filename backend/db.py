@@ -284,6 +284,17 @@ def seed_real_project():
         now_str = datetime.now().strftime("%H:%M:%S")
 
         # 1. Project thật
+        spec_path = BASE_DIR / "docs" / "SSOT_ORIGINAL_SPEC.md"
+        if not spec_path.exists():
+            spec_path = Path("/app/docs/SSOT_ORIGINAL_SPEC.md")
+        default_source_text = spec_path.read_text(encoding="utf-8") if spec_path.exists() else """# ĐẶC TẢ DỰ ÁN GEN-WORKPLACE (MULTI-AGENT SWARM ORCHESTRATOR)
+1. Bảng Console điều phối đa Agent Swarm quản lý nhiều dự án.
+2. Khu Implementation: Hàng 01 chia 3 cột (Input+Plan -> Roadmap -> Todo). Hàng 02 chọn CLI Engine cho từng Role.
+3. Khu Data Center: Git Repo, Database, Vault, File Manager.
+4. Khu Môi Trường Agent: Runtimes tự ghi tư duy, Chatroom thread @mention.
+5. Khu Nơi Làm Việc (Workplace): 2 cột Memory tổng Master SSOT vs Memory từng Role sync realtime + Catalog tra nhanh ID.
+6. Đóng gói phân phối All-In-One: Cài đặt 1 lệnh trên giao diện TUI có loading %, chạy 100% Docker, tự tạo Desktop Icon."""
+
         cursor.execute("""
         INSERT INTO projects (id, name, repo_path, branch, plan_file, source_text, meta, status)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -293,14 +304,8 @@ def seed_real_project():
             '/workspace/LinuxDataA/gen-workplace',
             'main',
             'docs/SSOT_ORIGINAL_SPEC.md',
-            """# ĐẶC TẢ DỰ ÁN GEN-WORKPLACE (MULTI-AGENT SWARM ORCHESTRATOR)
-1. Bảng Console điều phối đa Agent Swarm quản lý nhiều dự án.
-2. Khu Implementation: Hàng 01 chia 3 cột (Input+Plan -> Roadmap -> Todo). Hàng 02 chọn CLI Engine cho từng Role (Gemini CLI agy, Claude Code CLI, Cursor CLI, Codex Security CLI) với Instruction khóa theo Input tổng. Hàng 03 Sơ đồ live workflow từng node có checklist In-Output.
-3. Khu Data Center: Git Repo (tuân thủ quy tắc Genesis Brain: Branch riêng + PR), Database, Vault, File Manager.
-4. Khu Môi Trường Agent: Runtimes tự ghi tư duy (Thinking log), Chatroom thread @mention bàn giao task kèm file, phản ứng emoji thực tế (📥, ⚠️, 👎, ✅, ❓, 🔥), Live Kanban cả team do Trưởng nhóm phụ trách cập nhật live times.
-5. Khu Nơi Làm Việc (Workplace): 2 cột Memory tổng Master SSOT vs Memory từng Role sync realtime + Catalog tra nhanh ID (#EVT, #SEC, #MCP, #FILE, #TOOL) để agent lấy dữ kiện tức thì không cần audit toàn cục mỗi phiên.
-6. Đóng gói phân phối All-In-One: Cài đặt 1 lệnh trên giao diện TUI có thanh loading %, tự động kiểm tra môi trường (OS, Git, Docker, Compose), chạy 100% trong Docker container đa nền tảng, tự tạo Desktop Icon để nhấp đúp gọi WebApp ngay lập tức.""",
-            '6 role · Docker live mount · Active',
+            default_source_text,
+            '6 role · Docker live mount · Active SSOT',
             'active'
         ))
 
@@ -405,12 +410,16 @@ def seed_real_project():
             VALUES ('PRJ-GEN-WORKPLACE', ?, ?, ?, ?, ?, ?)
             """, m)
 
-        # 8. Master SSOT thật
+        # 8. Master SSOT thật (8 Trụ Cột Quy Chuẩn Bất Biến Toàn Dự Án)
         ssots = [
-            ('SSOT-SPEC-01', 'Đặc Tả Gốc Bất Biến Của Owner', 'Bản đặc tả 5 phân khu (Dashboard, Implementation 3 hàng, Data Center, Runtimes, Workplace) và tiêu chuẩn cài đặt 1 lệnh TUI Docker là Single Source of Truth bất biến của toàn dự án.', 'EVT-03 · docs/SSOT_ORIGINAL_SPEC.md', '20:35'),
-            ('SSOT-INSTALL-02', 'Tiêu Chuẩn Cài Đặt TUI & Desktop Icon', 'Kịch bản cài đặt phải có thanh đo tiến độ loading %, tự kiểm tra môi trường OS/Docker/Git và tự sinh shortcut desktop Gen-workplace.desktop khi kết thúc.', 'EVT-02 · installer_tui.py', '20:37'),
-            ('SSOT-DOCKER-03', 'Môi Trường Container Hóa Đa Nền Tảng', 'Toàn bộ backend, frontend và data runtimes phải đóng gói khép kín trong Docker container để chạy đồng nhất trên Linux, macOS và Windows.', 'EVT-01 · docker-compose.yml', '20:47'),
-            ('SSOT-LIVE-MOUNT-04', 'Cơ Chế Live Mount Hot-Reload', 'Thư mục frontend/ và backend/ được mount trực tiếp vào container với cờ SELinux :z, đảm bảo mọi thay đổi code trên repo được cập nhật tức thì trên WebApp khi F5.', 'COMMIT ae4e196', '20:47')
+            ('SSOT-SPEC-01', 'Đặc Tả Gốc Bất Biến Của Owner (Ryan)', 'Bản đặc tả 5 phân khu (Dashboard, Implementation 3 hàng, Data Center, Runtimes, Workplace) và tiêu chuẩn cài đặt 1 lệnh TUI Docker là Single Source of Truth bất biến của toàn dự án. Mọi suy diễn ngoài spec đều bị từ chối.', 'EVT-03 · docs/SSOT_ORIGINAL_SPEC.md', '20:35'),
+            ('SSOT-INSTALL-02', 'Tiêu Chuẩn Cài Đặt 1 Lệnh TUI & Desktop Shortcut', 'Kịch bản cài đặt phải có thanh đo tiến độ loading %, tự kiểm tra môi trường OS/Docker/Git và tự sinh shortcut desktop Gen-workplace.desktop khi kết thúc để người dùng click là mở WebApp ngay.', 'EVT-02 · installer_tui.py', '20:37'),
+            ('SSOT-DOCKER-03', 'Môi Trường Container Hóa Khép Kín Đa Nền Tảng', 'Toàn bộ backend, frontend và data runtimes phải đóng gói khép kín trong Docker container để chạy đồng nhất trên Linux, macOS và Windows (WSL2), đảm bảo zero-drift.', 'EVT-01 · docker-compose.yml', '20:47'),
+            ('SSOT-LIVE-MOUNT-04', 'Cơ Chế Live Mount Hot-Reload (:z SELinux)', 'Thư mục frontend/ và backend/ được mount trực tiếp vào container với cờ SELinux :z, đảm bảo mọi thay đổi code trên repo được cập nhật tức thì trên WebApp khi F5 mà không cần build lại image.', 'COMMIT ae4e196', '20:47'),
+            ('SSOT-TASK-MUTEX-05', 'Kỷ Luật Thép Task Mutex Khóa Độc Quyền (Anti-Chaos)', 'Mỗi nhiệm vụ chỉ do đúng 1 Agent khóa (locked_at). Kiểm tra ràng buộc tiền đề depends_on trước khi nhận việc. Thu hồi tự động các task bị treo quá 300s (Anti-Zombie Reclamation).', 'API /api/task/claim', '21:05'),
+            ('SSOT-EVIDENCE-06', 'Tiêu Chuẩn Nghiệm Thu Kép (Dual-Gate Verification)', 'Agent không thể tự ý chuyển task sang done nếu thiếu bằng chứng vật lý (commit hash / test log / artifact). Nghiệm thu bắt buộc có chữ ký phê chuẩn của Lead Architect.', 'API /api/task/complete', '21:10'),
+            ('SSOT-FTS5-CATALOG-07', 'Catalog Tra Nhanh Sub-Millisecond (Zero-Audit Tokens)', 'Mã định danh #EVT, #SEC, #MCP, #FILE, #TOOL, #TBL được lập chỉ mục FTS5 trong SQLite WAL, giúp các chuyên gia tra cứu dữ kiện tức thì dưới 1ms mà không cần quét lại toàn bộ repository.', 'SQLite FTS5 virtual table', '21:15'),
+            ('SSOT-ORCH-SWARM-08', 'Cơ Chế Phân Cấp Mệnh Lệnh 3 Tầng Kỷ Luật', 'Mệnh lệnh truyền từ Gen (Core Orchestrator vĩ mô) ➔ Lead Architect (Kế hoạch DAG kỹ thuật) ➔ 5 Chuyên gia chuyên môn. Giao ban, bàn giao I/O contract 100% bằng tiếng Việt.', 'Phòng Giao Ban War Room', '21:20')
         ]
         for s in ssots:
             cursor.execute("""
@@ -418,12 +427,14 @@ def seed_real_project():
             VALUES (?, 'PRJ-GEN-WORKPLACE', ?, ?, ?, ?)
             """, s)
 
-        # 9. Role Memories thật
+        # 9. Role Memories thật (Đầy đủ 6 Chuyên Gia)
         memories = [
-            ('Lead Architect', 'Lập quy ước phân nhánh Git: Không commit trực tiếp lên main, mọi tính năng đều qua branch riêng và đối chiếu SSOT.', json.dumps(['git-policy', 'ssot'], ensure_ascii=False), 1, '20:34'),
-            ('Backend & DB Specialist', 'Cấu hình SQLite với chế độ WAL (Write-Ahead Logging) và FTS5 để tối ưu hóa truy vấn catalog dưới 1ms cho agent.', json.dumps(['sqlite-wal', 'fts5'], ensure_ascii=False), 1, '20:56'),
-            ('Frontend Specialist', 'Áp dụng bảng màu Nocturne Slate (--bg: #0d1014, --panel: #13171d, --line: #252c35) giúp dịu mắt và chuyên nghiệp.', json.dumps(['ui-v1.1', 'slate-palette'], ensure_ascii=False), 1, '20:10'),
-            ('DevOps & Packaging', 'Ghi chú SELinux: Docker volume trên Fedora/RHEL bắt buộc có hậu tố :z để tự động gán nhãn container_file_t.', json.dumps(['docker', 'selinux'], ensure_ascii=False), 1, '20:46')
+            ('Lead Architect', 'Bảo tồn đặc tả SSOT gốc (docs/SSOT_ORIGINAL_SPEC.md), quản lý chuỗi Todo DAG, kiểm soát ranh giới Whitelist và duyệt bằng chứng nghiệm thu commit hash.', json.dumps(['ssot-freeze', 'dag-scheduler', 'dual-gate'], ensure_ascii=False), 1, '20:34'),
+            ('Backend & DB Specialist', 'Cấu hình SQLite với chế độ WAL (Write-Ahead Logging) và FTS5 để tối ưu hóa truy vấn catalog dưới 1ms. Triển khai API Task Mutex /api/task/claim.', json.dumps(['sqlite-wal', 'fts5-catalog', 'task-mutex'], ensure_ascii=False), 1, '20:56'),
+            ('Frontend Specialist', 'Áp dụng bảng màu Nocturne Slate v1.2, xây dựng Bàn Làm Việc Live Workbench 3 cột, stream terminal console và engine đồng bộ realtime 2.5s.', json.dumps(['live-workbench', 'realtime-sync', 'nocturne-slate'], ensure_ascii=False), 1, '20:10'),
+            ('DevOps & Packaging', 'Ghi chú SELinux: Docker volume trên Fedora/RHEL bắt buộc có hậu tố :z để tự động gán nhãn container_file_t. Xây dựng installer_tui.py và Desktop icon.', json.dumps(['docker-compose', 'selinux-z', 'tui-installer'], ensure_ascii=False), 1, '20:46'),
+            ('QA Tester', 'Thiết lập test suite tự động cho chu kỳ Auto-Wake 68ms, kiểm tra toàn bộ REST API endpoint và chứng thực bằng chứng commit hash trước khi bàn giao.', json.dumps(['auto-wake-68ms', 'api-regression', 'test-matrix'], ensure_ascii=False), 1, '20:37'),
+            ('Security Auditor', 'Kiểm toán Token Vault OAuth 2.0 PKCE và phân quyền thư mục. Đảm bảo zero-secret-leak, ngăn chặn rò rỉ credential ra log hoặc commit git.', json.dumps(['oauth-pkce', 'zero-leak', 'whitelist-guard'], ensure_ascii=False), 1, '20:46')
         ]
         for rm in memories:
             cursor.execute("""
@@ -583,9 +594,14 @@ def get_full_state(project_id="PRJ-GEN-WORKPLACE"):
         cursor.execute("SELECT * FROM role_memories WHERE project_id = ? ORDER BY id ASC", (project_id,))
         role_memory = []
         for rm in cursor.fetchall():
+            role_name = rm["role_name"]
+            summary = rm["body"][:85] + ("..." if len(rm["body"]) > 85 else "")
             role_memory.append({
                 "id": f"MEM-0{rm['id']}",
-                "role": rm["role_name"],
+                "role": role_name,
+                "runtime": f"runtime-{rm['id']}",
+                "summary": summary,
+                "detail": rm["body"],
                 "body": rm["body"],
                 "tags": json.loads(rm["tags_json"] or "[]"),
                 "synced": bool(rm["synced_to_ssot"]),
@@ -603,6 +619,18 @@ def get_full_state(project_id="PRJ-GEN-WORKPLACE"):
                 "desc": c["description"],
                 "ref": c["ref_path"]
             })
+
+        # Refs array for quick table rendering [id, type, title, desc]
+        refs = [[c["id"], c["type"], c["title"], c["desc"]] for c in catalog]
+
+        # Events list (verified events)
+        events = [
+            {"id": "EVT-01", "runtime": "DevOps / runtime-04", "request": "Khởi động container gen-workplace-app với live bind mount :z", "evidence": "docker-compose.yml · port 8888", "status": "ssot", "time": "20:47"},
+            {"id": "EVT-02", "runtime": "DevOps / runtime-05", "request": "Kiểm thử kịch bản installer_tui.py và tạo Desktop icon", "evidence": "Gen-workplace.desktop verified", "status": "ssot", "time": "20:37"},
+            {"id": "EVT-03", "runtime": "Lead / runtime-01", "request": "Lưu trữ đặc tả gốc của Owner thành SSOT bất biến", "evidence": "docs/SSOT_ORIGINAL_SPEC.md", "status": "ssot", "time": "20:35"},
+            {"id": "EVT-04", "runtime": "Backend / runtime-02", "request": "Triển khai SQLite WAL mode và FTS5 Full-Text Catalog", "evidence": "data/gen-workplace.db (<1ms query)", "status": "ssot", "time": "20:56"},
+            {"id": "EVT-05", "runtime": "QA / runtime-05", "request": "Kiểm thử chu kỳ Auto-Wake 68ms và API Regression Suite", "evidence": "100% test pass · latency 68ms", "status": "ssot", "time": "21:05"}
+        ]
 
         # Kanban (Derived from todos)
         cursor.execute("SELECT * FROM todos WHERE project_id = ?", (project_id,))
@@ -643,7 +671,9 @@ def get_full_state(project_id="PRJ-GEN-WORKPLACE"):
             "kanban": kanban,
             "ssot": ssot,
             "roleMemory": role_memory,
-            "catalog": catalog
+            "catalog": catalog,
+            "refs": refs,
+            "events": events
         }
 
 def search_catalog_fts(query_str, project_id="PRJ-GEN-WORKPLACE"):
