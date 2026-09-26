@@ -301,10 +301,27 @@ def init_db():
             model TEXT DEFAULT 'Gemini 3.1 Pro (High)',
             account_profile TEXT DEFAULT 'owner_default',
             is_pinned INTEGER DEFAULT 0,
+            active_tab TEXT DEFAULT 'files_repo',
+            active_file TEXT DEFAULT 'backend/main.py',
+            open_tabs_json TEXT DEFAULT '["backend/main.py"]',
+            active_evidence_id TEXT DEFAULT 'NOTE-01',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
         """)
+
+        # Migration columns if table already existed
+        for col_name, col_type in [
+            ("active_tab", "TEXT DEFAULT 'files_repo'"),
+            ("active_file", "TEXT DEFAULT 'backend/main.py'"),
+            ("open_tabs_json", "TEXT DEFAULT '[\"backend/main.py\"]'"),
+            ("active_evidence_id", "TEXT DEFAULT 'NOTE-01'")
+        ]:
+            try:
+                cursor.execute(f"ALTER TABLE gen_conversations ADD COLUMN {col_name} {col_type};")
+            except Exception:
+                pass
+
 
         # 15. Gen Workplace Messages (Lịch sử hội thoại có Progressive Compaction)
         cursor.execute("""
@@ -2818,15 +2835,23 @@ def get_gen_conversations(project_id="PRJ-GEN-WORKPLACE"):
         ORDER BY c.is_pinned DESC, c.updated_at DESC
         """, (project_id,))
         rows = cursor.fetchall()
-        return [dict(r) for r in rows]
+        result = []
+        for r in rows:
+            d = dict(r)
+            try:
+                d["open_tabs"] = json.loads(d.get("open_tabs_json") or '["backend/main.py"]')
+            except Exception:
+                d["open_tabs"] = ["backend/main.py"]
+            result.append(d)
+        return result
 
 def create_gen_conversation(project_id="PRJ-GEN-WORKPLACE", title="Cuộc trò chuyện mới", model="Gemini 3.1 Pro (High)", account="owner_default"):
     conv_id = f"conv-{uuid.uuid4().hex[:8]}"
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
-        INSERT INTO gen_conversations (id, project_id, title, model, account_profile, is_pinned)
-        VALUES (?, ?, ?, ?, ?, 0)
+        INSERT INTO gen_conversations (id, project_id, title, model, account_profile, is_pinned, active_tab, active_file, open_tabs_json, active_evidence_id)
+        VALUES (?, ?, ?, ?, ?, 0, 'files_repo', 'backend/main.py', '["backend/main.py"]', 'NOTE-01')
         """, (conv_id, project_id, title, model, account))
         
         # Initial greeting
@@ -2835,7 +2860,31 @@ def create_gen_conversation(project_id="PRJ-GEN-WORKPLACE", title="Cuộc trò c
         VALUES (?, 'Gen Core', 'assistant', 'Sẵn sàng phục vụ Owner Ryan! Bạn muốn giao nhiệm vụ hoặc thảo luận kiến trúc nào hôm nay?', ?, '[]')
         """, (conv_id, model))
         conn.commit()
-    return {"id": conv_id, "title": title, "model": model, "account": account}
+    return {"id": conv_id, "title": title, "model": model, "account": account, "active_tab": "files_repo", "active_file": "backend/main.py", "open_tabs": ["backend/main.py"], "active_evidence_id": "NOTE-01"}
+
+def update_gen_conversation_context(conv_id, active_tab=None, active_file=None, open_tabs=None, active_evidence_id=None):
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        updates = []
+        params = []
+        if active_tab is not None:
+            updates.append("active_tab = ?")
+            params.append(active_tab)
+        if active_file is not None:
+            updates.append("active_file = ?")
+            params.append(active_file)
+        if open_tabs is not None:
+            updates.append("open_tabs_json = ?")
+            params.append(json.dumps(open_tabs) if isinstance(open_tabs, list) else str(open_tabs))
+        if active_evidence_id is not None:
+            updates.append("active_evidence_id = ?")
+            params.append(active_evidence_id)
+        if updates:
+            updates.append("updated_at = CURRENT_TIMESTAMP")
+            params.append(conv_id)
+            cursor.execute(f"UPDATE gen_conversations SET {', '.join(updates)} WHERE id = ?", params)
+            conn.commit()
+    return {"status": "ok", "conv_id": conv_id}
 
 def update_gen_conversation(conv_id, title=None, is_pinned=None, model=None, account=None):
     with get_connection() as conn:

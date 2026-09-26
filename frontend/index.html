@@ -2932,6 +2932,168 @@ body.resizing-active, body.resizing-active * {
   flex-direction: column;
 }
 
+/* NATIVE FILE & REPO EXPLORER */
+.genRepoDashboard {
+  background: #0d121a;
+  border-bottom: 1px solid #1a2332;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.genRepoStatusRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.genRepoMetaTags {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.genRepoTag {
+  background: #151d2a;
+  border: 1px solid #222f44;
+  border-radius: 4px;
+  padding: 3px 8px;
+  font-size: 11px;
+  color: #cbd5e1;
+  font-family: var(--mono);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.genRepoTag strong {
+  color: #38bdf8;
+}
+.genGitModifiedBanner {
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  border-radius: 5px;
+  padding: 5px 8px;
+  font-size: 10.5px;
+  color: #f59e0b;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.genFileExplorerToolbar {
+  padding: 8px 14px;
+  background: #090d14;
+  border-bottom: 1px solid #161f2e;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.genFileSearchInput {
+  flex: 1;
+  background: #111722;
+  border: 1px solid #1c2637;
+  border-radius: 5px;
+  padding: 5px 10px;
+  font-size: 11px;
+  color: #f1f5f9;
+  outline: none;
+}
+.genFileSearchInput:focus {
+  border-color: #0284c7;
+}
+.genFileTreeContainer {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.genFolderGroup {
+  border: 1px solid #16202e;
+  border-radius: 6px;
+  background: #0a0e15;
+  overflow: hidden;
+}
+.genFolderHead {
+  padding: 7px 10px;
+  background: #111722;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #e2e8f0;
+  transition: background 0.12s ease;
+}
+.genFolderHead:hover {
+  background: #17212f;
+}
+.genFolderHead .folderToggle {
+  font-size: 10px;
+  color: #64748b;
+  transition: transform 0.15s ease;
+  margin-right: 6px;
+  display: inline-block;
+}
+.genFolderGroup.collapsed .genFolderHead .folderToggle {
+  transform: rotate(-90deg);
+}
+.genFolderGroup.collapsed .genFolderBody {
+  display: none;
+}
+.genFolderBody {
+  display: flex;
+  flex-direction: column;
+}
+.genFileTreeRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px 6px 28px;
+  border-top: 1px solid #111722;
+  cursor: pointer;
+  transition: all 0.1s ease;
+  font-size: 11px;
+}
+.genFileTreeRow:hover {
+  background: #131c2a;
+}
+.genFileTreeRow.active {
+  background: #182538;
+  border-left: 2px solid #38bdf8;
+}
+.genFileRowLeft {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--mono);
+  color: #e2e8f0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.genFileRowRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  color: #64748b;
+  white-space: nowrap;
+}
+.genFileTypeBadge {
+  font-size: 8.5px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: #16202f;
+  color: #94a3b8;
+  font-family: var(--mono);
+}
+
 /* Code Viewer */
 .genFileQuickBar {
   padding: 6px 12px;
@@ -3416,7 +3578,12 @@ body.resizing-active, body.resizing-active * {
           <div class="genWpCol2">
             <!-- VS Code Tab Strip -->
             <div class="genVsCodeTabBar" id="genVsCodeTabBar">
-              <button class="genVsCodeTab active" data-vstab="file" onclick="switchGenVsTab('file')">
+              <button class="genVsCodeTab active" data-vstab="files_repo" onclick="switchGenVsTab('files_repo')">
+                <span>📁</span>
+                <span>Files & Repo</span>
+                <span class="badge" style="font-size:8px;background:#1e293b;color:#38bdf8;padding:0 4px;margin-left:4px" id="genRepoFileCountBadge">0</span>
+              </button>
+              <button class="genVsCodeTab" data-vstab="file" onclick="switchGenVsTab('file')">
                 <span>📄</span>
                 <span id="tabLabelFile">File: backend/main.py</span>
                 <span style="font-size:10px;opacity:0.6;margin-left:4px" onclick="event.stopPropagation()">×</span>
@@ -3450,9 +3617,9 @@ body.resizing-active, body.resizing-active * {
                 <div class="genVsCodeBreadcrumbPath" id="genBreadcrumbPath">
                   <span>gen-workplace</span>
                   <span>›</span>
-                  <span>backend</span>
+                  <span id="genBreadcrumbSection">workspace</span>
                   <span>›</span>
-                  <span style="color:#f8fafc">main.py</span>
+                  <span style="color:#f8fafc" id="genBreadcrumbTarget">Files & Git Repo</span>
                 </div>
               </div>
               <div style="display:flex;align-items:center;gap:6px">
@@ -3465,8 +3632,64 @@ body.resizing-active, body.resizing-active * {
             <!-- Tab Bodies -->
             <div class="genVsCodeTabBody">
               
+              <!-- PANE 0: Native Files & Git Repo Explorer -->
+              <div class="genVsCodePane active" id="genVsPane-files_repo">
+                <!-- Git Repo Dashboard Header -->
+                <div class="genRepoDashboard">
+                  <div class="genRepoStatusRow">
+                    <div class="genRepoMetaTags">
+                      <div class="genRepoTag">
+                        <span>🔀</span>
+                        <span>Branch:</span>
+                        <strong id="genRepoBranch">main</strong>
+                      </div>
+                      <div class="genRepoTag">
+                        <span>📌</span>
+                        <span>HEAD:</span>
+                        <strong id="genRepoHead">HEAD</strong>
+                      </div>
+                      <div class="genRepoTag">
+                        <span>🔢</span>
+                        <span>Commits:</span>
+                        <strong id="genRepoCommits">0</strong>
+                      </div>
+                      <div class="genRepoTag" id="genRepoCleanTag">
+                        <span>●</span>
+                        <span id="genRepoCleanText" style="color:#4ade80">Git: Đồng bộ</span>
+                      </div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:6px">
+                      <button class="btn small" style="font-size:9.5px;padding:2px 7px" onclick="loadGenRepoData(true)" title="Làm mới trạng thái Git và File Tree">↻ Làm Mới</button>
+                      <button class="btn small" style="font-size:9.5px;padding:2px 7px" onclick="switchGenVsTab('file')" title="Chuyển sang File Viewer">📄 Xem Code</button>
+                    </div>
+                  </div>
+
+                  <!-- Git Modified Files Notification -->
+                  <div class="genGitModifiedBanner" id="genGitModifiedBanner" style="display:none">
+                    <div style="display:flex;align-items:center;gap:6px">
+                      <span>⚠️</span>
+                      <strong id="genGitModifiedCount">0 file thay đổi trong Git working tree</strong>
+                    </div>
+                    <span style="font-size:9.5px;font-family:var(--mono)" id="genGitModifiedSnippet"></span>
+                  </div>
+                </div>
+
+                <!-- File Explorer Toolbar -->
+                <div class="genFileExplorerToolbar">
+                  <span style="font-size:13px">📁</span>
+                  <input type="text" class="genFileSearchInput" id="genFileTreeSearch" placeholder="🔍 Lọc file theo tên, đuôi hoặc thư mục (vd: main.py, docker, .md)..." oninput="filterGenFileTree(this.value)">
+                  <button class="btn small" style="font-size:9.5px;padding:3px 7px" onclick="toggleAllGenFolders(true)" title="Mở rộng tất cả thư mục">Mở tất cả</button>
+                  <button class="btn small" style="font-size:9.5px;padding:3px 7px" onclick="toggleAllGenFolders(false)" title="Thu gọn tất cả thư mục">Thu gọn</button>
+                </div>
+
+                <!-- Native File Tree Container -->
+                <div class="genFileTreeContainer" id="genFileTreeList">
+                  <div style="color:#64748b;font-size:11px;padding:12px">Đang quét cây thư mục Repo...</div>
+                </div>
+              </div>
+
               <!-- PANE 1: File Viewer -->
-              <div class="genVsCodePane active" id="genVsPane-file">
+              <div class="genVsCodePane" id="genVsPane-file">
                 <div class="genFileQuickBar">
                   <span style="font-size:10px;color:#64748b;font-weight:700">MỞ NHANH:</span>
                   <button class="genFileQuickBtn active" onclick="loadGenFileContent('backend/main.py', this)">main.py</button>
@@ -9208,8 +9431,12 @@ let genState = {
   currentConvId: 'conv-gen-core-01',
   currentModel: 'Gemini 3.1 Pro (High)',
   currentAccount: 'owner_default',
-  currentVsTab: 'file',
+  currentVsTab: 'files_repo',
   activeFilePath: 'backend/main.py',
+  openTabs: ['backend/main.py'],
+  repoFiles: [],
+  gitStatus: null,
+  fileSearchQuery: '',
   notes: [],
   activeEvidenceId: 'NOTE-01',
   messages: [],
@@ -9217,14 +9444,47 @@ let genState = {
   showCompactedDetails: false
 };
 
+// Đồng bộ trạng thái một bộ (Session Workspace Context) với SQLite Backend
+async function syncCurrentGenSessionContext() {
+  if (!genState.currentConvId) return;
+  const c = genState.conversations.find(x => x.id === genState.currentConvId);
+  if (c) {
+    c.active_tab = genState.currentVsTab;
+    c.active_file = genState.activeFilePath;
+    c.open_tabs = genState.openTabs;
+    c.active_evidence_id = genState.activeEvidenceId;
+  }
+  try {
+    fetch('/api/gen/conversations/context', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        conv_id: genState.currentConvId,
+        active_tab: genState.currentVsTab,
+        active_file: genState.activeFilePath,
+        open_tabs: genState.openTabs,
+        active_evidence_id: genState.activeEvidenceId
+      })
+    });
+  } catch (e) {
+    console.warn('[Sync Context] Error:', e);
+  }
+}
+
 async function initGenWorkplace() {
   await Promise.all([
     loadGenConversations(),
-    loadGenNotes(),
+    loadGenRepoData(),
     loadGenSsotSpec()
   ]);
-  await loadGenFileContent(genState.activeFilePath || 'backend/main.py');
-  await loadGenMessages(genState.currentConvId);
+
+  if (genState.conversations.length > 0) {
+    await selectGenConversation(genState.currentConvId);
+  } else {
+    await loadGenFileContent(genState.activeFilePath || 'backend/main.py', null, false);
+    await loadGenNotes(genState.currentConvId);
+    await loadGenMessages(genState.currentConvId);
+  }
   syncGenQuotaTelemetry();
 }
 
@@ -9316,10 +9576,25 @@ async function selectGenConversation(convId) {
     if ($('genModelSelect')) $('genModelSelect').value = genState.currentModel;
     if ($('genAccountSelect')) $('genAccountSelect').value = genState.currentAccount;
     if ($('genInputModelBadge')) $('genInputModelBadge').textContent = genState.currentModel.split(' ')[0] + ' ' + (genState.currentModel.split(' ')[1] || '');
+
+    // Phục hồi trọn bộ Session Workspace Context cho Cột 2
+    const savedTab = c.active_tab || 'files_repo';
+    const savedFile = c.active_file || 'backend/main.py';
+    genState.openTabs = Array.isArray(c.open_tabs) && c.open_tabs.length > 0 ? c.open_tabs : ['backend/main.py'];
+    genState.activeEvidenceId = c.active_evidence_id || 'NOTE-01';
+
+    // Chuyển Cột 2 sang đúng tab và file của phiên này (không sync ngược lại):
+    switchGenVsTab(savedTab, false);
+    await loadGenFileContent(savedFile, null, false);
   }
   renderGenConversationsList();
   if ($('genCurrentSessionBadge')) $('genCurrentSessionBadge').textContent = c?.title?.slice(0, 18) || convId;
-  await loadGenMessages(convId);
+
+  // Tải đồng bộ Sổ tay & Tin nhắn của phiên này:
+  await Promise.all([
+    loadGenNotes(convId),
+    loadGenMessages(convId)
+  ]);
 }
 
 async function openNewGenChatModal() {
@@ -9615,8 +9890,170 @@ async function handleGenAccountChange(newAccount) {
   }
 }
 
-// 5. Cột 2: VS Code Tabs & File Content Viewer
-function switchGenVsTab(tabName) {
+// 5. Cột 2: Native Files & Git Repo Explorer, Multi-tab & File Viewer
+async function loadGenRepoData(forceToast = false) {
+  try {
+    const [gitRes, filesRes] = await Promise.all([
+      fetch('/api/git/status'),
+      fetch('/api/files/tree')
+    ]);
+
+    if (gitRes.ok) {
+      const gData = await gitRes.json();
+      genState.gitStatus = gData;
+      renderGenGitStatus(gData);
+    }
+
+    if (filesRes.ok) {
+      const fData = await filesRes.json();
+      genState.repoFiles = fData.files || [];
+      renderGenFileTree();
+      if ($('genRepoFileCountBadge')) $('genRepoFileCountBadge').textContent = genState.repoFiles.length;
+    }
+
+    if (forceToast) showToast('Đã làm mới cây thư mục Repo và trạng thái Git');
+  } catch (err) {
+    console.warn('[Gen Repo Data] Error:', err);
+  }
+}
+
+function renderGenGitStatus(stat) {
+  if (!stat) return;
+  if ($('genRepoBranch')) $('genRepoBranch').textContent = stat.branch || 'main';
+  if ($('genRepoHead')) $('genRepoHead').textContent = stat.head || 'HEAD';
+  if ($('genRepoCommits')) $('genRepoCommits').textContent = stat.total_commits || '0';
+
+  const cleanText = $('genRepoCleanText');
+  const banner = $('genGitModifiedBanner');
+
+  if (stat.clean) {
+    if (cleanText) {
+      cleanText.textContent = 'Git: Đồng bộ';
+      cleanText.style.color = '#4ade80';
+    }
+    if (banner) banner.style.display = 'none';
+  } else {
+    const chCount = (stat.changed_files || []).length;
+    if (cleanText) {
+      cleanText.textContent = `Git: ${chCount} thay đổi`;
+      cleanText.style.color = '#f59e0b';
+    }
+    if (banner) {
+      banner.style.display = 'flex';
+      const cCount = $('genGitModifiedCount');
+      if (cCount) cCount.textContent = `${chCount} file thay đổi trong working tree`;
+      const snip = $('genGitModifiedSnippet');
+      if (snip) snip.textContent = (stat.changed_files || []).slice(0, 3).join('  ·  ');
+    }
+  }
+}
+
+function renderGenFileTree() {
+  const container = $('genFileTreeList');
+  if (!container) return;
+
+  const files = genState.repoFiles || [];
+  const q = (genState.fileSearchQuery || '').toLowerCase();
+
+  const filtered = files.filter(f => !q || f.path.toLowerCase().includes(q) || (f.type || '').toLowerCase().includes(q));
+
+  if (filtered.length === 0) {
+    container.innerHTML = '<div style="color:#64748b;font-size:11.5px;padding:16px;text-align:center">Không tìm thấy file nào khớp từ khóa</div>';
+    return;
+  }
+
+  // Nhóm theo thư mục cấp 1:
+  const groups = {};
+  filtered.forEach(f => {
+    const parts = f.path.split('/');
+    const folder = parts.length > 1 ? parts[0] + '/' : 'Root Files';
+    if (!groups[folder]) groups[folder] = [];
+    groups[folder].push(f);
+  });
+
+  const getFileIcon = p => {
+    const lower = p.toLowerCase();
+    if (lower.endsWith('.py')) return '🐍';
+    if (lower.endsWith('.html')) return '🌐';
+    if (lower.endsWith('.css')) return '🎨';
+    if (lower.endsWith('.js')) return '⚡';
+    if (lower.endsWith('.md')) return '📜';
+    if (lower.endsWith('.yml') || lower.endsWith('.yaml')) return '⚙️';
+    if (lower.includes('docker')) return '🐳';
+    if (lower.endsWith('.sh')) return '💻';
+    if (lower.endsWith('.db') || lower.endsWith('.sqlite')) return '💾';
+    if (lower.endsWith('.json')) return '📦';
+    return '📄';
+  };
+
+  const groupKeys = Object.keys(groups).sort((a, b) => {
+    if (a === 'Root Files') return 1;
+    if (b === 'Root Files') return -1;
+    return a.localeCompare(b);
+  });
+
+  container.innerHTML = groupKeys.map((folder, gIdx) => {
+    const list = groups[folder];
+    return `
+      <div class="genFolderGroup" id="genFolder-${gIdx}">
+        <div class="genFolderHead" onclick="toggleGenFolder('genFolder-${gIdx}')">
+          <div style="display:flex;align-items:center">
+            <span class="folderToggle">▼</span>
+            <span>📁 ${folder}</span>
+          </div>
+          <span style="font-size:10px;color:#64748b;font-family:var(--mono)">${list.length} file</span>
+        </div>
+        <div class="genFolderBody">
+          ${list.map(f => {
+            const isAct = f.path === genState.activeFilePath;
+            return `
+              <div class="genFileTreeRow ${isAct ? 'active' : ''}" onclick="openGenFileFromTree('${escapeHtml(f.path)}')">
+                <div class="genFileRowLeft" title="${escapeHtml(f.path)}">
+                  <span>${getFileIcon(f.path)}</span>
+                  <span>${escapeHtml(f.path.split('/').pop())}</span>
+                  <span style="font-size:9.5px;color:#64748b;margin-left:4px">(${escapeHtml(f.path)})</span>
+                </div>
+                <div class="genFileRowRight">
+                  <span class="genFileTypeBadge">${escapeHtml(f.type || 'file')}</span>
+                  <span style="font-family:var(--mono);color:#94a3b8">${escapeHtml(f.size)}</span>
+                  <button class="btn small" style="font-size:9px;padding:1px 5px" onclick="event.stopPropagation();openGenFileFromTree('${escapeHtml(f.path)}')">Mở ↗</button>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function toggleGenFolder(folderId) {
+  const el = $(folderId);
+  if (el) el.classList.toggle('collapsed');
+}
+
+function toggleAllGenFolders(expand) {
+  document.querySelectorAll('.genFolderGroup').forEach(g => {
+    if (expand) g.classList.remove('collapsed');
+    else g.classList.add('collapsed');
+  });
+}
+
+function filterGenFileTree(q) {
+  genState.fileSearchQuery = q;
+  renderGenFileTree();
+}
+
+async function openGenFileFromTree(filePath) {
+  genState.activeFilePath = filePath;
+  if (!genState.openTabs.includes(filePath)) {
+    genState.openTabs.push(filePath);
+  }
+  await loadGenFileContent(filePath, null, true);
+  switchGenVsTab('file', true);
+}
+
+function switchGenVsTab(tabName, shouldSync = true) {
   genState.currentVsTab = tabName;
   document.querySelectorAll('.genVsCodeTab').forEach(t => {
     t.classList.toggle('active', t.dataset.vstab === tabName);
@@ -9626,20 +10063,36 @@ function switchGenVsTab(tabName) {
   });
   $(`genVsPane-${tabName}`)?.classList.add('active');
 
-  const bPath = $('genBreadcrumbPath');
-  if (bPath) {
-    if (tabName === 'file') {
-      const p = genState.activeFilePath || 'backend/main.py';
-      bPath.innerHTML = `<span>gen-workplace</span><span>›</span><span>${p.replace(/\//g, '</span><span>›</span><span>')}</span>`;
+  const bTarget = $('genBreadcrumbTarget');
+  const bSection = $('genBreadcrumbSection');
+  if (bTarget) {
+    if (tabName === 'files_repo') {
+      if (bSection) bSection.textContent = 'repository';
+      bTarget.textContent = 'Files & Git Explorer';
+    } else if (tabName === 'file') {
+      if (bSection) bSection.textContent = 'editor';
+      bTarget.textContent = genState.activeFilePath || 'backend/main.py';
     } else if (tabName === 'evidence') {
-      bPath.innerHTML = `<span>evidence</span><span>›</span><span style="color:#38bdf8">#${genState.activeEvidenceId || 'NOTE-01'}</span>`;
+      if (bSection) bSection.textContent = 'evidence';
+      bTarget.textContent = `#${genState.activeEvidenceId || 'NOTE-01'}`;
     } else if (tabName === 'scratchpad') {
-      bPath.innerHTML = `<span>scratchpad</span><span>›</span><span>sổ tay tạm thời</span>`;
+      if (bSection) bSection.textContent = 'notes';
+      bTarget.textContent = 'Sổ tay Scratchpad';
     } else if (tabName === 'console') {
-      bPath.innerHTML = `<span>terminal</span><span>›</span><span>gen core output</span>`;
+      if (bSection) bSection.textContent = 'terminal';
+      bTarget.textContent = 'Live Console Output';
     } else if (tabName === 'ssot') {
-      bPath.innerHTML = `<span>ssot</span><span>›</span><span>docs/SSOT_ORIGINAL_SPEC.md</span>`;
+      if (bSection) bSection.textContent = 'ssot';
+      bTarget.textContent = 'docs/SSOT_ORIGINAL_SPEC.md';
     }
+  }
+
+  if (tabName === 'files_repo' && (!genState.repoFiles || genState.repoFiles.length === 0)) {
+    loadGenRepoData();
+  }
+
+  if (shouldSync) {
+    syncCurrentGenSessionContext();
   }
 
   const subId = 'vstab-' + tabName;
@@ -9647,9 +10100,11 @@ function switchGenVsTab(tabName) {
   document.querySelectorAll('.subTab').forEach(b => b.classList.toggle('active', b.dataset.sub === subId));
 }
 
-async function loadGenFileContent(filePath, btnEl) {
+async function loadGenFileContent(filePath, btnEl, shouldSync = true) {
   genState.activeFilePath = filePath;
-  switchGenVsTab('file');
+  if (!genState.openTabs.includes(filePath)) {
+    genState.openTabs.push(filePath);
+  }
 
   if (btnEl) {
     document.querySelectorAll('.genFileQuickBtn').forEach(b => b.classList.remove('active'));
@@ -9661,31 +10116,36 @@ async function loadGenFileContent(filePath, btnEl) {
 
   const gutter = $('genCodeGutter');
   const text = $('genCodeText');
-  if (!text) return;
-
-  text.textContent = `// Đang nạp ${filePath}...`;
-  try {
-    const res = await fetch(`/api/file/content?path=${encodeURIComponent(filePath)}`);
-    if (res.ok) {
-      const data = await res.json();
-      const content = data.content || '';
-      const lines = content.split('\n');
-      if (gutter) {
-        gutter.innerHTML = Array.from({ length: lines.length }, (_, i) => i + 1).join('<br>');
+  if (text) {
+    text.textContent = `// Đang nạp ${filePath}...`;
+    try {
+      const res = await fetch(`/api/file/content?path=${encodeURIComponent(filePath)}`);
+      if (res.ok) {
+        const data = await res.json();
+        const content = data.content || '';
+        const lines = content.split('\n');
+        if (gutter) {
+          gutter.innerHTML = Array.from({ length: lines.length }, (_, i) => i + 1).join('<br>');
+        }
+        text.textContent = content;
+      } else {
+        text.textContent = `// Không thể đọc file: ${filePath}`;
       }
-      text.textContent = content;
-    } else {
-      text.textContent = `// Không thể đọc file: ${filePath}`;
+    } catch (err) {
+      text.textContent = `// Lỗi đọc file: ${err.message}`;
     }
-  } catch (err) {
-    text.textContent = `// Lỗi đọc file: ${err.message}`;
+  }
+
+  if (shouldSync) {
+    syncCurrentGenSessionContext();
   }
 }
 
 function loadCustomFile() {
   const inp = $('customFilePathInput');
   if (!inp || !inp.value.trim()) return;
-  loadGenFileContent(inp.value.trim());
+  loadGenFileContent(inp.value.trim(), null, true);
+  switchGenVsTab('file', true);
 }
 
 function copyGenActiveContent() {
@@ -9769,17 +10229,19 @@ function citeActiveEvidenceToChat() {
 }
 
 // 7. Scratchpad Notes (Cột 2 Tab 3 & Cột 3 Mini Widget)
-async function loadGenNotes() {
+async function loadGenNotes(convId) {
+  convId = convId || genState.currentConvId || '';
   const container = $('genNotesListContainer');
   try {
-    const res = await fetch('/api/gen/notes');
+    const url = convId ? `/api/gen/notes?project=PRJ-GEN-WORKPLACE&conv_id=${encodeURIComponent(convId)}` : '/api/gen/notes?project=PRJ-GEN-WORKPLACE';
+    const res = await fetch(url);
     if (res.ok) {
       const data = await res.json();
       genState.notes = data.notes || [];
       if (!container) return;
 
       if (genState.notes.length === 0) {
-        container.innerHTML = '<div style="color:#64748b;font-size:12px;padding:20px;text-align:center">Sổ tay tạm thời trống. Hãy tạo ghi chú đầu tiên!</div>';
+        container.innerHTML = '<div style="color:#64748b;font-size:12px;padding:20px;text-align:center">Sổ tay tạm thời trống cho phiên làm việc này. Hãy tạo ghi chú đầu tiên!</div>';
         return;
       }
 

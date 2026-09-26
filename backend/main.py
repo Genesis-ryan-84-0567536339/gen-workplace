@@ -662,6 +662,19 @@ class SwarmHandler(SimpleHTTPRequestHandler):
                 self._send_json(400, {"error": "Missing conv_id"})
             return
 
+        if path == "/api/gen/conversations/context":
+            conv_id = data.get("conv_id")
+            active_tab = data.get("active_tab")
+            active_file = data.get("active_file")
+            open_tabs = data.get("open_tabs")
+            active_evidence_id = data.get("active_evidence_id")
+            if conv_id:
+                res = db.update_gen_conversation_context(conv_id, active_tab, active_file, open_tabs, active_evidence_id)
+                self._send_json(200, res)
+            else:
+                self._send_json(400, {"error": "Missing conv_id"})
+            return
+
         if path == "/api/gen/conversations/delete":
             conv_id = data.get("conv_id")
             if conv_id:
