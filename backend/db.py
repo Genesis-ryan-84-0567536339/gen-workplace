@@ -452,6 +452,27 @@ def init_db():
         cursor.execute("UPDATE tmux_sessions SET owner_id = 'owner-ryan' WHERE owner_id IS NULL OR owner_id = ''")
         cursor.execute("UPDATE master_ssot SET owner_id = 'owner-ryan' WHERE owner_id IS NULL OR owner_id = ''")
 
+        # 20. Gen Session Todos & Interactive Checklists (Kanban DAG chuyên dụng theo phiên)
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS gen_session_todos (
+            id TEXT PRIMARY KEY,
+            conversation_id TEXT NOT NULL REFERENCES gen_conversations(id) ON DELETE CASCADE,
+            project_id TEXT NOT NULL DEFAULT 'PRJ-GEN-WORKPLACE',
+            title TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            status TEXT NOT NULL DEFAULT 'todo', -- 'todo', 'in_progress', 'review', 'done'
+            priority TEXT DEFAULT 'high', -- 'critical', 'high', 'medium', 'low'
+            assigned_agent TEXT DEFAULT 'Gen Core',
+            checklist_json TEXT DEFAULT '[]', -- JSON array of {"id": "chk-1", "text": "...", "done": true/false}
+            evidence_ref TEXT DEFAULT '',
+            order_idx INTEGER DEFAULT 0,
+            owner_id TEXT DEFAULT 'owner-ryan',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_gen_sess_todos_conv ON gen_session_todos(conversation_id, status);")
+
         conn.commit()
 
 def seed_ssot_events():
@@ -2910,6 +2931,12 @@ def seed_gen_workplace():
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """, n)
 
+            # Khởi tạo phiên Gen_workplace Builder chuyên dụng nếu chưa có
+            cursor.execute("""
+            INSERT OR IGNORE INTO gen_conversations (id, project_id, title, model, account_profile, is_pinned, active_tab, active_file, open_tabs_json, active_evidence_id, owner_id)
+            VALUES ('conv-gen-builder', 'PRJ-GEN-WORKPLACE', 'Gen_workplace Builder', 'Gemini 3.1 Pro (High)', 'owner_default', 1, 'kanban_todo', 'backend/db.py', '["backend/db.py"]', 'NOTE-BUILDER-01', 'owner-ryan')
+            """)
+
             conn.commit()
 
 def get_owner_profile(owner_id="owner-ryan"):
@@ -3218,22 +3245,40 @@ def generate_gen_smart_reply(conv_id, user_message, model, account="owner_defaul
         if len(notes) > 1:
             cited_notes.append(f"#{notes[1]['id']}")
 
-    # Nhóm 4: Hỏi về Tiến độ / Task / Việc chờ / Kanban
-    elif any(k in lower for k in ["tiến độ", "task", "việc", "chờ", "kanban", "todo", "chưa làm", "xong chưa", "trạng thái", "hoàn thành"]):
-        pending = [t for t in all_todos if t.get('status') in ('pending', 'todo')]
-        in_progress = [t for t in all_todos if t.get('status') in ('in_progress', 'doing')]
-        completed = [t for t in all_todos if t.get('status') in ('completed', 'done', 'verified')]
-        
-        p_summary = ', '.join([f"**{t['id']}** ({t.get('assigned_to', 'Swarm')})" for t in pending[:4]]) or "Không còn việc chờ"
-        ip_summary = ', '.join([f"**{t['id']}** ({t.get('assigned_to', 'Swarm')})" for t in in_progress[:3]]) or "Không có việc đang chạy"
-        
-        reply = (
-            f"Dạ em báo cáo Sếp bảng tiến độ thực tế của hệ thống:\n"
-            f"- ✅ **Đã hoàn tất nghiệm thu:** {len(completed)} nhiệm vụ (chứng thực bằng commit & test log).\n"
-            f"- ⚙️ **Đang triển khai:** {len(in_progress)} nhiệm vụ ({ip_summary}).\n"
-            f"- ⏳ **Chờ xử lý:** {len(pending)} nhiệm vụ ({p_summary}).\n\n"
-            f"Hệ thống Mutex lock bảo đảm các Agent không bị dẫm chân lên nhau. Sếp muốn em đôn đốc vị trí nào hay ưu tiên nhiệm vụ nào trước ạ?"
-        )
+    # Nhóm 4: Hỏi về Tiến độ / Task / Việc chờ / Kanban / Checklist
+    elif any(k in lower for k in ["tiến độ", "task", "việc", "chờ", "kanban", "todo", "checklist", "chưa làm", "xong chưa", "trạng thái", "hoàn thành"]):
+        sess_todos = get_gen_session_todos(conv_id)
+        if sess_todos:
+            t_lines = []
+            for t in sess_todos:
+                st_icon = "📋" if t["status"] == "todo" else ("⚡" if t["status"] == "in_progress" else ("🔍" if t["status"] == "review" else "✅"))
+                prog = t.get("progress_pct", 0)
+                t_lines.append(f"- {st_icon} **[{t['id']}] {t['title']}** ({t['status'].upper()} · {prog}% hoàn thành)")
+                for it in t.get("checklist", []):
+                    c_mark = "☑️" if it.get("done") else "⬜"
+                    t_lines.append(f"   {c_mark} `{it['id']}`: {it['text']}")
+            sess_tasks_str = "\n".join(t_lines)
+            reply = (
+                f"Dạ em báo cáo Sếp bảng **Kanban & Checklist chuyên dụng** của phiên **\"{conv_title}\"**:\n\n"
+                f"{sess_tasks_str}\n\n"
+                f"📌 **Quy chế Agent:** Toàn bộ công việc thực thi của em và các Swarm Agent tại phiên này đều phải đối soát và cập nhật trực tiếp vào từng checklist trên.\n"
+                f"Sếp có thể bấm tab **📌 Kanban & Todos** ở Cột 2 để tick chọn checklist hoặc kéo thả chuyển trạng thái trực tiếp ạ!"
+            )
+        else:
+            pending = [t for t in all_todos if t.get('status') in ('pending', 'todo')]
+            in_progress = [t for t in all_todos if t.get('status') in ('in_progress', 'doing')]
+            completed = [t for t in all_todos if t.get('status') in ('completed', 'done', 'verified')]
+            
+            p_summary = ', '.join([f"**{t['id']}** ({t.get('assigned_to', 'Swarm')})" for t in pending[:4]]) or "Không còn việc chờ"
+            ip_summary = ', '.join([f"**{t['id']}** ({t.get('assigned_to', 'Swarm')})" for t in in_progress[:3]]) or "Không có việc đang chạy"
+            
+            reply = (
+                f"Dạ em báo cáo Sếp bảng tiến độ thực tế của hệ thống:\n"
+                f"- ✅ **Đã hoàn tất nghiệm thu:** {len(completed)} nhiệm vụ (chứng thực bằng commit & test log).\n"
+                f"- ⚙️ **Đang triển khai:** {len(in_progress)} nhiệm vụ ({ip_summary}).\n"
+                f"- ⏳ **Chờ xử lý:** {len(pending)} nhiệm vụ ({p_summary}).\n\n"
+                f"Hệ thống Mutex lock bảo đảm các Agent không bị dẫm chân lên nhau. Sếp muốn em đôn đốc vị trí nào hay ưu tiên nhiệm vụ nào trước ạ?"
+            )
         cited_notes.append("#NOTE-03")
 
     # Nhóm 5: Hỏi về Git / Commit / Branch / Repo
@@ -3327,10 +3372,18 @@ def call_agy_cli_turn(conv_id, user_message, model=None, account="owner_default"
     if p_dir != "/workspace/.gemini" and os.path.exists(f"{p_dir}/antigravity-cli"):
         env["ANTIGRAVITY_APP_DATA_DIR"] = f"{p_dir}/antigravity-cli"
 
+    # Lấy Kanban & Checklist chuyên dụng của phiên để ép Agent tuân thủ quy trình
+    sess_todos = get_gen_session_todos(conv_id)
+    if sess_todos:
+        kanban_block = format_session_kanban_for_agent(conv_id, sess_todos)
+        prompt_payload = f"{kanban_block}\n\n[TIN NHẮN TRỰC TIẾP TỪ SẾP RYAN]:\n{user_message}"
+    else:
+        prompt_payload = user_message
+
     cmd = [
         "agy",
         "--output-format", "json",
-        "--print", user_message,
+        "--print", prompt_payload,
         "--dangerously-skip-permissions"
     ]
 
@@ -3416,7 +3469,7 @@ def send_gen_chat(conv_id, author, message, model, account="owner_default"):
         cursor.execute("UPDATE gen_conversations SET model = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", (model, conv_id))
         conn.commit()
 
-    # THỰC THI QUA CORE AGENT AGY CLI THỜI GIAN THỰC
+    # THỰC THI QUA CORE AGENT AGY CLI THỜI GIAN THỰC (BẮT BUỘC KANBAN & CHECKLIST DIRECTIVE)
     actual_reply, ret_conv_id, usage = call_agy_cli_turn(conv_id, message, model, account)
     if actual_reply:
         reply_content = actual_reply
@@ -3426,6 +3479,9 @@ def send_gen_chat(conv_id, author, message, model, account="owner_default"):
         # Nếu agy CLI bận hoặc timeout thì kích hoạt Smart Fallback
         reply_content, cited_notes = generate_gen_smart_reply(conv_id, message, model, account)
         engine_used = "smart-fallback"
+
+    # TỰ ĐỘNG PHÂN TÍCH VÀ CẬP NHẬT KANBAN & CHECKLIST TỪ PHẢN HỒI CỦA AGENT
+    applied_kanban = parse_and_apply_agent_kanban_updates(conv_id, reply_content)
 
     author_name = "Gen Core (agy CLI)" if engine_used == "agy-cli" else "Gen Core"
 
@@ -3458,7 +3514,8 @@ def send_gen_chat(conv_id, author, message, model, account="owner_default"):
         "model": model,
         "conv_title": updated_title,
         "engine": engine_used,
-        "usage": usage or {}
+        "usage": usage or {},
+        "kanban_updates": applied_kanban
     }
 
 def compact_gen_conversation(conv_id, model_from="", model_to="", manual=False):
@@ -3772,6 +3829,265 @@ def get_file_content_safely(file_path):
         return {"path": clean_p, "content": content, "size": size, "lines": len(content.splitlines())}
     except Exception as e:
         return {"error": str(e)}
+
+# =========================================================================
+# SESSION KANBAN & INTERACTIVE CHECKLIST ENGINE (PER-SESSION DAG)
+# =========================================================================
+
+def seed_session_default_todos(conv_id):
+    """Khởi tạo danh mục Kanban Todo & Checklist ban đầu cho phiên nếu đang trống."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM gen_conversations WHERE id = ?", (conv_id,))
+        if not cursor.fetchone():
+            return
+        cursor.execute("SELECT count(*) FROM gen_session_todos WHERE conversation_id = ?", (conv_id,))
+        if cursor.fetchone()[0] > 0:
+            return
+
+        if conv_id == "conv-gen-builder":
+            initial_todos = [
+                ("TSK-01", conv_id, "PRJ-GEN-WORKPLACE", "Thiết lập hạ tầng Swarm & Cách ly Workspace phiên", "Kiểm tra container gen-workplace-app và quyền đọc ghi tại thư mục /workspace/sessions/conv-gen-builder.", "done", "critical", "Builder Agent", json.dumps([
+                    {"id": "chk-1", "text": "Xác nhận container gen-workplace-app chạy trên port 8888 với cờ SELinux :z", "done": True},
+                    {"id": "chk-2", "text": "Khởi tạo thư mục /workspace/sessions/conv-gen-builder cô lập", "done": True},
+                    {"id": "chk-3", "text": "Khóa đặc tả SSOT_ORIGINAL_SPEC.md làm kim chỉ nam phát triển", "done": True}
+                ], ensure_ascii=False), "NOTE-BUILDER-01 · git commit 52c7861", 1, "owner-ryan"),
+                ("TSK-02", conv_id, "PRJ-GEN-WORKPLACE", "Khóa quyền sở hữu độc quyền cho Owner Ryan (owner_profiles)", "Khởi tạo bảng owner_profiles và backfill owner_id='owner-ryan' cho toàn bộ CSDL.", "done", "critical", "Builder Agent", json.dumps([
+                    {"id": "chk-1", "text": "Khởi tạo bảng owner_profiles (id='owner-ryan') trong SQLite WAL", "done": True},
+                    {"id": "chk-2", "text": "Gán cờ owner_id='owner-ryan' trên 100% các bảng dữ liệu", "done": True},
+                    {"id": "chk-3", "text": "Tích hợp huy hiệu Sovereign Profile và Modal quản trị trên Topbar", "done": True}
+                ], ensure_ascii=False), "NOTE-BUILDER-05 · git commit f211ce5", 2, "owner-ryan"),
+                ("TSK-03", conv_id, "PRJ-GEN-WORKPLACE", "Xây dựng phân hệ Kanban & Checklist chuyên dụng theo phiên", "Tạo tab Kanban 4 cột trong Cột 2, ràng buộc Agent bắt buộc đối soát checklist khi làm việc.", "in_progress", "high", "Builder Agent", json.dumps([
+                    {"id": "chk-1", "text": "Thiết kế bảng gen_session_todos với trường checklist_json và status", "done": True},
+                    {"id": "chk-2", "text": "Triển khai REST API quản lý todos và toggle checklist item", "done": True},
+                    {"id": "chk-3", "text": "Thêm tab Kanban & Todos trong Cột 2 với 4 cột tương tác trực tiếp", "done": True},
+                    {"id": "chk-4", "text": "Ràng buộc bắt buộc Agent phải đối soát và cập nhật checklist khi trả lời", "done": True}
+                ], ensure_ascii=False), "PRJ-GEN-WORKPLACE · session: conv-gen-builder", 3, "owner-ryan"),
+                ("TSK-04", conv_id, "PRJ-GEN-WORKPLACE", "Tự động hóa kiểm thử regression & Thẩm định bằng chứng", "Kiểm định toàn diện chu trình tương tác giữa Ryan, Gen Core và hệ thống Kanban.", "todo", "medium", "QA & Verification", json.dumps([
+                    {"id": "chk-1", "text": "Viết kịch bản kiểm thử API REST /api/gen/session/todos", "done": False},
+                    {"id": "chk-2", "text": "Kiểm tra render Headless Chrome không có lỗi JavaScript console", "done": False},
+                    {"id": "chk-3", "text": "Nghiệm thu toàn bộ tài liệu bàn giao kỹ thuật", "done": False}
+                ], ensure_ascii=False), "SOP Phase 4 Verification", 4, "owner-ryan"),
+            ]
+        else:
+            initial_todos = [
+                ("TSK-01", conv_id, "PRJ-GEN-WORKPLACE", "Tiếp nhận chỉ thị từ Owner Ryan & Phân tích nhiệm vụ", "Core Agent tiếp nhận mệnh lệnh từ Ryan, đối soát đặc tả SSOT và lập danh mục checklist.", "in_progress", "high", "Gen Core", json.dumps([
+                    {"id": "chk-1", "text": "Nhận diện yêu cầu và chỉ thị trực tiếp từ Owner Ryan trong phòng chat", "done": True},
+                    {"id": "chk-2", "text": "Đối soát các ràng buộc kiến trúc với docs/SSOT_ORIGINAL_SPEC.md", "done": False},
+                    {"id": "chk-3", "text": "Ghi nhận mã bằng chứng Note ID tương ứng vào Sổ tay Scratchpad", "done": False}
+                ], ensure_ascii=False), "docs/SSOT_ORIGINAL_SPEC.md", 1, "owner-ryan"),
+                ("TSK-02", conv_id, "PRJ-GEN-WORKPLACE", "Thực thi tác vụ & Cập nhật tiến độ theo từng checklist", "Thực hiện từng hạng mục kỹ thuật, lưu log vật lý và kiểm tra kết quả.", "todo", "high", "Gen Core", json.dumps([
+                    {"id": "chk-1", "text": "Thực thi lệnh code hoặc script qua agy CLI thời gian thực", "done": False},
+                    {"id": "chk-2", "text": "Kiểm tra trạng thái thoát (exit code) và dữ liệu đầu ra", "done": False},
+                    {"id": "chk-3", "text": "Đánh dấu hoàn thành checklist [x] và chuyển task sang review", "done": False}
+                ], ensure_ascii=False), "agy CLI turn log", 2, "owner-ryan"),
+                ("TSK-03", conv_id, "PRJ-GEN-WORKPLACE", "Báo cáo nghiệm thu kết quả cho Owner Ryan", "Tổng kết kết quả thực hiện, đối chiếu bằng chứng và sẵn sàng nhận chỉ thị tiếp theo.", "todo", "medium", "Gen Core", json.dumps([
+                    {"id": "chk-1", "text": "Tổng hợp kết quả ngắn gọn, sắc nét theo chuẩn Executive Assistant", "done": False},
+                    {"id": "chk-2", "text": "Cập nhật trạng thái task sang Hoàn thành (Done)", "done": False}
+                ], ensure_ascii=False), "Báo cáo điều hành", 3, "owner-ryan"),
+            ]
+
+        for t in initial_todos:
+            cursor.execute("""
+            INSERT OR IGNORE INTO gen_session_todos (id, conversation_id, project_id, title, description, status, priority, assigned_agent, checklist_json, evidence_ref, order_idx, owner_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, t)
+        conn.commit()
+
+def get_gen_session_todos(conv_id, project_id="PRJ-GEN-WORKPLACE"):
+    """Lấy danh sách Kanban Todo & Checklist chuyên dụng của phiên cụ thể."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+        SELECT * FROM gen_session_todos 
+        WHERE conversation_id = ?
+        ORDER BY order_idx ASC, id ASC
+        """, (conv_id,))
+        rows = cursor.fetchall()
+        
+        # Nếu phiên chưa có todo nào, tự động seed bộ todo mẫu tương ứng
+        if not rows:
+            seed_session_default_todos(conv_id)
+            cursor.execute("""
+            SELECT * FROM gen_session_todos 
+            WHERE conversation_id = ?
+            ORDER BY order_idx ASC, id ASC
+            """, (conv_id,))
+            rows = cursor.fetchall()
+
+        todos = []
+        for r in rows:
+            d = dict(r)
+            try:
+                d["checklist"] = json.loads(d.get("checklist_json") or "[]")
+            except Exception:
+                d["checklist"] = []
+            
+            total_items = len(d["checklist"])
+            done_items = sum(1 for it in d["checklist"] if it.get("done"))
+            d["total_items"] = total_items
+            d["done_items"] = done_items
+            d["progress_percent"] = int((done_items / total_items) * 100) if total_items > 0 else (100 if d["status"] == "done" else 0)
+            todos.append(d)
+        return todos
+
+def save_gen_session_todo(conv_id, todo_id=None, title="Nhiệm vụ mới", description="", status="todo", priority="high", assigned_agent="Gen Core", checklist=None, evidence_ref="", order_idx=0, owner_id="owner-ryan"):
+    checklist = checklist or []
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        if not todo_id:
+            cursor.execute("SELECT count(*) FROM gen_session_todos WHERE conversation_id = ?", (conv_id,))
+            num = cursor.fetchone()[0] + 1
+            todo_id = f"TSK-{num:02d}"
+
+        normalized_chk = []
+        for idx, item in enumerate(checklist, 1):
+            if isinstance(item, str):
+                normalized_chk.append({"id": f"chk-{idx}", "text": item, "done": False})
+            elif isinstance(item, dict):
+                normalized_chk.append({
+                    "id": item.get("id") or f"chk-{idx}",
+                    "text": item.get("text", f"Hạng mục {idx}"),
+                    "done": bool(item.get("done", False))
+                })
+
+        cursor.execute("""
+        INSERT INTO gen_session_todos (id, conversation_id, project_id, title, description, status, priority, assigned_agent, checklist_json, evidence_ref, order_idx, owner_id)
+        VALUES (?, ?, 'PRJ-GEN-WORKPLACE', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+            title = excluded.title,
+            description = excluded.description,
+            status = excluded.status,
+            priority = excluded.priority,
+            assigned_agent = excluded.assigned_agent,
+            checklist_json = excluded.checklist_json,
+            evidence_ref = excluded.evidence_ref,
+            order_idx = excluded.order_idx,
+            owner_id = excluded.owner_id,
+            updated_at = CURRENT_TIMESTAMP
+        """, (todo_id, conv_id, title, description, status, priority, assigned_agent, json.dumps(normalized_chk, ensure_ascii=False), evidence_ref, order_idx, owner_id))
+        conn.commit()
+    return {"status": "saved", "id": todo_id, "title": title}
+
+def toggle_gen_session_todo_checklist_item(conv_id, todo_id, item_id, done_status=None):
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT checklist_json, status FROM gen_session_todos WHERE id = ? AND conversation_id = ?", (todo_id, conv_id))
+        row = cursor.fetchone()
+        if not row:
+            return {"error": "Todo not found"}
+        
+        try:
+            chk = json.loads(row["checklist_json"] or "[]")
+        except Exception:
+            chk = []
+
+        found = False
+        all_done = True
+        for item in chk:
+            if item.get("id") == item_id or item.get("text") == item_id:
+                if done_status is not None:
+                    item["done"] = bool(done_status)
+                else:
+                    item["done"] = not item.get("done", False)
+                found = True
+            if not item.get("done"):
+                all_done = False
+
+        if not found:
+            return {"error": "Checklist item not found"}
+
+        new_status = row["status"]
+        if all_done and len(chk) > 0 and new_status in ("todo", "in_progress"):
+            new_status = "review"
+
+        cursor.execute("""
+        UPDATE gen_session_todos 
+        SET checklist_json = ?, status = ?, updated_at = CURRENT_TIMESTAMP 
+        WHERE id = ? AND conversation_id = ?
+        """, (json.dumps(chk, ensure_ascii=False), new_status, todo_id, conv_id))
+        conn.commit()
+    return {"status": "updated", "id": todo_id, "item_id": item_id, "all_done": all_done, "new_status": new_status}
+
+def update_gen_session_todo_status(conv_id, todo_id, new_status, evidence_ref=None):
+    valid_statuses = ["todo", "in_progress", "review", "done"]
+    if new_status not in valid_statuses:
+        new_status = "todo"
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        updates = ["status = ?", "updated_at = CURRENT_TIMESTAMP"]
+        params = [new_status]
+        if evidence_ref:
+            updates.append("evidence_ref = ?")
+            params.append(evidence_ref)
+        params.extend([todo_id, conv_id])
+        cursor.execute(f"UPDATE gen_session_todos SET {', '.join(updates)} WHERE id = ? AND conversation_id = ?", params)
+        conn.commit()
+    return {"status": "updated", "id": todo_id, "new_status": new_status}
+
+def delete_gen_session_todo(conv_id, todo_id):
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM gen_session_todos WHERE id = ? AND conversation_id = ?", (todo_id, conv_id))
+        conn.commit()
+    return {"status": "deleted", "id": todo_id}
+
+def format_session_kanban_for_agent(conv_id, todos):
+    """Định dạng bản tóm tắt Kanban & Checklist của phiên để nhồi vào prompt bắt buộc của Agent."""
+    if not todos:
+        return ""
+    lines = [
+        "==================================================",
+        f"🚨 [QUY CHẾ BẮT BUỘC: KANBAN & CHECKLIST ĐIỀU HÀNH PHIÊN ({conv_id})]",
+        "Là Agent của phiên làm việc này, bạn BẮT BUỘC phải thực thi theo quy trình Kanban và đối soát checklist dưới đây:",
+    ]
+    for t in todos:
+        status_icon = "📋" if t["status"] == "todo" else ("⚡" if t["status"] == "in_progress" else ("🔍" if t["status"] == "review" else "✅"))
+        lines.append(f"\n{status_icon} [{t['id']}] ({t['status'].upper()}) - {t['title']} (Ưu tiên: {t['priority']})")
+        if t.get("evidence_ref"):
+            lines.append(f"   Bằng chứng: {t['evidence_ref']}")
+        for item in t.get("checklist", []):
+            chk_mark = "[x]" if item.get("done") else "[ ]"
+            lines.append(f"   {chk_mark} ({item['id']}) {item['text']}")
+    
+    lines.append("\nQUY TẮC BẮT BUỘC CHO AGENT TRONG MỖI LƯỢT TRẢ LỜI:")
+    lines.append("1. Bạn PHẢI nêu rõ task nào trong bảng Kanban đang được xử lý.")
+    lines.append("2. Đối soát và cập nhật checklist tương ứng với phần việc bạn đang giải quyết.")
+    lines.append("3. Khi hoàn thành hạng mục checklist hoặc đổi trạng thái task, hãy ghi chú cú pháp chuẩn:")
+    lines.append("   [KANBAN_UPDATE: <ID_TASK> | STATUS: <in_progress/review/done> | CHECK: <item_id> | EVIDENCE: <bằng_chứng>]")
+    lines.append("   Hoặc ngắn gọn: [TASK_DONE: <ID_TASK>]")
+    lines.append("==================================================")
+    return "\n".join(lines)
+
+def parse_and_apply_agent_kanban_updates(conv_id, agent_text):
+    """Phân tích các chỉ thị cập nhật Kanban từ câu trả lời của Agent và tự động ghi vào SQLite."""
+    if not agent_text:
+        return []
+    updates_made = []
+    # Mẫu 1: [KANBAN_UPDATE: TSK-01 | STATUS: in_progress | CHECK: chk-1 | EVIDENCE: ...]
+    pattern = r'\[KANBAN_UPDATE:\s*([^\|\]]+)(?:\s*\|\s*STATUS:\s*([^\|\]]+))?(?:\s*\|\s*CHECK:\s*([^\|\]]+))?(?:\s*\|\s*EVIDENCE:\s*([^\]]+))?\]'
+    matches = re.findall(pattern, agent_text, re.IGNORECASE)
+    for m in matches:
+        tid = m[0].strip()
+        status = m[1].strip().lower() if m[1] else None
+        item_id = m[2].strip() if m[2] else None
+        evidence = m[3].strip() if m[3] else None
+        
+        if item_id:
+            toggle_gen_session_todo_checklist_item(conv_id, tid, item_id, done_status=True)
+            updates_made.append(f"Checklist {item_id} của {tid} -> Hoàn thành")
+        if status:
+            update_gen_session_todo_status(conv_id, tid, status, evidence_ref=evidence)
+            updates_made.append(f"Task {tid} -> {status}")
+
+    # Mẫu 2: [TASK_DONE: TSK-01]
+    done_matches = re.findall(r'\[TASK_DONE:\s*([A-Za-z0-9_-]+)\]', agent_text, re.IGNORECASE)
+    for tid in done_matches:
+        tid = tid.strip()
+        update_gen_session_todo_status(conv_id, tid, "done")
+        updates_made.append(f"Task {tid} -> Hoàn thành (Done)")
+
+    return updates_made
 
 # Khởi tạo tự động khi import
 init_db()

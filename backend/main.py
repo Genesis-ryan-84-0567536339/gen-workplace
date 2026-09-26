@@ -266,6 +266,13 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             self._send_json(200, sess_files)
             return
 
+        # 23. API Gen Session Todos & Interactive Checklists (Kanban DAG chuyên dụng theo phiên)
+        if path == "/api/gen/session/todos":
+            conv_id = query.get("conv_id", [query.get("conversation_id", ["conv-gen-core-01"])[0]])[0]
+            todos = db.get_gen_session_todos(conv_id)
+            self._send_json(200, {"todos": todos, "count": len(todos), "conversation_id": conv_id})
+            return
+
         return super().do_GET()
 
     def do_POST(self):
@@ -766,6 +773,59 @@ class SwarmHandler(SimpleHTTPRequestHandler):
                 self._send_json(200, res)
             else:
                 self._send_json(400, {"error": "Missing conv_id or repo_path"})
+            return
+
+        # 28. API Gen Session Todos & Checklists (Quản lý Kanban & Checklist chuyên dụng theo phiên)
+        if path == "/api/gen/session/todos/save":
+            conv_id = data.get("conv_id") or data.get("conversation_id")
+            todo_id = data.get("id") or data.get("todo_id")
+            title = data.get("title", "")
+            description = data.get("description", "")
+            status = data.get("status", "todo")
+            priority = data.get("priority", "high")
+            assigned_agent = data.get("assigned_agent", "Gen Core")
+            checklist = data.get("checklist", [])
+            evidence_ref = data.get("evidence_ref", "")
+            owner_id = data.get("owner_id", "owner-ryan")
+            if conv_id and title:
+                res = db.save_gen_session_todo(conv_id, todo_id, title, description, status, priority, assigned_agent, checklist, evidence_ref, owner_id)
+                self._send_json(200, res)
+            else:
+                self._send_json(400, {"error": "Missing conv_id or title"})
+            return
+
+        if path == "/api/gen/session/todos/item/toggle":
+            conv_id = data.get("conv_id") or data.get("conversation_id")
+            todo_id = data.get("todo_id") or data.get("id")
+            item_id = data.get("item_id")
+            done_status = data.get("done")
+            if conv_id and todo_id and item_id:
+                res = db.toggle_gen_session_todo_checklist_item(conv_id, todo_id, item_id, done_status)
+                self._send_json(200 if "error" not in res else 400, res)
+            else:
+                self._send_json(400, {"error": "Missing conv_id, todo_id, or item_id"})
+            return
+
+        if path == "/api/gen/session/todos/status":
+            conv_id = data.get("conv_id") or data.get("conversation_id")
+            todo_id = data.get("todo_id") or data.get("id")
+            new_status = data.get("status") or data.get("new_status")
+            evidence_ref = data.get("evidence_ref")
+            if conv_id and todo_id and new_status:
+                res = db.update_gen_session_todo_status(conv_id, todo_id, new_status, evidence_ref)
+                self._send_json(200, res)
+            else:
+                self._send_json(400, {"error": "Missing conv_id, todo_id, or status"})
+            return
+
+        if path == "/api/gen/session/todos/delete":
+            conv_id = data.get("conv_id") or data.get("conversation_id")
+            todo_id = data.get("todo_id") or data.get("id")
+            if conv_id and todo_id:
+                res = db.delete_gen_session_todo(conv_id, todo_id)
+                self._send_json(200, res)
+            else:
+                self._send_json(400, {"error": "Missing conv_id or todo_id"})
             return
 
         self.send_response(404)

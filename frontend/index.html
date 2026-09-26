@@ -3739,11 +3739,223 @@ body.resizing-active, body.resizing-active * {
 .genChatTextarea:focus {
   border-color: #0284c7;
 }
-.genChatToolbar {
+/* SESSION KANBAN & CHECKLIST BOARD */
+.genKanbanContainer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #080c14;
+  overflow: hidden;
+}
+.genKanbanHeader {
+  padding: 10px 16px;
+  background: #0d131f;
+  border-bottom: 1px solid #1a2538;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.genKanbanTitleBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.genKanbanTitle {
+  font-size: 13px;
+  font-weight: 700;
+  color: #f8fafc;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.genKanbanSubtitle {
+  font-size: 10.5px;
+  color: #64748b;
+}
+.genKanbanBoard {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(260px, 1fr));
+  gap: 14px;
+  padding: 14px;
+  flex: 1;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.genKanbanColumn {
+  display: flex;
+  flex-direction: column;
+  background: #0f1623;
+  border: 1px solid #1a2536;
+  border-radius: 8px;
+  overflow: hidden;
+  height: 100%;
+}
+.genKanbanColHead {
+  padding: 10px 12px;
+  background: #141c2c;
+  border-bottom: 1px solid #1a2536;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11.5px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.genKanbanColHead.todo { border-top: 3px solid #64748b; color: #cbd5e1; }
+.genKanbanColHead.in_progress { border-top: 3px solid #0284c7; color: #38bdf8; }
+.genKanbanColHead.review { border-top: 3px solid #a855f7; color: #c084fc; }
+.genKanbanColHead.done { border-top: 3px solid #10b981; color: #34d399; }
+
+.genKanbanColBadge {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.08);
+  font-family: var(--mono);
+}
+.genKanbanCardList {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.genKanbanCard {
+  background: #090d16;
+  border: 1px solid #1b263a;
+  border-radius: 6px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: all 0.15s ease;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+.genKanbanCard:hover {
+  border-color: #38bdf8;
+  transform: translateY(-1px);
+}
+.genKanbanCardHead {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 6px;
+}
+.genKanbanCardId {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.1);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-weight: 700;
+}
+.genKanbanPriorityBadge {
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+.genKanbanPriorityBadge.critical { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid #ef4444; }
+.genKanbanPriorityBadge.high { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid #f59e0b; }
+.genKanbanPriorityBadge.medium { background: rgba(59, 130, 246, 0.2); color: #60a5fa; border: 1px solid #3b82f6; }
+.genKanbanPriorityBadge.low { background: rgba(148, 163, 184, 0.2); color: #94a3b8; border: 1px solid #64748b; }
+
+.genKanbanCardTitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: #f1f5f9;
+  line-height: 1.35;
+}
+.genKanbanCardDesc {
+  font-size: 10.5px;
+  color: #94a3b8;
+  line-height: 1.4;
+}
+.genKanbanProgressWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.genKanbanProgressText {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9.5px;
+  color: #64748b;
+  font-family: var(--mono);
+}
+.genKanbanProgressBar {
+  width: 100%;
+  height: 5px;
+  background: #162030;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.genKanbanProgressFill {
+  height: 100%;
+  background: linear-gradient(90deg, #0284c7, #10b981);
+  transition: width 0.2s ease;
+}
+.genKanbanChecklist {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  background: #0c121e;
+  padding: 7px;
+  border-radius: 5px;
+  border: 1px solid #152032;
+}
+.genKanbanCheckItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  font-size: 11px;
+  color: #cbd5e1;
+  cursor: pointer;
+  line-height: 1.3;
+}
+.genKanbanCheckItem input[type="checkbox"] {
+  margin-top: 2px;
+  accent-color: #10b981;
+  cursor: pointer;
+}
+.genKanbanCheckItem.done {
+  color: #64748b;
+  text-decoration: line-through;
+}
+.genKanbanCardFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 6px;
+  border-top: 1px solid #162030;
+  margin-top: 2px;
+  font-size: 10px;
+}
+.genKanbanActions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+/* Active Task Banner at Col 3 Header */
+.genActiveTaskBanner {
+  background: #0b131f;
+  border-bottom: 1px solid #182638;
+  padding: 5px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10.5px;
+  color: #94a3b8;
+  flex-shrink: 0;
+}
+.genActiveTaskBanner:hover {
+  background: #0e1826;
 }
 </style>
 </head>
@@ -3924,6 +4136,11 @@ body.resizing-active, body.resizing-active * {
                 <span>📁</span>
                 <span>Files & Repo</span>
                 <span class="badge" style="font-size:8px;background:#1e293b;color:#38bdf8;padding:0 4px;margin-left:4px" id="genRepoFileCountBadge">0</span>
+              </button>
+              <button class="genVsCodeTab" data-vstab="kanban_todo" onclick="switchGenVsTab('kanban_todo')">
+                <span>📌</span>
+                <span>Kanban & Todos</span>
+                <span class="badge" style="font-size:8px;background:#1e293b;color:#38bdf8;padding:0 4px;margin-left:4px" id="genSessionTodoCountBadge">0</span>
               </button>
               <button class="genVsCodeTab" data-vstab="file" onclick="switchGenVsTab('file')">
                 <span>📄</span>
@@ -4248,6 +4465,30 @@ body.resizing-active, body.resizing-active * {
                 </div>
               </div>
 
+              <!-- PANE 6: Session Kanban & Interactive Checklists (Bắt buộc cho Agent) -->
+              <div class="genVsCodePane" id="genVsPane-kanban_todo" style="padding:0;overflow:hidden">
+                <div class="genKanbanContainer">
+                  <div class="genKanbanHeader">
+                    <div class="genKanbanTitleBlock">
+                      <div class="genKanbanTitle">
+                        <span>📌 BẢNG ĐIỀU HÀNH KANBAN & CHECKLIST THEO PHIÊN</span>
+                        <span class="badge" style="font-size:9.5px;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid #0284c7" id="kanbanSessionBadge">Phiên hiện hành</span>
+                      </div>
+                      <div class="genKanbanSubtitle">
+                        ⚡ Quy chế bắt buộc: Agent tại phiên này phải kiểm tra, cập nhật task và tick checklist khi làm việc.
+                      </div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:6px">
+                      <button class="btn small" style="background:#0284c7;color:#fff;border-color:#38bdf8;font-size:10.5px;padding:3px 8px" onclick="openNewSessionTodoModal()">+ Thêm Task Mới</button>
+                      <button class="btn small" style="font-size:10px;padding:3px 7px" onclick="loadGenSessionTodos()" title="Làm mới Kanban">↻ Làm mới</button>
+                    </div>
+                  </div>
+                  <div class="genKanbanBoard" id="genKanbanBoardRoot">
+                    <!-- Rendered dynamically: 4 columns (todo, in_progress, review, done) -->
+                  </div>
+                </div>
+              </div>
+
             </div>
           </div>
 
@@ -4317,6 +4558,18 @@ body.resizing-active, body.resizing-active * {
                     <option value="profile4">Profile #4 (admin@genesis.local)</option>
                   </select>
                 </div>
+              </div>
+            </div>
+
+            <!-- Active Session Task Mini-Banner (Chỉ dẫn điều hành của Agent) -->
+            <div class="genActiveTaskBanner" id="genActiveTaskBanner" onclick="switchGenVsTab('kanban_todo')" style="cursor:pointer" title="Bấm để xem chi tiết Bảng Kanban & Checklist của phiên">
+              <div style="display:flex;align-items:center;gap:6px;overflow:hidden">
+                <span style="color:#38bdf8;font-size:12px">📌</span>
+                <span style="font-weight:600;color:#f1f5f9;font-size:10px" id="genActiveTaskTitle">Đang nạp tiến độ phiên...</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+                <span class="badge" style="font-size:9px;background:#1e293b;color:#38bdf8" id="genActiveTaskProgressBadge">0/0</span>
+                <span style="font-size:9.5px;color:#38bdf8;text-decoration:underline">Mở Kanban ➔</span>
               </div>
             </div>
 
@@ -5932,6 +6185,93 @@ body.resizing-active, body.resizing-active * {
         </div>
       </div>
 
+    </div>
+  </div>
+</div>
+
+<!-- MODAL KANBAN TASK & CHECKLIST BUILDER -->
+<div class="modal" id="sessionTodoModal">
+  <div class="modalBox" style="max-width:620px;background:#0e1420;border:1px solid #1e293b;box-shadow:0 12px 40px rgba(0,0,0,0.85)">
+    <div class="modalHead" style="border-bottom:1px solid #1a2538;padding:12px 18px;display:flex;align-items:center;justify-content:space-between">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:18px">📌</span>
+        <div>
+          <strong style="color:#f8fafc;font-size:13px" id="sessionTodoModalTitle">Tạo Nhiệm Vụ Mới Cho Phiên</strong>
+          <span style="font-size:10px;color:#64748b;display:block" id="sessionTodoModalSubtitle">Quy chế bắt buộc: Agent tại phiên này phải kiểm tra và tick checklist khi làm việc</span>
+        </div>
+      </div>
+      <button class="btn small" onclick="closeSessionTodoModal()">✕</button>
+    </div>
+    <div class="modalBody" style="padding:16px;display:flex;flex-direction:column;gap:12px">
+      <input type="hidden" id="todoModalId" value="">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="field" style="margin-bottom:0">
+          <label>Mã Nhiệm Vụ (Task ID)</label>
+          <input type="text" id="todoModalTaskId" placeholder="TSK-01" style="font-family:var(--mono)">
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label>Độ Ưu Tiên (Priority)</label>
+          <select id="todoModalPriority">
+            <option value="critical">🚨 Critical (Khẩn cấp)</option>
+            <option value="high" selected>⚡ High (Ưu tiên cao)</option>
+            <option value="medium">🔹 Medium (Bình thường)</option>
+            <option value="low">☕ Low (Thấp)</option>
+          </select>
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:0">
+        <label>Tiêu Đề Nhiệm Vụ *</label>
+        <input type="text" id="todoModalTitle" placeholder="Ví dụ: Thiết kế SQLite Database & FTS5 Catalog" required>
+      </div>
+      <div class="field" style="margin-bottom:0">
+        <label>Mô Tả Chi Tiết</label>
+        <textarea id="todoModalDesc" rows="2" placeholder="Ghi chú mục tiêu, yêu cầu kỹ thuật và phạm vi triển khai..."></textarea>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="field" style="margin-bottom:0">
+          <label>Trạng Thái Cột Kanban</label>
+          <select id="todoModalStatus">
+            <option value="todo" selected>📋 Cần làm (To Do)</option>
+            <option value="in_progress">⚡ Đang thực thi (In Progress)</option>
+            <option value="review">🔍 Đối soát & Review</option>
+            <option value="done">✅ Hoàn thành (Done)</option>
+          </select>
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label>Agent / Role Phụ Trách</label>
+          <select id="todoModalAgent">
+            <option value="Gen Core" selected>Gen Core (Tổng Trợ Lý)</option>
+            <option value="Lead Architect">Lead Architect (Agy CLI)</option>
+            <option value="Backend & DB">Backend & DB Specialist (Claude Code)</option>
+            <option value="Frontend">Frontend Specialist (Cursor)</option>
+            <option value="DevOps">DevOps & Packaging</option>
+            <option value="QA Tester">QA Tester</option>
+          </select>
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:0">
+        <label>Bằng Chứng Nghiệm Thu (Evidence Ref / Note ID)</label>
+        <input type="text" id="todoModalEvidence" placeholder="Ví dụ: #NOTE-01 hoặc commit hash hoặc test output" style="font-family:var(--mono)">
+      </div>
+
+      <!-- Checklist Builder -->
+      <div style="background:#090d15;border:1px solid #1a2538;border-radius:6px;padding:10px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <label style="font-weight:700;color:#38bdf8;font-size:11px;margin-bottom:0">☑️ CHECKLIST BẮT BUỘC ĐỐI SOÁT (Agent PHẢI tick khi xử lý)</label>
+          <button type="button" class="btn small" style="font-size:9.5px;padding:1px 6px;color:#38bdf8" onclick="addChecklistItemInput()">+ Thêm mục</button>
+        </div>
+        <div id="todoModalChecklistContainer" style="display:flex;flex-direction:column;gap:6px;max-height:160px;overflow-y:auto">
+          <!-- Dynamic checklist rows -->
+        </div>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
+        <button type="button" class="btn small" style="color:#ef4444;border-color:#7f1d1d;display:none" id="btnDeleteSessionTodo" onclick="deleteSessionTodoFromModal()">🗑️ Xóa Task</button>
+        <div style="display:flex;gap:8px;margin-left:auto">
+          <button type="button" class="btn" onclick="closeSessionTodoModal()">Hủy</button>
+          <button type="button" class="btn primary" onclick="saveSessionTodoFromModal()" id="btnSaveSessionTodo">💾 Lưu Nhiệm Vụ</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -10094,7 +10434,8 @@ let genState = {
   activeEvidenceId: 'NOTE-01',
   messages: [],
   searchQuery: '',
-  showCompactedDetails: false
+  showCompactedDetails: false,
+  sessionTodos: []
 };
 
 // Đồng bộ trạng thái một bộ (Session Workspace Context) với SQLite Backend
@@ -10252,6 +10593,7 @@ async function initGenWorkplace() {
     await loadGenFileContent(genState.activeFilePath || 'backend/main.py', null, false);
     await loadGenNotes(genState.currentConvId);
     await loadGenMessages(genState.currentConvId);
+    await loadGenSessionTodos(genState.currentConvId);
   }
   syncGenQuotaTelemetry();
 }
@@ -10360,11 +10702,12 @@ async function selectGenConversation(convId) {
   if ($('genCurrentSessionBadge')) $('genCurrentSessionBadge').textContent = c?.title ? (c.title.length > 20 ? c.title.slice(0, 20) + '...' : c.title) : convId;
   if ($('genSessionFilesTitle')) $('genSessionFilesTitle').textContent = `Tệp Của Phiên: ${c?.title || convId}`;
 
-  // Tải đồng bộ Tệp của phiên, Sổ tay & Tin nhắn của phiên này:
+  // Tải đồng bộ Tệp của phiên, Sổ tay, Tiến độ Kanban & Tin nhắn của phiên này:
   await Promise.all([
     loadGenSessionFiles(convId),
     loadGenNotes(convId),
-    loadGenMessages(convId)
+    loadGenMessages(convId),
+    loadGenSessionTodos(convId)
   ]);
 }
 
@@ -10600,6 +10943,10 @@ async function sendGenMessage() {
       const data = await res.json();
       await loadGenMessages(genState.currentConvId);
       await loadGenConversations();
+      if (data.kanban_updates && data.kanban_updates.length > 0) {
+        showToast(`📌 Agent đã tự động cập nhật Kanban: ${data.kanban_updates.join('; ')}`);
+        await loadGenSessionTodos(genState.currentConvId);
+      }
       if (data.engine === 'agy-cli') {
         const tokStr = data.usage?.total_tokens ? ` (${data.usage.total_tokens.toLocaleString()} tokens)` : '';
         showToast(`⚡ Phản hồi từ Core Agent agy CLI [${data.model || 'Gemini'}]${tokStr}`);
@@ -11400,6 +11747,10 @@ function switchGenVsTab(tabName, shouldSync = true) {
     } else if (tabName === 'ssot') {
       if (bSection) bSection.textContent = 'ssot';
       bTarget.textContent = 'docs/SSOT_ORIGINAL_SPEC.md';
+    } else if (tabName === 'kanban_todo') {
+      if (bSection) bSection.textContent = 'session';
+      bTarget.textContent = 'Kanban & Interactive Checklists (Bắt buộc cho Agent)';
+      loadGenSessionTodos();
     }
   }
 
@@ -11414,6 +11765,397 @@ function switchGenVsTab(tabName, shouldSync = true) {
   const subId = 'vstab-' + tabName;
   activeSubTabs['gen_workplace'] = subId;
   document.querySelectorAll('.subTab').forEach(b => b.classList.toggle('active', b.dataset.sub === subId));
+}
+
+// =========================================================================
+// KANBAN & INTERACTIVE CHECKLIST ENGINE (THEO PHIÊN & BẮT BUỘC CHO AGENT)
+// =========================================================================
+
+async function loadGenSessionTodos(convId) {
+  const cId = convId || genState.currentConvId;
+  if (!cId) return;
+  try {
+    const res = await fetch(`/api/gen/session/todos?conv_id=${encodeURIComponent(cId)}`);
+    if (res.ok) {
+      const data = await res.json();
+      genState.sessionTodos = data.todos || [];
+      renderGenSessionKanban();
+      updateActiveTaskBanner();
+      const badge = $('genSessionTodoCountBadge');
+      if (badge) badge.textContent = genState.sessionTodos.length;
+      const kBadge = $('kanbanSessionBadge');
+      if (kBadge) {
+        const c = genState.conversations.find(x => x.id === cId);
+        kBadge.textContent = c?.title ? (c.title.length > 25 ? c.title.slice(0, 25) + '...' : c.title) : cId;
+      }
+    }
+  } catch (err) {
+    console.warn('[Session Todos] Load error:', err);
+  }
+}
+
+function updateActiveTaskBanner() {
+  const banner = $('genActiveTaskBanner');
+  const titleEl = $('genActiveTaskTitle');
+  const progBadge = $('genActiveTaskProgressBadge');
+  if (!banner || !titleEl || !progBadge) return;
+
+  const todos = genState.sessionTodos || [];
+  if (todos.length === 0) {
+    titleEl.textContent = 'Phiên chưa có Task nào · Bấm để tạo Task & Checklist';
+    progBadge.textContent = '0 task';
+    return;
+  }
+
+  // Ưu tiên tìm task in_progress, rồi review, rồi todo
+  const activeTask = todos.find(t => t.status === 'in_progress') || todos.find(t => t.status === 'review') || todos.find(t => t.status === 'todo') || todos[0];
+  const items = activeTask.checklist || [];
+  const doneCount = items.filter(x => x.done).length;
+  const statusIcon = activeTask.status === 'in_progress' ? '⚡' : (activeTask.status === 'review' ? '🔍' : (activeTask.status === 'done' ? '✅' : '📋'));
+
+  titleEl.innerHTML = `${statusIcon} <span style="font-family:var(--mono);color:#38bdf8">[${escapeHtml(activeTask.id)}]</span> ${escapeHtml(activeTask.title)}`;
+  progBadge.textContent = `${doneCount}/${items.length} checklist (${activeTask.progress_pct || 0}%)`;
+}
+
+function renderGenSessionKanban() {
+  const root = $('genKanbanBoardRoot');
+  if (!root) return;
+
+  const todos = genState.sessionTodos || [];
+  const cols = [
+    { id: 'todo', title: '📋 CẦN LÀM', cls: 'todo' },
+    { id: 'in_progress', title: '⚡ ĐANG THỰC THI', cls: 'in_progress' },
+    { id: 'review', title: '🔍 ĐỐI SOÁT & REVIEW', cls: 'review' },
+    { id: 'done', title: '✅ HOÀN THÀNH', cls: 'done' }
+  ];
+
+  let html = '';
+  cols.forEach(col => {
+    const list = todos.filter(t => t.status === col.id);
+    html += `
+      <div class="genKanbanColumn">
+        <div class="genKanbanColHead ${col.cls}">
+          <span>${col.title}</span>
+          <span class="genKanbanColBadge">${list.length}</span>
+        </div>
+        <div class="genKanbanCardList">
+    `;
+
+    if (list.length === 0) {
+      html += `<div style="color:#64748b;font-size:10.5px;text-align:center;padding:20px 10px;font-style:italic">Chưa có nhiệm vụ ở cột này</div>`;
+    } else {
+      list.forEach(t => {
+        const chk = t.checklist || [];
+        const doneCount = chk.filter(x => x.done).length;
+        const pct = t.progress_pct || 0;
+        const priorityClass = t.priority || 'high';
+
+        let chkHtml = '';
+        if (chk.length > 0) {
+          chkHtml = `
+            <div class="genKanbanChecklist">
+              <div style="font-size:9.5px;color:#64748b;font-weight:700;margin-bottom:3px">CHECKLIST BẮT BUỘC CHO AGENT:</div>
+              ${chk.map(item => `
+                <label class="genKanbanCheckItem ${item.done ? 'done' : ''}" onclick="event.stopPropagation()">
+                  <input type="checkbox" ${item.done ? 'checked' : ''} onchange="toggleSessionTodoCheckItem('${t.id}', '${item.id}', this.checked)">
+                  <span style="font-family:var(--mono);font-size:9.5px;color:#64748b">${escapeHtml(item.id)}</span>
+                  <span>${escapeHtml(item.text)}</span>
+                </label>
+              `).join('')}
+            </div>
+          `;
+        }
+
+        // Nút chuyển trạng thái nhanh
+        let moveButtons = '';
+        if (col.id === 'todo') {
+          moveButtons = `<button class="btn small" style="font-size:9px;padding:1px 5px;color:#38bdf8" onclick="moveSessionTodoStatus('${t.id}', 'in_progress')">⚡ Thực thi</button>`;
+        } else if (col.id === 'in_progress') {
+          moveButtons = `
+            <button class="btn small" style="font-size:9px;padding:1px 5px;color:#cbd5e1" onclick="moveSessionTodoStatus('${t.id}', 'todo')">← Todo</button>
+            <button class="btn small" style="font-size:9px;padding:1px 5px;color:#a855f7" onclick="moveSessionTodoStatus('${t.id}', 'review')">🔍 Review</button>
+          `;
+        } else if (col.id === 'review') {
+          moveButtons = `
+            <button class="btn small" style="font-size:9px;padding:1px 5px;color:#38bdf8" onclick="moveSessionTodoStatus('${t.id}', 'in_progress')">← Sửa lại</button>
+            <button class="btn small" style="font-size:9px;padding:1px 5px;color:#34d399" onclick="moveSessionTodoStatus('${t.id}', 'done')">✅ Nghiệm thu</button>
+          `;
+        } else if (col.id === 'done') {
+          moveButtons = `<button class="btn small" style="font-size:9px;padding:1px 5px;color:#94a3b8" onclick="moveSessionTodoStatus('${t.id}', 'in_progress')">↻ Mở lại</button>`;
+        }
+
+        html += `
+          <div class="genKanbanCard" onclick="openEditSessionTodoModal('${t.id}')" style="cursor:pointer">
+            <div class="genKanbanCardHead">
+              <div style="display:flex;align-items:center;gap:5px">
+                <span class="genKanbanCardId">${escapeHtml(t.id)}</span>
+                <span class="badge" style="font-size:8.5px;background:#1e293b;color:#94a3b8">${escapeHtml(t.assigned_agent || 'Gen Core')}</span>
+              </div>
+              <span class="genKanbanPriorityBadge ${priorityClass}">${escapeHtml(t.priority || 'high')}</span>
+            </div>
+            <div class="genKanbanCardTitle">${escapeHtml(t.title)}</div>
+            ${t.description ? `<div class="genKanbanCardDesc">${escapeHtml(t.description)}</div>` : ''}
+            
+            <div class="genKanbanProgressWrap">
+              <div class="genKanbanProgressText">
+                <span>Tiến độ checklist</span>
+                <span>${doneCount}/${chk.length} (${pct}%)</span>
+              </div>
+              <div class="genKanbanProgressBar">
+                <div class="genKanbanProgressFill" style="width:${pct}%"></div>
+              </div>
+            </div>
+
+            ${chkHtml}
+
+            ${t.evidence_ref ? `
+              <div style="font-size:9.5px;font-family:var(--mono);color:#fbbf24;background:rgba(245,158,11,0.08);padding:3px 6px;border-radius:3px;display:flex;align-items:center;gap:4px">
+                <span>🔍 Bằng chứng:</span>
+                <span>${escapeHtml(t.evidence_ref)}</span>
+              </div>
+            ` : ''}
+
+            <div class="genKanbanCardFoot" onclick="event.stopPropagation()">
+              <div class="genKanbanActions">
+                ${moveButtons}
+              </div>
+              <div style="display:flex;align-items:center;gap:3px">
+                <button class="btn small" style="font-size:9px;padding:1px 5px" onclick="openEditSessionTodoModal('${t.id}')" title="Sửa task">✏️</button>
+                <button class="btn small" style="font-size:9px;padding:1px 5px;color:#ef4444" onclick="deleteSessionTodo('${t.id}')" title="Xóa task">🗑️</button>
+              </div>
+            </div>
+          </div>
+        `;
+      });
+    }
+
+    html += `
+        </div>
+      </div>
+    `;
+  });
+
+  root.innerHTML = html;
+}
+
+async function toggleSessionTodoCheckItem(todoId, itemId, isChecked) {
+  try {
+    const res = await fetch('/api/gen/session/todos/item/toggle', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        conv_id: genState.currentConvId,
+        todo_id: todoId,
+        item_id: itemId,
+        done: isChecked
+      })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.all_done && data.new_status === 'review') {
+        showToast(`🎉 Toàn bộ checklist của ${todoId} đã hoàn thành! Task đã chuyển sang Review.`);
+      }
+      await loadGenSessionTodos();
+    }
+  } catch (err) {
+    showToast('Lỗi toggle checklist: ' + err.message);
+  }
+}
+
+async function moveSessionTodoStatus(todoId, newStatus) {
+  try {
+    const res = await fetch('/api/gen/session/todos/status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        conv_id: genState.currentConvId,
+        todo_id: todoId,
+        status: newStatus
+      })
+    });
+    if (res.ok) {
+      showToast(`Đã chuyển ${todoId} sang ${newStatus.toUpperCase()}`);
+      await loadGenSessionTodos();
+    }
+  } catch (err) {
+    showToast('Lỗi đổi trạng thái: ' + err.message);
+  }
+}
+
+async function deleteSessionTodo(todoId) {
+  if (!confirm(`Sếp có chắc chắn muốn xóa nhiệm vụ [${todoId}] khỏi phiên làm việc này không?`)) return;
+  try {
+    const res = await fetch('/api/gen/session/todos/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        conv_id: genState.currentConvId,
+        todo_id: todoId
+      })
+    });
+    if (res.ok) {
+      showToast(`Đã xóa nhiệm vụ [${todoId}]`);
+      await loadGenSessionTodos();
+    }
+  } catch (err) {
+    showToast('Lỗi xóa nhiệm vụ: ' + err.message);
+  }
+}
+
+// Modal Handlers
+function openNewSessionTodoModal() {
+  const m = $('sessionTodoModal');
+  if (!m) return;
+  $('sessionTodoModalTitle').textContent = 'Tạo Nhiệm Vụ Mới Cho Phiên';
+  $('todoModalId').value = '';
+  
+  // Tự sinh ID task tiếp theo
+  const currentCount = (genState.sessionTodos || []).length + 1;
+  $('todoModalTaskId').value = `TSK-${String(currentCount).padStart(2, '0')}`;
+  $('todoModalPriority').value = 'high';
+  $('todoModalTitle').value = '';
+  $('todoModalDesc').value = '';
+  $('todoModalStatus').value = 'todo';
+  $('todoModalAgent').value = 'Gen Core';
+  $('todoModalEvidence').value = '';
+  
+  $('btnDeleteSessionTodo').style.display = 'none';
+
+  // Dọn dẹp và thêm 2 checklist item mẫu
+  const container = $('todoModalChecklistContainer');
+  if (container) {
+    container.innerHTML = '';
+    addChecklistItemInput('Xác nhận phạm vi và yêu cầu nghiệp vụ');
+    addChecklistItemInput('Thực thi mã nguồn và kiểm thử đối soát');
+  }
+
+  m.classList.add('show');
+}
+
+function openEditSessionTodoModal(todoId) {
+  const m = $('sessionTodoModal');
+  if (!m) return;
+  const t = (genState.sessionTodos || []).find(x => x.id === todoId);
+  if (!t) return;
+
+  $('sessionTodoModalTitle').textContent = `Chỉnh Sửa Nhiệm Vụ [${t.id}]`;
+  $('todoModalId').value = t.id;
+  $('todoModalTaskId').value = t.id;
+  $('todoModalPriority').value = t.priority || 'high';
+  $('todoModalTitle').value = t.title || '';
+  $('todoModalDesc').value = t.description || '';
+  $('todoModalStatus').value = t.status || 'todo';
+  $('todoModalAgent').value = t.assigned_agent || 'Gen Core';
+  $('todoModalEvidence').value = t.evidence_ref || '';
+
+  $('btnDeleteSessionTodo').style.display = 'inline-block';
+
+  const container = $('todoModalChecklistContainer');
+  if (container) {
+    container.innerHTML = '';
+    const chk = t.checklist || [];
+    if (chk.length > 0) {
+      chk.forEach(item => addChecklistItemInput(item.text, item.done, item.id));
+    } else {
+      addChecklistItemInput('Tiến hành kiểm thử và hoàn thành');
+    }
+  }
+
+  m.classList.add('show');
+}
+
+function closeSessionTodoModal() {
+  const m = $('sessionTodoModal');
+  if (m) m.classList.remove('show');
+}
+
+function addChecklistItemInput(text = '', isDone = false, customId = '') {
+  const container = $('todoModalChecklistContainer');
+  if (!container) return;
+
+  const count = container.children.length + 1;
+  const itemId = customId || `chk-${count}`;
+
+  const row = document.createElement('div');
+  row.className = 'todoChecklistInputRow';
+  row.style.cssText = 'display:flex;align-items:center;gap:6px;';
+  row.innerHTML = `
+    <input type="checkbox" class="chkItemDone" ${isDone ? 'checked' : ''} title="Đã hoàn thành" style="accent-color:#10b981;cursor:pointer">
+    <span class="chkItemId" style="font-family:var(--mono);font-size:9.5px;color:#64748b;width:42px">${itemId}</span>
+    <input type="text" class="chkItemText" value="${escapeHtml(text)}" placeholder="Nội dung mục kiểm tra..." style="flex:1;background:#131822;border:1px solid #1e293b;border-radius:4px;padding:3px 8px;font-size:11px;color:#f1f5f9;outline:none">
+    <button type="button" class="btn small" style="color:#ef4444;padding:1px 5px;font-size:9px" onclick="this.parentElement.remove()" title="Xóa mục">✕</button>
+  `;
+  container.appendChild(row);
+}
+
+async function saveSessionTodoFromModal() {
+  const title = ($('todoModalTitle')?.value || '').trim();
+  if (!title) {
+    alert('Vui lòng nhập Tiêu đề nhiệm vụ!');
+    return;
+  }
+
+  const taskId = ($('todoModalTaskId')?.value || '').trim() || `TSK-${Date.now().toString().slice(-4)}`;
+  const priority = $('todoModalPriority')?.value || 'high';
+  const desc = ($('todoModalDesc')?.value || '').trim();
+  const status = $('todoModalStatus')?.value || 'todo';
+  const agent = $('todoModalAgent')?.value || 'Gen Core';
+  const evidence = ($('todoModalEvidence')?.value || '').trim();
+
+  // Thu thập checklist
+  const container = $('todoModalChecklistContainer');
+  const checklist = [];
+  if (container) {
+    const rows = container.querySelectorAll('.todoChecklistInputRow');
+    rows.forEach((r, idx) => {
+      const isDone = r.querySelector('.chkItemDone')?.checked || false;
+      const text = (r.querySelector('.chkItemText')?.value || '').trim();
+      const id = r.querySelector('.chkItemId')?.textContent || `chk-${idx + 1}`;
+      if (text) {
+        checklist.push({ id, text, done: isDone });
+      }
+    });
+  }
+
+  const btn = $('btnSaveSessionTodo');
+  if (btn) btn.disabled = true;
+
+  try {
+    const res = await fetch('/api/gen/session/todos/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        conv_id: genState.currentConvId,
+        id: taskId,
+        title: title,
+        description: desc,
+        status: status,
+        priority: priority,
+        assigned_agent: agent,
+        checklist: checklist,
+        evidence_ref: evidence,
+        owner_id: 'owner-ryan'
+      })
+    });
+    if (res.ok) {
+      showToast(`Đã lưu nhiệm vụ [${taskId}] thành công!`);
+      closeSessionTodoModal();
+      await loadGenSessionTodos();
+    } else {
+      showToast('Lỗi lưu nhiệm vụ');
+    }
+  } catch (err) {
+    showToast('Lỗi lưu nhiệm vụ: ' + err.message);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function deleteSessionTodoFromModal() {
+  const taskId = $('todoModalId')?.value;
+  if (!taskId) return;
+  closeSessionTodoModal();
+  await deleteSessionTodo(taskId);
 }
 
 async function loadGenFileContent(filePath, btnEl, shouldSync = true) {
