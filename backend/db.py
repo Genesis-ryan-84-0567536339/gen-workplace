@@ -2898,28 +2898,27 @@ def seed_gen_workplace():
     """Khởi tạo phiên làm việc mặc định và sổ tay tạm thời giữa Owner Ryan & Gen."""
     with get_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT count(*) FROM gen_conversations WHERE project_id = 'PRJ-GEN-WORKPLACE'")
+        cursor.execute("SELECT count(*) FROM gen_conversations WHERE id = 'conv-gen-core-01'")
         if cursor.fetchone()[0] == 0:
             conv_id = "conv-gen-core-01"
             cursor.execute("""
-            INSERT OR IGNORE INTO gen_conversations (id, project_id, title, model, account_profile, is_pinned)
-            VALUES (?, 'PRJ-GEN-WORKPLACE', 'Kiến Trúc & Điều Phối Swarm Tối Cao', 'Gemini 3.1 Pro (High)', 'owner_default', 1)
+            INSERT OR IGNORE INTO gen_conversations (id, project_id, title, model, account_profile, is_pinned, active_tab, active_file, open_tabs_json, active_evidence_id, owner_id)
+            VALUES (?, 'PRJ-GEN-WORKPLACE', 'Kiến Trúc & Điều Phối Swarm Tối Cao', 'Gemini 3.8 Flash (High)', 'owner_default', 1, 'files_repo', 'backend/main.py', '["backend/main.py"]', 'NOTE-01', 'owner-ryan')
             """, (conv_id,))
 
             # Initial messages
             initial_msgs = [
-                ("Ryan", "user", "Chào Gen! Tôi cần rà soát lại toàn bộ kiến trúc đa tác nhân Swarm và đảm bảo mọi chuyên gia tuân thủ chặt chẽ đặc tả gốc SSOT.", "Gemini 3.1 Pro (High)", "[]"),
-                ("Gen Core", "assistant", "Chào Ryan! Tôi (Gen - Core Orchestrator) đã sẵn sàng. Toàn bộ 6 Agent trong Swarm đang vận hành trên các phiên Tmux độc lập với ranh giới Whitelist rõ ràng. Mọi chỉ thị kiến trúc của bạn sẽ được tôi ghi nhận vào Sổ tay tạm thời với mã #NOTE-01 và đối soát trực tiếp với #EVT-03 (SSOT Spec gốc).", "Gemini 3.1 Pro (High)", '["#NOTE-01", "#EVT-03"]'),
-                ("Ryan", "user", "Tuyệt vời. Nhớ lưu ý kiểm soát dung lượng token quota khi gọi model nặng và tự động compact ngữ cảnh khi đổi sang Claude hoặc Gemini Flash.", "Gemini 3.1 Pro (High)", "[]"),
-                ("Gen Core", "assistant", "Rõ chỉ thị! Cơ chế Progressive Context Compaction đã được kích hoạt. Bất cứ khi nào bạn đổi Model hoặc phiên làm việc, tôi sẽ tự động cô đọng các quyết định và gắn kèm các Note ID dữ liệu (#NOTE-01, #NOTE-02...) để làm chứng cứ nghiệm thu vững chắc mà không hao tổn quota.", "Gemini 3.1 Pro (High)", '["#NOTE-01", "#NOTE-02"]')
+                ("Ryan", "user", "Chào Gen! Tôi cần rà soát lại toàn bộ kiến trúc đa tác nhân Swarm và đảm bảo mọi chuyên gia tuân thủ chặt chẽ đặc tả gốc SSOT.", "Gemini 3.8 Flash (High)", "[]"),
+                ("Gen Core", "assistant", "Chào Ryan! Tôi (Gen - Core Orchestrator) đã sẵn sàng. Toàn bộ 6 Agent trong Swarm đang vận hành trên các phiên Tmux độc lập với ranh giới Whitelist rõ ràng. Mọi chỉ thị kiến trúc của bạn sẽ được tôi ghi nhận vào Sổ tay tạm thời với mã #NOTE-01 và đối soát trực tiếp với #EVT-03 (SSOT Spec gốc).", "Gemini 3.8 Flash (High)", '["#NOTE-01", "#EVT-03"]'),
+                ("Ryan", "user", "Tuyệt vời. Nhớ lưu ý kiểm soát dung lượng token quota khi gọi model nặng và tự động compact ngữ cảnh khi đổi sang Claude hoặc Gemini Flash.", "Gemini 3.8 Flash (High)", "[]"),
+                ("Gen Core", "assistant", "Rõ chỉ thị! Cơ chế Progressive Context Compaction đã được kích hoạt. Bất cứ khi nào bạn đổi Model hoặc phiên làm việc, tôi sẽ tự động cô đọng các quyết định và gắn kèm các Note ID dữ liệu (#NOTE-01, #NOTE-02...) để làm chứng cứ nghiệm thu vững chắc mà không hao tổn quota.", "Gemini 3.8 Flash (High)", '["#NOTE-01", "#NOTE-02"]')
             ]
             for author, role, content, model, notes in initial_msgs:
                 cursor.execute("""
-                INSERT INTO gen_messages (conversation_id, author, role, content, model, note_ids_json)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO gen_messages (conversation_id, author, role, content, model, note_ids_json, owner_id)
+                VALUES (?, ?, ?, ?, ?, ?, 'owner-ryan')
                 """, (conv_id, author, role, content, model, notes))
 
-            # Initial notes in scratchpad
             initial_notes = [
                 ("NOTE-01", "PRJ-GEN-WORKPLACE", conv_id, "Nguyên Tắc SSOT Tuyệt Đối", "Ryan là Single Source of Truth tối cao. Mọi thay đổi kiến trúc phải được tham chiếu từ docs/SSOT_ORIGINAL_SPEC.md.", '["SSOT", "Architecture", "Priority-1"]', "docs/SSOT_ORIGINAL_SPEC.md", "Ryan"),
                 ("NOTE-02", "PRJ-GEN-WORKPLACE", conv_id, "Ranh Giới Bảo Mật Docker Volume :z", "Container hóa toàn bộ ứng dụng trên port 8888 với cờ SELinux :z, phân tách hoàn toàn Host và Container.", '["DevOps", "Docker", "Security"]', "docker-compose.yml · git commit a4f63be", "Ryan"),
@@ -2927,17 +2926,23 @@ def seed_gen_workplace():
             ]
             for n in initial_notes:
                 cursor.execute("""
-                INSERT OR IGNORE INTO gen_scratchpad_notes (id, project_id, conversation_id, title, content, tags_json, evidence_ref, author)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT OR IGNORE INTO gen_scratchpad_notes (id, project_id, conversation_id, title, content, tags_json, evidence_ref, author, owner_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'owner-ryan')
                 """, n)
 
-            # Khởi tạo phiên Gen_workplace Builder chuyên dụng nếu chưa có
-            cursor.execute("""
-            INSERT OR IGNORE INTO gen_conversations (id, project_id, title, model, account_profile, is_pinned, active_tab, active_file, open_tabs_json, active_evidence_id, owner_id)
-            VALUES ('conv-gen-builder', 'PRJ-GEN-WORKPLACE', 'Gen_workplace Builder', 'Gemini 3.1 Pro (High)', 'owner_default', 1, 'kanban_todo', 'backend/db.py', '["backend/db.py"]', 'NOTE-BUILDER-01', 'owner-ryan')
-            """)
+        # Khởi tạo phiên Gen_workplace Builder chuyên dụng nếu chưa có
+        cursor.execute("""
+        INSERT OR IGNORE INTO gen_conversations (id, project_id, title, model, account_profile, is_pinned, active_tab, active_file, open_tabs_json, active_evidence_id, owner_id)
+        VALUES ('conv-gen-builder', 'PRJ-GEN-WORKPLACE', 'Gen_workplace Builder', 'Gemini 3.8 Flash (High)', 'owner_default', 1, 'kanban_todo', 'backend/db.py', '["backend/db.py"]', 'NOTE-BUILDER-01', 'owner-ryan')
+        """)
 
-            conn.commit()
+        # Đảm bảo thư mục workspace cho phiên conv-gen-builder tồn tại
+        builder_sess_dir = Path("/workspace/sessions/conv-gen-builder")
+        if not builder_sess_dir.exists():
+            builder_sess_dir = BASE_DIR / "workspace" / "sessions" / "conv-gen-builder"
+        builder_sess_dir.mkdir(parents=True, exist_ok=True)
+
+        conn.commit()
 
 def get_owner_profile(owner_id="owner-ryan"):
     """Truy xuất hồ sơ Owner Ryan cùng số liệu thống kê toàn bộ tài sản dữ liệu thuộc quyền sở hữu."""
@@ -3340,6 +3345,52 @@ def generate_gen_smart_reply(conv_id, user_message, model, account="owner_defaul
 
     return reply, cited_notes
 
+AGY_MODEL_MAPPING = {
+    "gemini-3.8-flash-high": "gemini-3.8-flash-high",
+    "gemini-3.8-flash-medium": "gemini-3.8-flash-medium",
+    "gemini-3.8-flash-low": "gemini-3.8-flash-low",
+    "gemini-3.7-flash-high": "gemini-3.7-flash-high",
+    "gemini-3.7-flash-medium": "gemini-3.7-flash-medium",
+    "gemini-3.7-flash-low": "gemini-3.7-flash-low",
+    "gemini-3.6-flash-high": "gemini-3.6-flash-high",
+    "gemini-3.6-flash-medium": "gemini-3.6-flash-medium",
+    "gemini-3.6-flash-low": "gemini-3.6-flash-low",
+    "gemini-3.1-pro-high": "gemini-3.1-pro-high",
+    "gemini-3.1-pro-low": "gemini-3.1-pro-low",
+    "claude-sonnet-4-6": "claude-sonnet-4-6",
+    "claude-opus-4-6-thinking": "claude-opus-4-6-thinking",
+    "gpt-oss-120b-medium": "gpt-oss-120b-medium",
+    "gemini 3.8 flash (high)": "gemini-3.8-flash-high",
+    "gemini 3.8 flash (medium)": "gemini-3.8-flash-medium",
+    "gemini 3.8 flash (low)": "gemini-3.8-flash-low",
+    "gemini 3.7 flash (high)": "gemini-3.7-flash-high",
+    "gemini 3.7 flash (medium)": "gemini-3.7-flash-medium",
+    "gemini 3.7 flash (low)": "gemini-3.7-flash-low",
+    "gemini 3.6 flash (high)": "gemini-3.6-flash-high",
+    "gemini 3.1 pro (high)": "gemini-3.1-pro-high",
+    "gemini 3.1 pro (low)": "gemini-3.1-pro-low",
+    "claude sonnet 4.6 (thinking)": "claude-sonnet-4-6",
+    "claude opus 4.6 (thinking)": "claude-opus-4-6-thinking",
+    "gpt-oss 120b (medium)": "gpt-oss-120b-medium"
+}
+
+def resolve_agy_model_slug(model_name):
+    if not model_name or not str(model_name).strip():
+        return "gemini-3.8-flash-high"
+    cleaned = str(model_name).strip().lower()
+    if cleaned in AGY_MODEL_MAPPING:
+        return AGY_MODEL_MAPPING[cleaned]
+    for k, v in AGY_MODEL_MAPPING.items():
+        if k in cleaned or cleaned in k:
+            return v
+    if "flash" in cleaned:
+        return "gemini-3.8-flash-high"
+    if "sonnet" in cleaned or "claude" in cleaned:
+        return "claude-sonnet-4-6"
+    if "pro" in cleaned:
+        return "gemini-3.1-pro-high"
+    return "gemini-3.8-flash-high"
+
 def call_agy_cli_turn(conv_id, user_message, model=None, account="owner_default"):
     """
     Gọi Core Agent agy CLI thời gian thực:
@@ -3347,6 +3398,7 @@ def call_agy_cli_turn(conv_id, user_message, model=None, account="owner_default"
     - Sử dụng tài khoản/profile OAuth đã xác thực.
     - Trả về phản hồi thực sự từ mô hình AI (Gemini / Claude).
     - Cập nhật số token thực tế vào DB.
+    - Tự động bắt lỗi Quota (429 RESOURCE_EXHAUSTED) và cảnh báo rõ ràng cho Sếp.
     """
     agy_conv_id = None
     try:
@@ -3372,7 +3424,7 @@ def call_agy_cli_turn(conv_id, user_message, model=None, account="owner_default"
     if p_dir != "/workspace/.gemini" and os.path.exists(f"{p_dir}/antigravity-cli"):
         env["ANTIGRAVITY_APP_DATA_DIR"] = f"{p_dir}/antigravity-cli"
 
-    # Lấy Kanban & Checklist chuyên dụng của phiên để ép Agent tuân thủ quy trình
+    # Lấy Kanban & Checklist chuyên dụng của phiên để định hướng Agent
     sess_todos = get_gen_session_todos(conv_id)
     if sess_todos:
         kanban_block = format_session_kanban_for_agent(conv_id, sess_todos)
@@ -3380,42 +3432,30 @@ def call_agy_cli_turn(conv_id, user_message, model=None, account="owner_default"
     else:
         prompt_payload = user_message
 
+    model_slug = resolve_agy_model_slug(model)
+
     cmd = [
         "agy",
         "--output-format", "json",
         "--print", prompt_payload,
-        "--dangerously-skip-permissions"
+        "--dangerously-skip-permissions",
+        "--model", model_slug
     ]
-
-    valid_models = [
-        "Gemini 3.8 Flash (High)", "Gemini 3.8 Flash (Medium)", "Gemini 3.8 Flash (Low)",
-        "Gemini 3.7 Flash (High)", "Gemini 3.7 Flash (Medium)", "Gemini 3.7 Flash (Low)",
-        "Gemini 3.6 Flash (High)", "Gemini 3.6 Flash (Medium)", "Gemini 3.6 Flash (Low)",
-        "Gemini 3.1 Pro (High)", "Gemini 3.1 Pro (Low)",
-        "Claude Sonnet 4.6 (Thinking)", "Claude Opus 4.6 (Thinking)", "GPT-OSS 120B (Medium)"
-    ]
-    if model and str(model).strip():
-        m_str = str(model).strip()
-        matched = next((m for m in valid_models if m.lower() == m_str.lower()), None)
-        if matched:
-            cmd.extend(["--model", matched])
-        elif "flash" in m_str.lower():
-            cmd.extend(["--model", "Gemini 3.8 Flash (High)"])
-        elif "sonnet" in m_str.lower() or "claude" in m_str.lower():
-            cmd.extend(["--model", "Claude Sonnet 4.6 (Thinking)"])
-        else:
-            cmd.extend(["--model", "Gemini 3.1 Pro (High)"])
 
     if agy_conv_id:
         cmd.extend(["--conversation", agy_conv_id])
 
-    # Thư mục làm việc phiên (nếu có)
-    sess_dir = BASE_DIR / "workspace" / "sessions" / conv_id
+    # Xác định thư mục làm việc (ưu tiên thư mục cô lập của phiên)
+    work_dir = "/workspace"
+    sess_dir = Path("/workspace/sessions") / conv_id
+    if not sess_dir.exists():
+        sess_dir = BASE_DIR / "workspace" / "sessions" / conv_id
     if sess_dir.exists():
+        work_dir = str(sess_dir)
         cmd.extend(["--add-dir", str(sess_dir)])
 
     try:
-        res = subprocess.run(cmd, capture_output=True, text=True, env=env, timeout=50)
+        res = subprocess.run(cmd, capture_output=True, text=True, env=env, cwd=work_dir, timeout=180)
         if res.returncode == 0 and res.stdout.strip():
             try:
                 data = json.loads(res.stdout)
@@ -3439,8 +3479,64 @@ def call_agy_cli_turn(conv_id, user_message, model=None, account="owner_default"
             except Exception:
                 if res.stdout.strip():
                     return res.stdout.strip(), agy_conv_id, {}
+        else:
+            err_output = ((res.stderr or "") + " " + (res.stdout or "")).strip()
+            print(f"[AGY Runner] returncode={res.returncode}, err: {err_output[:300]}")
+
+            # 1. Bắt lỗi Quota / Resource Exhausted (ví dụ Claude 429)
+            if "RESOURCE_EXHAUSTED" in err_output or "429" in err_output or "quota" in err_output.lower():
+                quota_msg = (
+                    f"⚠️ **Thông báo Hạn mức Quota agy CLI:** Model `{model_slug}` hiện đã chạm giới hạn truy vấn cá nhân (RESOURCE_EXHAUSTED / Code 429).\n\n"
+                    f"👉 **Giải pháp tức thì:** Sếp vui lòng chọn chuyển sang **Gemini 3.8 Flash (High)** hoặc **Gemini 3.1 Pro (High)** trên thanh công cụ dropdown phía trên để tiếp tục làm việc mượt mà ngay ạ."
+                )
+                return quota_msg, agy_conv_id, {"error": "RESOURCE_EXHAUSTED"}
+
+            # 2. Nếu có agy_conv_id nhưng bị lỗi (phiên cũ bị hỏng hoặc hết hạn), tự động reset và thử lại phiên mới
+            if agy_conv_id:
+                print(f"[AGY Runner] agy_conv_id '{agy_conv_id}' failed, resetting conv and retrying fresh turn...")
+                with get_connection() as conn:
+                    conn.execute("UPDATE gen_conversations SET agy_conv_id = '' WHERE id = ?", (conv_id,))
+                    conn.commit()
+                fresh_cmd = []
+                skip_next = False
+                for token in cmd:
+                    if skip_next:
+                        skip_next = False
+                        continue
+                    if token == "--conversation":
+                        skip_next = True
+                        continue
+                    fresh_cmd.append(token)
+
+                res_retry = subprocess.run(fresh_cmd, capture_output=True, text=True, env=env, cwd=work_dir, timeout=180)
+                if res_retry.returncode == 0 and res_retry.stdout.strip():
+                    try:
+                        data = json.loads(res_retry.stdout)
+                        actual_reply = (data.get("response") or "").strip()
+                        ret_id = data.get("conversation_id")
+                        usage = data.get("usage", {})
+                        tokens = usage.get("total_tokens", 0)
+                        if ret_id:
+                            with get_connection() as conn:
+                                conn.execute("""
+                                UPDATE gen_conversations 
+                                SET agy_conv_id = ?, total_tokens = coalesce(total_tokens, 0) + ?
+                                WHERE id = ?
+                                """, (ret_id, tokens, conv_id))
+                                conn.commit()
+                        if actual_reply:
+                            return actual_reply, ret_id, usage
+                    except Exception:
+                        if res_retry.stdout.strip():
+                            return res_retry.stdout.strip(), None, {}
+
     except subprocess.TimeoutExpired:
-        print(f"[AGY Runner] Timeout (50s) for conv {conv_id}")
+        print(f"[AGY Runner] Timeout (180s) for conv {conv_id}")
+        timeout_msg = (
+            f"⏱️ **Thông báo Quá giờ:** Lệnh agy CLI (`{model_slug}`) đã vượt quá thời hạn chờ tối đa 180s do tác vụ phức tạp.\n\n"
+            f"👉 **Khuyến nghị:** Sếp có thể đổi sang **Gemini 3.8 Flash (High Speed)** để nhận phản hồi siêu tốc dưới 15 giây."
+        )
+        return timeout_msg, agy_conv_id, {"error": "TIMEOUT"}
     except Exception as e:
         print(f"[AGY Runner] Exception: {e}")
 
@@ -3522,6 +3618,10 @@ def compact_gen_conversation(conv_id, model_from="", model_to="", manual=False):
     """Tự động nén (compact) ngữ cảnh hội thoại cũ dạng lũy tiến và bảo toàn các Note ID làm bằng chứng."""
     with get_connection() as conn:
         cursor = conn.cursor()
+        if model_to and model_to.strip():
+            cursor.execute("UPDATE gen_conversations SET model = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", (model_to.strip(), conv_id))
+            conn.commit()
+
         cursor.execute("""
         SELECT * FROM gen_messages 
         WHERE conversation_id = ? AND is_compacted = 0 AND role != 'compact'
@@ -4039,7 +4139,7 @@ def format_session_kanban_for_agent(conv_id, todos):
     lines = [
         "==================================================",
         f"🚨 [QUY CHẾ BẮT BUỘC: KANBAN & CHECKLIST ĐIỀU HÀNH PHIÊN ({conv_id})]",
-        "Là Agent của phiên làm việc này, bạn BẮT BUỘC phải thực thi theo quy trình Kanban và đối soát checklist dưới đây:",
+        "Là Agent của phiên làm việc này, bạn BẮT BUỘC phải tuân thủ quy trình Kanban và đối soát checklist dưới đây:",
     ]
     for t in todos:
         status_icon = "📋" if t["status"] == "todo" else ("⚡" if t["status"] == "in_progress" else ("🔍" if t["status"] == "review" else "✅"))
@@ -4050,12 +4150,16 @@ def format_session_kanban_for_agent(conv_id, todos):
             chk_mark = "[x]" if item.get("done") else "[ ]"
             lines.append(f"   {chk_mark} ({item['id']}) {item['text']}")
     
-    lines.append("\nQUY TẮC BẮT BUỘC CHO AGENT TRONG MỖI LƯỢT TRẢ LỜI:")
-    lines.append("1. Bạn PHẢI nêu rõ task nào trong bảng Kanban đang được xử lý.")
-    lines.append("2. Đối soát và cập nhật checklist tương ứng với phần việc bạn đang giải quyết.")
-    lines.append("3. Khi hoàn thành hạng mục checklist hoặc đổi trạng thái task, hãy ghi chú cú pháp chuẩn:")
-    lines.append("   [KANBAN_UPDATE: <ID_TASK> | STATUS: <in_progress/review/done> | CHECK: <item_id> | EVIDENCE: <bằng_chứng>]")
-    lines.append("   Hoặc ngắn gọn: [TASK_DONE: <ID_TASK>]")
+    lines.append("\n🎯 NGUYÊN TẮC HÀNH XỬ CHO AGENT TRONG MỖI LƯỢT:")
+    lines.append("1. TRỌNG TÂM TRỰC TIẾP: Luôn ưu tiên trả lời trực tiếp, chính xác, tự nhiên và đầy đủ câu hỏi hoặc yêu cầu của Sếp Ryan trong phần [TIN NHẮN TRỰC TIẾP TỪ SẾP RYAN].")
+    lines.append("2. PHÂN ĐỊNH HÀNH ĐỘNG:")
+    lines.append("   - Nếu Sếp chỉ hỏi thăm, thảo luận kiến trúc, rà soát tiến độ hoặc xin ý kiến: Hãy trả lời trực tiếp ngay bằng văn bản điều hành, đính kèm khối đối soát Kanban ngắn gọn ở đầu hoặc cuối câu trả lời; TUYỆT ĐỐI KHÔNG tự ý chạy các công cụ bash/tool không liên quan.")
+    lines.append("   - Nếu Sếp giao việc thực thi cụ thể (viết mã, sửa file, kiểm thử, tạo file): Mới gọi các công cụ tương ứng để hoàn thành nhiệm vụ.")
+    lines.append("3. ĐỐI SOÁT & CẬP NHẬT KANBAN:")
+    lines.append("   - Nêu rõ task nào đang liên quan hoặc được giải quyết.")
+    lines.append("   - Khi hoàn thành hạng mục checklist hoặc đổi trạng thái task, hãy ghi chú cú pháp chuẩn:")
+    lines.append("     [KANBAN_UPDATE: <ID_TASK> | STATUS: <in_progress/review/done> | CHECK: <item_id> | EVIDENCE: <bằng_chứng>]")
+    lines.append("     Hoặc ngắn gọn: [TASK_DONE: <ID_TASK>]")
     lines.append("==================================================")
     return "\n".join(lines)
 

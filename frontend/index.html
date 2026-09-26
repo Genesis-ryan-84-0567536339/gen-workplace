@@ -4729,12 +4729,14 @@ body.resizing-active, body.resizing-active * {
                 <div>
                   <label style="font-size:9px;color:#64748b;display:block;margin-bottom:2px">ĐỔI MODEL (TỰ COMPACT):</label>
                   <select class="genChatSelect" id="genModelSelect" onchange="handleGenModelChange(this.value)">
-                    <option value="Gemini 3.1 Pro (High)">Gemini 3.1 Pro (High Effort Thinking)</option>
-                    <option value="Gemini 3.8 Flash (High)">Gemini 3.8 Flash (High Speed)</option>
-                    <option value="Gemini 3.7 Flash (High)">Gemini 3.7 Flash (High Reasoning)</option>
-                    <option value="Claude Sonnet 4.6 (Thinking)">Claude Sonnet 4.6 (Extended Thinking)</option>
-                    <option value="Claude Opus 4.6 (Thinking)">Claude Opus 4.6 (Deep Reasoning)</option>
-                    <option value="Claude Haiku 4.5 (Fast)">Claude Haiku 4.5 (Fast & Lightweight)</option>
+                    <option value="Gemini 3.8 Flash (High)">⚡ Gemini 3.8 Flash (Tốc độ cao & Thông minh - Khuyến nghị)</option>
+                    <option value="Gemini 3.8 Flash (Medium)">⚡ Gemini 3.8 Flash (Medium Effort)</option>
+                    <option value="Gemini 3.8 Flash (Low)">⚡ Gemini 3.8 Flash (Low Effort - Cực nhanh)</option>
+                    <option value="Gemini 3.7 Flash (High)">🧠 Gemini 3.7 Flash (High Reasoning)</option>
+                    <option value="Gemini 3.1 Pro (High)">👑 Gemini 3.1 Pro (Deep Thinking & Kiến trúc sâu)</option>
+                    <option value="Claude Sonnet 4.6 (Thinking)">🔮 Claude Sonnet 4.6 (Extended Thinking)</option>
+                    <option value="Claude Opus 4.6 (Thinking)">🏛️ Claude Opus 4.6 (Deep Reasoning)</option>
+                    <option value="GPT-OSS 120B (Medium)">🌐 GPT-OSS 120B (Open Weights)</option>
                   </select>
                 </div>
                 <div>
@@ -10873,9 +10875,15 @@ async function selectGenConversation(convId) {
   genState.currentConvId = convId;
   const c = genState.conversations.find(x => x.id === convId);
   if (c) {
-    genState.currentModel = c.model || 'Gemini 3.1 Pro (High)';
+    genState.currentModel = c.model || 'Gemini 3.8 Flash (High)';
     genState.currentAccount = c.account_profile || 'owner_default';
-    if ($('genModelSelect')) $('genModelSelect').value = genState.currentModel;
+    if ($('genModelSelect')) {
+      $('genModelSelect').value = genState.currentModel;
+      if ($('genModelSelect').value !== genState.currentModel) {
+        const opt = Array.from($('genModelSelect').options).find(o => o.value.toLowerCase().includes(genState.currentModel.toLowerCase().split(' ')[0]));
+        if (opt) $('genModelSelect').value = opt.value;
+      }
+    }
     if ($('genAccountSelect')) $('genAccountSelect').value = genState.currentAccount;
     if ($('genInputModelBadge')) $('genInputModelBadge').textContent = genState.currentModel.split(' ')[0] + ' ' + (genState.currentModel.split(' ')[1] || '');
 
@@ -10912,7 +10920,7 @@ async function openNewGenChatModal() {
       body: JSON.stringify({
         project_id: 'PRJ-GEN-WORKPLACE',
         title: title.trim(),
-        model: genState.currentModel || 'Gemini 3.1 Pro (High)',
+        model: genState.currentModel || 'Gemini 3.8 Flash (High)',
         account: genState.currentAccount || 'owner_default'
       })
     });
@@ -11174,12 +11182,34 @@ function insertNoteRefToInput() {
   input.focus();
 }
 
-// 4. Progressive Compaction Trigger
+// 4. Progressive Compaction Trigger & Per-Session Model Persistence
 async function handleGenModelChange(newModel) {
   const oldModel = genState.currentModel;
   genState.currentModel = newModel;
   if ($('genInputModelBadge')) $('genInputModelBadge').textContent = newModel.split(' ')[0] + ' ' + (newModel.split(' ')[1] || '');
 
+  // 1. Cập nhật ngay trong object phiên cục bộ để sidebar badges và danh sách nhảy tức thì
+  const cur = genState.conversations.find(x => x.id === genState.currentConvId);
+  if (cur) {
+    cur.model = newModel;
+    renderGenConversationsList();
+  }
+
+  // 2. Lưu vĩnh viễn model vào SQLite cho phiên này
+  try {
+    await fetch('/api/gen/conversations/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        conv_id: genState.currentConvId,
+        model: newModel
+      })
+    });
+  } catch (err) {
+    console.warn('[Session Model] Lỗi lưu model vào DB:', err);
+  }
+
+  // 3. Thực hiện Compact ngữ cảnh nếu có tin nhắn cũ
   try {
     const res = await fetch('/api/gen/compact', {
       method: 'POST',
@@ -11194,14 +11224,14 @@ async function handleGenModelChange(newModel) {
     if (res.ok) {
       const data = await res.json();
       if (data.status === 'compacted') {
-        showToast(`⚡ Đã chuyển sang ${newModel} & nén lũy tiến ${data.message_count} tin cũ!`);
+        showToast(`⚡ Đã lưu ${newModel} cho phiên & nén lũy tiến ${data.message_count} tin cũ!`);
         await loadGenMessages(genState.currentConvId);
       } else {
-        showToast(`Đã đổi model sang: ${newModel}`);
+        showToast(`✅ Đã lưu model [${newModel}] cho phiên này!`);
       }
     }
   } catch (err) {
-    showToast('Đã đổi model: ' + newModel);
+    showToast(`✅ Đã lưu model [${newModel}] cho phiên này!`);
   }
 }
 
@@ -11229,6 +11259,10 @@ async function triggerManualCompact() {
 
 async function handleGenAccountChange(newAccount) {
   genState.currentAccount = newAccount;
+  const cur = genState.conversations.find(x => x.id === genState.currentConvId);
+  if (cur) {
+    cur.account_profile = newAccount;
+  }
   try {
     await fetch('/api/gen/conversations/update', {
       method: 'POST',
@@ -11238,7 +11272,7 @@ async function handleGenAccountChange(newAccount) {
         account: newAccount
       })
     });
-    showToast(`Đã chuyển tài khoản agy CLI sang: ${newAccount}`);
+    showToast(`✅ Đã lưu tài khoản agy CLI [${newAccount}] cho phiên này!`);
   } catch (e) {
     showToast('Đã đổi tài khoản: ' + newAccount);
   }
