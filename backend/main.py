@@ -117,7 +117,30 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             self._send_json(200, {"sessions": sessions})
             return
 
-        # 5. API Danh sách OAuth Profiles & Trạng thái Google Login
+        # 5. API Kiểm tra Quota Live từ Google Cloud Code API của agy CLI
+        if path in ("/api/quota/live", "/api/quota/check"):
+            profile_id = query.get("profile", ["owner_default"])[0]
+            force = query.get("force", ["1"])[0] not in ("0", "false", "False")
+            quota_res = db.fetch_live_google_quota(profile_id, force=force)
+            if quota_res:
+                g_q, a_q = quota_res
+                self._send_json(200, {
+                    "ok": True,
+                    "source": "cloudcode_api_live",
+                    "gemini": g_q,
+                    "claude": a_q
+                })
+            else:
+                g_q, a_q = db.get_quota_telemetry(profile_id)
+                self._send_json(200, {
+                    "ok": True,
+                    "source": "log_telemetry_fallback",
+                    "gemini": g_q,
+                    "claude": a_q
+                })
+            return
+
+        # 6. API Danh sách OAuth Profiles & Trạng thái Google Login
         if path == "/api/oauth/profiles":
             profiles = db.get_oauth_profiles()
             self._send_json(200, {"profiles": profiles})
