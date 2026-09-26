@@ -1077,11 +1077,69 @@ _LIVE_QUOTA_CACHE = {}
 _LIVE_QUOTA_CACHE_TIME = {}
 QUOTA_CACHE_TTL = 30.0  # 30 giây cache cho auto-polling để tránh spam Cloud Code API
 
+GOOGLE_OAUTH_CLIENT_ID = ""
+GOOGLE_OAUTH_CLIENT_SECRET = ""
+
+def refresh_google_oauth_token(profile_id="owner_default"):
+    """
+    Tự động làm mới OAuth Access Token từ Google OAuth endpoint bằng refresh_token
+    khi access token hết hạn. Hỗ trợ cả owner_default và profile1-4.
+    """
+    target_dir = "/workspace/.gemini" if profile_id == "owner_default" else f"/workspace/.agy-profiles/{profile_id}"
+    token_file = os.path.join(target_dir, "antigravity-cli", "antigravity-oauth-token")
+    if not os.path.exists(token_file):
+        token_file = "/workspace/.gemini/antigravity-cli/antigravity-oauth-token"
+    if not os.path.exists(token_file):
+        return None
+
+    try:
+        import urllib.request, urllib.parse
+        from datetime import datetime, timezone
+        with open(token_file, "r") as f:
+            data = json.load(f)
+        rf_token = data.get("token", {}).get("refresh_token") or data.get("refresh_token")
+        if not rf_token:
+            return None
+
+        params = {
+            "client_id": GOOGLE_OAUTH_CLIENT_ID,
+            "client_secret": GOOGLE_OAUTH_CLIENT_SECRET,
+            "grant_type": "refresh_token",
+            "refresh_token": rf_token,
+        }
+        body = urllib.parse.urlencode(params).encode("utf-8")
+        req = urllib.request.Request(
+            "https://oauth2.googleapis.com/token",
+            data=body,
+            headers={"Content-Type": "application/x-www-form-urlencoded"}
+        )
+        with urllib.request.urlopen(req, timeout=5.0) as resp:
+            res = json.loads(resp.read().decode())
+        
+        new_token = res.get("access_token")
+        if new_token:
+            expires_in = res.get("expires_in", 3600)
+            expiry_str = datetime.fromtimestamp(time.time() + expires_in, timezone.utc).isoformat()
+            if "token" in data and isinstance(data["token"], dict):
+                data["token"]["access_token"] = new_token
+                data["token"]["expiry"] = expiry_str
+            else:
+                data["access_token"] = new_token
+            try:
+                with open(token_file, "w") as f:
+                    json.dump(data, f, indent=2)
+            except Exception:
+                pass
+            return new_token
+    except Exception as e:
+        print(f"[Live Quota] Token refresh error for {profile_id}: {e}")
+    return None
+
 def fetch_live_google_quota(profile_id="owner_default", force=False):
     """
     Truy vấn trực tiếp hạn ngạch Quota thời gian thực từ Google Cloud Code API
     (Endpoint nội bộ https://daily-cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels)
-    bằng OAuth access token của agy CLI.
+    Tự động refresh token nếu hết hạn, hỗ trợ đa tài khoản (profile1, profile2, profile3, profile4).
     """
     global _LIVE_QUOTA_CACHE, _LIVE_QUOTA_CACHE_TIME
     now = time.time()
@@ -1091,8 +1149,8 @@ def fetch_live_google_quota(profile_id="owner_default", force=False):
 
     target_dir = "/workspace/.gemini" if profile_id == "owner_default" else f"/workspace/.agy-profiles/{profile_id}"
     token_path = os.path.join(target_dir, "antigravity-cli", "antigravity-oauth-token")
+    owner_token_path = "/workspace/.gemini/antigravity-cli/antigravity-oauth-token"
     
-    # Đọc token từ profile hoặc fallback về owner_default token
     token = None
     if os.path.exists(token_path):
         try:
@@ -1102,7 +1160,6 @@ def fetch_live_google_quota(profile_id="owner_default", force=False):
         except Exception:
             pass
 
-    owner_token_path = "/workspace/.gemini/antigravity-cli/antigravity-oauth-token"
     if not token and os.path.exists(owner_token_path):
         try:
             with open(owner_token_path) as f:
@@ -1110,44 +1167,53 @@ def fetch_live_google_quota(profile_id="owner_default", force=False):
         except Exception:
             pass
 
-    if not token:
+    import urllib.request
+    from datetime import datetime, timezone, timedelta
+
+    def _do_query(t):
+        req = urllib.request.Request(
+            "https://daily-cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels",
+            data=b"{}",
+            headers={
+                "Authorization": f"Bearer {t}",
+                "Content-Type": "application/json",
+                "User-Agent": "Antigravity"
+            }
+        )
+        with urllib.request.urlopen(req, timeout=5.0) as resp:
+            return json.loads(resp.read().decode())
+
+    data = None
+    if token:
+        try:
+            data = _do_query(token)
+        except Exception:
+            data = None
+
+    if data is None:
+        new_tok = refresh_google_oauth_token(profile_id)
+        if new_tok:
+            try:
+                data = _do_query(new_tok)
+            except Exception:
+                data = None
+
+    if data is None and profile_id != "owner_default":
+        new_owner_tok = refresh_google_oauth_token("owner_default")
+        if new_owner_tok:
+            try:
+                data = _do_query(new_owner_tok)
+            except Exception:
+                data = None
+
+    if data is None:
         return _LIVE_QUOTA_CACHE.get(profile_id)
 
     try:
-        import urllib.request
-        from datetime import datetime, timezone, timedelta
-
-        def _do_query(t):
-            req = urllib.request.Request(
-                "https://daily-cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels",
-                data=b"{}",
-                headers={
-                    "Authorization": f"Bearer {t}",
-                    "Content-Type": "application/json",
-                    "User-Agent": "Antigravity"
-                }
-            )
-            with urllib.request.urlopen(req, timeout=5.0) as resp:
-                return json.loads(resp.read().decode())
-
-        try:
-            data = _do_query(token)
-        except Exception as e:
-            # Nếu token profile bị 401 thì thử fallback dùng owner_token
-            if profile_id != "owner_default" and os.path.exists(owner_token_path):
-                with open(owner_token_path) as f:
-                    owner_token = json.load(f).get("token", {}).get("access_token")
-                if owner_token and owner_token != token:
-                    data = _do_query(owner_token)
-                else:
-                    raise e
-            else:
-                raise e
-
         models = data.get("models", {})
         
         # Gemini models
-        g_model = models.get("gemini-3.1-pro-high") or models.get("gemini-3.8-flash-tiered") or {}
+        g_model = models.get("gemini-3.8-flash-tiered") or models.get("gemini-3.1-pro-high") or {}
         g_q = g_model.get("quotaInfo") or {}
         g_fraction = g_q.get("remainingFraction")
         g_reset = g_q.get("resetTime", "")
@@ -1158,8 +1224,13 @@ def fetch_live_google_quota(profile_id="owner_default", force=False):
         c_fraction = c_q.get("remainingFraction")
         c_reset = c_q.get("resetTime", "")
         
-        g_pct = int(round(g_fraction * 100)) if g_fraction is not None else 71
-        c_pct = int(round(c_fraction * 100)) if c_fraction is not None else 0
+        g_pct = int(round(g_fraction * 100)) if g_fraction is not None else 100
+        if c_fraction is not None:
+            c_pct = int(round(c_fraction * 100))
+        elif c_reset:
+            c_pct = 0
+        else:
+            c_pct = 100
         
         def _format_vn_reset(iso_time):
             if not iso_time:
@@ -1167,7 +1238,16 @@ def fetch_live_google_quota(profile_id="owner_default", force=False):
             try:
                 dt = datetime.fromisoformat(iso_time.replace("Z", "+00:00"))
                 vn = dt.astimezone(timezone(timedelta(hours=7)))
-                return vn.strftime("%H:%M ngày %d/%m")
+                time_str = vn.strftime("%H:%M ngày %d/%m")
+                now_utc = datetime.now(timezone.utc)
+                diff = dt - now_utc
+                if diff.total_seconds() > 0:
+                    hrs = int(diff.total_seconds() // 3600)
+                    mins = int((diff.total_seconds() % 3600) // 60)
+                    rem_str = f"còn ~{hrs}h{mins:02d}m" if hrs > 0 else f"còn ~{mins}m"
+                    return f"{time_str} ({rem_str})"
+                else:
+                    return f"{time_str} (đang hồi phục)"
             except Exception:
                 return iso_time
 
@@ -1191,21 +1271,32 @@ def fetch_live_google_quota(profile_id="owner_default", force=False):
             "detail": f"Hạn ngạch thực tế: {g_pct}% · Hồi lúc {g_reset_vn}" if g_reset_vn else f"Hạn ngạch thực tế: {g_pct}% · 60 RPM"
         }
         
+        if c_pct > 0:
+            c_label = f"Khả dụng {c_pct}% (Sẵn sàng)"
+            c_detail = f"Khả dụng: {c_pct}% · Tokens/Min: 200k"
+            c_color = "#f59e0b"
+            c_status = "ready"
+        else:
+            c_label = f"0% (429 Cạn hạn ngạch · Hồi lúc {c_reset_vn})" if c_reset_vn else "0% (429 Quota Exceeded)"
+            c_detail = f"Hạn ngạch cá nhân đã cạn (0%) · Hồi lúc {c_reset_vn}" if c_reset_vn else "Hạn ngạch cá nhân đã cạn"
+            c_color = "#ef4444"
+            c_status = "rate_limited"
+
         anthropic_quota = {
             "family": "Anthropic Claude",
             "model": "Claude Sonnet 4.6 (Thinking)",
             "alt_model": "Claude Opus 4.6 (Thinking)",
-            "status": "ready" if c_pct > 0 else "rate_limited",
-            "status_label": f"Khả dụng {c_pct}% (Standby)" if c_pct > 0 else f"0% (429 Quota Exceeded · Hồi lúc {c_reset_vn})",
+            "status": c_status,
+            "status_label": c_label,
             "percent": c_pct,
-            "used_tokens": 200000 if c_pct == 0 else 0,
+            "used_tokens": 0 if c_pct > 0 else 200000,
             "limit_tokens": 200000,
             "rpm": 50,
             "tpm": 200000,
             "reset_time": c_reset_vn or "Rolling 5h",
             "tier": "Sonnet 4.6 Tier 4 Entitlement",
-            "color": "#ef4444" if c_pct == 0 else "#f59e0b",
-            "detail": f"Hạn ngạch cá nhân đã cạn (0%) · Hồi lúc {c_reset_vn}" if c_pct == 0 else f"Khả dụng: {c_pct}%"
+            "color": c_color,
+            "detail": c_detail
         }
         
         result = (gemini_quota, anthropic_quota)
@@ -1213,7 +1304,7 @@ def fetch_live_google_quota(profile_id="owner_default", force=False):
         _LIVE_QUOTA_CACHE_TIME[profile_id] = now
         return result
     except Exception as e:
-        print(f"[Live Quota] Error querying Cloud Code API: {e}")
+        print(f"[Live Quota] Error processing quota models: {e}")
         return _LIVE_QUOTA_CACHE.get(profile_id)
 
 def get_quota_telemetry(profile_id, email=""):

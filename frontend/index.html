@@ -4797,10 +4797,10 @@ body.resizing-active, body.resizing-active * {
                 <div>
                   <div class="genQuotaBarRow">
                     <span style="color:#38bdf8;font-weight:600">Google Gemini (Flash/Pro):</span>
-                    <span style="color:#94a3b8;font-family:var(--mono)" id="genGeminiQuotaText">Khả dụng 67% (Sẵn sàng)</span>
+                    <span style="color:#94a3b8;font-family:var(--mono)" id="genGeminiQuotaText">Khả dụng 93% (Sẵn sàng)</span>
                   </div>
                   <div class="genQuotaProgress">
-                    <div class="genQuotaProgressFill" id="genGeminiQuotaFill" style="width:67%;background:#38bdf8"></div>
+                    <div class="genQuotaProgressFill" id="genGeminiQuotaFill" style="width:93%;background:#38bdf8"></div>
                   </div>
                 </div>
                 <div>
@@ -4945,7 +4945,7 @@ body.resizing-active, body.resizing-active * {
                 <span class="orchItemIcon">🔑</span>
                 <div class="orchItemInfo">
                   <strong>owner@genesis.local</strong>
-                  <small id="orchOwnerQuotaSmall">Owner Profile · 💎 67% · ⚡ 0%</small>
+                  <small id="orchOwnerQuotaSmall">Owner Profile · 💎 93% · ⚡ 0%</small>
                 </div>
               </div>
               <div class="orchListItem" onclick="openAccountModal()">
@@ -4990,7 +4990,7 @@ body.resizing-active, body.resizing-active * {
                   </div>
                 </div>
                 <div class="deckHeadActions">
-                  <span class="deckQuotaPill" id="orchDeckQuotaPill">💎 67% · ⚡ 0%</span>
+                  <span class="deckQuotaPill" id="orchDeckQuotaPill">💎 93% · ⚡ 0%</span>
                   <button class="btn small" onclick="orchSpawnWorker()" title="Sinh worker mới">⚡ Spawn Worker</button>
                   <button class="btn small" onclick="loadOrchChatMessages()" title="Đồng bộ lịch sử chat">🔄 Đồng Bộ</button>
                 </div>
@@ -5319,7 +5319,7 @@ body.resizing-active, body.resizing-active * {
                   </div>
                 </div>
                 <div class="deckHeadActions">
-                  <span class="deckQuotaPill" id="deckQuotaPill">💎 67% · ⚡ 0%</span>
+                  <span class="deckQuotaPill" id="deckQuotaPill">💎 93% · ⚡ 0%</span>
                   <button class="btn small" onclick="triggerSessionLifecycle('pause')" title="Tạm dừng đóng băng CPU">⏸ Tạm dừng</button>
                   <button class="btn small" onclick="triggerSessionLifecycle('sleep')" title="Ngủ đông giải phóng 100% RAM">😴 Sleep</button>
                   <button class="btn small primary" onclick="triggerSessionLifecycle('resume')" title="Đánh thức phiên">⚡ Thức</button>
@@ -10894,10 +10894,10 @@ function syncGenQuotaTelemetry() {
   const cText = $('genClaudeQuotaText');
 
   const s0 = (state.tmuxSessions && state.tmuxSessions[0]) || {};
-  const qG = s0.quota_gemini || { percent: 67, rpm: 60, status: 'ready', color: '#38bdf8' };
+  const qG = s0.quota_gemini || { percent: 93, rpm: 60, status: 'ready', color: '#38bdf8' };
   const qC = s0.quota_anthropic || { percent: 0, tpm: 200000, status: 'rate_limited', color: '#ef4444' };
 
-  const gPct = qG.percent !== undefined ? qG.percent : 67;
+  const gPct = qG.percent !== undefined ? qG.percent : 93;
   const aPct = qC.percent !== undefined ? qC.percent : 0;
 
   if (gFill) {
@@ -10966,7 +10966,7 @@ async function checkLiveQuotaNow() {
           badge.style.background = data.source === 'cloudcode_api_live' ? '#064e3b' : '#3b2f0a';
           badge.style.color = data.source === 'cloudcode_api_live' ? '#34d399' : '#f59e0b';
         }
-        const gP = data.gemini?.percent !== undefined ? data.gemini.percent : 67;
+        const gP = data.gemini?.percent !== undefined ? data.gemini.percent : 93;
         const aP = data.claude?.percent !== undefined ? data.claude.percent : 0;
         showToast(`⚡ Cập nhật Quota Live: Gemini ${gP}%, Claude ${aP}%`);
       } else {
