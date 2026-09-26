@@ -133,15 +133,16 @@ def call_agy_cli_turn(conv_id, user_message, model=None, account="owner_default"
 
 Cơ sở dữ liệu được đặt tại `/app/data/gen-workplace.db` (chế độ `PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;`).
 
-### Các Bảng Cốt Lõi:
-1. **`projects`**: Quản lý đa dự án (`id`, `name`, `repo_path`, `branch`, `plan_file`, `status`).
-2. **`roadmaps`**: Phân rã mục tiêu thành các giai đoạn (`id`, `project_id`, `title`, `todos_count`, `status`).
-3. **`todos`**: Nhiệm vụ chi tiết (`id`, `roadmap_id`, `project_id`, `title`, `assigned_role`, `status`, `assigned_to`, `locked_at`, `evidence_ref`). Hỗ trợ Mutex Lock chống xung đột giữa các agent.
-4. **`tmux_sessions`**: Quản lý 6 phiên chuyên gia Swarm (`id`, `role`, `project_id`, `status`, `pid`, `account_label`, `profile_dir`, `task_status`, `progress_percent`).
-5. **`gen_conversations`**: Các phiên chat với Core Agent (`id`, `project_id`, `title`, `model`, `account_profile`, `is_pinned`, `active_tab`, `active_file`, `open_tabs_json`, `active_evidence_id`, `agy_conv_id`, `total_tokens`).
-6. **`gen_messages`**: Lịch sử tin nhắn (`id`, `conversation_id`, `author`, `role`, `content`, `model`, `note_ids_json`, `is_compacted`, `compact_id`).
-7. **`gen_scratchpad_notes`**: Sổ tay bằng chứng (`id`, `project_id`, `conversation_id`, `title`, `body`, `status`).
-8. **`quick_catalog`**: Virtual table FTS5 hỗ trợ tra cứu nhanh ID dữ kiện toàn cục (`id`, `cat_type`, `title`, `description`, `source_ref`, `data_json`).
+1. **`owner_profiles`**: Hồ sơ Chủ Sở Hữu Tối Cao (`id='owner-ryan'`, `username='ryan'`, `display_name='Ryan (Owner)'`, `role='Chủ Sở Hữu & Kiến Trúc Sư Trưởng Tối Cao'`, `email='owner@genesis.local'`, `avatar='👑'`, `settings_json`). Đảm bảo 100% tài nguyên và dữ liệu thuộc quyền sở hữu độc quyền của Ryan.
+2. **`projects`**: Quản lý đa dự án (`id`, `name`, `repo_path`, `branch`, `plan_file`, `status`, `owner_id='owner-ryan'`).
+3. **`roadmaps`**: Phân rã mục tiêu thành các giai đoạn (`id`, `project_id`, `title`, `todos_count`, `status`).
+4. **`todos`**: Nhiệm vụ chi tiết (`id`, `roadmap_id`, `project_id`, `title`, `assigned_role`, `status`, `assigned_to`, `locked_at`, `evidence_ref`). Hỗ trợ Mutex Lock chống xung đột giữa các agent.
+5. **`tmux_sessions`**: Quản lý 6 phiên chuyên gia Swarm (`id`, `role`, `project_id`, `status`, `pid`, `account_label`, `profile_dir`, `task_status`, `progress_percent`, `owner_id='owner-ryan'`).
+6. **`gen_conversations`**: Các phiên chat với Core Agent (`id`, `project_id`, `title`, `model`, `account_profile`, `is_pinned`, `active_tab`, `active_file`, `open_tabs_json`, `active_evidence_id`, `agy_conv_id`, `total_tokens`, `owner_id='owner-ryan'`).
+7. **`gen_messages`**: Lịch sử tin nhắn (`id`, `conversation_id`, `author`, `role`, `content`, `model`, `note_ids_json`, `is_compacted`, `compact_id`, `owner_id='owner-ryan'`).
+8. **`gen_scratchpad_notes`**: Sổ tay bằng chứng (`id`, `project_id`, `conversation_id`, `title`, `content`, `tags_json`, `evidence_ref`, `author`, `owner_id='owner-ryan'`).
+9. **`gen_session_files`**: Quản lý tập tin theo từng phiên làm việc (`id`, `conversation_id`, `name`, `path`, `file_type`, `size_bytes`, `source`, `owner_id='owner-ryan'`).
+10. **`quick_catalog`**: Virtual table FTS5 hỗ trợ tra cứu nhanh ID dữ kiện toàn cục (`id`, `cat_type`, `title`, `description`, `source_ref`, `data_json`).
 
 ---
 

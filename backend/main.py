@@ -223,6 +223,13 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             self._send_json(200, trace_data)
             return
 
+        # 17.5. API Hồ Sơ Owner Ryan (Sở hữu độc quyền dữ liệu)
+        if path == "/api/owner/profile":
+            owner_id = query.get("owner_id", ["owner-ryan"])[0]
+            profile = db.get_owner_profile(owner_id)
+            self._send_json(200, profile)
+            return
+
         # 18. API Gen Workplace Conversations
         if path == "/api/gen/conversations":
             prj_id = query.get("project", ["PRJ-GEN-WORKPLACE"])[0]
@@ -625,7 +632,7 @@ class SwarmHandler(SimpleHTTPRequestHandler):
         # 23. API Gen Workplace Chat
         if path == "/api/gen/chat":
             conv_id = data.get("conv_id", "conv-gen-core-01")
-            author = data.get("author", "Ryan")
+            author = data.get("author", "Ryan (Owner)")
             message = data.get("message", "").strip()
             model = data.get("model", "Gemini 3.1 Pro (High)")
             account = data.get("account", "owner_default")
@@ -634,6 +641,17 @@ class SwarmHandler(SimpleHTTPRequestHandler):
                 return
             res = db.send_gen_chat(conv_id, author, message, model, account)
             self._send_json(200, res)
+            return
+
+        # 23.5. API Cập Nhật Hồ Sơ Owner Ryan
+        if path == "/api/owner/profile/update":
+            owner_id = data.get("owner_id", "owner-ryan")
+            display_name = data.get("display_name")
+            email = data.get("email")
+            bio = data.get("bio")
+            settings = data.get("settings")
+            res = db.update_owner_profile(owner_id, display_name, email, bio, settings)
+            self._send_json(200 if res.get("status") == "ok" else 400, res)
             return
 
         # 24. API Gen Workplace Progressive Compaction
@@ -652,7 +670,8 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             title = data.get("title", "Cuộc trò chuyện mới")
             model = data.get("model", "Gemini 3.1 Pro (High)")
             account = data.get("account", "owner_default")
-            res = db.create_gen_conversation(project_id, title, model, account)
+            owner_id = data.get("owner_id", "owner-ryan")
+            res = db.create_gen_conversation(project_id, title, model, account, owner_id)
             self._send_json(200, res)
             return
 
@@ -699,9 +718,10 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             content = data.get("content", "")
             tags = data.get("tags", [])
             evidence_ref = data.get("evidence_ref", "")
-            author = data.get("author", "Ryan")
+            author = data.get("author", "Ryan (Owner)")
             conv_id = data.get("conv_id", "")
-            res = db.save_gen_note(project_id, note_id, title, content, tags, evidence_ref, author, conv_id)
+            owner_id = data.get("owner_id", "owner-ryan")
+            res = db.save_gen_note(project_id, note_id, title, content, tags, evidence_ref, author, conv_id, owner_id)
             self._send_json(200, res)
             return
 

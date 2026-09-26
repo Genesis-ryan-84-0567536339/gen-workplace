@@ -388,6 +388,70 @@ def init_db():
         );
         """)
 
+        # 19. Owner Profiles (Hồ sơ chủ sở hữu tối cao hệ thống - Ryan)
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS owner_profiles (
+            id TEXT PRIMARY KEY,
+            username TEXT UNIQUE NOT NULL,
+            display_name TEXT NOT NULL,
+            role TEXT NOT NULL,
+            email TEXT NOT NULL,
+            avatar TEXT DEFAULT '👑',
+            bio TEXT,
+            storage_path TEXT,
+            workspace_root TEXT,
+            settings_json TEXT DEFAULT '{}',
+            is_primary INTEGER DEFAULT 1,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """)
+
+        # Migration columns for exclusive data ownership by Ryan
+        for tbl_name, col_name, col_type in [
+            ("projects", "owner_id", "TEXT DEFAULT 'owner-ryan'"),
+            ("gen_conversations", "owner_id", "TEXT DEFAULT 'owner-ryan'"),
+            ("gen_messages", "owner_id", "TEXT DEFAULT 'owner-ryan'"),
+            ("gen_scratchpad_notes", "owner_id", "TEXT DEFAULT 'owner-ryan'"),
+            ("gen_session_files", "owner_id", "TEXT DEFAULT 'owner-ryan'"),
+            ("gen_compact_snapshots", "owner_id", "TEXT DEFAULT 'owner-ryan'"),
+            ("tmux_sessions", "owner_id", "TEXT DEFAULT 'owner-ryan'"),
+            ("master_ssot", "owner_id", "TEXT DEFAULT 'owner-ryan'"),
+        ]:
+            try:
+                cursor.execute(f"ALTER TABLE {tbl_name} ADD COLUMN {col_name} {col_type};")
+            except Exception:
+                pass
+
+        # Seed primary Owner Profile for Ryan
+        cursor.execute("""
+        INSERT OR IGNORE INTO owner_profiles (
+            id, username, display_name, role, email, avatar, bio, storage_path, workspace_root, settings_json, is_primary
+        ) VALUES (
+            'owner-ryan',
+            'ryan',
+            'Ryan (Owner)',
+            'Chủ Sở Hữu & Kiến Trúc Sư Trưởng Tối Cao (System Owner & Sovereign)',
+            'owner@genesis.local',
+            '👑',
+            'Single Source of Truth tối cao và chủ sở hữu độc quyền toàn bộ dữ liệu hệ thống Gen Workplace & Genesis Swarm.',
+            '/workspace',
+            '/workspace/LinuxDataA/gen-workplace/workspace',
+            '{"theme":"dark","default_model":"Gemini 3.1 Pro (High)","persona":"executive_assistant","auto_compact":true,"data_ownership":"exclusive_ryan","isolation_level":"strict"}',
+            1
+        );
+        """)
+
+        # Backfill ownership: all existing data belongs to Ryan
+        cursor.execute("UPDATE projects SET owner_id = 'owner-ryan' WHERE owner_id IS NULL OR owner_id = ''")
+        cursor.execute("UPDATE gen_conversations SET owner_id = 'owner-ryan' WHERE owner_id IS NULL OR owner_id = ''")
+        cursor.execute("UPDATE gen_messages SET owner_id = 'owner-ryan' WHERE owner_id IS NULL OR owner_id = ''")
+        cursor.execute("UPDATE gen_scratchpad_notes SET owner_id = 'owner-ryan', author = 'Ryan (Owner)' WHERE owner_id IS NULL OR owner_id = '' OR author = 'Ryan'")
+        cursor.execute("UPDATE gen_session_files SET owner_id = 'owner-ryan' WHERE owner_id IS NULL OR owner_id = ''")
+        cursor.execute("UPDATE gen_compact_snapshots SET owner_id = 'owner-ryan' WHERE owner_id IS NULL OR owner_id = ''")
+        cursor.execute("UPDATE tmux_sessions SET owner_id = 'owner-ryan' WHERE owner_id IS NULL OR owner_id = ''")
+        cursor.execute("UPDATE master_ssot SET owner_id = 'owner-ryan' WHERE owner_id IS NULL OR owner_id = ''")
+
         conn.commit()
 
 def seed_ssot_events():
@@ -911,7 +975,7 @@ def get_oauth_profiles():
     """Quét toàn bộ hồ sơ profile Google OAuth trên hệ thống và đối chiếu với các role."""
     base_dir = "/workspace/.agy-profiles"
     candidates = [
-        ("owner_default", "Mặc định (Owner Gmail)", "/workspace/.gemini"),
+        ("owner_default", "👑 Ryan (Owner) - Hồ Sơ Mặc Định", "/workspace/.gemini"),
     ]
     if os.path.exists(base_dir):
         try:
@@ -961,13 +1025,20 @@ def get_oauth_profiles():
         is_expired = (exp > 0 and exp < now_ts)
         exp_formatted = datetime.fromtimestamp(exp).strftime("%Y-%m-%d %H:%M") if exp > 0 else "Tự động refresh (Refresh Token)"
 
+        is_owner = (pid == "owner_default")
+        display_label = label if not email else f"{label} ({email})"
+        if is_owner and "Ryan" not in display_label:
+            display_label = f"👑 Ryan (Owner) - {email}"
+
         results.append({
             "id": pid,
-            "label": label if not email else f"{label} ({email})",
+            "label": display_label,
             "path": ppath,
             "is_auth": is_auth,
             "email": email,
-            "name": user_name,
+            "name": "Ryan (Owner)" if is_owner else user_name,
+            "is_owner": is_owner,
+            "owner_id": "owner-ryan" if is_owner else None,
             "exp": exp,
             "exp_formatted": exp_formatted,
             "is_expired": is_expired,
@@ -2841,7 +2912,106 @@ def seed_gen_workplace():
 
             conn.commit()
 
-def get_gen_conversations(project_id="PRJ-GEN-WORKPLACE"):
+def get_owner_profile(owner_id="owner-ryan"):
+    """Truy xuất hồ sơ Owner Ryan cùng số liệu thống kê toàn bộ tài sản dữ liệu thuộc quyền sở hữu."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM owner_profiles WHERE id = ?", (owner_id,))
+        row = cursor.fetchone()
+        if not row:
+            cursor.execute("SELECT * FROM owner_profiles WHERE is_primary = 1 LIMIT 1")
+            row = cursor.fetchone()
+        
+        if not row:
+            return {
+                "id": "owner-ryan",
+                "username": "ryan",
+                "display_name": "Ryan (Owner)",
+                "role": "Chủ Sở Hữu & Kiến Trúc Sư Trưởng Tối Cao (System Owner & Sovereign)",
+                "email": "owner@genesis.local",
+                "avatar": "👑",
+                "bio": "Single Source of Truth tối cao và chủ sở hữu độc quyền toàn bộ dữ liệu hệ thống Gen Workplace & Genesis Swarm.",
+                "storage_path": "/workspace",
+                "workspace_root": "/workspace/LinuxDataA/gen-workplace/workspace",
+                "settings": {"theme": "dark", "data_ownership": "exclusive_ryan", "isolation_level": "strict"},
+                "stats": {
+                    "total_projects": 1,
+                    "total_conversations": 0,
+                    "total_messages": 0,
+                    "total_notes": 0,
+                    "total_session_files": 0,
+                    "total_tmux_sessions": 6
+                },
+                "ownership_guarantee": "Toàn bộ dữ liệu thuộc quyền sở hữu độc quyền của Owner Ryan."
+            }
+
+        profile = dict(row)
+        try:
+            profile["settings"] = json.loads(profile.get("settings_json") or "{}")
+        except Exception:
+            profile["settings"] = {}
+
+        # Thống kê khối lượng tài sản dữ liệu thuộc sở hữu của Ryan
+        stats = {
+            "total_projects": 1,
+            "total_conversations": 0,
+            "total_messages": 0,
+            "total_notes": 0,
+            "total_session_files": 0,
+            "total_tmux_sessions": 6
+        }
+        try:
+            cursor.execute("SELECT count(*) FROM projects WHERE owner_id = ? OR owner_id IS NULL", (owner_id,))
+            stats["total_projects"] = cursor.fetchone()[0]
+
+            cursor.execute("SELECT count(*) FROM gen_conversations WHERE owner_id = ? OR owner_id IS NULL", (owner_id,))
+            stats["total_conversations"] = cursor.fetchone()[0]
+
+            cursor.execute("SELECT count(*) FROM gen_messages WHERE owner_id = ? OR owner_id IS NULL", (owner_id,))
+            stats["total_messages"] = cursor.fetchone()[0]
+
+            cursor.execute("SELECT count(*) FROM gen_scratchpad_notes WHERE owner_id = ? OR owner_id IS NULL", (owner_id,))
+            stats["total_notes"] = cursor.fetchone()[0]
+
+            cursor.execute("SELECT count(*) FROM gen_session_files WHERE owner_id = ? OR owner_id IS NULL", (owner_id,))
+            stats["total_session_files"] = cursor.fetchone()[0]
+
+            cursor.execute("SELECT count(*) FROM tmux_sessions WHERE owner_id = ? OR owner_id IS NULL", (owner_id,))
+            stats["total_tmux_sessions"] = cursor.fetchone()[0]
+        except Exception:
+            pass
+
+        profile["stats"] = stats
+        profile["ownership_guarantee"] = "100% Dữ liệu (Dự án, Phiên hội thoại, Tập tin Workspace, Sổ tay Scratchpad, Token và Tmux Runtimes) thuộc quyền sở hữu riêng biệt và độc quyền của Owner Ryan. Hệ thống cô lập triệt để, ngăn chặn rò rỉ hoặc chia sẻ ngoài ý muốn."
+        return profile
+
+def update_owner_profile(owner_id="owner-ryan", display_name=None, email=None, bio=None, settings=None):
+    """Cập nhật thông tin hồ sơ và tùy chọn bảo mật của Owner Ryan."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        updates = []
+        params = []
+        if display_name:
+            updates.append("display_name = ?")
+            params.append(display_name)
+        if email:
+            updates.append("email = ?")
+            params.append(email)
+        if bio:
+            updates.append("bio = ?")
+            params.append(bio)
+        if settings is not None:
+            updates.append("settings_json = ?")
+            params.append(json.dumps(settings, ensure_ascii=False) if isinstance(settings, dict) else str(settings))
+        
+        if updates:
+            updates.append("updated_at = CURRENT_TIMESTAMP")
+            params.append(owner_id)
+            cursor.execute(f"UPDATE owner_profiles SET {', '.join(updates)} WHERE id = ?", params)
+            conn.commit()
+    return {"status": "ok", "message": "Đã cập nhật hồ sơ Owner Ryan thành công"}
+
+def get_gen_conversations(project_id="PRJ-GEN-WORKPLACE", owner_id="owner-ryan"):
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
@@ -2850,9 +3020,9 @@ def get_gen_conversations(project_id="PRJ-GEN-WORKPLACE"):
                (SELECT content FROM gen_messages m WHERE m.conversation_id = c.id ORDER BY id DESC LIMIT 1) as last_msg,
                (SELECT created_at FROM gen_messages m WHERE m.conversation_id = c.id ORDER BY id DESC LIMIT 1) as last_time
         FROM gen_conversations c
-        WHERE c.project_id = ?
+        WHERE c.project_id = ? AND (c.owner_id = ? OR c.owner_id IS NULL)
         ORDER BY c.is_pinned DESC, c.updated_at DESC
-        """, (project_id,))
+        """, (project_id, owner_id))
         rows = cursor.fetchall()
         result = []
         for r in rows:
@@ -2864,22 +3034,22 @@ def get_gen_conversations(project_id="PRJ-GEN-WORKPLACE"):
             result.append(d)
         return result
 
-def create_gen_conversation(project_id="PRJ-GEN-WORKPLACE", title="Cuộc trò chuyện mới", model="Gemini 3.1 Pro (High)", account="owner_default"):
+def create_gen_conversation(project_id="PRJ-GEN-WORKPLACE", title="Cuộc trò chuyện mới", model="Gemini 3.1 Pro (High)", account="owner_default", owner_id="owner-ryan"):
     conv_id = f"conv-{uuid.uuid4().hex[:8]}"
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
-        INSERT INTO gen_conversations (id, project_id, title, model, account_profile, is_pinned, active_tab, active_file, open_tabs_json, active_evidence_id)
-        VALUES (?, ?, ?, ?, ?, 0, 'files_repo', 'backend/main.py', '["backend/main.py"]', 'NOTE-01')
-        """, (conv_id, project_id, title, model, account))
+        INSERT INTO gen_conversations (id, project_id, title, model, account_profile, is_pinned, active_tab, active_file, open_tabs_json, active_evidence_id, owner_id)
+        VALUES (?, ?, ?, ?, ?, 0, 'files_repo', 'backend/main.py', '["backend/main.py"]', 'NOTE-01', ?)
+        """, (conv_id, project_id, title, model, account, owner_id))
         
         # Initial greeting
         cursor.execute("""
-        INSERT INTO gen_messages (conversation_id, author, role, content, model, note_ids_json)
-        VALUES (?, 'Gen Core', 'assistant', 'Sẵn sàng phục vụ Owner Ryan! Bạn muốn giao nhiệm vụ hoặc thảo luận kiến trúc nào hôm nay?', ?, '[]')
-        """, (conv_id, model))
+        INSERT INTO gen_messages (conversation_id, author, role, content, model, note_ids_json, owner_id)
+        VALUES (?, 'Gen Core', 'assistant', 'Sẵn sàng phục vụ Owner Ryan! Bạn muốn giao nhiệm vụ hoặc thảo luận kiến trúc nào hôm nay?', ?, '[]', ?)
+        """, (conv_id, model, owner_id))
         conn.commit()
-    return {"id": conv_id, "title": title, "model": model, "account": account, "active_tab": "files_repo", "active_file": "backend/main.py", "open_tabs": ["backend/main.py"], "active_evidence_id": "NOTE-01"}
+    return {"id": conv_id, "title": title, "model": model, "account": account, "active_tab": "files_repo", "active_file": "backend/main.py", "open_tabs": ["backend/main.py"], "active_evidence_id": "NOTE-01", "owner_id": owner_id}
 
 def update_gen_conversation_context(conv_id, active_tab=None, active_file=None, open_tabs=None, active_evidence_id=None):
     with get_connection() as conn:
@@ -3230,15 +3400,15 @@ def send_gen_chat(conv_id, author, message, model, account="owner_default"):
         cursor.execute("SELECT id FROM gen_conversations WHERE id = ?", (conv_id,))
         if not cursor.fetchone():
             cursor.execute("""
-            INSERT INTO gen_conversations (id, project_id, title, model, account_profile, is_pinned, active_tab, active_file, open_tabs_json, active_evidence_id)
-            VALUES (?, 'PRJ-GEN-WORKPLACE', ?, ?, ?, 0, 'files_repo', 'backend/main.py', '["backend/main.py"]', 'NOTE-01')
+            INSERT INTO gen_conversations (id, project_id, title, model, account_profile, is_pinned, active_tab, active_file, open_tabs_json, active_evidence_id, owner_id)
+            VALUES (?, 'PRJ-GEN-WORKPLACE', ?, ?, ?, 0, 'files_repo', 'backend/main.py', '["backend/main.py"]', 'NOTE-01', 'owner-ryan')
             """, (conv_id, f"Phiên {conv_id}", model, account))
             conn.commit()
 
         # Ghi tin nhắn user vào DB
         cursor.execute("""
-        INSERT INTO gen_messages (conversation_id, author, role, content, model, note_ids_json)
-        VALUES (?, ?, 'user', ?, ?, '[]')
+        INSERT INTO gen_messages (conversation_id, author, role, content, model, note_ids_json, owner_id)
+        VALUES (?, ?, 'user', ?, ?, '[]', 'owner-ryan')
         """, (conv_id, author, message, model))
         user_msg_id = cursor.lastrowid
 
@@ -3262,8 +3432,8 @@ def send_gen_chat(conv_id, author, message, model, account="owner_default"):
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
-        INSERT INTO gen_messages (conversation_id, author, role, content, model, note_ids_json)
-        VALUES (?, ?, 'assistant', ?, ?, ?)
+        INSERT INTO gen_messages (conversation_id, author, role, content, model, note_ids_json, owner_id)
+        VALUES (?, ?, 'assistant', ?, ?, ?, 'owner-ryan')
         """, (conv_id, author_name, reply_content, model, json.dumps(cited_notes, ensure_ascii=False)))
         reply_id = cursor.lastrowid
         conn.commit()
@@ -3339,28 +3509,28 @@ def compact_gen_conversation(conv_id, model_from="", model_to="", manual=False):
         )
 
         cursor.execute("""
-        INSERT INTO gen_compact_snapshots (id, conversation_id, model_from, model_to, summary, note_ids_json, message_count)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO gen_compact_snapshots (id, conversation_id, model_from, model_to, summary, note_ids_json, message_count, owner_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'owner-ryan')
         """, (cpt_id, conv_id, model_from, model_to, summary, json.dumps(notes_list, ensure_ascii=False), count))
 
         for m in uncompacted:
             cursor.execute("UPDATE gen_messages SET is_compacted = 1, compact_id = ? WHERE id = ?", (cpt_id, m["id"]))
 
         cursor.execute("""
-        INSERT INTO gen_messages (conversation_id, author, role, content, model, note_ids_json, compact_id)
-        VALUES (?, 'Hệ Thống', 'compact', ?, ?, ?, ?)
+        INSERT INTO gen_messages (conversation_id, author, role, content, model, note_ids_json, compact_id, owner_id)
+        VALUES (?, 'Hệ Thống', 'compact', ?, ?, ?, ?, 'owner-ryan')
         """, (conv_id, summary, model_to, json.dumps(notes_list, ensure_ascii=False), cpt_id))
 
         conn.commit()
     return {"status": "compacted", "compact_id": cpt_id, "message_count": count, "note_ids": notes_list, "summary": summary}
 
-def get_gen_notes(project_id="PRJ-GEN-WORKPLACE", conv_id=None):
+def get_gen_notes(project_id="PRJ-GEN-WORKPLACE", conv_id=None, owner_id="owner-ryan"):
     with get_connection() as conn:
         cursor = conn.cursor()
         if conv_id:
-            cursor.execute("SELECT * FROM gen_scratchpad_notes WHERE project_id = ? AND (conversation_id = ? OR conversation_id = '') ORDER BY id ASC", (project_id, conv_id))
+            cursor.execute("SELECT * FROM gen_scratchpad_notes WHERE project_id = ? AND (conversation_id = ? OR conversation_id = '') AND (owner_id = ? OR owner_id IS NULL) ORDER BY id ASC", (project_id, conv_id, owner_id))
         else:
-            cursor.execute("SELECT * FROM gen_scratchpad_notes WHERE project_id = ? ORDER BY id ASC", (project_id,))
+            cursor.execute("SELECT * FROM gen_scratchpad_notes WHERE project_id = ? AND (owner_id = ? OR owner_id IS NULL) ORDER BY id ASC", (project_id, owner_id))
         rows = cursor.fetchall()
         notes = []
         for r in rows:
@@ -3378,7 +3548,7 @@ def get_gen_notes(project_id="PRJ-GEN-WORKPLACE", conv_id=None):
             })
         return notes
 
-def save_gen_note(project_id="PRJ-GEN-WORKPLACE", note_id=None, title="Ghi chú mới", content="", tags=None, evidence_ref="", author="Ryan", conv_id=""):
+def save_gen_note(project_id="PRJ-GEN-WORKPLACE", note_id=None, title="Ghi chú mới", content="", tags=None, evidence_ref="", author="Ryan (Owner)", conv_id="", owner_id="owner-ryan"):
     tags = tags or []
     with get_connection() as conn:
         cursor = conn.cursor()
@@ -3388,15 +3558,17 @@ def save_gen_note(project_id="PRJ-GEN-WORKPLACE", note_id=None, title="Ghi chú 
             note_id = f"NOTE-{num:02d}"
         
         cursor.execute("""
-        INSERT INTO gen_scratchpad_notes (id, project_id, conversation_id, title, content, tags_json, evidence_ref, author)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO gen_scratchpad_notes (id, project_id, conversation_id, title, content, tags_json, evidence_ref, author, owner_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
             title = excluded.title,
             content = excluded.content,
             tags_json = excluded.tags_json,
             evidence_ref = excluded.evidence_ref,
+            author = excluded.author,
+            owner_id = excluded.owner_id,
             updated_at = CURRENT_TIMESTAMP
-        """, (note_id, project_id, conv_id, title, content, json.dumps(tags, ensure_ascii=False), evidence_ref, author))
+        """, (note_id, project_id, conv_id, title, content, json.dumps(tags, ensure_ascii=False), evidence_ref, author, owner_id))
         conn.commit()
     return {"status": "saved", "id": note_id, "title": title}
 
