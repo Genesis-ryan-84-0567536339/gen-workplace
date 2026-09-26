@@ -3712,6 +3712,84 @@ body.resizing-active, body.resizing-active * {
   font-size: 10.5px;
 }
 
+/* Kanban Monitor Collapsible Box in Messages */
+.genKanbanMonitorBox {
+  margin: 8px 0;
+  background: #090e17;
+  border: 1px solid #1e293b;
+  border-left: 3px solid #38bdf8;
+  border-radius: 6px;
+  overflow: hidden;
+  font-size: 11px;
+}
+.genKanbanMonitorHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 10px;
+  background: rgba(15, 23, 42, 0.85);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s ease;
+}
+.genKanbanMonitorHeader:hover {
+  background: rgba(30, 41, 59, 0.9);
+}
+.genKanbanMonitorTitle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #f1f5f9;
+  font-size: 11px;
+}
+.genKanbanMonitorConvTag {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.12);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+.genKanbanMonitorStatsBadge {
+  font-size: 9.5px;
+  color: #94a3b8;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.genKanbanMonitorArrow {
+  font-size: 10px;
+  color: #38bdf8;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  background: rgba(56, 189, 248, 0.1);
+  padding: 2px 7px;
+  border-radius: 4px;
+  border: 1px solid rgba(56, 189, 248, 0.25);
+}
+.genKanbanMonitorBody {
+  padding: 8px 10px;
+  border-top: 1px solid #1e293b;
+  background: #06090e;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: #cbd5e1;
+}
+.genKanbanMonitorRow {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 3px 0;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.05);
+}
+.genKanbanMonitorRow:last-child {
+  border-bottom: none;
+}
+
 /* Chat Input Area */
 .genChatInputBox {
   padding: 8px 10px;
@@ -11092,11 +11170,8 @@ function renderGenChatMessages() {
     const isUser = m.role === 'user';
     const timeStr = m.created_at ? m.created_at.slice(11, 16) || m.created_at : '';
     
-    // Format text: replace #NOTE-xx or #EVT-xx with clickable pill
-    let formatted = escapeHtml(m.content);
-    formatted = formatted.replace(/(#(?:NOTE|EVT)-\d+)/g, '<span class="genNotePill" onclick="openEvidenceDetail(\'$1\')">$1</span>');
-    formatted = formatted.replace(/\n/g, '<br>');
-    formatted = formatted.replace(/`([^`]+)`/g, '<code style="background:#16202e;padding:1px 4px;border-radius:3px;color:#38bdf8;font-family:var(--mono);font-size:11px">$1</code>');
+    // Format text: parse collapsible KANBAN_MONITOR, code blocks, #NOTE-xx and #EVT-xx
+    const formatted = formatGenChatMessage(m.content);
 
     return `
       <div class="genMsg ${isUser ? 'user' : 'assistant'}" style="${m.is_compacted ? 'opacity:0.65;border:1px dashed #334155;border-radius:8px;padding:4px' : ''}">
@@ -11113,6 +11188,141 @@ function renderGenChatMessages() {
   }).join('');
 
   container.scrollTop = container.scrollHeight;
+}
+
+function toggleKanbanMonitor(el) {
+  const box = el.closest('.genKanbanMonitorBox');
+  if (!box) return;
+  const body = box.querySelector('.genKanbanMonitorBody');
+  const arrow = box.querySelector('.genKanbanMonitorArrow');
+  if (!body) return;
+  const isHidden = body.style.display === 'none' || !body.style.display;
+  if (isHidden) {
+    body.style.display = 'block';
+    if (arrow) arrow.innerHTML = '▲ Thu gọn';
+  } else {
+    body.style.display = 'none';
+    if (arrow) arrow.innerHTML = '▶ Mở rộng';
+  }
+}
+
+function renderKanbanMonitorWidget(fullBlock, convId, bodyText) {
+  convId = (convId || '').trim() || (genState.currentConvId || 'conv-active');
+  const rawLines = bodyText.split('\n')
+    .map(l => l.trim())
+    .filter(l => l.startsWith('•') || l.startsWith('*') || l.startsWith('-') || l.startsWith('[TSK-') || l.startsWith('TSK-'));
+  
+  let doneCount = 0, inProgCount = 0, reviewCount = 0, todoCount = 0;
+  
+  const renderedRows = rawLines.map(line => {
+    let statusClass = 'todo';
+    let statusIcon = '📋';
+    let statusText = 'TODO';
+    
+    if (/\[DONE\]/i.test(line)) {
+      doneCount++;
+      statusClass = 'done';
+      statusIcon = '✓';
+      statusText = 'DONE';
+    } else if (/\[IN_PROGRESS\]/i.test(line)) {
+      inProgCount++;
+      statusClass = 'in_progress';
+      statusIcon = '⚙️';
+      statusText = 'IN PROGRESS';
+    } else if (/\[REVIEW\]/i.test(line)) {
+      reviewCount++;
+      statusClass = 'review';
+      statusIcon = '🔍';
+      statusText = 'REVIEW';
+    } else {
+      todoCount++;
+    }
+    
+    let cleanLine = escapeHtml(line.replace(/^[•\*\-]\s*/, ''));
+    cleanLine = cleanLine.replace(/\[(DONE)\]/gi, `<span class="chip done" style="font-size:9.5px;padding:1px 5px;border-radius:4px;font-weight:600;background:rgba(34,197,94,0.18);color:#4ade80;border:1px solid rgba(34,197,94,0.35)">✓ DONE</span>`);
+    cleanLine = cleanLine.replace(/\[(IN_PROGRESS)\]/gi, `<span class="chip in_progress" style="font-size:9.5px;padding:1px 5px;border-radius:4px;font-weight:600;background:rgba(56,189,248,0.18);color:#38bdf8;border:1px solid rgba(56,189,248,0.35)">⚙️ IN PROGRESS</span>`);
+    cleanLine = cleanLine.replace(/\[(REVIEW)\]/gi, `<span class="chip review" style="font-size:9.5px;padding:1px 5px;border-radius:4px;font-weight:600;background:rgba(250,204,21,0.18);color:#facc15;border:1px solid rgba(250,204,21,0.35)">🔍 REVIEW</span>`);
+    cleanLine = cleanLine.replace(/\[(TODO)\]/gi, `<span class="chip todo" style="font-size:9.5px;padding:1px 5px;border-radius:4px;font-weight:600;background:rgba(148,163,184,0.18);color:#94a3b8;border:1px solid rgba(148,163,184,0.35)">📋 TODO</span>`);
+    cleanLine = cleanLine.replace(/\((commit\s+[a-f0-9]+)\)/gi, `<code style="font-size:9.5px;color:#a855f7;background:rgba(168,85,247,0.12);border:1px solid rgba(168,85,247,0.25);padding:1px 5px;border-radius:3px">$1</code>`);
+    cleanLine = cleanLine.replace(/(\[[A-Z0-9_-]+\])/g, `<strong style="color:#f1f5f9;font-family:var(--mono)">$1</strong>`);
+    
+    return `<div class="genKanbanMonitorRow"><span style="color:#38bdf8;font-size:12px">•</span><div style="flex:1">${cleanLine}</div></div>`;
+  }).join('');
+  
+  const statsParts = [];
+  if (doneCount > 0) statsParts.push(`${doneCount} Hoàn thành`);
+  if (inProgCount > 0) statsParts.push(`${inProgCount} Đang chạy`);
+  if (reviewCount > 0) statsParts.push(`${reviewCount} Nghiệm thu`);
+  if (todoCount > 0) statsParts.push(`${todoCount} Chờ`);
+  const statsBadge = statsParts.length > 0 ? statsParts.join(' · ') : `${rawLines.length} hạng mục`;
+  
+  return `
+    <div class="genKanbanMonitorBox">
+      <div class="genKanbanMonitorHeader" onclick="toggleKanbanMonitor(this)" title="Bấm để mở rộng / thu gọn chi tiết Kanban">
+        <div class="genKanbanMonitorTitle">
+          <span style="font-size:13px">📊</span>
+          <strong>Tiến độ Kanban</strong>
+          <span class="genKanbanMonitorConvTag">${escapeHtml(convId)}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="genKanbanMonitorStatsBadge">${statsBadge}</span>
+          <span class="genKanbanMonitorArrow">▶ Mở rộng</span>
+        </div>
+      </div>
+      <div class="genKanbanMonitorBody" style="display:none">
+        ${renderedRows}
+        <div style="margin-top:8px;padding-top:6px;border-top:1px dashed rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:space-between">
+          <span style="color:#64748b;font-size:9.5px">Đồng bộ trực tiếp với SQLite SSOT</span>
+          <button class="btn small" style="font-size:9px;padding:2px 8px;background:rgba(56,189,248,0.1);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);cursor:pointer" onclick="event.stopPropagation();switchGenVsTab('kanban_todo')">
+            📋 Mở Bảng Kanban Cột 2 ➔
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function formatGenChatMessage(rawText) {
+  if (!rawText) return '';
+  
+  const placeholders = [];
+  
+  // 1. Khối code block chứa [KANBAN_MONITOR: ...]
+  let text = rawText.replace(/```(?:text|markdown)?\s*\n?(\[KANBAN_MONITOR:?\s*([^\]\n]*)\][\s\S]*?)```/gi, (match, body, convId) => {
+    const idx = placeholders.length;
+    placeholders.push(renderKanbanMonitorWidget(match, convId, body));
+    return `___KANBAN_PLACEHOLDER_${idx}___`;
+  });
+  
+  // 2. Khối văn bản tự do chứa [KANBAN_MONITOR: ...]
+  text = text.replace(/(\[KANBAN_MONITOR:?\s*([^\]\n]*)\](?:\n[ \t]*[•\*\-][^\n]+)+)/gi, (match, body, convId) => {
+    const idx = placeholders.length;
+    placeholders.push(renderKanbanMonitorWidget(match, convId, body));
+    return `___KANBAN_PLACEHOLDER_${idx}___`;
+  });
+
+  // 3. Khối code blocks thông thường (```lang ... ```)
+  text = text.replace(/```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g, (match, lang, code) => {
+    const idx = placeholders.length;
+    const safeCode = escapeHtml(code.trim());
+    placeholders.push(`<pre style="background:#090d14;border:1px solid #1e293b;border-radius:6px;padding:8px 10px;margin:6px 0;overflow-x:auto;font-family:var(--mono);font-size:11px;color:#38bdf8"><code>${safeCode}</code></pre>`);
+    return `___KANBAN_PLACEHOLDER_${idx}___`;
+  });
+  
+  // 4. Escape an toàn phần HTML còn lại
+  let formatted = escapeHtml(text);
+  
+  // 5. Thay thế các badge/pill inline
+  formatted = formatted.replace(/(#(?:NOTE|EVT)-\d+)/g, '<span class="genNotePill" onclick="openEvidenceDetail(\'$1\')">$1</span>');
+  formatted = formatted.replace(/\n/g, '<br>');
+  formatted = formatted.replace(/`([^`]+)`/g, '<code style="background:#16202e;padding:1px 4px;border-radius:3px;color:#38bdf8;font-family:var(--mono);font-size:11px">$1</code>');
+  
+  // 6. Phục hồi lại các widget HTML
+  placeholders.forEach((html, idx) => {
+    formatted = formatted.replace(`___KANBAN_PLACEHOLDER_${idx}___`, html);
+  });
+  
+  return formatted;
 }
 
 function toggleCompactedDetails() {

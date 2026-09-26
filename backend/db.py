@@ -4168,7 +4168,7 @@ def format_session_kanban_for_agent(conv_id, todos):
     lines.append("\n🎯 NGUYÊN TẮC HÀNH XỬ CHO AGENT TRONG MỖI LƯỢT:")
     lines.append("1. TRỌNG TÂM TRỰC TIẾP: Luôn ưu tiên trả lời trực tiếp, chính xác, tự nhiên và đầy đủ câu hỏi hoặc yêu cầu của Sếp Ryan trong phần [TIN NHẮN TRỰC TIẾP TỪ SẾP RYAN].")
     lines.append("2. PHÂN ĐỊNH HÀNH ĐỘNG:")
-    lines.append("   - Nếu Sếp chỉ hỏi thăm, thảo luận kiến trúc, rà soát tiến độ hoặc xin ý kiến: Hãy trả lời trực tiếp ngay bằng văn bản điều hành, đính kèm khối đối soát Kanban ngắn gọn ở đầu hoặc cuối câu trả lời; TUYỆT ĐỐI KHÔNG tự ý chạy các công cụ bash/tool không liên quan.")
+    lines.append(f"   - Nếu Sếp chỉ hỏi thăm, thảo luận kiến trúc, rà soát tiến độ hoặc xin ý kiến: Hãy trả lời trực tiếp ngay bằng văn bản điều hành. Nếu đính kèm bảng đối soát Kanban, hãy dùng đúng khối chuẩn: ```text\\n[KANBAN_MONITOR: {conv_id}]\\n• [TSK-xx] Tiêu đề : [STATUS] (commit ...)\\n``` (Giao diện chat sẽ tự động thu gọn khối này, Sếp Ryan có thể bấm mở rộng khi cần); TUYỆT ĐỐI KHÔNG tự ý chạy các công cụ bash/tool không liên quan.")
     lines.append("   - Nếu Sếp giao việc thực thi cụ thể (viết mã, sửa file, kiểm thử, tạo file): Mới gọi các công cụ tương ứng để hoàn thành nhiệm vụ.")
     lines.append("3. ĐỐI SOÁT & CẬP NHẬT KANBAN:")
     lines.append("   - Nêu rõ task nào đang liên quan hoặc được giải quyết.")
