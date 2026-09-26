@@ -369,6 +369,22 @@ def init_db():
         );
         """)
 
+        # 18. Gen Session Workspace Files (Quản lý Folder & File theo từng phiên)
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS gen_session_files (
+            id TEXT PRIMARY KEY,
+            conversation_id TEXT NOT NULL REFERENCES gen_conversations(id) ON DELETE CASCADE,
+            project_id TEXT NOT NULL DEFAULT 'PRJ-GEN-WORKPLACE',
+            name TEXT NOT NULL,
+            path TEXT NOT NULL,
+            file_type TEXT NOT NULL DEFAULT 'file',
+            size_bytes INTEGER DEFAULT 0,
+            source TEXT DEFAULT 'session',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """)
+
         conn.commit()
 
 def seed_ssot_events():
@@ -3142,7 +3158,175 @@ def delete_gen_note(note_id, project_id="PRJ-GEN-WORKPLACE"):
         conn.commit()
     return {"status": "deleted", "id": note_id}
 
+def get_session_workspace_dir(conv_id):
+    base_ws = "/workspace" if os.path.exists("/workspace") else str(BASE_DIR / "workspace")
+    sess_dir = os.path.join(base_ws, "sessions", conv_id)
+    os.makedirs(sess_dir, exist_ok=True)
+    return sess_dir
+
+def get_gen_session_files(conv_id):
+    sess_dir = get_session_workspace_dir(conv_id)
+    
+    # Khởi tạo tệp mẫu ban đầu cho phiên nếu trống
+    init_marker = os.path.join(sess_dir, ".init")
+    if not os.path.exists(init_marker):
+        try:
+            with open(init_marker, "w") as f:
+                f.write("initialized")
+            docs_dir = os.path.join(sess_dir, "docs")
+            src_dir = os.path.join(sess_dir, "src")
+            os.makedirs(docs_dir, exist_ok=True)
+            os.makedirs(src_dir, exist_ok=True)
+            with open(os.path.join(sess_dir, "README.md"), "w", encoding="utf-8") as f:
+                f.write(f"# Session Workspace: {conv_id}\n\nThư mục làm việc chuyên biệt dành riêng cho phiên làm việc giữa Owner và Gen Core.\n- Mọi tệp và thư mục tại đây được cô lập theo phiên.\n")
+            with open(os.path.join(docs_dir, "session_brief.md"), "w", encoding="utf-8") as f:
+                f.write(f"# Hồ Sơ Nhiệm Vụ Phiên: {conv_id}\n- Trạng thái: Đang hoạt động\n- Người thực thi: Gen Core Agent\n- Giám sát: Owner Ryan\n")
+        except Exception:
+            pass
+
+    # Quét tệp và thư mục trên đĩa của phiên
+    files = []
+    idx = 1
+    for root, dirs, fnames in os.walk(sess_dir):
+        rel_root = os.path.relpath(root, sess_dir)
+        for d in sorted(dirs):
+            dir_rel = d if rel_root == "." else os.path.join(rel_root, d)
+            files.append({
+                "id": f"SDIR-{idx:02d}",
+                "name": d,
+                "path": dir_rel,
+                "is_dir": True,
+                "size": "Folder",
+                "type": "folder",
+                "source": "session"
+            })
+            idx += 1
+        for fn in sorted(fnames):
+            if fn == ".init":
+                continue
+            file_rel = fn if rel_root == "." else os.path.join(rel_root, fn)
+            full_path = os.path.join(root, fn)
+            try:
+                st = os.stat(full_path)
+                sz = st.st_size
+                sz_str = f"{sz} B" if sz < 1024 else (f"{sz/1024:.1f} KB" if sz < 1024*1024 else f"{sz/(1024*1024):.1f} MB")
+                ext = os.path.splitext(fn)[1].lower()
+                cat = "doc / spec" if ext == ".md" else ("script" if ext in [".py", ".sh"] else "file")
+                files.append({
+                    "id": f"SFIL-{idx:02d}",
+                    "name": fn,
+                    "path": file_rel,
+                    "is_dir": False,
+                    "size": sz_str,
+                    "type": cat,
+                    "source": "session",
+                    "modified": time.strftime("%Y-%m-%d %H:%M", time.localtime(st.st_mtime))
+                })
+                idx += 1
+            except Exception:
+                pass
+
+    # Lấy danh sách Repo Reference files từ DB
+    repo_refs = []
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM gen_session_files WHERE conversation_id = ? AND file_type = 'repo_ref'", (conv_id,))
+        for r in cursor.fetchall():
+            repo_refs.append({
+                "id": r["id"],
+                "name": r["name"],
+                "path": r["path"],
+                "is_dir": False,
+                "size": "Repo ref",
+                "type": "repo_ref",
+                "source": "repo_ref"
+            })
+
+    return {
+        "conv_id": conv_id,
+        "workspace_dir": f"/workspace/sessions/{conv_id}",
+        "files": files,
+        "repo_refs": repo_refs
+    }
+
+def create_gen_session_file(conv_id, rel_path, is_dir=False, content=""):
+    sess_dir = get_session_workspace_dir(conv_id)
+    clean_p = rel_path.lstrip("/").replace("\\", "/")
+    if ".." in clean_p:
+        return {"error": "Invalid path"}
+    target = os.path.join(sess_dir, clean_p)
+    try:
+        if is_dir:
+            os.makedirs(target, exist_ok=True)
+        else:
+            os.makedirs(os.path.dirname(target), exist_ok=True)
+            with open(target, "w", encoding="utf-8") as f:
+                f.write(content)
+        
+        file_id = f"SFIL-{uuid.uuid4().hex[:6]}"
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            INSERT OR REPLACE INTO gen_session_files (id, conversation_id, name, path, file_type, size_bytes, source)
+            VALUES (?, ?, ?, ?, ?, ?, 'session')
+            """, (file_id, conv_id, os.path.basename(clean_p), clean_p, "folder" if is_dir else "file", len(content.encode("utf-8"))))
+            conn.commit()
+        return {"status": "ok", "path": clean_p, "is_dir": is_dir}
+    except Exception as e:
+        return {"error": str(e)}
+
+def delete_gen_session_file(conv_id, rel_path):
+    sess_dir = get_session_workspace_dir(conv_id)
+    clean_p = rel_path.lstrip("/").replace("\\", "/")
+    if ".." in clean_p:
+        return {"error": "Invalid path"}
+    target = os.path.join(sess_dir, clean_p)
+    try:
+        if os.path.isdir(target):
+            shutil.rmtree(target, ignore_errors=True)
+        elif os.path.exists(target):
+            os.remove(target)
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM gen_session_files WHERE conversation_id = ? AND path = ?", (conv_id, clean_p))
+            conn.commit()
+        return {"status": "deleted", "path": clean_p}
+    except Exception as e:
+        return {"error": str(e)}
+
+def attach_repo_file_to_session(conv_id, repo_path):
+    clean_p = repo_path.lstrip("/").replace("\\", "/")
+    file_id = f"SREF-{uuid.uuid4().hex[:6]}"
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+        INSERT OR REPLACE INTO gen_session_files (id, conversation_id, name, path, file_type, size_bytes, source)
+        VALUES (?, ?, ?, ?, 'repo_ref', 0, 'repo_ref')
+        """, (file_id, conv_id, os.path.basename(clean_p), clean_p))
+        conn.commit()
+    return {"status": "attached", "path": clean_p}
+
 def get_file_content_safely(file_path):
+    # Hỗ trợ đọc file thuộc Session Workspace (prefix session:<conv_id>/<rel_path>)
+    if file_path.startswith("session:"):
+        parts = file_path[len("session:"):].split("/", 1)
+        if len(parts) == 2:
+            conv_id, rel_p = parts[0], parts[1]
+            sess_dir = get_session_workspace_dir(conv_id)
+            clean_p = rel_p.lstrip("/").replace("\\", "/")
+            if ".." in clean_p:
+                return {"error": "Invalid path"}
+            target = os.path.abspath(os.path.join(sess_dir, clean_p))
+            if not target.startswith(sess_dir) or not os.path.exists(target):
+                return {"error": f"Session file không tồn tại: {clean_p}"}
+            try:
+                sz = os.path.getsize(target)
+                with open(target, "r", encoding="utf-8", errors="replace") as f:
+                    content = f.read()
+                return {"path": file_path, "content": content, "size": sz, "lines": len(content.splitlines()), "is_session_file": True}
+            except Exception as e:
+                return {"error": str(e)}
+
     repo_base = "/app/repo"
     clean_p = file_path.lstrip("/").replace("\\", "/")
     if ".." in clean_p:

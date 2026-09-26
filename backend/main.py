@@ -252,6 +252,13 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             self._send_json(200 if "error" not in res else 400, res)
             return
 
+        # 22. API Gen Session Workspace Files (Quản lý File & Folder theo từng phiên)
+        if path == "/api/gen/session/files":
+            conv_id = query.get("conv_id", ["conv-gen-core-01"])[0]
+            sess_files = db.get_gen_session_files(conv_id)
+            self._send_json(200, sess_files)
+            return
+
         return super().do_GET()
 
     def do_POST(self):
@@ -706,6 +713,39 @@ class SwarmHandler(SimpleHTTPRequestHandler):
                 self._send_json(200, res)
             else:
                 self._send_json(400, {"error": "Missing id"})
+            return
+
+        # 27. API Gen Session File Create / Delete / Attach
+        if path == "/api/gen/session/file/create":
+            conv_id = data.get("conv_id")
+            file_path = data.get("path")
+            is_dir = bool(data.get("is_dir", False))
+            content = data.get("content", "")
+            if conv_id and file_path:
+                res = db.create_gen_session_file(conv_id, file_path, is_dir, content)
+                self._send_json(200 if "error" not in res else 400, res)
+            else:
+                self._send_json(400, {"error": "Missing conv_id or path"})
+            return
+
+        if path == "/api/gen/session/file/delete":
+            conv_id = data.get("conv_id")
+            file_path = data.get("path")
+            if conv_id and file_path:
+                res = db.delete_gen_session_file(conv_id, file_path)
+                self._send_json(200 if "error" not in res else 400, res)
+            else:
+                self._send_json(400, {"error": "Missing conv_id or path"})
+            return
+
+        if path == "/api/gen/session/file/attach_repo":
+            conv_id = data.get("conv_id")
+            repo_path = data.get("repo_path")
+            if conv_id and repo_path:
+                res = db.attach_repo_file_to_session(conv_id, repo_path)
+                self._send_json(200, res)
+            else:
+                self._send_json(400, {"error": "Missing conv_id or repo_path"})
             return
 
         self.send_response(404)
