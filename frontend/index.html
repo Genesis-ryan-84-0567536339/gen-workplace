@@ -6575,27 +6575,29 @@ function renderWorkflow() {
 function selectNode(i) {
   state.selectedNode = i;
   const n = state.nodes[i];
-  $('nodeDetail').innerHTML = `
-    <div class="detailBox">
-      <b>Node / Role</b>
-      <p><span class="ref">${n.id}</span> · ${escapeHtml(n.role)}</p>
-    </div>
-    <div class="detailBox">
-      <b>Checklist Input</b>
-      <div class="ioList"><span class="ioTag">${escapeHtml(n.input)}</span></div>
-    </div>
-    <div class="detailBox">
-      <b>Checklist Output</b>
-      <div class="ioList"><span class="ioTag">${escapeHtml(n.output)}</span></div>
-    </div>
-    <div class="detailBox">
-      <b>Checkpoint / Handoff</b>
-      <p>${escapeHtml(n.check)} · ${escapeHtml(n.handoff)}</p>
-      <div class="checkList" style="margin-top:6px">
-        ${(n.checklist || []).map((x, j) => `<div class="checkItem ${j === 0 && n.status === 'done' ? 'done' : ''}"><span class="checkDot">${j === 0 && n.status === 'done' ? '✓' : ''}</span>${escapeHtml(x)}</div>`).join('')}
+  if ($('nodeDetail')) {
+    $('nodeDetail').innerHTML = `
+      <div class="detailBox">
+        <b>Node / Role</b>
+        <p><span class="ref">${n.id}</span> · ${escapeHtml(n.role)}</p>
       </div>
-    </div>
-  `;
+      <div class="detailBox">
+        <b>Checklist Input</b>
+        <div class="ioList"><span class="ioTag">${escapeHtml(n.input)}</span></div>
+      </div>
+      <div class="detailBox">
+        <b>Checklist Output</b>
+        <div class="ioList"><span class="ioTag">${escapeHtml(n.output)}</span></div>
+      </div>
+      <div class="detailBox">
+        <b>Checkpoint / Handoff</b>
+        <p>${escapeHtml(n.check)} · ${escapeHtml(n.handoff)}</p>
+        <div class="checkList" style="margin-top:6px">
+          ${(n.checklist || []).map((x, j) => `<div class="checkItem ${j === 0 && n.status === 'done' ? 'done' : ''}"><span class="checkDot">${j === 0 && n.status === 'done' ? '✓' : ''}</span>${escapeHtml(x)}</div>`).join('')}
+        </div>
+      </div>
+    `;
+  }
 }
 
 function advanceWorkflow() {
@@ -6603,7 +6605,7 @@ function advanceWorkflow() {
     state.workflowIndex++;
     state.nodes[state.workflowIndex].status = 'live';
     if (state.workflowIndex > 0) state.nodes[state.workflowIndex - 1].status = 'done';
-    if (state.workflowIndex === state.nodes.length - 1) $('wfRunStatus').textContent = 'CHECKPOINT RELEASE';
+    if (state.workflowIndex === state.nodes.length - 1 && $('wfRunStatus')) $('wfRunStatus').textContent = 'CHECKPOINT RELEASE';
     persist();
     renderWorkflow();
     showToast('Workflow chuyển sang ' + state.nodes[state.workflowIndex].id);
@@ -6678,42 +6680,46 @@ function renderDashboardProjects() {
 
 function renderOverview() {
   const active = state.runtimes.filter(r => r.status === 'running').length;
-  $('ovRoadmap').textContent = state.roadmap.length;
-  $('ovTodo').textContent = state.todos.flat().length;
-  $('ovActive').textContent = active;
-  $('sideRuntime').textContent = state.runtimes.length + ' online (Docker)';
-  $('sideRoles').textContent = state.roles.length;
-  $('sideSsot').textContent = state.ssot.length + ' verified';
+  if ($('ovRoadmap')) $('ovRoadmap').textContent = state.roadmap.length;
+  if ($('ovTodo')) $('ovTodo').textContent = state.todos.flat().length;
+  if ($('ovActive')) $('ovActive').textContent = active;
+  if ($('sideRuntime')) $('sideRuntime').textContent = state.runtimes.length + ' online (Docker)';
+  if ($('sideRoles')) $('sideRoles').textContent = state.roles.length;
+  if ($('sideSsot')) $('sideSsot').textContent = state.ssot.length + ' verified';
 
-  $('overviewSteps').innerHTML = state.nodes.map((n, i) => `
-    <div class="runStep">
-      <div class="stepNo">${i + 1}</div>
-      <div>
-        <b>${escapeHtml(n.title)}</b>
-        <small>${escapeHtml(n.role)} · ${escapeHtml(n.input)} → ${escapeHtml(n.output)}</small>
-      </div>
-      <span class="chip ${n.status === 'done' ? 'done' : n.status === 'live' ? 'live' : n.status === 'blocked' ? 'bad' : 'wait'}">
-        ${n.status === 'done' ? 'done' : n.status === 'live' ? 'running' : n.status === 'blocked' ? 'blocked' : 'waiting'}
-      </span>
-    </div>
-  `).join('');
-
-  $('overviewAgents').innerHTML = state.runtimes.map(r => {
-    const matchedRole = (state.roles || []).find(x => x.name.toLowerCase().includes(r.role.split(' ')[0].toLowerCase())) || {};
-    const modelTag = matchedRole.model || r.cli || 'Gemini 2.5 Pro';
-    return `
-    <div class="resource">
-      <div class="resLeft">
-        <div class="resIcon">${r.role[0]}</div>
+  if ($('overviewSteps')) {
+    $('overviewSteps').innerHTML = state.nodes.map((n, i) => `
+      <div class="runStep">
+        <div class="stepNo">${i + 1}</div>
         <div>
-          <b>${escapeHtml(r.role)}</b>
-          <small>${escapeHtml(r.task)} · <span style="color:#38bdf8">🤖 ${escapeHtml(modelTag)}</span></small>
+          <b>${escapeHtml(n.title)}</b>
+          <small>${escapeHtml(n.role)} · ${escapeHtml(n.input)} → ${escapeHtml(n.output)}</small>
         </div>
+        <span class="chip ${n.status === 'done' ? 'done' : n.status === 'live' ? 'live' : n.status === 'blocked' ? 'bad' : 'wait'}">
+          ${n.status === 'done' ? 'done' : n.status === 'live' ? 'running' : n.status === 'blocked' ? 'blocked' : 'waiting'}
+        </span>
       </div>
-      <span class="chip ${r.status === 'running' ? 'live' : r.status === 'done' ? 'done' : 'wait'}">${r.status}</span>
-    </div>
-  `;
-  }).join('');
+    `).join('');
+  }
+
+  if ($('overviewAgents')) {
+    $('overviewAgents').innerHTML = state.runtimes.map(r => {
+      const matchedRole = (state.roles || []).find(x => x.name.toLowerCase().includes(r.role.split(' ')[0].toLowerCase())) || {};
+      const modelTag = matchedRole.model || r.cli || 'Gemini 2.5 Pro';
+      return `
+      <div class="resource">
+        <div class="resLeft">
+          <div class="resIcon">${r.role[0]}</div>
+          <div>
+            <b>${escapeHtml(r.role)}</b>
+            <small>${escapeHtml(r.task)} · <span style="color:#38bdf8">🤖 ${escapeHtml(modelTag)}</span></small>
+          </div>
+        </div>
+        <span class="chip ${r.status === 'running' ? 'live' : r.status === 'done' ? 'done' : 'wait'}">${r.status}</span>
+      </div>
+    `;
+    }).join('');
+  }
 
   renderDashboardKanban();
 
@@ -9394,11 +9400,13 @@ function switchChat(mode, el) {
 
 function renderThreadBar() {
   const threads = ['all', 'Repo Init', 'Live Mount', 'Installer', 'Database'];
-  $('threadBar').innerHTML = threads.map(t => `
-    <button class="threadBtn ${state.selectedThread === t ? 'active' : ''}" onclick="selectThread('${t}')">
-      ${t === 'all' ? 'Tất cả' : t}
-    </button>
-  `).join('');
+  if ($('threadBar')) {
+    $('threadBar').innerHTML = threads.map(t => `
+      <button class="threadBtn ${state.selectedThread === t ? 'active' : ''}" onclick="selectThread('${t}')">
+        ${t === 'all' ? 'Tất cả' : t}
+      </button>
+    `).join('');
+  }
 }
 
 function selectThread(t) {
@@ -10067,7 +10075,8 @@ async function selectGenConversation(convId) {
     await loadGenFileContent(savedFile, null, false);
   }
   renderGenConversationsList();
-  if ($('genCurrentSessionBadge')) $('genCurrentSessionBadge').textContent = c?.title?.slice(0, 18) || convId;
+  if ($('genCurrentSessionBadge')) $('genCurrentSessionBadge').textContent = c?.title ? (c.title.length > 20 ? c.title.slice(0, 20) + '...' : c.title) : convId;
+  if ($('genSessionFilesTitle')) $('genSessionFilesTitle').textContent = `Tệp Của Phiên: ${c?.title || convId}`;
 
   // Tải đồng bộ Tệp của phiên, Sổ tay & Tin nhắn của phiên này:
   await Promise.all([
@@ -11857,17 +11866,17 @@ function loadPersisted() {
 }
 
 function refreshAll() {
-  renderProjectList();
-  renderDashboardProjects();
-  renderImplementation();
-  renderOverview();
-  renderRuntimes();
-  renderMemory();
-  refreshTmuxSessions();
-  refreshOauthProfiles();
-  renderOrchSwarmCards();
-  renderKanban();
-  updateCommandDeck();
+  try { renderProjectList(); } catch (e) { console.warn('[refreshAll] renderProjectList:', e); }
+  try { renderDashboardProjects(); } catch (e) { console.warn('[refreshAll] renderDashboardProjects:', e); }
+  try { renderImplementation(); } catch (e) { console.warn('[refreshAll] renderImplementation:', e); }
+  try { renderOverview(); } catch (e) { console.warn('[refreshAll] renderOverview:', e); }
+  try { renderRuntimes(); } catch (e) { console.warn('[refreshAll] renderRuntimes:', e); }
+  try { renderMemory(); } catch (e) { console.warn('[refreshAll] renderMemory:', e); }
+  try { refreshTmuxSessions(); } catch (e) { console.warn('[refreshAll] refreshTmuxSessions:', e); }
+  try { refreshOauthProfiles(); } catch (e) { console.warn('[refreshAll] refreshOauthProfiles:', e); }
+  try { renderOrchSwarmCards(); } catch (e) { console.warn('[refreshAll] renderOrchSwarmCards:', e); }
+  try { renderKanban(); } catch (e) { console.warn('[refreshAll] renderKanban:', e); }
+  try { updateCommandDeck(); } catch (e) { console.warn('[refreshAll] updateCommandDeck:', e); }
 }
 
 // Keyboard shortcuts
@@ -12095,14 +12104,20 @@ async function sendWarRoomMessage() {
 }
 
 // Initial boot
-initResizersAndSidebars();
-loadPersisted();
-ensureProjectWorkspaces();
-restoreWorkspace(state.projects[state.activeProjectIndex || 0]?.workspace || snapshotWorkspace());
-refreshAll();
-persist();
-syncFromBackend();
-initGenWorkplace();
+try { initResizersAndSidebars(); } catch (e) { console.warn('[Boot] initResizersAndSidebars:', e); }
+try { loadPersisted(); } catch (e) { console.warn('[Boot] loadPersisted:', e); }
+try { ensureProjectWorkspaces(); } catch (e) { console.warn('[Boot] ensureProjectWorkspaces:', e); }
+try { restoreWorkspace(state.projects[state.activeProjectIndex || 0]?.workspace || snapshotWorkspace()); } catch (e) { console.warn('[Boot] restoreWorkspace:', e); }
+try { refreshAll(); } catch (e) { console.warn('[Boot] refreshAll:', e); }
+try { persist(); } catch (e) { console.warn('[Boot] persist:', e); }
+try { syncFromBackend(); } catch (e) { console.warn('[Boot] syncFromBackend:', e); }
+
+// Khởi chạy phân hệ Gen Workplace (Ưu tiên số 1)
+try {
+  initGenWorkplace();
+} catch (e) {
+  console.error('[Boot] initGenWorkplace failed:', e);
+}
 
 // Seed deck with welcome messages once DOM is ready
 setTimeout(() => {
