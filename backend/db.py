@@ -1171,17 +1171,32 @@ def fetch_live_google_quota(profile_id="owner_default", force=False):
     from datetime import datetime, timezone, timedelta
 
     def _do_query(t):
-        req = urllib.request.Request(
-            "https://daily-cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels",
-            data=b"{}",
-            headers={
-                "Authorization": f"Bearer {t}",
-                "Content-Type": "application/json",
-                "User-Agent": "Antigravity"
-            }
-        )
-        with urllib.request.urlopen(req, timeout=5.0) as resp:
-            return json.loads(resp.read().decode())
+        # Ưu tiên lấy bản tóm tắt phân bổ 2 tầng (5h limit & weekly limit) từ Cloud Code API
+        try:
+            req_sum = urllib.request.Request(
+                "https://daily-cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary",
+                data=b"{}",
+                headers={
+                    "Authorization": f"Bearer {t}",
+                    "Content-Type": "application/json",
+                    "User-Agent": "Antigravity"
+                }
+            )
+            with urllib.request.urlopen(req_sum, timeout=5.0) as resp:
+                return json.loads(resp.read().decode())
+        except Exception:
+            # Fallback sang fetchAvailableModels nếu retrieveUserQuotaSummary không khả dụng
+            req = urllib.request.Request(
+                "https://daily-cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels",
+                data=b"{}",
+                headers={
+                    "Authorization": f"Bearer {t}",
+                    "Content-Type": "application/json",
+                    "User-Agent": "Antigravity"
+                }
+            )
+            with urllib.request.urlopen(req, timeout=5.0) as resp:
+                return json.loads(resp.read().decode())
 
     data = None
     if token:
@@ -1210,28 +1225,6 @@ def fetch_live_google_quota(profile_id="owner_default", force=False):
         return _LIVE_QUOTA_CACHE.get(profile_id)
 
     try:
-        models = data.get("models", {})
-        
-        # Gemini models
-        g_model = models.get("gemini-3.8-flash-tiered") or models.get("gemini-3.1-pro-high") or {}
-        g_q = g_model.get("quotaInfo") or {}
-        g_fraction = g_q.get("remainingFraction")
-        g_reset = g_q.get("resetTime", "")
-        
-        # Claude model
-        c_model = models.get("claude-sonnet-4-6") or models.get("claude-opus-4-6-thinking") or {}
-        c_q = c_model.get("quotaInfo") or {}
-        c_fraction = c_q.get("remainingFraction")
-        c_reset = c_q.get("resetTime", "")
-        
-        g_pct = int(round(g_fraction * 100)) if g_fraction is not None else 100
-        if c_fraction is not None:
-            c_pct = int(round(c_fraction * 100))
-        elif c_reset:
-            c_pct = 0
-        else:
-            c_pct = 100
-        
         def _format_vn_reset(iso_time):
             if not iso_time:
                 return ""
@@ -1242,62 +1235,166 @@ def fetch_live_google_quota(profile_id="owner_default", force=False):
                 now_utc = datetime.now(timezone.utc)
                 diff = dt - now_utc
                 if diff.total_seconds() > 0:
-                    hrs = int(diff.total_seconds() // 3600)
+                    days = diff.days
+                    hrs = int((diff.total_seconds() % 86400) // 3600)
                     mins = int((diff.total_seconds() % 3600) // 60)
-                    rem_str = f"còn ~{hrs}h{mins:02d}m" if hrs > 0 else f"còn ~{mins}m"
+                    if days > 0:
+                        rem_str = f"còn ~{days}d {hrs}h"
+                    elif hrs > 0:
+                        rem_str = f"còn ~{hrs}h{mins:02d}m"
+                    else:
+                        rem_str = f"còn ~{mins}m"
                     return f"{time_str} ({rem_str})"
                 else:
                     return f"{time_str} (đang hồi phục)"
             except Exception:
                 return iso_time
 
-        g_reset_vn = _format_vn_reset(g_reset)
-        c_reset_vn = _format_vn_reset(c_reset)
-        
-        gemini_quota = {
-            "family": "Google Gemini",
-            "model": "Gemini 3.8 Flash (High)",
-            "alt_model": "Gemini 3.1 Pro (High)",
-            "status": "ready" if g_pct > 0 else "rate_limited",
-            "status_label": f"Khả dụng {g_pct}% (Sẵn sàng)" if g_pct > 0 else f"429 Rate Limit (Hồi lúc {g_reset_vn})",
-            "percent": g_pct,
-            "used_requests": 1500 - int(g_pct * 15),
-            "limit_requests": 1500,
-            "rpm": 60,
-            "tpm": 4000000,
-            "reset_time": g_reset_vn or "Hằng ngày",
-            "tier": "Cloud Code VIP Entitlement",
-            "color": "#38bdf8" if g_pct > 0 else "#ef4444",
-            "detail": f"Hạn ngạch thực tế: {g_pct}% · Hồi lúc {g_reset_vn}" if g_reset_vn else f"Hạn ngạch thực tế: {g_pct}% · 60 RPM"
-        }
-        
-        if c_pct > 0:
-            c_label = f"Khả dụng {c_pct}% (Sẵn sàng)"
-            c_detail = f"Khả dụng: {c_pct}% · Tokens/Min: 200k"
-            c_color = "#f59e0b"
-            c_status = "ready"
-        else:
-            c_label = f"0% (429 Cạn hạn ngạch · Hồi lúc {c_reset_vn})" if c_reset_vn else "0% (429 Quota Exceeded)"
-            c_detail = f"Hạn ngạch cá nhân đã cạn (0%) · Hồi lúc {c_reset_vn}" if c_reset_vn else "Hạn ngạch cá nhân đã cạn"
-            c_color = "#ef4444"
-            c_status = "rate_limited"
+        # Kiểm tra xem có cấu trúc groups từ retrieveUserQuotaSummary hay không
+        if "groups" in data:
+            g_5h_pct = 100
+            g_5h_reset = ""
+            g_weekly_pct = 100
+            g_weekly_reset = ""
+            
+            c_5h_pct = 100
+            c_5h_reset = ""
+            c_5h_disabled = False
+            c_weekly_pct = 0
+            c_weekly_reset = ""
 
-        anthropic_quota = {
-            "family": "Anthropic Claude",
-            "model": "Claude Sonnet 4.6 (Thinking)",
-            "alt_model": "Claude Opus 4.6 (Thinking)",
-            "status": c_status,
-            "status_label": c_label,
-            "percent": c_pct,
-            "used_tokens": 0 if c_pct > 0 else 200000,
-            "limit_tokens": 200000,
-            "rpm": 50,
-            "tpm": 200000,
-            "reset_time": c_reset_vn or "Rolling 5h",
-            "tier": "Sonnet 4.6 Tier 4 Entitlement",
-            "color": c_color,
-            "detail": c_detail
-        }
+            for grp in data.get("groups", []):
+                disp_name = (grp.get("displayName") or "").lower()
+                if "gemini" in disp_name:
+                    for b in grp.get("buckets", []):
+                        w = b.get("window")
+                        pct = int(round((b.get("remainingFraction") or 0) * 100))
+                        rst = b.get("resetTime", "")
+                        if w == "5h":
+                            g_5h_pct = pct
+                            g_5h_reset = rst
+                        elif w == "weekly":
+                            g_weekly_pct = pct
+                            g_weekly_reset = rst
+                elif "claude" in disp_name or "gpt" in disp_name:
+                    for b in grp.get("buckets", []):
+                        w = b.get("window")
+                        pct = int(round((b.get("remainingFraction") or 0) * 100))
+                        rst = b.get("resetTime", "")
+                        dis = b.get("disabled", False)
+                        if w == "5h":
+                            c_5h_pct = pct
+                            c_5h_reset = rst
+                            c_5h_disabled = dis
+                        elif w == "weekly":
+                            c_weekly_pct = pct
+                            c_weekly_reset = rst
+
+            g_5h_reset_vn = _format_vn_reset(g_5h_reset)
+            g_weekly_reset_vn = _format_vn_reset(g_weekly_reset)
+            c_5h_reset_vn = _format_vn_reset(c_5h_reset)
+            c_weekly_reset_vn = _format_vn_reset(c_weekly_reset)
+
+            gemini_quota = {
+                "family": "Google Gemini",
+                "model": "Gemini 3.8 Flash (High)",
+                "alt_model": "Gemini 3.1 Pro (High)",
+                "status": "ready" if g_5h_pct > 0 and g_weekly_pct > 0 else "rate_limited",
+                "status_label": f"5h: {g_5h_pct}% · Tuần: {g_weekly_pct}%",
+                "percent": g_5h_pct,
+                "percent_5h": g_5h_pct,
+                "percent_weekly": g_weekly_pct,
+                "reset_5h": g_5h_reset_vn,
+                "reset_weekly": g_weekly_reset_vn,
+                "reset_time": g_5h_reset_vn or "Cửa sổ 5h",
+                "tier": "Cloud Code VIP Entitlement",
+                "color": "#38bdf8" if g_5h_pct > 0 else "#ef4444",
+                "detail": f"Cửa sổ 5h: {g_5h_pct}% (Hồi {g_5h_reset_vn}) · Tuần: {g_weekly_pct}% (Hồi {g_weekly_reset_vn})"
+            }
+
+            if c_weekly_pct == 0:
+                c_label = f"0% (Hết quota tuần · Hồi {c_weekly_reset_vn})"
+                c_color = "#ef4444"
+                c_status = "rate_limited"
+                c_desc_5h = "Đang khóa (sẽ tự động mở khi hạn mức tuần hồi)"
+            else:
+                c_label = f"5h: {c_5h_pct}% · Tuần: {c_weekly_pct}%"
+                c_color = "#f59e0b"
+                c_status = "ready"
+                c_desc_5h = f"Cửa sổ 5h: {c_5h_pct}% (Hồi {c_5h_reset_vn})"
+
+            anthropic_quota = {
+                "family": "Anthropic Claude",
+                "model": "Claude Sonnet 4.6 (Thinking)",
+                "alt_model": "Claude Opus 4.6 (Thinking)",
+                "status": c_status,
+                "status_label": c_label,
+                "percent": c_weekly_pct if c_weekly_pct == 0 else c_5h_pct,
+                "percent_5h": c_5h_pct,
+                "percent_weekly": c_weekly_pct,
+                "disabled_5h": c_5h_disabled,
+                "desc_5h": c_desc_5h,
+                "reset_5h": c_5h_reset_vn,
+                "reset_weekly": c_weekly_reset_vn,
+                "reset_time": c_weekly_reset_vn or "Cửa sổ tuần",
+                "tier": "Sonnet 4.6 Tier 4 Entitlement",
+                "color": c_color,
+                "detail": f"Hạn ngạch tuần: {c_weekly_pct}% (Hồi {c_weekly_reset_vn}) · Cửa sổ 5h: {c_5h_pct}%"
+            }
+        else:
+            # Fallback nếu API trả về dạng models đơn giản
+            models = data.get("models", {})
+            g_model = models.get("gemini-3.8-flash-tiered") or models.get("gemini-3.1-pro-high") or {}
+            g_q = g_model.get("quotaInfo") or {}
+            g_fraction = g_q.get("remainingFraction")
+            g_reset = g_q.get("resetTime", "")
+            
+            c_model = models.get("claude-sonnet-4-6") or models.get("claude-opus-4-6-thinking") or {}
+            c_q = c_model.get("quotaInfo") or {}
+            c_fraction = c_q.get("remainingFraction")
+            c_reset = c_q.get("resetTime", "")
+            
+            g_pct = int(round(g_fraction * 100)) if g_fraction is not None else 100
+            c_pct = int(round(c_fraction * 100)) if c_fraction is not None else (0 if c_reset else 100)
+            
+            g_reset_vn = _format_vn_reset(g_reset)
+            c_reset_vn = _format_vn_reset(c_reset)
+            
+            gemini_quota = {
+                "family": "Google Gemini",
+                "model": "Gemini 3.8 Flash (High)",
+                "alt_model": "Gemini 3.1 Pro (High)",
+                "status": "ready" if g_pct > 0 else "rate_limited",
+                "status_label": f"Khả dụng {g_pct}% (Sẵn sàng)",
+                "percent": g_pct,
+                "percent_5h": g_pct,
+                "percent_weekly": 100,
+                "reset_5h": g_reset_vn,
+                "reset_weekly": "",
+                "reset_time": g_reset_vn or "Cửa sổ 5h",
+                "tier": "Cloud Code VIP Entitlement",
+                "color": "#38bdf8" if g_pct > 0 else "#ef4444",
+                "detail": f"Hạn ngạch thực tế: {g_pct}% · Hồi lúc {g_reset_vn}" if g_reset_vn else f"Hạn ngạch thực tế: {g_pct}%"
+            }
+            
+            anthropic_quota = {
+                "family": "Anthropic Claude",
+                "model": "Claude Sonnet 4.6 (Thinking)",
+                "alt_model": "Claude Opus 4.6 (Thinking)",
+                "status": "ready" if c_pct > 0 else "rate_limited",
+                "status_label": f"Khả dụng {c_pct}%" if c_pct > 0 else f"0% (Hồi lúc {c_reset_vn})",
+                "percent": c_pct,
+                "percent_5h": c_pct,
+                "percent_weekly": c_pct,
+                "disabled_5h": False,
+                "desc_5h": "",
+                "reset_5h": c_reset_vn,
+                "reset_weekly": c_reset_vn,
+                "reset_time": c_reset_vn or "Cửa sổ tuần",
+                "tier": "Sonnet 4.6 Tier 4 Entitlement",
+                "color": "#f59e0b" if c_pct > 0 else "#ef4444",
+                "detail": f"Hạn ngạch: {c_pct}% · Hồi lúc {c_reset_vn}"
+            }
         
         result = (gemini_quota, anthropic_quota)
         _LIVE_QUOTA_CACHE[profile_id] = result
