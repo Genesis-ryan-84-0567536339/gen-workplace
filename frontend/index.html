@@ -3971,8 +3971,117 @@ body.resizing-active, body.resizing-active * {
   color: #94a3b8;
   flex-shrink: 0;
 }
-.genActiveTaskBanner:hover {
-  background: #0e1826;
+/* SESSION GROUPED TODO MATRIX TABLE */
+.genTodoTableView {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  background: #080c14;
+  overflow: hidden;
+}
+.genTodoTableToolbar {
+  padding: 8px 14px;
+  background: #0c121d;
+  border-bottom: 1px solid #1a2538;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.genTodoTableMetricsBar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 14px;
+  background: #090e17;
+  border-bottom: 1px solid #162030;
+  font-size: 11px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+.genTodoMetricItem {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #94a3b8;
+}
+.genTodoMetricVal {
+  font-weight: 700;
+  color: #f8fafc;
+  font-family: var(--mono);
+}
+.genTodoTableScrollWrap {
+  flex: 1;
+  overflow: auto;
+  padding: 12px 14px;
+}
+.genGroupedTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11.5px;
+  color: #cbd5e1;
+}
+.genGroupedTable th {
+  background: #111827;
+  color: #94a3b8;
+  text-align: left;
+  padding: 7px 10px;
+  font-size: 10.5px;
+  font-weight: 600;
+  border-bottom: 1px solid #1f293d;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+.genGroupHeaderRow {
+  background: #131d2e;
+  border-top: 2px solid #1e2c44;
+  border-bottom: 1px solid #1e2c44;
+}
+.genGroupHeaderCell {
+  padding: 8px 10px;
+  font-weight: 700;
+  color: #f1f5f9;
+  font-size: 12px;
+}
+.genTodoRow {
+  border-bottom: 1px solid #131b28;
+  transition: background 0.12s ease;
+}
+.genTodoRow:hover {
+  background: #0f1624;
+}
+.genTodoRow.taskParent {
+  background: rgba(15, 23, 42, 0.6);
+  font-weight: 600;
+}
+.genTodoRow.checkChild {
+  background: rgba(8, 12, 20, 0.4);
+}
+.genTodoRow.checkChild td:first-child {
+  padding-left: 20px;
+}
+.genTodoRow td {
+  padding: 7px 10px;
+  vertical-align: middle;
+}
+.genKanbanContainer.dualMode .genKanbanBoard {
+  flex: none;
+  height: 48%;
+  max-height: 48%;
+  border-bottom: 2px solid #1a2538;
+}
+.genKanbanContainer.dualMode .genTodoTableView {
+  flex: 1;
+  display: flex !important;
+}
+.genKanbanViewSwitcher .btn.active {
+  background: #0284c7;
+  color: #fff;
+  border-color: #38bdf8;
+  font-weight: 600;
 }
 </style>
 </head>
@@ -4509,6 +4618,11 @@ body.resizing-active, body.resizing-active * {
                         <button class="btn small" style="font-size:9px;padding:1px 5px;color:#c084fc" onclick="scrollKanbanToCol('review')">🔍 Review</button>
                         <button class="btn small" style="font-size:9px;padding:1px 5px;color:#34d399" onclick="scrollKanbanToCol('done')">✅ Hoàn thành</button>
                       </div>
+                      <div class="genKanbanViewSwitcher" style="display:flex;align-items:center;background:#090d16;padding:2px;border-radius:6px;border:1px solid #1a2536">
+                        <button class="btn small active" id="btnViewModeKanban" style="font-size:10px;padding:3px 8px" onclick="setKanbanViewMode('kanban')">📋 4 Cột Kanban</button>
+                        <button class="btn small" id="btnViewModeTable" style="font-size:10px;padding:3px 8px" onclick="setKanbanViewMode('table')">📊 Bảng Todo Toàn Phiên</button>
+                        <button class="btn small" id="btnViewModeDual" style="font-size:10px;padding:3px 8px" onclick="setKanbanViewMode('dual')">◫ Kết Hợp Song Song</button>
+                      </div>
                       <button class="btn small" id="btnToggleKanbanFullscreen" style="font-size:10px;padding:3px 8px;background:#141c2c;color:#38bdf8;border-color:#1e293b" onclick="toggleKanbanFullscreen()" title="Thu gọn 2 cột bên để xem trọn vẹn 4 cột Kanban">⛶ Xem Toàn Cảnh</button>
                       <button class="btn small" style="background:#0284c7;color:#fff;border-color:#38bdf8;font-size:10.5px;padding:3px 8px" onclick="openNewSessionTodoModal()">+ Thêm Task Mới</button>
                       <button class="btn small" style="font-size:10px;padding:3px 7px" onclick="loadGenSessionTodos()" title="Làm mới Kanban">↻ Làm mới</button>
@@ -4516,6 +4630,50 @@ body.resizing-active, body.resizing-active * {
                   </div>
                   <div class="genKanbanBoard" id="genKanbanBoardRoot">
                     <!-- Rendered dynamically: 4 columns (todo, in_progress, review, done) -->
+                  </div>
+
+                  <!-- BẢNG TODO LIST TOÀN PHIÊN (DẠNG BẢNG PHÂN NHÓM TỔNG HỢP TỰ ĐỘNG TỪ KANBAN) -->
+                  <div class="genTodoTableView" id="genTodoTableViewRoot" style="display:none">
+                    <div class="genTodoTableToolbar">
+                      <div style="display:flex;align-items:center;gap:8px;flex:1;max-width:380px">
+                        <input type="text" class="genFileSearchInput" id="todoTableSearchInput" placeholder="🔍 Lọc theo task, checklist, bằng chứng..." oninput="renderGenSessionTodoTable()" style="padding:4px 8px;font-size:11px">
+                      </div>
+                      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                        <label style="font-size:10.5px;color:#94a3b8">Phân nhóm:</label>
+                        <select id="todoTableGroupBySelect" onchange="renderGenSessionTodoTable()" style="padding:3px 8px;font-size:11px;background:#111722;color:#f1f5f9;border:1px solid #1e293b;border-radius:4px">
+                          <option value="status" selected>Theo Trạng Thái (Status)</option>
+                          <option value="task">Theo Nhiệm Vụ Cha (Task Parent)</option>
+                          <option value="priority">Theo Độ Ưu Tiên (Priority)</option>
+                          <option value="agent">Theo Agent Phụ Trách</option>
+                        </select>
+                        <button class="btn small" style="font-size:10px;padding:3px 7px" onclick="copyTodoTableMarkdown()" title="Sao chép toàn bộ bảng dạng Markdown để làm chứng cứ">📋 Copy MD</button>
+                        <button class="btn small" style="font-size:10px;padding:3px 7px" onclick="loadGenSessionTodos()" title="Làm mới dữ liệu">↻ Sync</button>
+                      </div>
+                    </div>
+                    <!-- KPI Metrics Ribbon -->
+                    <div class="genTodoTableMetricsBar" id="genTodoTableMetricsBar">
+                      <!-- Rendered dynamically -->
+                    </div>
+                    <!-- Grouped Table Container -->
+                    <div class="genTodoTableScrollWrap">
+                      <table class="genGroupedTable" id="genGroupedTodoTable">
+                        <thead>
+                          <tr>
+                            <th style="width:36px;text-align:center">Check</th>
+                            <th style="width:90px">Mã ID</th>
+                            <th>Nhiệm Vụ &amp; Hạng Mục Đối Soát</th>
+                            <th style="width:115px">Agent</th>
+                            <th style="width:85px">Ưu Tiên</th>
+                            <th style="width:110px">Trạng Thái</th>
+                            <th style="width:145px">Bằng Chứng (Evidence)</th>
+                            <th style="width:95px;text-align:right">Thao Tác</th>
+                          </tr>
+                        </thead>
+                        <tbody id="genGroupedTodoTableBody">
+                          <!-- Rendered dynamically -->
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -11813,6 +11971,7 @@ async function loadGenSessionTodos(convId) {
       const data = await res.json();
       genState.sessionTodos = data.todos || [];
       renderGenSessionKanban();
+      renderGenSessionTodoTable();
       updateActiveTaskBanner();
       const badge = $('genSessionTodoCountBadge');
       if (badge) badge.textContent = genState.sessionTodos.length;
@@ -11827,6 +11986,291 @@ async function loadGenSessionTodos(convId) {
   } catch (err) {
     console.warn('[Session Todos] Load error:', err);
   }
+}
+
+let currentKanbanViewMode = 'kanban';
+
+function setKanbanViewMode(mode) {
+  currentKanbanViewMode = mode;
+  const container = document.querySelector('.genKanbanContainer');
+  const board = $('genKanbanBoardRoot');
+  const table = $('genTodoTableViewRoot');
+  const btnK = $('btnViewModeKanban');
+  const btnT = $('btnViewModeTable');
+  const btnD = $('btnViewModeDual');
+
+  if (btnK) btnK.classList.toggle('active', mode === 'kanban');
+  if (btnT) btnT.classList.toggle('active', mode === 'table');
+  if (btnD) btnD.classList.toggle('active', mode === 'dual');
+
+  if (container) {
+    container.classList.toggle('dualMode', mode === 'dual');
+  }
+
+  if (mode === 'kanban') {
+    if (board) board.style.display = 'grid';
+    if (table) table.style.display = 'none';
+  } else if (mode === 'table') {
+    if (board) board.style.display = 'none';
+    if (table) table.style.display = 'flex';
+    renderGenSessionTodoTable();
+  } else if (mode === 'dual') {
+    if (board) board.style.display = 'grid';
+    if (table) table.style.display = 'flex';
+    renderGenSessionTodoTable();
+  }
+}
+
+function renderGenSessionTodoTable() {
+  const tbody = $('genGroupedTodoTableBody');
+  const metricsBar = $('genTodoTableMetricsBar');
+  if (!tbody) return;
+
+  const todos = genState.sessionTodos || [];
+  const q = ($('todoTableSearchInput')?.value || '').trim().toLowerCase();
+  const groupBy = $('todoTableGroupBySelect')?.value || 'status';
+
+  // 1. Tính toán Metrics Ribbon toàn phiên
+  let totalTasks = todos.length;
+  let totalChecklistItems = 0;
+  let doneChecklistItems = 0;
+  let statusCounts = { todo: 0, in_progress: 0, review: 0, done: 0 };
+  let priorityCounts = { critical: 0, high: 0, medium: 0, low: 0 };
+
+  todos.forEach(t => {
+    statusCounts[t.status] = (statusCounts[t.status] || 0) + 1;
+    priorityCounts[t.priority] = (priorityCounts[t.priority] || 0) + 1;
+    (t.checklist || []).forEach(it => {
+      totalChecklistItems++;
+      if (it.done) doneChecklistItems++;
+    });
+  });
+
+  const overallPct = totalChecklistItems > 0 ? Math.round((doneChecklistItems / totalChecklistItems) * 100) : (totalTasks > 0 && statusCounts.done === totalTasks ? 100 : 0);
+
+  if (metricsBar) {
+    metricsBar.innerHTML = `
+      <div class="genTodoMetricItem">
+        <span>📌 Nhiệm vụ:</span>
+        <span class="genTodoMetricVal">${totalTasks}</span>
+      </div>
+      <div style="height:12px;width:1px;background:#1e293b"></div>
+      <div class="genTodoMetricItem">
+        <span>☑️ Checklist Đối Soát:</span>
+        <span class="genTodoMetricVal" style="color:#10b981">${doneChecklistItems}/${totalChecklistItems}</span>
+        <span class="badge" style="font-size:9px;background:#162436;color:#38bdf8">${overallPct}%</span>
+      </div>
+      <div style="height:12px;width:1px;background:#1e293b"></div>
+      <div class="genTodoMetricItem">
+        <span style="color:#cbd5e1">📋 Cần làm: <b style="color:#f8fafc">${statusCounts.todo || 0}</b></span> ·
+        <span style="color:#38bdf8">⚡ Đang làm: <b style="color:#f8fafc">${statusCounts.in_progress || 0}</b></span> ·
+        <span style="color:#c084fc">🔍 Review: <b style="color:#f8fafc">${statusCounts.review || 0}</b></span> ·
+        <span style="color:#34d399">✅ Hoàn thành: <b style="color:#f8fafc">${statusCounts.done || 0}</b></span>
+      </div>
+      <div style="margin-left:auto;width:140px">
+        <div style="height:5px;background:#162030;border-radius:3px;overflow:hidden">
+          <div style="width:${overallPct}%;height:100%;background:linear-gradient(90deg,#0284c7,#10b981)"></div>
+        </div>
+      </div>
+    `;
+  }
+
+  // 2. Lọc danh sách theo từ khóa tìm kiếm
+  const filteredTodos = todos.filter(t => {
+    if (!q) return true;
+    const matchTask = t.id.toLowerCase().includes(q) ||
+                      t.title.toLowerCase().includes(q) ||
+                      (t.description || '').toLowerCase().includes(q) ||
+                      (t.evidence_ref || '').toLowerCase().includes(q) ||
+                      (t.assigned_agent || '').toLowerCase().includes(q);
+    const matchChecklist = (t.checklist || []).some(it => (it.text || '').toLowerCase().includes(q) || it.id.toLowerCase().includes(q));
+    return matchTask || matchChecklist;
+  });
+
+  if (filteredTodos.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="8" style="text-align:center;padding:32px;color:#64748b;font-style:italic">
+          Không tìm thấy nhiệm vụ hoặc checklist nào khớp với từ khóa tìm kiếm.
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  // 3. Phân nhóm (Group By)
+  let groups = [];
+  if (groupBy === 'status') {
+    groups = [
+      { key: 'in_progress', title: '⚡ ĐANG THỰC THI (IN PROGRESS)', color: '#38bdf8', items: filteredTodos.filter(t => t.status === 'in_progress') },
+      { key: 'todo', title: '📋 CẦN LÀM (TO DO)', color: '#cbd5e1', items: filteredTodos.filter(t => t.status === 'todo') },
+      { key: 'review', title: '🔍 ĐỐI SOÁT & REVIEW (REVIEW)', color: '#c084fc', items: filteredTodos.filter(t => t.status === 'review') },
+      { key: 'done', title: '✅ HOÀN THÀNH (DONE & VERIFIED)', color: '#34d399', items: filteredTodos.filter(t => t.status === 'done') }
+    ];
+  } else if (groupBy === 'priority') {
+    groups = [
+      { key: 'critical', title: '🚨 CRITICAL (KHẨN CẤP)', color: '#f87171', items: filteredTodos.filter(t => t.priority === 'critical') },
+      { key: 'high', title: '⚡ HIGH (ƯU TIÊN CAO)', color: '#fbbf24', items: filteredTodos.filter(t => t.priority === 'high') },
+      { key: 'medium', title: '🔹 MEDIUM (BÌNH THƯỜNG)', color: '#60a5fa', items: filteredTodos.filter(t => t.priority === 'medium') },
+      { key: 'low', title: '☕ LOW (THẤP)', color: '#94a3b8', items: filteredTodos.filter(t => t.priority === 'low') }
+    ];
+  } else if (groupBy === 'agent') {
+    const agents = [...new Set(filteredTodos.map(t => t.assigned_agent || 'Gen Core'))];
+    groups = agents.map(ag => ({
+      key: ag,
+      title: `👤 AGENT: ${ag.toUpperCase()}`,
+      color: '#38bdf8',
+      items: filteredTodos.filter(t => (t.assigned_agent || 'Gen Core') === ag)
+    }));
+  } else {
+    // Theo từng nhiệm vụ cha (Task Parent)
+    groups = filteredTodos.map(t => ({
+      key: t.id,
+      title: `[${t.id}] ${t.title.toUpperCase()}`,
+      color: t.status === 'done' ? '#34d399' : (t.status === 'in_progress' ? '#38bdf8' : '#cbd5e1'),
+      items: [t]
+    }));
+  }
+
+  // 4. Render Table HTML
+  let rowsHtml = '';
+  groups.forEach(grp => {
+    if (grp.items.length === 0) return;
+
+    // Đếm số checklist trong nhóm
+    let grpTotalCheck = 0;
+    let grpDoneCheck = 0;
+    grp.items.forEach(t => {
+      (t.checklist || []).forEach(it => {
+        grpTotalCheck++;
+        if (it.done) grpDoneCheck++;
+      });
+    });
+
+    const checkSummary = grpTotalCheck > 0 ? ` · ${grpDoneCheck}/${grpTotalCheck} checklist hoàn tất (${Math.round((grpDoneCheck/grpTotalCheck)*100)}%)` : '';
+
+    rowsHtml += `
+      <tr class="genGroupHeaderRow">
+        <td colspan="8" class="genGroupHeaderCell" style="border-left:3px solid ${grp.color}">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <span style="color:${grp.color}">${grp.title}</span>
+            <span style="font-size:10px;color:#94a3b8;font-weight:normal">${grp.items.length} nhiệm vụ${checkSummary}</span>
+          </div>
+        </td>
+      </tr>
+    `;
+
+    grp.items.forEach(t => {
+      const chk = t.checklist || [];
+      const isTaskDone = t.status === 'done';
+      const statusClass = t.status || 'todo';
+      const priorityClass = t.priority || 'high';
+      const pct = t.progress_pct || 0;
+
+      // Dòng nhiệm vụ cha (Task Row)
+      rowsHtml += `
+        <tr class="genTodoRow taskParent">
+          <td style="text-align:center">
+            <input type="checkbox" ${isTaskDone ? 'checked' : ''} onchange="moveSessionTodoStatus('${t.id}', this.checked ? 'done' : 'in_progress')" title="Chuyển trạng thái task sang Hoàn thành" style="accent-color:#10b981;cursor:pointer">
+          </td>
+          <td>
+            <span class="genKanbanCardId">${escapeHtml(t.id)}</span>
+          </td>
+          <td>
+            <div style="font-weight:700;color:#f8fafc;font-size:12px;display:flex;align-items:center;gap:6px">
+              <span>${escapeHtml(t.title)}</span>
+              <span class="badge" style="font-size:9px;background:#1e293b;color:#38bdf8">${pct}%</span>
+            </div>
+            ${t.description ? `<div style="font-size:10.5px;color:#94a3b8;margin-top:2px">${escapeHtml(t.description)}</div>` : ''}
+          </td>
+          <td>
+            <span class="badge" style="font-size:9.5px;background:#1e293b;color:#94a3b8">${escapeHtml(t.assigned_agent || 'Gen Core')}</span>
+          </td>
+          <td>
+            <span class="genKanbanPriorityBadge ${priorityClass}">${escapeHtml(t.priority || 'high')}</span>
+          </td>
+          <td>
+            <span class="badge" style="font-size:9.5px;font-family:var(--mono);${t.status === 'done' ? 'background:rgba(16,185,129,0.15);color:#34d399;border:1px solid #10b981' : (t.status === 'in_progress' ? 'background:rgba(2,132,199,0.15);color:#38bdf8;border:1px solid #0284c7' : 'background:#1e293b;color:#94a3b8')}">${escapeHtml(t.status.toUpperCase())}</span>
+          </td>
+          <td>
+            ${t.evidence_ref ? `<span style="font-family:var(--mono);font-size:9.5px;color:#fbbf24;background:rgba(245,158,11,0.08);padding:2px 5px;border-radius:3px">🔍 ${escapeHtml(t.evidence_ref)}</span>` : '<span style="color:#64748b;font-size:10px">-</span>'}
+          </td>
+          <td style="text-align:right">
+            <div style="display:flex;align-items:center;justify-content:flex-end;gap:3px">
+              <button class="btn small" style="font-size:9px;padding:1px 5px" onclick="openEditSessionTodoModal('${t.id}')" title="Sửa nhiệm vụ">✏️</button>
+              <button class="btn small" style="font-size:9px;padding:1px 5px;color:#ef4444" onclick="deleteSessionTodo('${t.id}')" title="Xóa">🗑️</button>
+            </div>
+          </td>
+        </tr>
+      `;
+
+      // Các dòng checklist con (Checklist Child Rows)
+      chk.forEach(it => {
+        rowsHtml += `
+          <tr class="genTodoRow checkChild">
+            <td style="text-align:center">
+              <input type="checkbox" ${it.done ? 'checked' : ''} onchange="toggleSessionTodoCheckItem('${t.id}', '${it.id}', this.checked)" title="Tick checklist item" style="accent-color:#10b981;cursor:pointer">
+            </td>
+            <td>
+              <span style="font-family:var(--mono);font-size:9.5px;color:#64748b;padding-left:6px">↳ ${escapeHtml(it.id)}</span>
+            </td>
+            <td>
+              <span style="font-size:11px;color:${it.done ? '#94a3b8' : '#e2e8f0'}">${escapeHtml(it.text)}</span>
+            </td>
+            <td>
+              <span style="font-size:9.5px;color:#64748b">${escapeHtml(t.assigned_agent || 'Gen Core')}</span>
+            </td>
+            <td>
+              <span style="font-size:9.5px;color:#64748b">-</span>
+            </td>
+            <td>
+              <span style="font-size:9.5px;color:${it.done ? '#34d399' : '#94a3b8'}">${it.done ? '☑️ Đã hoàn tất' : '⬜ Chờ thực thi'}</span>
+            </td>
+            <td>
+              <span style="font-size:9px;color:#64748b;font-family:var(--mono)">Thừa hưởng từ ${t.id}</span>
+            </td>
+            <td style="text-align:right">
+              <button class="btn small" style="font-size:8.5px;padding:1px 4px;color:#38bdf8" onclick="toggleSessionTodoCheckItem('${t.id}', '${it.id}', ${!it.done})">${it.done ? 'Mở lại' : 'Xong'}</button>
+            </td>
+          </tr>
+        `;
+      });
+    });
+  });
+
+  tbody.innerHTML = rowsHtml;
+}
+
+function copyTodoTableMarkdown() {
+  const todos = genState.sessionTodos || [];
+  if (todos.length === 0) {
+    showToast('Phiên chưa có dữ liệu Todo để sao chép');
+    return;
+  }
+
+  const c = genState.conversations.find(x => x.id === genState.currentConvId);
+  const title = c?.title || genState.currentConvId;
+
+  let md = `# BẢNG ĐỐI SOÁT & NGHIỆM THU TIẾN ĐỘ TOÀN PHIÊN\n`;
+  md += `**Phiên làm việc:** ${title} (\`${genState.currentConvId}\`)\n`;
+  md += `**Thời gian xuất bản:** ${new Date().toLocaleString('vi-VN')}\n\n`;
+  md += `| Check | Mã ID | Nhiệm Vụ & Hạng Mục Đối Soát | Agent Phụ Trách | Ưu Tiên | Trạng Thái | Bằng Chứng |\n`;
+  md += `| :---: | :--- | :--- | :--- | :---: | :---: | :--- |\n`;
+
+  todos.forEach(t => {
+    const tCheck = t.status === 'done' ? '[x]' : '[ ]';
+    md += `| ${tCheck} | **${t.id}** | **${t.title}** (${t.progress_pct || 0}% hoàn thành) | ${t.assigned_agent || 'Gen Core'} | ${t.priority || 'high'} | \`${t.status.toUpperCase()}\` | ${t.evidence_ref || '-'} |\n`;
+    (t.checklist || []).forEach(it => {
+      const cCheck = it.done ? '[x]' : '[ ]';
+      md += `| ${cCheck} | \`${t.id}.${it.id}\` | ↳ ${it.text} | ${t.assigned_agent || 'Gen Core'} | - | ${it.done ? 'Hoàn tất' : 'Chờ xử lý'} | - |\n`;
+    });
+  });
+
+  navigator.clipboard.writeText(md).then(() => {
+    showToast('📋 Đã sao chép Bảng Đối Soát Nghiệm Thu Toàn Phiên dạng Markdown!');
+  }).catch(e => {
+    showToast('Không thể sao chép: ' + e.message);
+  });
 }
 
 function toggleKanbanFullscreen() {
