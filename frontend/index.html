@@ -29,11 +29,18 @@
 * { box-sizing: border-box; }
 html, body {
   height: 100%;
+  height: 100vh;
+  height: 100dvh;
   margin: 0;
+  padding: 0;
   background: var(--bg);
   color: var(--text);
   font: 13px/1.42 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   overflow: hidden;
+  position: fixed;
+  width: 100%;
+  top: 0;
+  left: 0;
 }
 button, input, textarea, select { font: inherit; color: inherit; }
 button { cursor: pointer; }
@@ -48,9 +55,13 @@ button { cursor: pointer; }
 /* Layout Grid */
 .app {
   height: 100vh;
+  height: 100dvh;
+  max-height: 100vh;
+  max-height: 100dvh;
+  width: 100%;
   display: grid;
   grid-template-columns: var(--sidebar-w, 230px) minmax(0, 1fr);
-  grid-template-rows: 50px 1fr;
+  grid-template-rows: 50px minmax(0, 1fr);
   overflow: hidden;
   transition: grid-template-columns 0.15s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -270,8 +281,11 @@ body.resizing-active, body.resizing-active * {
 .main {
   min-width: 0;
   min-height: 0;
+  height: 100%;
+  max-height: 100%;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   background: var(--bg);
 }
 .subtop {
@@ -344,9 +358,37 @@ body.resizing-active, body.resizing-active * {
   flex-shrink: 0;
 }
 
-.content { padding: 14px; overflow: auto; min-height: 0; flex: 1; }
+.content {
+  padding: 14px;
+  overflow: auto;
+  min-height: 0;
+  height: 100%;
+  max-height: 100%;
+  flex: 1 1 0;
+  box-sizing: border-box;
+}
+.content.no-padding,
+.content:has(#gen_workplace.active) {
+  padding: 0 !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+  max-height: 100% !important;
+}
 .screen { display: none; }
 .screen.active { display: block; }
+#gen_workplace.screen.active {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+  max-height: 100% !important;
+  min-height: 0 !important;
+  flex: 1 1 0 !important;
+  overflow: hidden !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
 .pageHead {
   display: flex;
   justify-content: space-between;
@@ -2705,9 +2747,11 @@ body.resizing-active, body.resizing-active * {
 .genWpShell {
   display: flex;
   flex-direction: row;
-  height: calc(100vh - 46px);
-  max-height: calc(100vh - 46px);
-  overflow: hidden;
+  height: 100% !important;
+  max-height: 100% !important;
+  min-height: 0 !important;
+  flex: 1 1 0 !important;
+  overflow: hidden !important;
   background: #090d14;
   border-top: 1px solid #161f2e;
   position: relative;
@@ -2716,9 +2760,8 @@ body.resizing-active, body.resizing-active * {
 }
 @media (max-width: 1024px) {
   .genWpShell {
-    flex-direction: column;
-    height: auto;
-    overflow-y: auto;
+    --gen-col1-w: 200px;
+    --gen-col3-w: 320px;
   }
 }
 
@@ -3120,9 +3163,197 @@ body.resizing-active, body.resizing-active * {
 .genFileTreeRow:hover {
   background: #131c2a;
 }
-.genFileTreeRow.active {
-  background: #182538;
-  border-left: 2px solid #38bdf8;
+.genFileTreeRow.active,
+.genFileTreeRow.active-detail,
+.genFileTreeRow.selected {
+  background: #18283e !important;
+  border-left: 2px solid #38bdf8 !important;
+}
+
+/* ========================================================================= */
+/* FILE MANAGER 2-COLUMN SPLIT: CỘT DANH SÁCH & CỘT CHI TIẾT / XEM NHANH */
+/* ========================================================================= */
+.genFileManagerSplit {
+  display: flex;
+  flex-direction: row;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+  --file-split-list-w: 48%;
+}
+.genFileManagerLeft {
+  width: var(--file-split-list-w, 48%);
+  min-width: 250px;
+  max-width: 75%;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  border-right: 1px solid #161f2e;
+}
+.genFileSplitResizer {
+  width: 5px;
+  cursor: col-resize;
+  background: transparent;
+  transition: background 0.15s ease;
+  position: relative;
+  z-index: 5;
+  flex-shrink: 0;
+  margin: 0 -2px;
+}
+.genFileSplitResizer:hover, .genFileSplitResizer.dragging {
+  background: #0284c7;
+}
+.genFileManagerRight {
+  flex: 1;
+  min-width: 280px;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #090d14;
+}
+
+/* CỘT CHI TIẾT TỆP (DETAIL PANE) */
+.genFileDetailHeader {
+  padding: 10px 14px;
+  background: #0f1521;
+  border-bottom: 1px solid #1c2738;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.genFileDetailTitleBox {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+.genFileDetailIcon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+.genFileDetailName {
+  font-size: 13px;
+  font-weight: 700;
+  color: #f8fafc;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.genFileDetailPath {
+  font-size: 10.5px;
+  color: #64748b;
+  font-family: var(--mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.genFileDetailActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.genFileMetaGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 8px;
+  padding: 10px 14px;
+  background: #0b1017;
+  border-bottom: 1px solid #182333;
+  flex-shrink: 0;
+}
+.genFileMetaCard {
+  background: #111722;
+  border: 1px solid #1c2738;
+  border-radius: 5px;
+  padding: 6px 9px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.genFileMetaLabel {
+  font-size: 9px;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  font-weight: 600;
+}
+.genFileMetaValue {
+  font-size: 11px;
+  font-family: var(--mono);
+  color: #cbd5e1;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* LIVE PREVIEW CONTAINER IN DETAIL COLUMN */
+.genFilePreviewHeader {
+  padding: 7px 14px;
+  background: #0d121b;
+  border-bottom: 1px solid #161f2e;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #94a3b8;
+  flex-shrink: 0;
+}
+.genFilePreviewBox {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+  background: #080c12;
+  font-family: var(--mono);
+  font-size: 11.5px;
+}
+.genFilePreviewGutter {
+  padding: 10px 6px;
+  background: #0b0f16;
+  color: #475569;
+  user-select: none;
+  text-align: right;
+  min-width: 38px;
+  border-right: 1px solid #141c28;
+  overflow: hidden;
+  line-height: 1.5;
+  font-size: 11px;
+}
+.genFilePreviewCode {
+  flex: 1;
+  padding: 10px 12px;
+  overflow: auto;
+  white-space: pre;
+  color: #e2e8f0;
+  line-height: 1.5;
+  margin: 0;
+  tab-size: 2;
+}
+
+.genFileEmptyDetail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #64748b;
+  padding: 30px;
+  text-align: center;
+  gap: 12px;
+}
+.genFileEmptyDetailIcon {
+  font-size: 40px;
+  opacity: 0.6;
 }
 .genFileRowLeft {
   display: flex;
@@ -3575,7 +3806,7 @@ body.resizing-active, body.resizing-active * {
 
   <!-- MAIN VIEWPORT -->
   <main class="main">
-    <div class="content">
+    <div class="content no-padding">
 
       <!-- ========================================================================= -->
       <!-- 00. GEN WORKPLACE IDE: KHÔNG GIAN LÀM VIỆC CHÍNH (OWNER ↔ GEN CORE - 3 CỘT) -->
@@ -3730,62 +3961,144 @@ body.resizing-active, body.resizing-active * {
                   </div>
                 </div>
 
-                <!-- VIEW 1: SESSION FILES & FOLDERS (Mặc định) -->
-                <div id="genSessionFilesView" style="display:flex;flex-direction:column;flex:1;overflow:hidden">
-                  <!-- Search bar -->
-                  <div class="genFileExplorerToolbar">
-                    <span style="font-size:12px">🔍</span>
-                    <input type="text" class="genFileSearchInput" id="genSessionSearchInputFiles" placeholder="Tìm kiếm tệp trong phiên này..." oninput="filterGenSessionFiles(this.value)">
-                    <button class="btn small" style="font-size:9.5px;padding:3px 7px" onclick="toggleAllSessionFolders(true)">Mở tất cả</button>
-                    <button class="btn small" style="font-size:9.5px;padding:3px 7px" onclick="toggleAllSessionFolders(false)">Thu gọn</button>
-                  </div>
-                  <!-- Session Files List -->
-                  <div class="genFileTreeContainer" id="genSessionFilesTreeList">
-                    <div style="color:#64748b;font-size:11px;padding:14px">Đang nạp tệp và thư mục của phiên...</div>
-                  </div>
-                </div>
+                <!-- SPLIT VIEW CHO TAB QUẢN LÝ TỆP: CỘT DANH SÁCH & CỘT CHI TIẾT -->
+                <div class="genFileManagerSplit">
+                  <!-- CỘT 1 TRONG TAB: DANH SÁCH TỆP & THƯ MỤC -->
+                  <div class="genFileManagerLeft">
+                    <!-- VIEW 1: SESSION FILES & FOLDERS (Mặc định) -->
+                    <div id="genSessionFilesView" style="display:flex;flex-direction:column;flex:1;overflow:hidden">
+                      <!-- Search bar -->
+                      <div class="genFileExplorerToolbar">
+                        <span style="font-size:12px">🔍</span>
+                        <input type="text" class="genFileSearchInput" id="genSessionSearchInputFiles" placeholder="Tìm kiếm tệp trong phiên này..." oninput="filterGenSessionFiles(this.value)">
+                        <button class="btn small" style="font-size:9.5px;padding:3px 7px" onclick="toggleAllSessionFolders(true)">Mở tất cả</button>
+                        <button class="btn small" style="font-size:9.5px;padding:3px 7px" onclick="toggleAllSessionFolders(false)">Thu gọn</button>
+                      </div>
+                      <!-- Session Files List -->
+                      <div class="genFileTreeContainer" id="genSessionFilesTreeList">
+                        <div style="color:#64748b;font-size:11px;padding:14px">Đang nạp tệp và thư mục của phiên...</div>
+                      </div>
+                    </div>
 
-                <!-- VIEW 2: ALL REPO FILES & GIT DASHBOARD (Ẩn ban đầu) -->
-                <div id="genRepoFilesView" style="display:none;flex-direction:column;flex:1;overflow:hidden">
-                  <!-- Git Dashboard -->
-                  <div class="genRepoDashboard">
-                    <div class="genRepoStatusRow">
-                      <div class="genRepoMetaTags">
-                        <div class="genRepoTag">
-                          <span>🔀</span>
-                          <span>Branch:</span>
-                          <strong id="genRepoBranch">main</strong>
-                        </div>
-                        <div class="genRepoTag">
-                          <span>📌</span>
-                          <span>HEAD:</span>
-                          <strong id="genRepoHead">HEAD</strong>
-                        </div>
-                        <div class="genRepoTag">
-                          <span>🔢</span>
-                          <span>Commits:</span>
-                          <strong id="genRepoCommits">0</strong>
-                        </div>
-                        <div class="genRepoTag" id="genRepoCleanTag">
-                          <span>●</span>
-                          <span id="genRepoCleanText" style="color:#4ade80">Git: Đồng bộ</span>
+                    <!-- VIEW 2: ALL REPO FILES & GIT DASHBOARD (Ẩn ban đầu) -->
+                    <div id="genRepoFilesView" style="display:none;flex-direction:column;flex:1;overflow:hidden">
+                      <!-- Git Dashboard -->
+                      <div class="genRepoDashboard">
+                        <div class="genRepoStatusRow">
+                          <div class="genRepoMetaTags">
+                            <div class="genRepoTag">
+                              <span>🔀</span>
+                              <span>Branch:</span>
+                              <strong id="genRepoBranch">main</strong>
+                            </div>
+                            <div class="genRepoTag">
+                              <span>📌</span>
+                              <span>HEAD:</span>
+                              <strong id="genRepoHead">HEAD</strong>
+                            </div>
+                            <div class="genRepoTag">
+                              <span>🔢</span>
+                              <span>Commits:</span>
+                              <strong id="genRepoCommits">0</strong>
+                            </div>
+                            <div class="genRepoTag" id="genRepoCleanTag">
+                              <span>●</span>
+                              <span id="genRepoCleanText" style="color:#4ade80">Git: Đồng bộ</span>
+                            </div>
+                          </div>
+                          <div style="display:flex;align-items:center;gap:6px">
+                            <button class="btn small" style="font-size:9.5px;padding:2px 7px" onclick="loadGenRepoData(true)" title="Làm mới trạng thái Git và File Tree">↻ Làm Mới</button>
+                          </div>
                         </div>
                       </div>
-                      <div style="display:flex;align-items:center;gap:6px">
-                        <button class="btn small" style="font-size:9.5px;padding:2px 7px" onclick="loadGenRepoData(true)" title="Làm mới trạng thái Git và File Tree">↻ Làm Mới</button>
+                      <!-- Repo File Search -->
+                      <div class="genFileExplorerToolbar">
+                        <span style="font-size:12px">🌐</span>
+                        <input type="text" class="genFileSearchInput" id="genFileTreeSearch" placeholder="🔍 Lọc toàn bộ file trong Repo..." oninput="filterGenFileTree(this.value)">
+                        <button class="btn small" style="font-size:9.5px;padding:3px 7px" onclick="toggleAllGenFolders(true)">Mở tất cả</button>
+                        <button class="btn small" style="font-size:9.5px;padding:3px 7px" onclick="toggleAllGenFolders(false)">Thu gọn</button>
+                      </div>
+                      <!-- Repo Files Tree -->
+                      <div class="genFileTreeContainer" id="genFileTreeList">
+                        <div style="color:#64748b;font-size:11px;padding:12px">Đang quét cây thư mục Repo...</div>
                       </div>
                     </div>
                   </div>
-                  <!-- Repo File Search -->
-                  <div class="genFileExplorerToolbar">
-                    <span style="font-size:12px">🌐</span>
-                    <input type="text" class="genFileSearchInput" id="genFileTreeSearch" placeholder="🔍 Lọc toàn bộ file trong Repo..." oninput="filterGenFileTree(this.value)">
-                    <button class="btn small" style="font-size:9.5px;padding:3px 7px" onclick="toggleAllGenFolders(true)">Mở tất cả</button>
-                    <button class="btn small" style="font-size:9.5px;padding:3px 7px" onclick="toggleAllGenFolders(false)">Thu gọn</button>
-                  </div>
-                  <!-- Repo Files Tree -->
-                  <div class="genFileTreeContainer" id="genFileTreeList">
-                    <div style="color:#64748b;font-size:11px;padding:12px">Đang quét cây thư mục Repo...</div>
+
+                  <!-- THANH RESIZER KÉO THẢ GIỮA DANH SÁCH & CHI TIẾT -->
+                  <div class="genFileSplitResizer" id="genFileSplitResizer" title="Kéo để chỉnh độ rộng Cột Danh Sách và Cột Chi Tiết"></div>
+
+                  <!-- CỘT 2 TRONG TAB: CHI TIẾT TỆP & LIVE PREVIEW (DETAIL PANE) -->
+                  <div class="genFileManagerRight" id="genFileDetailPane">
+                    <!-- Trạng thái trống khi chưa chọn file -->
+                    <div class="genFileEmptyDetail" id="genDetailPaneEmpty">
+                      <div class="genFileEmptyDetailIcon">📄</div>
+                      <div style="font-weight:600;color:#94a3b8;font-size:13px">Chưa Chọn Tệp Nào</div>
+                      <div style="font-size:11px;color:#64748b;max-width:320px;line-height:1.5">Chọn một tệp từ cột danh sách bên trái để kiểm tra chi tiết metadata và xem nhanh nội dung trực tiếp tại đây.</div>
+                    </div>
+
+                    <!-- Khối Chi Tiết & Live Preview khi đã chọn file -->
+                    <div id="genDetailPaneContent" style="display:none;flex-direction:column;height:100%;min-height:0;overflow:hidden">
+                      <!-- Detail Header -->
+                      <div class="genFileDetailHeader">
+                        <div class="genFileDetailTitleBox">
+                          <span class="genFileDetailIcon" id="detailFileIcon">📄</span>
+                          <div style="min-width:0">
+                            <div style="display:flex;align-items:center;gap:6px">
+                              <span class="genFileDetailName" id="detailFileName">README.md</span>
+                              <span class="genFileTypeBadge" id="detailFileScopeBadge" style="background:#0284c7;color:#fff">Session File</span>
+                            </div>
+                            <div class="genFileDetailPath" id="detailFilePath">/workspace/sessions/conv-gen-core-01/README.md</div>
+                          </div>
+                        </div>
+                        <div class="genFileDetailActions">
+                          <button class="btn small primary" id="btnDetailOpenEditor" style="font-size:10px;padding:3px 9px" onclick="openCurrentDetailInEditor()" title="Mở sang Tab Soạn thảo File Viewer đầy đủ">Mở Soạn Thảo ↗</button>
+                          <button class="btn small" id="btnDetailCopyContent" style="font-size:10px;padding:3px 8px" onclick="copyDetailFileContent()" title="Sao chép toàn bộ nội dung tệp vào Clipboard">📋 Chép Nội Dung</button>
+                          <button class="btn small" id="btnDetailCopyPath" style="font-size:10px;padding:3px 8px" onclick="copyDetailFilePath()" title="Sao chép đường dẫn tệp">📋 Chép Đường Dẫn</button>
+                          <button class="btn small" id="btnDetailDelete" style="font-size:10px;padding:3px 7px;color:#f87171" onclick="deleteCurrentDetailFile()" title="Xóa tệp khỏi phiên">🗑️</button>
+                        </div>
+                      </div>
+
+                      <!-- Metadata Grid -->
+                      <div class="genFileMetaGrid">
+                        <div class="genFileMetaCard">
+                          <span class="genFileMetaLabel">Kích Thước</span>
+                          <span class="genFileMetaValue" id="detailMetaSize">213 B</span>
+                        </div>
+                        <div class="genFileMetaCard">
+                          <span class="genFileMetaLabel">Định Dạng</span>
+                          <span class="genFileMetaValue" id="detailMetaType">Markdown (.md)</span>
+                        </div>
+                        <div class="genFileMetaCard">
+                          <span class="genFileMetaLabel">Cập Nhật</span>
+                          <span class="genFileMetaValue" id="detailMetaModified">2026-09-26 01:12</span>
+                        </div>
+                        <div class="genFileMetaCard">
+                          <span class="genFileMetaLabel">Quyền Hạn</span>
+                          <span class="genFileMetaValue" id="detailMetaPerms" style="color:#4ade80">Read / Write (Phiên)</span>
+                        </div>
+                      </div>
+
+                      <!-- Live Code / Markdown Preview -->
+                      <div class="genFilePreviewHeader">
+                        <div style="display:flex;align-items:center;gap:6px">
+                          <span>👁️ Xem nhanh nội dung:</span>
+                          <strong id="detailPreviewFileName" style="color:#f1f5f9;font-family:var(--mono)">README.md</strong>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:10px">
+                          <span id="detailPreviewLines">0 dòng</span>
+                          <span>·</span>
+                          <span id="detailPreviewChars">0 bytes</span>
+                          <span>·</span>
+                          <span>UTF-8</span>
+                        </div>
+                      </div>
+
+                      <div class="genFilePreviewBox">
+                        <div class="genFilePreviewGutter" id="detailPreviewGutter">1</div>
+                        <pre class="genFilePreviewCode" id="detailPreviewCode">// Đang nạp nội dung...</pre>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -5801,6 +6114,13 @@ function go(id, el) {
   else document.querySelector('.navItem[data-nav="' + id + '"]')?.classList.add('active');
 
   updateSubtopNav(id);
+
+  const contentEl = document.querySelector('.content');
+  if (id === 'gen_workplace') {
+    contentEl?.classList.add('no-padding');
+  } else {
+    contentEl?.classList.remove('no-padding');
+  }
 
   if (id === 'gen_workplace') {
     initGenWorkplace();
@@ -9513,6 +9833,49 @@ function initResizersAndSidebars() {
     });
   }
 
+  // 5.5. Setup Draggable Resizer: File Manager List <-> Detail
+  const fileResizer = $('genFileSplitResizer');
+  const fileContainer = document.querySelector('.genFileManagerSplit');
+  if (fileResizer && fileContainer) {
+    const savedSplitW = localStorage.getItem('agy_gen_file_split_w');
+    if (savedSplitW) {
+      fileContainer.style.setProperty('--file-split-list-w', savedSplitW);
+    }
+    let isDraggingFileSplit = false;
+    let startX = 0;
+    let startW = 0;
+
+    fileResizer.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      isDraggingFileSplit = true;
+      startX = e.clientX;
+      const leftCol = document.querySelector('.genFileManagerLeft');
+      startW = leftCol ? leftCol.getBoundingClientRect().width : 380;
+      document.body.classList.add('resizing-active');
+      fileResizer.classList.add('dragging');
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isDraggingFileSplit) return;
+      const dx = e.clientX - startX;
+      const totalW = fileContainer.getBoundingClientRect().width;
+      let newW = startW + dx;
+      if (newW < 220) newW = 220;
+      if (newW > totalW - 240) newW = totalW - 240;
+      fileContainer.style.setProperty('--file-split-list-w', newW + 'px');
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (isDraggingFileSplit) {
+        isDraggingFileSplit = false;
+        document.body.classList.remove('resizing-active');
+        fileResizer.classList.remove('dragging');
+        const curW = fileContainer.style.getPropertyValue('--file-split-list-w');
+        if (curW) localStorage.setItem('agy_gen_file_split_w', curW);
+      }
+    });
+  }
+
   // 6. Shortcut Ctrl+B / Cmd+B for Sidebar toggle
   window.addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
@@ -9541,6 +9904,9 @@ let genState = {
   sessionFiles: [],
   sessionRepoRefs: [],
   sessionSearchQuery: '',
+  detailSelectedFile: null,
+  detailSelectedMeta: null,
+  detailFileContent: '',
   repoFiles: [],
   gitStatus: null,
   fileSearchQuery: '',
@@ -10037,6 +10403,22 @@ async function loadGenSessionFiles(convId, forceToast = false) {
       if ($('genSessionDirPath')) $('genSessionDirPath').textContent = data.workspace_dir || `/workspace/sessions/${convId}`;
       if ($('badgeSessionCount')) $('badgeSessionCount').textContent = genState.sessionFiles.length + genState.sessionRepoRefs.length;
       renderGenSessionFilesTree();
+      
+      // Tự động chọn tệp đầu tiên để nạp Cột Chi Tiết & Xem Nhanh
+      if (genState.sessionFiles.length > 0) {
+        const currentDetail = genState.detailSelectedFile;
+        const belongsToSession = currentDetail && currentDetail.startsWith(`session:${convId}/`);
+        if (!belongsToSession) {
+          const defaultFile = genState.sessionFiles.find(x => !x.is_dir && (x.name === 'README.md' || x.name === 'session_brief.md')) || genState.sessionFiles.find(x => !x.is_dir) || genState.sessionFiles[0];
+          if (defaultFile && !defaultFile.is_dir) {
+            selectGenFileForDetail(`session:${convId}/${defaultFile.path}`, defaultFile);
+          }
+        } else {
+          const cleanRel = currentDetail.replace(`session:${convId}/`, '');
+          const meta = genState.sessionFiles.find(x => x.path === cleanRel) || { path: cleanRel, name: cleanRel.split('/').pop(), type: 'file', size: '...' };
+          selectGenFileForDetail(currentDetail, meta);
+        }
+      }
       if (forceToast) showToast('Đã làm mới danh mục tệp của phiên!');
     }
   } catch (err) {
@@ -10113,9 +10495,10 @@ function renderGenSessionFilesTree() {
           ${list.length === 0 ? '<div style="font-size:10.5px;color:#64748b;padding:6px 28px;font-style:italic">(Thư mục rỗng)</div>' : ''}
           ${list.map(f => {
             const sessPath = `session:${genState.currentConvId}/${f.path}`;
-            const isAct = genState.activeFilePath === sessPath || genState.activeFilePath === f.path;
+            const isAct = genState.detailSelectedFile === sessPath;
+            const metaJson = JSON.stringify(f).replace(/"/g, '&quot;');
             return `
-              <div class="genFileTreeRow ${isAct ? 'active' : ''}" onclick="openGenFileFromTree('${escapeHtml(sessPath)}')">
+              <div class="genFileTreeRow ${isAct ? 'active-detail' : ''}" data-filepath="${escapeHtml(sessPath)}" onclick="selectGenFileForDetail('${escapeHtml(sessPath)}', ${metaJson})" ondblclick="openGenFileFromTree('${escapeHtml(sessPath)}')">
                 <div class="genFileRowLeft" title="${escapeHtml(f.path)}">
                   <span>${getFileIcon(f.name)}</span>
                   <strong style="color:#f8fafc">${escapeHtml(f.name)}</strong>
@@ -10147,8 +10530,11 @@ function renderGenSessionFilesTree() {
           <span style="font-size:10px;color:#38bdf8;font-family:var(--mono)">${repoRefs.length} tệp</span>
         </div>
         <div class="genFolderBody">
-          ${repoRefs.map(rf => `
-            <div class="genFileTreeRow" onclick="openGenFileFromTree('${escapeHtml(rf.path)}')">
+          ${repoRefs.map(rf => {
+            const metaJson = JSON.stringify(rf).replace(/"/g, '&quot;');
+            const isAct = genState.detailSelectedFile === rf.path;
+            return `
+            <div class="genFileTreeRow ${isAct ? 'active-detail' : ''}" data-filepath="${escapeHtml(rf.path)}" onclick="selectGenFileForDetail('${escapeHtml(rf.path)}', ${metaJson})" ondblclick="openGenFileFromTree('${escapeHtml(rf.path)}')">
               <div class="genFileRowLeft" title="${escapeHtml(rf.path)}">
                 <span>${getFileIcon(rf.path)}</span>
                 <strong style="color:#38bdf8">${escapeHtml(rf.name)}</strong>
@@ -10159,7 +10545,8 @@ function renderGenSessionFilesTree() {
                 <button class="btn small" style="font-size:9px;padding:1px 5px" onclick="event.stopPropagation();openGenFileFromTree('${escapeHtml(rf.path)}')">Mở ↗</button>
               </div>
             </div>
-          `).join('')}
+          `;
+          }).join('')}
         </div>
       </div>
     `;
@@ -10299,6 +10686,16 @@ async function loadGenRepoData(forceToast = false) {
       genState.repoFiles = fData.files || [];
       renderGenFileTree();
       if ($('genRepoFileCountBadge')) $('genRepoFileCountBadge').textContent = genState.repoFiles.length;
+      if ($('badgeRepoCount')) $('badgeRepoCount').textContent = genState.repoFiles.length;
+
+      // Tự động chọn tệp đầu tiên để xem chi tiết nếu đang ở phạm vi Repo
+      if (genState.sessionFileScope === 'repo' && genState.repoFiles.length > 0) {
+        const curDetail = genState.detailSelectedFile;
+        const existsInRepo = curDetail && !curDetail.startsWith('session:') && genState.repoFiles.some(x => x.path === curDetail);
+        if (!existsInRepo) {
+          selectGenFileForDetail(genState.repoFiles[0].path, genState.repoFiles[0]);
+        }
+      }
     }
 
     if (forceToast) showToast('Đã làm mới cây thư mục Repo và trạng thái Git');
@@ -10395,9 +10792,10 @@ function renderGenFileTree() {
         </div>
         <div class="genFolderBody">
           ${list.map(f => {
-            const isAct = f.path === genState.activeFilePath;
+            const isAct = f.path === genState.detailSelectedFile;
+            const metaJson = JSON.stringify(f).replace(/"/g, '&quot;');
             return `
-              <div class="genFileTreeRow ${isAct ? 'active' : ''}" onclick="openGenFileFromTree('${escapeHtml(f.path)}')">
+              <div class="genFileTreeRow ${isAct ? 'active-detail' : ''}" data-filepath="${escapeHtml(f.path)}" onclick="selectGenFileForDetail('${escapeHtml(f.path)}', ${metaJson})" ondblclick="openGenFileFromTree('${escapeHtml(f.path)}')">
                 <div class="genFileRowLeft" title="${escapeHtml(f.path)}">
                   <span>${getFileIcon(f.path)}</span>
                   <span>${escapeHtml(f.path.split('/').pop())}</span>
@@ -10415,6 +10813,193 @@ function renderGenFileTree() {
       </div>
     `;
   }).join('');
+}
+
+// =========================================================================
+// BỘ ĐIỀU KHIỂN CỘT CHI TIẾT & XEM NHANH TỆP (DETAIL & LIVE PREVIEW)
+// =========================================================================
+
+async function selectGenFileForDetail(filePath, meta = null) {
+  genState.detailSelectedFile = filePath;
+  genState.detailSelectedMeta = meta;
+
+  // Highlight active row in both trees
+  document.querySelectorAll('.genFileTreeRow').forEach(r => {
+    const rPath = r.getAttribute('data-filepath');
+    if (rPath === filePath) {
+      r.classList.add('active-detail');
+    } else {
+      r.classList.remove('active-detail');
+    }
+  });
+
+  const emptyEl = $('genDetailPaneEmpty');
+  const contentEl = $('genDetailPaneContent');
+  if (emptyEl) emptyEl.style.display = 'none';
+  if (contentEl) contentEl.style.display = 'flex';
+
+  const fileName = filePath.split('/').pop();
+  const isSessionFile = filePath.startsWith('session:');
+  const cleanRelPath = isSessionFile ? filePath.replace(`session:${genState.currentConvId}/`, '') : filePath;
+
+  if ($('detailFileName')) $('detailFileName').textContent = fileName;
+  if ($('detailPreviewFileName')) $('detailPreviewFileName').textContent = fileName;
+  if ($('detailFileIcon')) $('detailFileIcon').textContent = getDetailFileIcon(fileName);
+
+  const scopeBadge = $('detailFileScopeBadge');
+  if (scopeBadge) {
+    if (isSessionFile) {
+      scopeBadge.textContent = 'Session File (RW)';
+      scopeBadge.style.background = 'rgba(74, 222, 128, 0.15)';
+      scopeBadge.style.color = '#4ade80';
+      scopeBadge.style.border = '1px solid rgba(74, 222, 128, 0.3)';
+    } else if (meta?.source === 'repo_ref') {
+      scopeBadge.textContent = 'Repo Ref (Gắn Kết)';
+      scopeBadge.style.background = 'rgba(56, 189, 248, 0.15)';
+      scopeBadge.style.color = '#38bdf8';
+      scopeBadge.style.border = '1px solid rgba(56, 189, 248, 0.3)';
+    } else {
+      scopeBadge.textContent = 'Git Repo (Dự Án)';
+      scopeBadge.style.background = 'rgba(148, 163, 184, 0.15)';
+      scopeBadge.style.color = '#cbd5e1';
+      scopeBadge.style.border = '1px solid rgba(148, 163, 184, 0.3)';
+    }
+  }
+
+  if ($('detailFilePath')) {
+    const fullDisplayPath = isSessionFile 
+      ? `/workspace/sessions/${genState.currentConvId}/${cleanRelPath}` 
+      : `/app/repo/${filePath}`;
+    $('detailFilePath').textContent = fullDisplayPath;
+    $('detailFilePath').title = fullDisplayPath;
+  }
+
+  // Update Meta Cards
+  if ($('detailMetaSize')) $('detailMetaSize').textContent = meta?.size || 'Đang tính...';
+  if ($('detailMetaType')) $('detailMetaType').textContent = meta?.type || getFileTypeDesc(fileName);
+  if ($('detailMetaModified')) $('detailMetaModified').textContent = meta?.modified || 'Gần đây';
+  if ($('detailMetaPerms')) {
+    if (isSessionFile) {
+      $('detailMetaPerms').textContent = 'Read / Write (Phiên)';
+      $('detailMetaPerms').style.color = '#4ade80';
+    } else {
+      $('detailMetaPerms').textContent = 'Git Tracked (Dự Án)';
+      $('detailMetaPerms').style.color = '#38bdf8';
+    }
+  }
+
+  // Delete button visibility
+  const delBtn = $('btnDetailDelete');
+  if (delBtn) {
+    delBtn.style.display = isSessionFile ? 'inline-flex' : 'none';
+  }
+
+  // Load preview content
+  const gutter = $('detailPreviewGutter');
+  const code = $('detailPreviewCode');
+  if (gutter) gutter.innerHTML = '1';
+  if (code) code.textContent = `// Đang tải bản xem nhanh tệp ${fileName}...`;
+
+  try {
+    const res = await fetch(`/api/file/content?path=${encodeURIComponent(filePath)}`);
+    if (res.ok) {
+      const data = await res.json();
+      const content = data.content || '';
+      genState.detailFileContent = content;
+      const lines = content.split('\n');
+      if (gutter) {
+        gutter.innerHTML = Array.from({ length: lines.length }, (_, i) => i + 1).join('<br>');
+      }
+      if (code) {
+        code.textContent = content;
+      }
+      if ($('detailPreviewLines')) $('detailPreviewLines').textContent = `${data.lines || lines.length} dòng`;
+      if ($('detailPreviewChars')) $('detailPreviewChars').textContent = `${data.size || content.length} B`;
+      if ($('detailMetaSize') && data.size) {
+        const sz = data.size < 1024 ? `${data.size} B` : `${(data.size / 1024).toFixed(1)} KB`;
+        $('detailMetaSize').textContent = sz;
+      }
+    } else {
+      if (code) code.textContent = `// Không thể tải nội dung tệp: ${filePath}`;
+    }
+  } catch (err) {
+    if (code) code.textContent = `// Lỗi tải nội dung: ${err.message}`;
+  }
+}
+
+function getDetailFileIcon(fileName) {
+  const lower = (fileName || '').toLowerCase();
+  if (lower.endsWith('.py')) return '🐍';
+  if (lower.endsWith('.html')) return '🌐';
+  if (lower.endsWith('.css')) return '🎨';
+  if (lower.endsWith('.js')) return '⚡';
+  if (lower.endsWith('.md')) return '📜';
+  if (lower.endsWith('.yml') || lower.endsWith('.yaml')) return '⚙️';
+  if (lower.includes('docker')) return '🐳';
+  if (lower.endsWith('.sh')) return '💻';
+  if (lower.endsWith('.db') || lower.endsWith('.sqlite')) return '💾';
+  if (lower.endsWith('.json')) return '📦';
+  return '📄';
+}
+
+function getFileTypeDesc(fileName) {
+  const lower = (fileName || '').toLowerCase();
+  if (lower.endsWith('.py')) return 'Python Script (.py)';
+  if (lower.endsWith('.html')) return 'HTML Document (.html)';
+  if (lower.endsWith('.css')) return 'CSS Stylesheet (.css)';
+  if (lower.endsWith('.js')) return 'JavaScript (.js)';
+  if (lower.endsWith('.md')) return 'Markdown Spec (.md)';
+  if (lower.endsWith('.yml') || lower.endsWith('.yaml')) return 'YAML Config (.yml)';
+  if (lower.includes('docker')) return 'Docker Config';
+  if (lower.endsWith('.sh')) return 'Shell Script (.sh)';
+  if (lower.endsWith('.db') || lower.endsWith('.sqlite')) return 'SQLite DB (.db)';
+  if (lower.endsWith('.json')) return 'JSON Data (.json)';
+  return 'Tệp tin chuẩn';
+}
+
+function openCurrentDetailInEditor() {
+  if (genState.detailSelectedFile) {
+    openGenFileFromTree(genState.detailSelectedFile);
+  } else {
+    showToast('Chưa chọn tệp nào!');
+  }
+}
+
+function copyDetailFileContent() {
+  if (genState.detailFileContent !== undefined) {
+    navigator.clipboard.writeText(genState.detailFileContent).then(() => {
+      showToast('Đã sao chép toàn bộ nội dung tệp vào Clipboard!');
+    }).catch(() => {
+      showToast('Không thể truy cập Clipboard');
+    });
+  } else {
+    showToast('Tệp không có nội dung để chép');
+  }
+}
+
+function copyDetailFilePath() {
+  if (genState.detailSelectedFile) {
+    const isSessionFile = genState.detailSelectedFile.startsWith('session:');
+    const cleanRelPath = isSessionFile 
+      ? genState.detailSelectedFile.replace(`session:${genState.currentConvId}/`, '') 
+      : genState.detailSelectedFile;
+    const fullPath = isSessionFile 
+      ? `/workspace/sessions/${genState.currentConvId}/${cleanRelPath}` 
+      : `/app/repo/${genState.detailSelectedFile}`;
+    navigator.clipboard.writeText(fullPath).then(() => {
+      showToast('Đã sao chép đường dẫn tệp!');
+    });
+  }
+}
+
+function deleteCurrentDetailFile() {
+  if (!genState.detailSelectedFile) return;
+  if (!genState.detailSelectedFile.startsWith('session:')) {
+    showToast('Chỉ có thể xóa tệp thuộc phiên làm việc này!');
+    return;
+  }
+  const cleanRelPath = genState.detailSelectedFile.replace(`session:${genState.currentConvId}/`, '');
+  deleteSessionFile(cleanRelPath);
 }
 
 function toggleGenFolder(folderId) {
