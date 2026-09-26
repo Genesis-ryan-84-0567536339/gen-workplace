@@ -4697,6 +4697,7 @@ body.resizing-active, body.resizing-active * {
                 </div>
                 <div style="display:flex;align-items:center;gap:6px">
                   <span class="badge" style="background:#162436;color:#38bdf8;font-size:9.5px;cursor:pointer" id="genCurrentSessionBadge" onclick="renameCurrentGenSession()" title="Bấm để đổi tên phiên này">Session 01</span>
+                  <span class="badge" style="background:#0f172a;color:#a855f7;border:1px solid rgba(168,85,247,0.35);font-size:9.5px;font-family:var(--mono)" id="genSessionTokenCountBadge" title="Tổng tokens đã dùng trong phiên này">🪙 0 tokens</span>
                   <button class="btn small" style="font-size:9px;padding:2px 6px" onclick="renameCurrentGenSession()" title="Đổi tên tiêu đề phiên này">✏️ Đổi tên</button>
                   <button class="btn small" id="btnCollapseGenCol3" style="font-size:11px;padding:2px 6px;border-radius:4px;color:#94a3b8" onclick="toggleGenCol3()" title="Thu gọn Cột Chatroom Gen Core">▶</button>
                 </div>
@@ -4707,19 +4708,19 @@ body.resizing-active, body.resizing-active * {
                 <div>
                   <div class="genQuotaBarRow">
                     <span style="color:#38bdf8;font-weight:600">Google Gemini (RP/TPM):</span>
-                    <span style="color:#94a3b8;font-family:var(--mono)" id="genGeminiQuotaText">72% khả dụng · 60 RPM</span>
+                    <span style="color:#94a3b8;font-family:var(--mono)" id="genGeminiQuotaText">100% khả dụng · 60 RPM</span>
                   </div>
                   <div class="genQuotaProgress">
-                    <div class="genQuotaProgressFill" id="genGeminiQuotaFill" style="width:72%;background:#38bdf8"></div>
+                    <div class="genQuotaProgressFill" id="genGeminiQuotaFill" style="width:100%;background:#38bdf8"></div>
                   </div>
                 </div>
                 <div>
                   <div class="genQuotaBarRow">
                     <span style="color:#f59e0b;font-weight:600">Anthropic Claude (Tokens):</span>
-                    <span style="color:#94a3b8;font-family:var(--mono)" id="genClaudeQuotaText">94% khả dụng · 200k TPM</span>
+                    <span style="color:#94a3b8;font-family:var(--mono)" id="genClaudeQuotaText">100% khả dụng · 200k TPM</span>
                   </div>
                   <div class="genQuotaProgress">
-                    <div class="genQuotaProgressFill" id="genClaudeQuotaFill" style="width:94%;background:#f59e0b"></div>
+                    <div class="genQuotaProgressFill" id="genClaudeQuotaFill" style="width:100%;background:#f59e0b"></div>
                   </div>
                 </div>
               </div>
@@ -7650,6 +7651,7 @@ async function refreshTmuxSessions(showNotify = false) {
     state.selectedTmuxSessionId = state.tmuxSessions[0]?.id || 'gw-lead-agy';
   }
 
+  syncGenQuotaTelemetry();
   renderTmuxSessions();
 }
 
@@ -7775,8 +7777,8 @@ function renderExpertSquadGrid() {
   container.innerHTML = state.tmuxSessions.map(s => {
     const isSel = s.id === state.selectedTmuxSessionId;
     const avatar = ROLE_AVATARS[s.id] || '🤖';
-    const qG = s.quota_gemini || { percent: 72, model: 'Gemini 3.8 Flash' };
-    const qA = s.quota_anthropic || { percent: 89, model: 'Claude Sonnet 4.6' };
+    const qG = s.quota_gemini || { percent: 100, model: 'Gemini 3.8 Flash' };
+    const qA = s.quota_anthropic || { percent: 100, model: 'Claude Sonnet 4.6' };
     const isHib = s.status === 'hibernated';
     const isPaused = s.status === 'paused';
 
@@ -7829,8 +7831,8 @@ function renderExpertSquadGrid() {
           <div style="min-width:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#cbd5e1;background:rgba(255,255,255,0.03);padding:2px 6px;border-radius:4px;border:1px solid rgba(255,255,255,0.06)" title="${escapeHtml(s.current_task_id ? `${s.current_task_id}: ${s.task_title || ''} (${s.evidence_ref || 'Verified'})` : 'Sẵn sàng')}">
             ${taskHtml}
           </div>
-          <div style="font-family:var(--mono);color:#94a3b8;font-size:9.5px;flex-shrink:0;background:rgba(0,0,0,0.3);padding:2px 5px;border-radius:4px" title="Quota: Gemini ${qG.percent || 72}% · Claude ${qA.percent || 89}%">
-            💎${qG.percent || 72}% ⚡${qA.percent || 89}%
+          <div style="font-family:var(--mono);color:#94a3b8;font-size:9.5px;flex-shrink:0;background:rgba(0,0,0,0.3);padding:2px 5px;border-radius:4px" title="Quota: Gemini ${qG.percent ?? 100}% · Claude ${qA.percent ?? 100}%">
+            💎${qG.percent ?? 100}% ⚡${qA.percent ?? 100}%
           </div>
         </div>
       </div>
@@ -7846,8 +7848,8 @@ function updateCommandDeck() {
   const email = current.email || (current.account_label?.includes('@') ? current.account_label.split('(')[1]?.replace(')', '') : 'Chưa đăng nhập');
   const isHib = current.status === 'hibernated';
   const isPaused = current.status === 'paused';
-  const qG = current.quota_gemini || { percent: 72 };
-  const qA = current.quota_anthropic || { percent: 89 };
+  const qG = current.quota_gemini || { percent: 100 };
+  const qA = current.quota_anthropic || { percent: 100 };
   const roleInfo = rolesSopData[current.id] || ROLE_DETAILS[current.id] || { 
     title: current.role_name, 
     mission: 'Thực thi các nhiệm vụ chuyên trách theo quy chuẩn SSOT',
@@ -9154,8 +9156,8 @@ function renderOrchSwarmCards() {
 
     const statusLabel = isHib ? '😴 Ngủ đông' : (isPaused ? '⏸ Tạm dừng' : '● Đang chạy');
     const statusClass = isHib ? 'sleep' : (isPaused ? 'paused' : 'live');
-    const qG = s.quota_gemini?.percent ?? 72;
-    const qA = s.quota_anthropic?.percent ?? 89;
+    const qG = s.quota_gemini?.percent ?? 100;
+    const qA = s.quota_anthropic?.percent ?? 100;
 
     const hasTask = Boolean(s.current_task_id && s.current_task_id.trim());
     const allowed = (s.allowed_paths && s.allowed_paths.length) ? s.allowed_paths.join(', ') : 'Toàn quyền';
@@ -10799,13 +10801,29 @@ function syncGenQuotaTelemetry() {
   const cText = $('genClaudeQuotaText');
 
   const s0 = (state.tmuxSessions && state.tmuxSessions[0]) || {};
-  const qG = s0.quota_gemini || { percent: 72, rpm: 60 };
-  const qC = s0.quota_anthropic || { percent: 94, tpm: 200000 };
+  const qG = s0.quota_gemini || { percent: 100, rpm: 60, status: 'ready', color: '#38bdf8' };
+  const qC = s0.quota_anthropic || { percent: 100, tpm: 200000, status: 'ready', color: '#f59e0b' };
 
-  if (gFill) gFill.style.width = (qG.percent || 72) + '%';
-  if (gText) gText.textContent = `${qG.percent || 72}% khả dụng · ${qG.rpm || 60} RPM`;
-  if (cFill) cFill.style.width = (qC.percent || 94) + '%';
-  if (cText) cText.textContent = `${qC.percent || 94}% khả dụng · ${(qC.tpm || 200000)/1000}k TPM`;
+  if (gFill) {
+    gFill.style.width = (qG.percent ?? 100) + '%';
+    gFill.style.background = qG.color || (qG.status === 'rate_limited' ? '#ef4444' : '#38bdf8');
+  }
+  if (gText) {
+    gText.textContent = qG.status === 'rate_limited' 
+      ? (qG.status_label || '429 Rate Limit (Đang chờ hồi)') 
+      : `${qG.percent ?? 100}% khả dụng · ${qG.rpm || 60} RPM`;
+    gText.style.color = qG.status === 'rate_limited' ? '#ef4444' : '#94a3b8';
+  }
+  if (cFill) {
+    cFill.style.width = (qC.percent ?? 100) + '%';
+    cFill.style.background = qC.color || (qC.status === 'rate_limited' ? '#ef4444' : '#f59e0b');
+  }
+  if (cText) {
+    cText.textContent = qC.status === 'rate_limited' 
+      ? (qC.status_label || '429 Rate Limit (Đang chờ hồi)') 
+      : `${qC.percent ?? 100}% khả dụng · ${(qC.tpm || 200000)/1000}k TPM`;
+    cText.style.color = qC.status === 'rate_limited' ? '#ef4444' : '#94a3b8';
+  }
 }
 
 // 2. Load & Render Conversations (Cột 1)
@@ -10899,6 +10917,7 @@ async function selectGenConversation(convId) {
   }
   renderGenConversationsList();
   if ($('genCurrentSessionBadge')) $('genCurrentSessionBadge').textContent = c?.title ? (c.title.length > 20 ? c.title.slice(0, 20) + '...' : c.title) : convId;
+  if ($('genSessionTokenCountBadge')) $('genSessionTokenCountBadge').textContent = `🪙 ${(c?.total_tokens || 0).toLocaleString()} tokens`;
   if ($('genSessionFilesTitle')) $('genSessionFilesTitle').textContent = `Tệp Của Phiên: ${c?.title || convId}`;
 
   // Tải đồng bộ Tệp của phiên, Sổ tay, Tiến độ Kanban & Tin nhắn của phiên này:
@@ -11142,6 +11161,10 @@ async function sendGenMessage() {
       const data = await res.json();
       await loadGenMessages(genState.currentConvId);
       await loadGenConversations();
+      const curConv = genState.conversations.find(x => x.id === genState.currentConvId);
+      if ($('genSessionTokenCountBadge') && curConv) {
+        $('genSessionTokenCountBadge').textContent = `🪙 ${(curConv.total_tokens || 0).toLocaleString()} tokens`;
+      }
       if (data.kanban_updates && data.kanban_updates.length > 0) {
         showToast(`📌 Agent đã tự động cập nhật Kanban: ${data.kanban_updates.join('; ')}`);
         await loadGenSessionTodos(genState.currentConvId);
@@ -13748,6 +13771,7 @@ setInterval(async () => {
       const sData = await sRes.json();
       if (sData && Array.isArray(sData.sessions) && sData.sessions.length > 0) {
         state.tmuxSessions = sData.sessions;
+        syncGenQuotaTelemetry();
       }
     }
     // 4. Render lại giao diện trực quan ngay lập tức
