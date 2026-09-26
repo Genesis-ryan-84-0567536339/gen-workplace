@@ -223,6 +223,35 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             self._send_json(200, trace_data)
             return
 
+        # 18. API Gen Workplace Conversations
+        if path == "/api/gen/conversations":
+            prj_id = query.get("project", ["PRJ-GEN-WORKPLACE"])[0]
+            convs = db.get_gen_conversations(prj_id)
+            self._send_json(200, {"conversations": convs})
+            return
+
+        # 19. API Gen Workplace Messages
+        if path == "/api/gen/messages":
+            conv_id = query.get("conv_id", ["conv-gen-core-01"])[0]
+            msgs = db.get_gen_messages(conv_id)
+            self._send_json(200, {"messages": msgs})
+            return
+
+        # 20. API Gen Scratchpad Notes
+        if path == "/api/gen/notes":
+            prj_id = query.get("project", ["PRJ-GEN-WORKPLACE"])[0]
+            conv_id = query.get("conv_id", [None])[0]
+            notes = db.get_gen_notes(prj_id, conv_id)
+            self._send_json(200, {"notes": notes})
+            return
+
+        # 21. API File Safe Reader cho VS Code Viewer
+        if path == "/api/file/content":
+            fpath = query.get("path", [""])[0]
+            res = db.get_file_content_safely(fpath)
+            self._send_json(200 if "error" not in res else 400, res)
+            return
+
         return super().do_GET()
 
     def do_POST(self):
@@ -584,6 +613,86 @@ class SwarmHandler(SimpleHTTPRequestHandler):
                 self._send_json(200, {"status": "sent", "session_id": session_id, "time": now_time})
             else:
                 self._send_json(400, {"error": "Missing message"})
+            return
+
+        # 23. API Gen Workplace Chat
+        if path == "/api/gen/chat":
+            conv_id = data.get("conv_id", "conv-gen-core-01")
+            author = data.get("author", "Ryan")
+            message = data.get("message", "").strip()
+            model = data.get("model", "Gemini 3.1 Pro (High)")
+            account = data.get("account", "owner_default")
+            if not message:
+                self._send_json(400, {"error": "Message is empty"})
+                return
+            res = db.send_gen_chat(conv_id, author, message, model, account)
+            self._send_json(200, res)
+            return
+
+        # 24. API Gen Workplace Progressive Compaction
+        if path == "/api/gen/compact":
+            conv_id = data.get("conv_id", "conv-gen-core-01")
+            model_from = data.get("model_from", "")
+            model_to = data.get("model_to", "")
+            manual = bool(data.get("manual", False))
+            res = db.compact_gen_conversation(conv_id, model_from, model_to, manual)
+            self._send_json(200, res)
+            return
+
+        # 25. API Gen Workplace Conversation Create / Update / Delete
+        if path == "/api/gen/conversations/create":
+            project_id = data.get("project_id", "PRJ-GEN-WORKPLACE")
+            title = data.get("title", "Cuộc trò chuyện mới")
+            model = data.get("model", "Gemini 3.1 Pro (High)")
+            account = data.get("account", "owner_default")
+            res = db.create_gen_conversation(project_id, title, model, account)
+            self._send_json(200, res)
+            return
+
+        if path == "/api/gen/conversations/update":
+            conv_id = data.get("conv_id")
+            title = data.get("title")
+            is_pinned = data.get("is_pinned")
+            model = data.get("model")
+            account = data.get("account")
+            if conv_id:
+                res = db.update_gen_conversation(conv_id, title, is_pinned, model, account)
+                self._send_json(200, res)
+            else:
+                self._send_json(400, {"error": "Missing conv_id"})
+            return
+
+        if path == "/api/gen/conversations/delete":
+            conv_id = data.get("conv_id")
+            if conv_id:
+                res = db.delete_gen_conversation(conv_id)
+                self._send_json(200, res)
+            else:
+                self._send_json(400, {"error": "Missing conv_id"})
+            return
+
+        # 26. API Gen Scratchpad Note Save / Delete
+        if path == "/api/gen/notes/save":
+            project_id = data.get("project_id", "PRJ-GEN-WORKPLACE")
+            note_id = data.get("id")
+            title = data.get("title", "Ghi chú mới")
+            content = data.get("content", "")
+            tags = data.get("tags", [])
+            evidence_ref = data.get("evidence_ref", "")
+            author = data.get("author", "Ryan")
+            conv_id = data.get("conv_id", "")
+            res = db.save_gen_note(project_id, note_id, title, content, tags, evidence_ref, author, conv_id)
+            self._send_json(200, res)
+            return
+
+        if path == "/api/gen/notes/delete":
+            note_id = data.get("id")
+            project_id = data.get("project_id", "PRJ-GEN-WORKPLACE")
+            if note_id:
+                res = db.delete_gen_note(note_id, project_id)
+                self._send_json(200, res)
+            else:
+                self._send_json(400, {"error": "Missing id"})
             return
 
         self.send_response(404)

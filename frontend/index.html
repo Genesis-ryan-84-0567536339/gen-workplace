@@ -2631,12 +2631,513 @@ button { cursor: pointer; }
   display: flex;
   flex-direction: column;
 }
+/* ========================================================================= */
+/* GEN WORKPLACE IDE: 3-COLUMN STUDIO LAYOUT */
+/* ========================================================================= */
+.genWpShell {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr) 430px;
+  height: calc(100vh - 46px);
+  max-height: calc(100vh - 46px);
+  overflow: hidden;
+  background: #090d14;
+  border-top: 1px solid #161f2e;
+}
+@media (max-width: 1280px) {
+  .genWpShell {
+    grid-template-columns: 220px minmax(0, 1fr) 380px;
+  }
+}
 @media (max-width: 1024px) {
-  .cockpitShell {
+  .genWpShell {
     grid-template-columns: 1fr;
     height: auto;
-    overflow: visible;
+    overflow-y: auto;
   }
+}
+
+/* CỘT 1: CLAUDE.AI CHAT SESSIONS SIDEBAR */
+.genWpCol1 {
+  background: #0d121a;
+  border-right: 1px solid #1a2332;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.genWpCol1Head {
+  padding: 10px 12px;
+  border-bottom: 1px solid #1a2332;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #111722;
+}
+.genWpCol1Search {
+  padding: 8px 10px;
+  border-bottom: 1px solid #161f2e;
+  background: #0a0e14;
+}
+.genWpCol1Search input {
+  width: 100%;
+  background: #121824;
+  border: 1px solid #1f2a3c;
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 11px;
+  color: #f1f5f9;
+  outline: none;
+}
+.genWpCol1Search input:focus {
+  border-color: #0284c7;
+}
+.genWpCol1List {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.genSectionLabel {
+  font-size: 10px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 2px 6px;
+}
+.genSessionItem {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 7px 9px;
+  border-radius: 6px;
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.12s ease;
+  position: relative;
+}
+.genSessionItem:hover {
+  background: #151c27;
+  border-color: #212c3d;
+}
+.genSessionItem.active {
+  background: #182333;
+  border-color: #0284c7;
+}
+.genSessionItemTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+.genSessionTitle {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #e2e8f0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+.genSessionModelBadge {
+  font-size: 8.5px;
+  font-weight: 600;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: rgba(56, 189, 248, 0.12);
+  color: #38bdf8;
+  white-space: nowrap;
+}
+.genSessionSnippet {
+  font-size: 10px;
+  color: #94a3b8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.genSessionItemFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 9px;
+  color: #64748b;
+  margin-top: 2px;
+}
+.genWpCol1Foot {
+  padding: 8px 12px;
+  border-top: 1px solid #1a2332;
+  background: #0a0e14;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 10px;
+  color: #64748b;
+}
+
+/* CỘT 2: VS CODE MULTI-TAB CONTENT & VIEWER */
+.genWpCol2 {
+  background: #080b10;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-right: 1px solid #1a2332;
+}
+.genVsCodeTabBar {
+  display: flex;
+  align-items: center;
+  background: #0f141d;
+  border-bottom: 1px solid #1a2332;
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+.genVsCodeTab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  font-size: 11px;
+  color: #94a3b8;
+  background: transparent;
+  border: none;
+  border-top: 2px solid transparent;
+  border-right: 1px solid #161f2e;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.12s ease;
+}
+.genVsCodeTab:hover {
+  background: #141b26;
+  color: #e2e8f0;
+}
+.genVsCodeTab.active {
+  background: #080b10;
+  color: #38bdf8;
+  border-top-color: #38bdf8;
+  font-weight: 600;
+}
+.genVsCodeBreadcrumbBar {
+  padding: 5px 12px;
+  background: #0b0f16;
+  border-bottom: 1px solid #161f2e;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10.5px;
+  color: #64748b;
+  font-family: var(--mono);
+  flex-shrink: 0;
+}
+.genVsCodeBreadcrumbPath {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.genVsCodeTabBody {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+.genVsCodePane {
+  display: none;
+  flex: 1;
+  overflow: auto;
+  height: 100%;
+}
+.genVsCodePane.active {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Code Viewer */
+.genFileQuickBar {
+  padding: 6px 12px;
+  background: #0b0f16;
+  border-bottom: 1px solid #161f2e;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+.genFileQuickBtn {
+  background: #131a24;
+  border: 1px solid #1e2837;
+  color: #cbd5e1;
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: var(--mono);
+}
+.genFileQuickBtn:hover, .genFileQuickBtn.active {
+  background: #1e293b;
+  color: #38bdf8;
+  border-color: #0284c7;
+}
+.genCodeContainer {
+  flex: 1;
+  overflow: auto;
+  background: #05070a;
+  display: flex;
+  font-family: ui-monospace, SFMono-Regular, 'JetBrains Mono', Menlo, Consolas, monospace;
+  font-size: 11.5px;
+  line-height: 1.6;
+}
+.genCodeGutter {
+  padding: 10px 8px;
+  color: #475569;
+  text-align: right;
+  user-select: none;
+  background: #07090e;
+  border-right: 1px solid #161f2e;
+}
+.genCodeText {
+  padding: 10px 14px;
+  color: #e2e8f0;
+  white-space: pre;
+  tab-size: 2;
+  flex: 1;
+}
+
+/* CỘT 3: GEN CORE CHATROOM & TELEMETRY */
+.genWpCol3 {
+  background: #0b0e14;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.genChatHead {
+  padding: 10px 12px;
+  background: #101621;
+  border-bottom: 1px solid #1a2332;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.genTelemetryQuotaBox {
+  background: #080c12;
+  border: 1px solid #17212f;
+  border-radius: 6px;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.genQuotaBarRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 9.5px;
+}
+.genQuotaProgress {
+  height: 4px;
+  border-radius: 2px;
+  background: #1e293b;
+  overflow: hidden;
+  margin-top: 2px;
+}
+.genQuotaProgressFill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+.genChatControlsRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.genChatSelect {
+  background: #080c12;
+  border: 1px solid #1a2434;
+  border-radius: 5px;
+  color: #cbd5e1;
+  font-size: 10.5px;
+  padding: 4px 6px;
+  outline: none;
+  width: 100%;
+}
+.genChatSelect:focus {
+  border-color: #0284c7;
+}
+
+/* Mini Scratchpad Widget */
+.genMiniScratchpad {
+  background: #0e131b;
+  border-bottom: 1px solid #161f2e;
+  padding: 6px 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.genMiniScratchpad input {
+  flex: 1;
+  background: #080c12;
+  border: 1px solid #1a2332;
+  border-radius: 4px;
+  padding: 3px 7px;
+  font-size: 10.5px;
+  color: #f1f5f9;
+  outline: none;
+}
+
+/* Progressive Compact Banner */
+.genCompactBanner {
+  background: #0a111a;
+  border-bottom: 1px solid #162232;
+  padding: 4px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10px;
+  color: #38bdf8;
+  flex-shrink: 0;
+}
+
+/* Chat Stream */
+.genChatStream {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: #07090e;
+}
+.genMsg {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-width: 92%;
+  animation: fadeInMsg 0.15s ease-out;
+}
+@keyframes fadeInMsg {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.genMsg.user {
+  align-self: flex-end;
+}
+.genMsg.assistant {
+  align-self: flex-start;
+}
+.genMsgMeta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 9.5px;
+  color: #64748b;
+}
+.genMsg.user .genMsgMeta {
+  justify-content: flex-end;
+}
+.genMsgBubble {
+  padding: 9px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #f1f5f9;
+  word-break: break-word;
+}
+.genMsg.user .genMsgBubble {
+  background: #0284c7;
+  color: #fff;
+  border-bottom-right-radius: 2px;
+}
+.genMsg.assistant .genMsgBubble {
+  background: #111622;
+  border: 1px solid #1e2837;
+  border-bottom-left-radius: 2px;
+}
+.genNotePill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  text-decoration: none;
+  vertical-align: middle;
+  transition: all 0.12s ease;
+}
+.genNotePill:hover {
+  background: #0284c7;
+  color: #fff;
+}
+
+/* Progressive Compact Card */
+.genCompactCard {
+  align-self: center;
+  width: 96%;
+  background: #0c1420;
+  border: 1px solid #1e2f47;
+  border-radius: 8px;
+  padding: 9px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 11px;
+}
+.genCompactCardHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #7dd3fc;
+  font-weight: 600;
+}
+.genCompactCardBody {
+  color: #94a3b8;
+  line-height: 1.45;
+  font-size: 10.5px;
+}
+
+/* Chat Input Area */
+.genChatInputBox {
+  padding: 8px 10px;
+  background: #0e131b;
+  border-top: 1px solid #1a2332;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.genChatTextarea {
+  width: 100%;
+  min-height: 52px;
+  max-height: 120px;
+  resize: vertical;
+  background: #070a0f;
+  border: 1px solid #1a2332;
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-size: 11.5px;
+  color: #f8fafc;
+  font-family: inherit;
+  outline: none;
+}
+.genChatTextarea:focus {
+  border-color: #0284c7;
+}
+.genChatToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
 }
 </style>
 </head>
@@ -2673,9 +3174,14 @@ button { cursor: pointer; }
   <!-- SIDEBAR NAVIGATION -->
   <aside class="sidebar">
     <nav class="nav">
-      <!-- TẦNG 1: TỔNG CHỈ HUY TOÀN CỤC -->
+      <!-- TẦNG 1: KHÔNG GIAN LÀM VIỆC CHÍNH (OWNER ↔ GEN) -->
       <div class="navGroup">
-        <div class="navLabel">Tổng Chỉ Huy Toàn Cục</div>
+        <div class="navLabel">Không Gian Làm Việc Chính</div>
+        <button class="navItem active" data-nav="gen_workplace" onclick="go('gen_workplace', this)">
+          <span class="navIcon">⚡</span>
+          <span>Gen Workplace IDE</span>
+          <span class="badge" style="font-size:8.5px;background:rgba(56,189,248,0.15);color:#38bdf8;padding:1px 5px;margin-left:auto">3-Col</span>
+        </button>
         <button class="navItem" data-nav="orchestrator" onclick="go('orchestrator', this)">
           <span class="navIcon">🧠</span>
           <span>Core Orchestrator</span>
@@ -2685,7 +3191,7 @@ button { cursor: pointer; }
       <!-- TẦNG 2: TÁC CHIẾN DỰ ÁN (gen-workplace) -->
       <div class="navGroup">
         <div class="navLabel">Tác Chiến Dự Án</div>
-        <button class="navItem active" data-nav="warroom" onclick="go('warroom', this)">
+        <button class="navItem" data-nav="warroom" onclick="go('warroom', this)">
           <span class="navIcon">📡</span>
           <span>Phòng Giao Ban Swarm</span>
         </button>
@@ -2735,6 +3241,292 @@ button { cursor: pointer; }
   <!-- MAIN VIEWPORT -->
   <main class="main">
     <div class="content">
+
+      <!-- ========================================================================= -->
+      <!-- 00. GEN WORKPLACE IDE: KHÔNG GIAN LÀM VIỆC CHÍNH (OWNER ↔ GEN CORE - 3 CỘT) -->
+      <!-- ========================================================================= -->
+      <section class="screen active" id="gen_workplace" style="padding:0;max-width:none">
+        <div class="genWpShell">
+          
+          <!-- CỘT 1: CLAUDE.AI STYLE CHAT SESSIONS SIDEBAR -->
+          <div class="genWpCol1">
+            <div class="genWpCol1Head">
+              <div style="display:flex;align-items:center;gap:7px">
+                <span style="font-size:14px">💬</span>
+                <strong style="font-size:12px;color:#f8fafc">Phiên Chat Gen</strong>
+              </div>
+              <button class="btn small primary" style="font-size:10px;padding:2px 8px;border-radius:4px" onclick="openNewGenChatModal()" title="Mở phiên trò chuyện mới">+ Mới</button>
+            </div>
+
+            <div class="genWpCol1Search">
+              <input type="text" id="genSessionSearchInput" placeholder="🔍 Tìm kiếm phiên thảo luận..." oninput="filterGenSessions(this.value)">
+            </div>
+
+            <div class="genWpCol1List" id="genSessionList">
+              <div class="genSectionLabel">📌 Được Ghim</div>
+              <div id="genPinnedSessions" style="display:flex;flex-direction:column;gap:4px">
+                <!-- Rendered dynamically -->
+              </div>
+
+              <div class="genSectionLabel" style="margin-top:6px">🕒 Gần Đây</div>
+              <div id="genRecentSessions" style="display:flex;flex-direction:column;gap:4px">
+                <!-- Rendered dynamically -->
+              </div>
+            </div>
+
+            <div class="genWpCol1Foot">
+              <div style="display:flex;align-items:center;justify-content:space-between">
+                <span>🤖 Gen Core Agent:</span>
+                <span style="color:#4ade80;font-weight:600">● Online</span>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between">
+                <span>⚡ SQLite Storage:</span>
+                <span style="color:#38bdf8;font-family:var(--mono)">WAL + FTS5</span>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between">
+                <span>📦 Context Compaction:</span>
+                <span style="color:#f59e0b;font-weight:600">Lũy tiến tự động</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- CỘT 2: VS CODE MULTI-TAB CONTENT & VIEWER -->
+          <div class="genWpCol2">
+            <!-- VS Code Tab Strip -->
+            <div class="genVsCodeTabBar" id="genVsCodeTabBar">
+              <button class="genVsCodeTab active" data-vstab="file" onclick="switchGenVsTab('file')">
+                <span>📄</span>
+                <span id="tabLabelFile">File: backend/main.py</span>
+                <span style="font-size:10px;opacity:0.6;margin-left:4px" onclick="event.stopPropagation()">×</span>
+              </button>
+              <button class="genVsCodeTab" data-vstab="evidence" onclick="switchGenVsTab('evidence')">
+                <span>📊</span>
+                <span id="tabLabelEvidence">Bằng chứng & Note ID</span>
+                <span style="font-size:10px;opacity:0.6;margin-left:4px" onclick="event.stopPropagation()">×</span>
+              </button>
+              <button class="genVsCodeTab" data-vstab="scratchpad" onclick="switchGenVsTab('scratchpad')">
+                <span>📋</span>
+                <span>Sổ tay Tạm thời (Scratchpad)</span>
+                <span style="font-size:10px;opacity:0.6;margin-left:4px" onclick="event.stopPropagation()">×</span>
+              </button>
+              <button class="genVsCodeTab" data-vstab="console" onclick="switchGenVsTab('console')">
+                <span>⚡</span>
+                <span>Live Terminal Console</span>
+                <span style="font-size:10px;opacity:0.6;margin-left:4px" onclick="event.stopPropagation()">×</span>
+              </button>
+              <button class="genVsCodeTab" data-vstab="ssot" onclick="switchGenVsTab('ssot')">
+                <span>📜</span>
+                <span>SSOT Spec Gốc</span>
+                <span style="font-size:10px;opacity:0.6;margin-left:4px" onclick="event.stopPropagation()">×</span>
+              </button>
+            </div>
+
+            <!-- VS Code Breadcrumbs Bar -->
+            <div class="genVsCodeBreadcrumbBar">
+              <div class="genVsCodeBreadcrumbPath" id="genBreadcrumbPath">
+                <span>gen-workplace</span>
+                <span>›</span>
+                <span>backend</span>
+                <span>›</span>
+                <span style="color:#f8fafc">main.py</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px">
+                <button class="btn small" style="font-size:9.5px;padding:1px 6px" onclick="copyGenActiveContent()" title="Sao chép nội dung">📋 Copy</button>
+                <button class="btn small" style="font-size:9.5px;padding:1px 6px" onclick="reloadGenActiveTab()" title="Làm mới nội dung">↻ Reload</button>
+              </div>
+            </div>
+
+            <!-- Tab Bodies -->
+            <div class="genVsCodeTabBody">
+              
+              <!-- PANE 1: File Viewer -->
+              <div class="genVsCodePane active" id="genVsPane-file">
+                <div class="genFileQuickBar">
+                  <span style="font-size:10px;color:#64748b;font-weight:700">MỞ NHANH:</span>
+                  <button class="genFileQuickBtn active" onclick="loadGenFileContent('backend/main.py', this)">main.py</button>
+                  <button class="genFileQuickBtn" onclick="loadGenFileContent('backend/db.py', this)">db.py</button>
+                  <button class="genFileQuickBtn" onclick="loadGenFileContent('docker-compose.yml', this)">docker-compose.yml</button>
+                  <button class="genFileQuickBtn" onclick="loadGenFileContent('docs/SSOT_ORIGINAL_SPEC.md', this)">SSOT_SPEC.md</button>
+                  <button class="genFileQuickBtn" onclick="loadGenFileContent('installer_tui.py', this)">installer_tui.py</button>
+                  <div style="display:flex;align-items:center;gap:4px;margin-left:auto">
+                    <input type="text" id="customFilePathInput" placeholder="path/file..." style="background:#090d14;border:1px solid #1a2332;border-radius:4px;padding:2px 6px;font-size:10px;color:#cbd5e1;width:130px;font-family:var(--mono)">
+                    <button class="btn small" style="font-size:9.5px;padding:1px 6px" onclick="loadCustomFile()">Mở</button>
+                  </div>
+                </div>
+                <div class="genCodeContainer">
+                  <div class="genCodeGutter" id="genCodeGutter">1</div>
+                  <div class="genCodeText" id="genCodeText">// Đang nạp nội dung file...</div>
+                </div>
+              </div>
+
+              <!-- PANE 2: Evidence & Note ID Trace -->
+              <div class="genVsCodePane" id="genVsPane-evidence" style="padding:14px;overflow-y:auto">
+                <div style="max-width:820px;margin:0 auto;width:100%;display:flex;flex-direction:column;gap:12px">
+                  <div style="display:flex;align-items:center;justify-content:space-between">
+                    <div>
+                      <h3 style="margin:0;font-size:13.5px;color:#f8fafc" id="evidenceTitle">Bằng chứng & Hồ sơ Tra Cứu Note ID</h3>
+                      <p style="margin:2px 0 0 0;font-size:11px;color:#94a3b8">Bằng chứng kỹ thuật, trích dẫn ranh giới và hồ sơ thẩm định được liên kết từ Chatroom.</p>
+                    </div>
+                    <span class="badge" style="background:#0284c7;color:#fff;font-family:var(--mono);font-size:10px" id="evidenceActiveId">#NOTE-01</span>
+                  </div>
+
+                  <div class="card" style="padding:14px;background:#0d131c;border:1px solid #1c2738;border-radius:8px">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                      <span class="chip done" style="font-size:9.5px" id="evidenceStatusChip">● Đã xác thực SSOT</span>
+                      <span style="font-size:10px;color:#64748b" id="evidenceTime">20:35</span>
+                    </div>
+                    <h4 style="margin:0 0 8px 0;font-size:13px;color:#38bdf8" id="evidenceHeading">Nguyên Tắc SSOT Tuyệt Đối</h4>
+                    <div style="font-size:12px;color:#e2e8f0;line-height:1.6;margin-bottom:12px" id="evidenceBody">
+                      Ryan là Single Source of Truth tối cao. Mọi thay đổi kiến trúc phải được tham chiếu từ docs/SSOT_ORIGINAL_SPEC.md.
+                    </div>
+                    <div style="background:#070a0f;border:1px solid #151d2a;border-radius:6px;padding:8px 10px;font-size:11px;font-family:var(--mono);color:#94a3b8" id="evidenceRefBox">
+                      <strong>🔗 Bằng chứng / File tham chiếu:</strong> <span style="color:#4ade80" id="evidenceRefText">docs/SSOT_ORIGINAL_SPEC.md</span>
+                    </div>
+                  </div>
+
+                  <div style="display:flex;gap:8px">
+                    <button class="btn small primary" onclick="citeActiveEvidenceToChat()">💬 Trích dẫn vào Chatroom</button>
+                    <button class="btn small" onclick="switchGenVsTab('scratchpad')">📋 Xem Toàn Bộ Sổ Tay</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- PANE 3: Scratchpad (Sổ tay tạm thời) -->
+              <div class="genVsCodePane" id="genVsPane-scratchpad" style="padding:14px;overflow-y:auto">
+                <div style="max-width:860px;margin:0 auto;width:100%;display:flex;flex-direction:column;gap:12px">
+                  <div style="display:flex;align-items:center;justify-content:space-between">
+                    <div>
+                      <h3 style="margin:0;font-size:13.5px;color:#f8fafc">📋 Sổ Tay Tạm Thời (Gen Scratchpad)</h3>
+                      <p style="margin:2px 0 0 0;font-size:11px;color:#94a3b8">Lưu trữ các ràng buộc tức thì, ghi chú điều phối và phát hành Note ID dữ liệu để dựng chứng.</p>
+                    </div>
+                    <button class="btn small primary" onclick="openNewNoteModal()">+ Thêm Ghi Chú Mới</button>
+                  </div>
+
+                  <div id="genNotesListContainer" style="display:flex;flex-direction:column;gap:8px">
+                    <!-- Rendered dynamically -->
+                  </div>
+                </div>
+              </div>
+
+              <!-- PANE 4: Console Output -->
+              <div class="genVsCodePane" id="genVsPane-console">
+                <div style="background:#090d14;border-bottom:1px solid #161f2e;padding:6px 12px;display:flex;align-items:center;justify-content:space-between">
+                  <span style="font-size:10.5px;color:#94a3b8;font-family:var(--mono)">Terminal Output: Gen Core Engine</span>
+                  <button class="btn small" style="font-size:9.5px;padding:1px 6px" onclick="clearGenConsole()">Xóa màn hình</button>
+                </div>
+                <div style="flex:1;overflow:auto;padding:12px;font-family:var(--mono);font-size:11px;line-height:1.6;color:#cbd5e1;background:#05070a" id="genConsoleOutput">
+                  <span style="color:#64748b">▸ Sẵn sàng nhận lệnh thực thi từ Gen Core...</span>
+                </div>
+              </div>
+
+              <!-- PANE 5: SSOT Spec Gốc -->
+              <div class="genVsCodePane" id="genVsPane-ssot" style="padding:16px;overflow-y:auto">
+                <div style="max-width:820px;margin:0 auto;width:100%;color:#e2e8f0;font-size:12px;line-height:1.65" id="genSsotSpecRendered">
+                  <!-- Rendered dynamically -->
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- CỘT 3: CHATROOM VỚI GEN CORE & TELEMETRY -->
+          <div class="genWpCol3">
+            <div class="genChatHead">
+              <div style="display:flex;align-items:center;justify-content:space-between">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <div style="width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,#0284c7,#6366f1);display:grid;place-items:center;font-size:13px">⚡</div>
+                  <div>
+                    <strong style="font-size:12px;color:#f8fafc">Gen Core</strong>
+                    <span style="font-size:9.5px;color:#38bdf8;margin-left:4px">Tổng Trợ Lý Điều Hành</span>
+                  </div>
+                </div>
+                <span class="badge" style="background:#162436;color:#38bdf8;font-size:9px" id="genCurrentSessionBadge">Session 01</span>
+              </div>
+
+              <!-- Telemetry Quota Monitor -->
+              <div class="genTelemetryQuotaBox">
+                <div>
+                  <div class="genQuotaBarRow">
+                    <span style="color:#38bdf8;font-weight:600">Google Gemini (RP/TPM):</span>
+                    <span style="color:#94a3b8;font-family:var(--mono)" id="genGeminiQuotaText">72% khả dụng · 60 RPM</span>
+                  </div>
+                  <div class="genQuotaProgress">
+                    <div class="genQuotaProgressFill" id="genGeminiQuotaFill" style="width:72%;background:#38bdf8"></div>
+                  </div>
+                </div>
+                <div>
+                  <div class="genQuotaBarRow">
+                    <span style="color:#f59e0b;font-weight:600">Anthropic Claude (Tokens):</span>
+                    <span style="color:#94a3b8;font-family:var(--mono)" id="genClaudeQuotaText">94% khả dụng · 200k TPM</span>
+                  </div>
+                  <div class="genQuotaProgress">
+                    <div class="genQuotaProgressFill" id="genClaudeQuotaFill" style="width:94%;background:#f59e0b"></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Model Selector & Account Profile Row -->
+              <div class="genChatControlsRow">
+                <div>
+                  <label style="font-size:9px;color:#64748b;display:block;margin-bottom:2px">ĐỔI MODEL (TỰ COMPACT):</label>
+                  <select class="genChatSelect" id="genModelSelect" onchange="handleGenModelChange(this.value)">
+                    <option value="Gemini 3.1 Pro (High)">Gemini 3.1 Pro (High Effort Thinking)</option>
+                    <option value="Gemini 3.8 Flash (High)">Gemini 3.8 Flash (High Speed)</option>
+                    <option value="Gemini 3.7 Flash (High)">Gemini 3.7 Flash (High Reasoning)</option>
+                    <option value="Claude Sonnet 4.6 (Thinking)">Claude Sonnet 4.6 (Extended Thinking)</option>
+                    <option value="Claude Opus 4.6 (Thinking)">Claude Opus 4.6 (Deep Reasoning)</option>
+                    <option value="Claude Haiku 4.5 (Fast)">Claude Haiku 4.5 (Fast & Lightweight)</option>
+                  </select>
+                </div>
+                <div>
+                  <label style="font-size:9px;color:#64748b;display:block;margin-bottom:2px">TÀI KHOẢN AGY CLI:</label>
+                  <select class="genChatSelect" id="genAccountSelect" onchange="handleGenAccountChange(this.value)">
+                    <option value="owner_default">Mặc định (owner@genesis.local)</option>
+                    <option value="profile1">Profile #1 (owner@genesis.local)</option>
+                    <option value="profile2">Profile #2 (claude.bot@genesis.local)</option>
+                    <option value="profile3">Profile #3 (admin@genesis.local)</option>
+                    <option value="profile4">Profile #4 (admin@genesis.local)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- Mini Scratchpad Input Widget -->
+            <div class="genMiniScratchpad">
+              <span style="font-size:11px" title="Ghi chú nhanh cho Core Agent">📝</span>
+              <input type="text" id="genQuickNoteInput" placeholder="Note nhanh cho Gen: 'Ràng buộc...', 'Quy định...' " onkeydown="if(event.key==='Enter')saveQuickNote()">
+              <button class="btn small" style="font-size:9.5px;padding:2px 7px;font-family:var(--mono);color:#38bdf8" onclick="saveQuickNote()">+ Note ID</button>
+            </div>
+
+            <!-- Progressive Compaction Notification Banner -->
+            <div class="genCompactBanner">
+              <span id="genCompactStatusText">📦 Progressive Compaction sẵn sàng</span>
+              <button class="btn small" style="font-size:9.5px;padding:1px 6px;height:18px" onclick="triggerManualCompact()" title="Tự nén ngữ cảnh cũ thành bản tóm tắt lũy tiến">⚡ Compact Ngay</button>
+            </div>
+
+            <!-- Messages Stream -->
+            <div class="genChatStream" id="genChatMessages">
+              <!-- Rendered dynamically -->
+            </div>
+
+            <!-- Chat Input Box -->
+            <div class="genChatInputBox">
+              <textarea class="genChatTextarea" id="genChatInput" placeholder="Trao đổi chỉ thị với Gen Core (Enter để gửi, Shift+Enter xuống dòng)…" onkeydown="handleGenChatKeyDown(event)"></textarea>
+              <div class="genChatToolbar">
+                <div style="display:flex;align-items:center;gap:4px">
+                  <span class="badge" style="font-size:8.5px;background:#131c28;color:#94a3b8" id="genInputModelBadge">Gemini 3.1 Pro</span>
+                  <button class="btn small" style="font-size:9.5px;padding:1px 6px" onclick="insertNoteRefToInput()" title="Chèn Note ID vào tin nhắn"># Note</button>
+                </div>
+                <div style="display:flex;align-items:center;gap:6px">
+                  <button class="btn small" style="font-size:10px;padding:3px 8px" onclick="clearGenInput()">Xóa</button>
+                  <button class="btn small primary" style="font-size:11px;padding:3px 14px" id="btnGenSend" onclick="sendGenMessage()">Gửi ➔</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
 
       <!-- ========================================================================= -->
       <!-- 0. GENESIS CORE ORCHESTRATOR: TỔNG CHỈ HUY TOÀN CỤC (GLOBAL CONTROL PLANE) -->
@@ -2908,7 +3700,7 @@ button { cursor: pointer; }
       <!-- ========================================================================= -->
       <!-- PHÒNG GIAO BAN SWARM (WAR ROOM) - MỆNH LỆNH VÀ ĐIỀU PHỐI BẰNG TIẾNG VIỆT -->
       <!-- ========================================================================= -->
-      <section class="screen active" id="warroom">
+      <section class="screen" id="warroom">
         <div class="pageHead">
           <div>
             <h1>📡 Phòng Giao Ban Swarm (War Room)</h1>
@@ -4404,6 +5196,17 @@ function escapeHtml(s) {
 
 // Cấu hình Sub-Tabs theo từng Phân khu chức năng (Loại bỏ trùng lặp với Sidebar)
 const SUBTAB_CONFIG = {
+  gen_workplace: {
+    icon: '⚡',
+    name: 'Không Gian Làm Việc Chính (Owner ↔ Gen IDE)',
+    tabs: [
+      { id: 'vstab-file', label: '📄 File Viewer', action: () => switchGenVsTab('file') },
+      { id: 'vstab-evidence', label: '📊 Bằng Chứng & Note ID', action: () => switchGenVsTab('evidence') },
+      { id: 'vstab-scratchpad', label: '📋 Sổ Tay Tạm Thời', action: () => switchGenVsTab('scratchpad') },
+      { id: 'vstab-console', label: '⚡ Live Console', action: () => switchGenVsTab('console') },
+      { id: 'vstab-ssot', label: '📜 SSOT Spec', action: () => switchGenVsTab('ssot') }
+    ]
+  },
   orchestrator: {
     icon: '🧠',
     name: 'Tổng Chỉ Huy Toàn Cục',
@@ -4541,7 +5344,9 @@ function go(id, el) {
 
   updateSubtopNav(id);
 
-  if (id === 'orchestrator') {
+  if (id === 'gen_workplace') {
+    initGenWorkplace();
+  } else if (id === 'orchestrator') {
     loadOrchChatMessages();
     if (!state.currentOrchTab) state.currentOrchTab = 'chat';
     switchOrchTab(state.currentOrchTab);
@@ -8033,16 +8838,6 @@ function dragKanban(e, key, i) {
   dragRef = { key, i };
   e.dataTransfer.effectAllowed = 'move';
 }
-function dropKanban(e, target) {
-  if (!dragRef) return;
-  const item = state.kanban[dragRef.key].splice(dragRef.i, 1)[0];
-  state.kanban[target].push(item);
-  dragRef = null;
-  persist();
-  renderKanban();
-  showToast('Task đã chuyển sang ' + target + ' bởi Trưởng nhóm');
-}
-
 async function dropKanban(e, target) {
   if (!dragRef) return;
   const item = state.kanban[dragRef.key].splice(dragRef.i, 1)[0];
@@ -8062,6 +8857,715 @@ async function dropKanban(e, target) {
     });
   } catch (err) {
     console.warn('Lỗi lưu todo status:', err);
+  }
+}
+
+// =========================================================================
+// GEN WORKPLACE IDE: 3-COLUMN STUDIO LOGIC (OWNER ↔ GEN CORE ENGINE)
+// =========================================================================
+
+let genState = {
+  conversations: [],
+  currentConvId: 'conv-gen-core-01',
+  currentModel: 'Gemini 3.1 Pro (High)',
+  currentAccount: 'owner_default',
+  currentVsTab: 'file',
+  activeFilePath: 'backend/main.py',
+  notes: [],
+  activeEvidenceId: 'NOTE-01',
+  messages: [],
+  searchQuery: '',
+  showCompactedDetails: false
+};
+
+async function initGenWorkplace() {
+  await Promise.all([
+    loadGenConversations(),
+    loadGenNotes(),
+    loadGenSsotSpec()
+  ]);
+  await loadGenFileContent(genState.activeFilePath || 'backend/main.py');
+  await loadGenMessages(genState.currentConvId);
+  syncGenQuotaTelemetry();
+}
+
+// 1. Quota Telemetry Sync
+function syncGenQuotaTelemetry() {
+  const gFill = $('genGeminiQuotaFill');
+  const gText = $('genGeminiQuotaText');
+  const cFill = $('genClaudeQuotaFill');
+  const cText = $('genClaudeQuotaText');
+
+  const s0 = (state.tmuxSessions && state.tmuxSessions[0]) || {};
+  const qG = s0.quota_gemini || { percent: 72, rpm: 60 };
+  const qC = s0.quota_anthropic || { percent: 94, tpm: 200000 };
+
+  if (gFill) gFill.style.width = (qG.percent || 72) + '%';
+  if (gText) gText.textContent = `${qG.percent || 72}% khả dụng · ${qG.rpm || 60} RPM`;
+  if (cFill) cFill.style.width = (qC.percent || 94) + '%';
+  if (cText) cText.textContent = `${qC.percent || 94}% khả dụng · ${(qC.tpm || 200000)/1000}k TPM`;
+}
+
+// 2. Load & Render Conversations (Cột 1)
+async function loadGenConversations() {
+  try {
+    const res = await fetch('/api/gen/conversations');
+    if (res.ok) {
+      const data = await res.json();
+      genState.conversations = data.conversations || [];
+      if (!genState.conversations.some(c => c.id === genState.currentConvId)) {
+        genState.currentConvId = genState.conversations[0]?.id || 'conv-gen-core-01';
+      }
+      renderGenConversationsList();
+    }
+  } catch (err) {
+    console.warn('[Gen Conversations] Error:', err);
+  }
+}
+
+function renderGenConversationsList() {
+  const pList = $('genPinnedSessions');
+  const rList = $('genRecentSessions');
+  if (!pList || !rList) return;
+
+  const q = (genState.searchQuery || '').toLowerCase();
+  const filtered = genState.conversations.filter(c => {
+    return !q || (c.title || '').toLowerCase().includes(q) || (c.last_msg || '').toLowerCase().includes(q);
+  });
+
+  const pinned = filtered.filter(c => c.is_pinned);
+  const recent = filtered.filter(c => !c.is_pinned);
+
+  const renderCard = c => {
+    const isAct = c.id === genState.currentConvId;
+    const timeStr = c.last_time ? c.last_time.slice(11, 16) || c.last_time : 'Mới';
+    return `
+      <div class="genSessionItem ${isAct ? 'active' : ''}" onclick="selectGenConversation('${c.id}')">
+        <div class="genSessionItemTop">
+          <span class="genSessionTitle" title="${escapeHtml(c.title)}">${escapeHtml(c.title)}</span>
+          <span class="genSessionModelBadge">${escapeHtml((c.model || 'Gemini 3.1 Pro').split(' ')[0] + ' ' + ((c.model || '').split(' ')[1] || ''))}</span>
+        </div>
+        <div class="genSessionSnippet">${escapeHtml(c.last_msg || 'Chưa có tin nhắn...')}</div>
+        <div class="genSessionItemFoot">
+          <span>🕒 ${escapeHtml(timeStr)} · ${c.msg_count || 0} tin</span>
+          <div style="display:flex;align-items:center;gap:4px">
+            <span onclick="event.stopPropagation();togglePinGenSession('${c.id}', ${c.is_pinned ? 0 : 1})" title="${c.is_pinned ? 'Bỏ ghim' : 'Ghim phiên này'}" style="cursor:pointer;opacity:0.7">
+              ${c.is_pinned ? '📌' : '📍'}
+            </span>
+            <span onclick="event.stopPropagation();deleteGenSession('${c.id}')" title="Xóa phiên" style="cursor:pointer;opacity:0.6">🗑️</span>
+          </div>
+        </div>
+      </div>
+    `;
+  };
+
+  pList.innerHTML = pinned.length > 0 ? pinned.map(renderCard).join('') : '<div style="font-size:10px;color:#64748b;padding:4px 6px">Chưa có phiên ghim</div>';
+  rList.innerHTML = recent.length > 0 ? recent.map(renderCard).join('') : '<div style="font-size:10px;color:#64748b;padding:4px 6px">Chưa có phiên gần đây</div>';
+}
+
+function filterGenSessions(q) {
+  genState.searchQuery = q;
+  renderGenConversationsList();
+}
+
+async function selectGenConversation(convId) {
+  genState.currentConvId = convId;
+  const c = genState.conversations.find(x => x.id === convId);
+  if (c) {
+    genState.currentModel = c.model || 'Gemini 3.1 Pro (High)';
+    genState.currentAccount = c.account_profile || 'owner_default';
+    if ($('genModelSelect')) $('genModelSelect').value = genState.currentModel;
+    if ($('genAccountSelect')) $('genAccountSelect').value = genState.currentAccount;
+    if ($('genInputModelBadge')) $('genInputModelBadge').textContent = genState.currentModel.split(' ')[0] + ' ' + (genState.currentModel.split(' ')[1] || '');
+  }
+  renderGenConversationsList();
+  if ($('genCurrentSessionBadge')) $('genCurrentSessionBadge').textContent = c?.title?.slice(0, 18) || convId;
+  await loadGenMessages(convId);
+}
+
+async function openNewGenChatModal() {
+  const title = prompt('Nhập tên phiên làm việc mới với Gen Core:', 'Phiên thảo luận kiến trúc Swarm');
+  if (!title || !title.trim()) return;
+  try {
+    const res = await fetch('/api/gen/conversations/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        project_id: 'PRJ-GEN-WORKPLACE',
+        title: title.trim(),
+        model: genState.currentModel || 'Gemini 3.1 Pro (High)',
+        account: genState.currentAccount || 'owner_default'
+      })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      showToast('Đã khởi tạo phiên: ' + data.title);
+      await loadGenConversations();
+      selectGenConversation(data.id);
+    }
+  } catch (e) {
+    showToast('Lỗi tạo phiên: ' + e.message);
+  }
+}
+
+async function togglePinGenSession(convId, newPinStatus) {
+  try {
+    await fetch('/api/gen/conversations/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ conv_id: convId, is_pinned: newPinStatus })
+    });
+    await loadGenConversations();
+    showToast(newPinStatus ? 'Đã ghim phiên' : 'Đã bỏ ghim phiên');
+  } catch (e) {
+    showToast('Lỗi: ' + e.message);
+  }
+}
+
+async function deleteGenSession(convId) {
+  if (!confirm('Bạn có chắc chắn muốn xóa phiên hội thoại này?')) return;
+  try {
+    await fetch('/api/gen/conversations/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ conv_id: convId })
+    });
+    showToast('Đã xóa phiên hội thoại');
+    await loadGenConversations();
+  } catch (e) {
+    showToast('Lỗi: ' + e.message);
+  }
+}
+
+// 3. Messages & Progressive Compact (Cột 3)
+async function loadGenMessages(convId) {
+  const container = $('genChatMessages');
+  if (!container) return;
+  try {
+    const res = await fetch(`/api/gen/messages?conv_id=${encodeURIComponent(convId)}`);
+    if (res.ok) {
+      const data = await res.json();
+      genState.messages = data.messages || [];
+      renderGenChatMessages();
+    }
+  } catch (e) {
+    console.warn('[Gen Messages] Error:', e);
+  }
+}
+
+function renderGenChatMessages() {
+  const container = $('genChatMessages');
+  if (!container) return;
+
+  const msgs = genState.messages || [];
+  if (msgs.length === 0) {
+    container.innerHTML = `
+      <div style="text-align:center;padding:40px 10px;color:#64748b;font-size:12px">
+        ⚡ Phiên hội thoại trống. Hãy gửi tin nhắn chỉ thị đầu tiên cho Gen Core!
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = msgs.map((m) => {
+    // Thẻ nén lũy tiến (Compact Card)
+    if (m.role === 'compact') {
+      const notesPills = (m.note_ids || []).map(nid => `
+        <span class="genNotePill" onclick="openEvidenceDetail('${nid}')">${nid}</span>
+      `).join(' ');
+
+      return `
+        <div class="genCompactCard">
+          <div class="genCompactCardHead">
+            <div style="display:flex;align-items:center;gap:6px">
+              <span>📦</span>
+              <strong>Progressive Compact Context (${escapeHtml(m.compact_id || 'CPT-AUTO')})</strong>
+            </div>
+            <button class="btn small" style="font-size:9.5px;padding:1px 6px" onclick="toggleCompactedDetails()" title="Mở rộng / Thu gọn các tin nhắn cũ đã được nén">
+              ${genState.showCompactedDetails ? '▲ Thu gọn' : '▼ Chi tiết đã nén'}
+            </button>
+          </div>
+          <div class="genCompactCardBody">
+            ${escapeHtml(m.content).replace(/\n/g, '<br>')}
+          </div>
+          ${notesPills ? `<div style="display:flex;align-items:center;gap:6px;margin-top:4px">
+            <span style="font-size:10px;color:#64748b">Bằng chứng liên kết:</span>
+            ${notesPills}
+          </div>` : ''}
+        </div>
+      `;
+    }
+
+    // Nếu tin nhắn đã bị nén và người dùng không bật xem chi tiết
+    if (m.is_compacted && !genState.showCompactedDetails) {
+      return '';
+    }
+
+    const isUser = m.role === 'user';
+    const timeStr = m.created_at ? m.created_at.slice(11, 16) || m.created_at : '';
+    
+    // Format text: replace #NOTE-xx or #EVT-xx with clickable pill
+    let formatted = escapeHtml(m.content);
+    formatted = formatted.replace(/(#(?:NOTE|EVT)-\d+)/g, '<span class="genNotePill" onclick="openEvidenceDetail(\'$1\')">$1</span>');
+    formatted = formatted.replace(/\n/g, '<br>');
+    formatted = formatted.replace(/`([^`]+)`/g, '<code style="background:#16202e;padding:1px 4px;border-radius:3px;color:#38bdf8;font-family:var(--mono);font-size:11px">$1</code>');
+
+    return `
+      <div class="genMsg ${isUser ? 'user' : 'assistant'}" style="${m.is_compacted ? 'opacity:0.65;border:1px dashed #334155;border-radius:8px;padding:4px' : ''}">
+        <div class="genMsgMeta">
+          ${isUser ? `<span style="font-weight:600;color:#93c5fd">Ryan (Owner)</span>` : `<span style="font-weight:600;color:#38bdf8">⚡ Gen Core (${escapeHtml(m.model || 'Gemini Pro')})</span>`}
+          <span>${escapeHtml(timeStr)}</span>
+          ${m.is_compacted ? '<span class="badge" style="font-size:8px;background:#334155;color:#94a3b8">Đã nén</span>' : ''}
+        </div>
+        <div class="genMsgBubble">
+          ${formatted}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  container.scrollTop = container.scrollHeight;
+}
+
+function toggleCompactedDetails() {
+  genState.showCompactedDetails = !genState.showCompactedDetails;
+  renderGenChatMessages();
+}
+
+async function sendGenMessage() {
+  const input = $('genChatInput');
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text) return;
+
+  input.value = '';
+  const btn = $('btnGenSend');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Đang xử lý...';
+  }
+
+  // Optimistic UI push
+  genState.messages.push({
+    id: Date.now(),
+    role: 'user',
+    author: 'Ryan',
+    content: text,
+    model: genState.currentModel,
+    is_compacted: false,
+    created_at: new Date().toISOString()
+  });
+  renderGenChatMessages();
+
+  try {
+    const res = await fetch('/api/gen/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        conv_id: genState.currentConvId,
+        author: 'Ryan',
+        message: text,
+        model: genState.currentModel,
+        account: genState.currentAccount
+      })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      await loadGenMessages(genState.currentConvId);
+      await loadGenConversations();
+      if (data.cited_notes && data.cited_notes.length > 0) {
+        showToast(`Gen Core đã đối soát ${data.cited_notes.join(', ')} tại Cột 2`);
+      }
+    }
+  } catch (err) {
+    showToast('Lỗi gửi tin: ' + err.message);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Gửi ➔';
+    }
+  }
+}
+
+function handleGenChatKeyDown(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendGenMessage();
+  }
+}
+
+function clearGenInput() {
+  if ($('genChatInput')) $('genChatInput').value = '';
+}
+
+function insertNoteRefToInput() {
+  const input = $('genChatInput');
+  if (!input) return;
+  const currentId = genState.activeEvidenceId || 'NOTE-01';
+  input.value = (input.value ? input.value + ' ' : '') + `#${currentId}`;
+  input.focus();
+}
+
+// 4. Progressive Compaction Trigger
+async function handleGenModelChange(newModel) {
+  const oldModel = genState.currentModel;
+  genState.currentModel = newModel;
+  if ($('genInputModelBadge')) $('genInputModelBadge').textContent = newModel.split(' ')[0] + ' ' + (newModel.split(' ')[1] || '');
+
+  try {
+    const res = await fetch('/api/gen/compact', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        conv_id: genState.currentConvId,
+        model_from: oldModel,
+        model_to: newModel,
+        manual: false
+      })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.status === 'compacted') {
+        showToast(`⚡ Đã chuyển sang ${newModel} & nén lũy tiến ${data.message_count} tin cũ!`);
+        await loadGenMessages(genState.currentConvId);
+      } else {
+        showToast(`Đã đổi model sang: ${newModel}`);
+      }
+    }
+  } catch (err) {
+    showToast('Đã đổi model: ' + newModel);
+  }
+}
+
+async function triggerManualCompact() {
+  try {
+    const res = await fetch('/api/gen/compact', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        conv_id: genState.currentConvId,
+        model_from: genState.currentModel,
+        model_to: genState.currentModel,
+        manual: true
+      })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      showToast(`📦 Đã nén thành công ${data.message_count || ''} tin nhắn thành Snapshot ${data.compact_id || ''}`);
+      await loadGenMessages(genState.currentConvId);
+    }
+  } catch (e) {
+    showToast('Lỗi compact: ' + e.message);
+  }
+}
+
+async function handleGenAccountChange(newAccount) {
+  genState.currentAccount = newAccount;
+  try {
+    await fetch('/api/gen/conversations/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        conv_id: genState.currentConvId,
+        account: newAccount
+      })
+    });
+    showToast(`Đã chuyển tài khoản agy CLI sang: ${newAccount}`);
+  } catch (e) {
+    showToast('Đã đổi tài khoản: ' + newAccount);
+  }
+}
+
+// 5. Cột 2: VS Code Tabs & File Content Viewer
+function switchGenVsTab(tabName) {
+  genState.currentVsTab = tabName;
+  document.querySelectorAll('.genVsCodeTab').forEach(t => {
+    t.classList.toggle('active', t.dataset.vstab === tabName);
+  });
+  document.querySelectorAll('.genVsCodePane').forEach(p => {
+    p.classList.remove('active');
+  });
+  $(`genVsPane-${tabName}`)?.classList.add('active');
+
+  const bPath = $('genBreadcrumbPath');
+  if (bPath) {
+    if (tabName === 'file') {
+      const p = genState.activeFilePath || 'backend/main.py';
+      bPath.innerHTML = `<span>gen-workplace</span><span>›</span><span>${p.replace(/\//g, '</span><span>›</span><span>')}</span>`;
+    } else if (tabName === 'evidence') {
+      bPath.innerHTML = `<span>evidence</span><span>›</span><span style="color:#38bdf8">#${genState.activeEvidenceId || 'NOTE-01'}</span>`;
+    } else if (tabName === 'scratchpad') {
+      bPath.innerHTML = `<span>scratchpad</span><span>›</span><span>sổ tay tạm thời</span>`;
+    } else if (tabName === 'console') {
+      bPath.innerHTML = `<span>terminal</span><span>›</span><span>gen core output</span>`;
+    } else if (tabName === 'ssot') {
+      bPath.innerHTML = `<span>ssot</span><span>›</span><span>docs/SSOT_ORIGINAL_SPEC.md</span>`;
+    }
+  }
+
+  const subId = 'vstab-' + tabName;
+  activeSubTabs['gen_workplace'] = subId;
+  document.querySelectorAll('.subTab').forEach(b => b.classList.toggle('active', b.dataset.sub === subId));
+}
+
+async function loadGenFileContent(filePath, btnEl) {
+  genState.activeFilePath = filePath;
+  switchGenVsTab('file');
+
+  if (btnEl) {
+    document.querySelectorAll('.genFileQuickBtn').forEach(b => b.classList.remove('active'));
+    btnEl.classList.add('active');
+  }
+
+  const lbl = $('tabLabelFile');
+  if (lbl) lbl.textContent = `File: ${filePath.split('/').pop()}`;
+
+  const gutter = $('genCodeGutter');
+  const text = $('genCodeText');
+  if (!text) return;
+
+  text.textContent = `// Đang nạp ${filePath}...`;
+  try {
+    const res = await fetch(`/api/file/content?path=${encodeURIComponent(filePath)}`);
+    if (res.ok) {
+      const data = await res.json();
+      const content = data.content || '';
+      const lines = content.split('\n');
+      if (gutter) {
+        gutter.innerHTML = Array.from({ length: lines.length }, (_, i) => i + 1).join('<br>');
+      }
+      text.textContent = content;
+    } else {
+      text.textContent = `// Không thể đọc file: ${filePath}`;
+    }
+  } catch (err) {
+    text.textContent = `// Lỗi đọc file: ${err.message}`;
+  }
+}
+
+function loadCustomFile() {
+  const inp = $('customFilePathInput');
+  if (!inp || !inp.value.trim()) return;
+  loadGenFileContent(inp.value.trim());
+}
+
+function copyGenActiveContent() {
+  if (genState.currentVsTab === 'file') {
+    const t = $('genCodeText')?.textContent || '';
+    navigator.clipboard.writeText(t);
+    showToast('Đã copy nội dung file vào clipboard!');
+  } else if (genState.currentVsTab === 'evidence') {
+    const t = $('evidenceBody')?.textContent || '';
+    navigator.clipboard.writeText(t);
+    showToast('Đã copy nội dung bằng chứng!');
+  }
+}
+
+function reloadGenActiveTab() {
+  if (genState.currentVsTab === 'file') {
+    loadGenFileContent(genState.activeFilePath || 'backend/main.py');
+    showToast('Đã tải lại file!');
+  } else if (genState.currentVsTab === 'scratchpad') {
+    loadGenNotes();
+    showToast('Đã làm mới sổ tay!');
+  } else if (genState.currentVsTab === 'evidence') {
+    openEvidenceDetail(genState.activeEvidenceId || 'NOTE-01');
+    showToast('Đã làm mới hồ sơ bằng chứng!');
+  }
+}
+
+// 6. Evidence Trace Viewer (Cột 2 Tab 2)
+async function openEvidenceDetail(rawId) {
+  const id = (rawId || 'NOTE-01').replace(/^#/, '').trim();
+  genState.activeEvidenceId = id;
+  switchGenVsTab('evidence');
+
+  const titleEl = $('evidenceHeading');
+  const bodyEl = $('evidenceBody');
+  const refEl = $('evidenceRefText');
+  const badgeEl = $('evidenceActiveId');
+  const timeEl = $('evidenceTime');
+
+  if (badgeEl) badgeEl.textContent = `#${id}`;
+
+  let found = genState.notes.find(n => n.id === id);
+  if (!found) {
+    await loadGenNotes();
+    found = genState.notes.find(n => n.id === id);
+  }
+
+  if (!found && state.events) {
+    const ev = state.events.find(e => e.id === id);
+    if (ev) {
+      found = {
+        id: ev.id,
+        title: ev.request,
+        content: `Sự kiện thẩm định kỹ thuật: ${ev.request}\nRuntime ghi nhận: ${ev.runtime}\nTrạng thái SSOT: ${ev.status}`,
+        evidence_ref: ev.evidence,
+        created_at: ev.time || '20:35'
+      };
+    }
+  }
+
+  if (found) {
+    if (titleEl) titleEl.textContent = found.title;
+    if (bodyEl) bodyEl.textContent = found.content;
+    if (refEl) refEl.textContent = found.evidence_ref || 'Chưa gắn tệp tham chiếu';
+    if (timeEl) timeEl.textContent = found.created_at ? found.created_at.slice(11, 16) || found.created_at : '20:35';
+  } else {
+    if (titleEl) titleEl.textContent = `Hồ sơ ${id}`;
+    if (bodyEl) bodyEl.textContent = `Đang xác thực dữ kiện cho mã ${id}... Dữ liệu đã được bảo lưu trong SQLite.`;
+    if (refEl) refEl.textContent = 'docs/SSOT_ORIGINAL_SPEC.md';
+  }
+}
+
+function citeActiveEvidenceToChat() {
+  const id = genState.activeEvidenceId || 'NOTE-01';
+  const inp = $('genChatInput');
+  if (inp) {
+    inp.value = (inp.value ? inp.value + ' ' : '') + `Theo chứng cứ #${id}: `;
+    inp.focus();
+    showToast(`Đã trích dẫn #${id} vào ô chat`);
+  }
+}
+
+// 7. Scratchpad Notes (Cột 2 Tab 3 & Cột 3 Mini Widget)
+async function loadGenNotes() {
+  const container = $('genNotesListContainer');
+  try {
+    const res = await fetch('/api/gen/notes');
+    if (res.ok) {
+      const data = await res.json();
+      genState.notes = data.notes || [];
+      if (!container) return;
+
+      if (genState.notes.length === 0) {
+        container.innerHTML = '<div style="color:#64748b;font-size:12px;padding:20px;text-align:center">Sổ tay tạm thời trống. Hãy tạo ghi chú đầu tiên!</div>';
+        return;
+      }
+
+      container.innerHTML = genState.notes.map(n => `
+        <div class="card" style="padding:10px 12px;background:#0d131c;border:1px solid #1a2434;border-radius:6px;display:flex;flex-direction:column;gap:5px">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div style="display:flex;align-items:center;gap:6px">
+              <span class="genNotePill" onclick="openEvidenceDetail('${n.id}')">#${n.id}</span>
+              <strong style="font-size:11.5px;color:#f8fafc">${escapeHtml(n.title)}</strong>
+            </div>
+            <div style="display:flex;align-items:center;gap:4px">
+              <button class="btn small" style="font-size:9.5px;padding:1px 5px" onclick="openEvidenceDetail('${n.id}')">Xem hồ sơ</button>
+              <button class="btn small" style="font-size:9.5px;padding:1px 5px" onclick="deleteGenNote('${n.id}')">Xóa</button>
+            </div>
+          </div>
+          <div style="font-size:11px;color:#cbd5e1;line-height:1.4">${escapeHtml(n.content)}</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;font-size:9.5px;color:#64748b;margin-top:2px">
+            <span>Ref: <code style="color:#4ade80">${escapeHtml(n.evidence_ref || 'SSOT spec')}</code></span>
+            <span>Tác giả: ${escapeHtml(n.author || 'Ryan')}</span>
+          </div>
+        </div>
+      `).join('');
+    }
+  } catch (err) {
+    console.warn('[Gen Notes] Error:', err);
+  }
+}
+
+async function saveQuickNote() {
+  const inp = $('genQuickNoteInput');
+  if (!inp) return;
+  const val = inp.value.trim();
+  if (!val) return;
+
+  try {
+    const res = await fetch('/api/gen/notes/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        project_id: 'PRJ-GEN-WORKPLACE',
+        title: val.slice(0, 40),
+        content: val,
+        tags: ['QuickNote'],
+        evidence_ref: 'Gen Chatroom interaction',
+        author: 'Ryan',
+        conv_id: genState.currentConvId
+      })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      inp.value = '';
+      showToast(`✅ Đã lưu ${data.id}: "${data.title}" vào SQLite!`);
+      await loadGenNotes();
+      
+      const chatInp = $('genChatInput');
+      if (chatInp) {
+        chatInp.value = (chatInp.value ? chatInp.value + ' ' : '') + `#${data.id}`;
+      }
+    }
+  } catch (e) {
+    showToast('Lỗi lưu note: ' + e.message);
+  }
+}
+
+function openNewNoteModal() {
+  const title = prompt('Tiêu đề ghi chú:', 'Quy ước ranh giới kỹ thuật');
+  if (!title) return;
+  const content = prompt('Nội dung chi tiết ghi chú:', 'Chỉ thị từ Ryan...');
+  if (!content) return;
+
+  fetch('/api/gen/notes/save', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      project_id: 'PRJ-GEN-WORKPLACE',
+      title: title.trim(),
+      content: content.trim(),
+      tags: ['ManualNote'],
+      author: 'Ryan',
+      conv_id: genState.currentConvId
+    })
+  }).then(r => r.json()).then(data => {
+    showToast(`Đã tạo #${data.id}`);
+    loadGenNotes();
+  });
+}
+
+async function deleteGenNote(noteId) {
+  if (!confirm(`Xóa ghi chú #${noteId}?`)) return;
+  try {
+    await fetch('/api/gen/notes/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: noteId, project_id: 'PRJ-GEN-WORKPLACE' })
+    });
+    showToast(`Đã xóa #${noteId}`);
+    await loadGenNotes();
+  } catch (e) {
+    showToast('Lỗi: ' + e.message);
+  }
+}
+
+// 8. SSOT Spec Preview
+async function loadGenSsotSpec() {
+  const box = $('genSsotSpecRendered');
+  if (!box) return;
+  try {
+    const res = await fetch('/api/file/content?path=docs/SSOT_ORIGINAL_SPEC.md');
+    if (res.ok) {
+      const data = await res.json();
+      const raw = data.content || '';
+      let html = escapeHtml(raw);
+      html = html.replace(/^### (.*$)/gim, '<h3 style="color:#7dd3fc;margin:14px 0 6px 0;font-size:13px">$1</h3>');
+      html = html.replace(/^## (.*$)/gim, '<h2 style="color:#38bdf8;margin:18px 0 8px 0;font-size:14.5px;border-bottom:1px solid #1e293b;padding-bottom:4px">$1</h2>');
+      html = html.replace(/^# (.*$)/gim, '<h1 style="color:#f8fafc;margin:0 0 10px 0;font-size:16px">$1</h1>');
+      html = html.replace(/^\- (.*$)/gim, '<li style="margin-left:16px">$1</li>');
+      html = html.replace(/\n/g, '<br>');
+      box.innerHTML = html;
+    }
+  } catch (e) {}
+}
+
+function clearGenConsole() {
+  if ($('genConsoleOutput')) {
+    $('genConsoleOutput').innerHTML = '<span style="color:#64748b">▸ Đã xóa màn hình console. Sẵn sàng...</span>';
   }
 }
 
@@ -8771,6 +10275,7 @@ restoreWorkspace(state.projects[state.activeProjectIndex || 0]?.workspace || sna
 refreshAll();
 persist();
 syncFromBackend();
+initGenWorkplace();
 
 // Seed deck with welcome messages once DOM is ready
 setTimeout(() => {

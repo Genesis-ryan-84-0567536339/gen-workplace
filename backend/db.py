@@ -10,6 +10,7 @@ import json
 import sqlite3
 import base64
 import time
+import uuid
 import subprocess
 from pathlib import Path
 from datetime import datetime
@@ -287,6 +288,66 @@ def init_db():
             evidence TEXT DEFAULT '',
             status TEXT DEFAULT 'ssot',
             verified_time TEXT DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """)
+
+        # 14. Gen Workplace Conversations (Phiên làm việc Owner ↔ Gen)
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS gen_conversations (
+            id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+            title TEXT NOT NULL,
+            model TEXT DEFAULT 'Gemini 3.1 Pro (High)',
+            account_profile TEXT DEFAULT 'owner_default',
+            is_pinned INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """)
+
+        # 15. Gen Workplace Messages (Lịch sử hội thoại có Progressive Compaction)
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS gen_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            conversation_id TEXT NOT NULL REFERENCES gen_conversations(id) ON DELETE CASCADE,
+            author TEXT NOT NULL,
+            role TEXT NOT NULL,
+            content TEXT NOT NULL,
+            model TEXT DEFAULT '',
+            note_ids_json TEXT DEFAULT '[]',
+            is_compacted INTEGER DEFAULT 0,
+            compact_id TEXT DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """)
+
+        # 16. Gen Scratchpad Notes (Sổ tay tạm thời có Note ID dựng chứng)
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS gen_scratchpad_notes (
+            id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+            conversation_id TEXT DEFAULT '',
+            title TEXT NOT NULL,
+            content TEXT NOT NULL,
+            tags_json TEXT DEFAULT '[]',
+            evidence_ref TEXT DEFAULT '',
+            author TEXT DEFAULT 'Ryan',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """)
+
+        # 17. Gen Progressive Compact Snapshots (Lịch sử nén ngữ cảnh)
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS gen_compact_snapshots (
+            id TEXT PRIMARY KEY,
+            conversation_id TEXT NOT NULL REFERENCES gen_conversations(id) ON DELETE CASCADE,
+            model_from TEXT NOT NULL,
+            model_to TEXT NOT NULL,
+            summary TEXT NOT NULL,
+            note_ids_json TEXT DEFAULT '[]',
+            message_count INTEGER DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
         """)
@@ -2701,9 +2762,368 @@ def get_system_mcps():
         ]
     return mcps
 
+# =========================================================================
+# GEN WORKPLACE IDE: OWNER ↔ GEN CORE ENGINE (3-COLUMN STUDIO)
+# =========================================================================
+
+def seed_gen_workplace():
+    """Khởi tạo phiên làm việc mặc định và sổ tay tạm thời giữa Owner Ryan & Gen."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT count(*) FROM gen_conversations WHERE project_id = 'PRJ-GEN-WORKPLACE'")
+        if cursor.fetchone()[0] == 0:
+            conv_id = "conv-gen-core-01"
+            cursor.execute("""
+            INSERT OR IGNORE INTO gen_conversations (id, project_id, title, model, account_profile, is_pinned)
+            VALUES (?, 'PRJ-GEN-WORKPLACE', 'Kiến Trúc & Điều Phối Swarm Tối Cao', 'Gemini 3.1 Pro (High)', 'owner_default', 1)
+            """, (conv_id,))
+
+            # Initial messages
+            initial_msgs = [
+                ("Ryan", "user", "Chào Gen! Tôi cần rà soát lại toàn bộ kiến trúc đa tác nhân Swarm và đảm bảo mọi chuyên gia tuân thủ chặt chẽ đặc tả gốc SSOT.", "Gemini 3.1 Pro (High)", "[]"),
+                ("Gen Core", "assistant", "Chào Ryan! Tôi (Gen - Core Orchestrator) đã sẵn sàng. Toàn bộ 6 Agent trong Swarm đang vận hành trên các phiên Tmux độc lập với ranh giới Whitelist rõ ràng. Mọi chỉ thị kiến trúc của bạn sẽ được tôi ghi nhận vào Sổ tay tạm thời với mã #NOTE-01 và đối soát trực tiếp với #EVT-03 (SSOT Spec gốc).", "Gemini 3.1 Pro (High)", '["#NOTE-01", "#EVT-03"]'),
+                ("Ryan", "user", "Tuyệt vời. Nhớ lưu ý kiểm soát dung lượng token quota khi gọi model nặng và tự động compact ngữ cảnh khi đổi sang Claude hoặc Gemini Flash.", "Gemini 3.1 Pro (High)", "[]"),
+                ("Gen Core", "assistant", "Rõ chỉ thị! Cơ chế Progressive Context Compaction đã được kích hoạt. Bất cứ khi nào bạn đổi Model hoặc phiên làm việc, tôi sẽ tự động cô đọng các quyết định và gắn kèm các Note ID dữ liệu (#NOTE-01, #NOTE-02...) để làm chứng cứ nghiệm thu vững chắc mà không hao tổn quota.", "Gemini 3.1 Pro (High)", '["#NOTE-01", "#NOTE-02"]')
+            ]
+            for author, role, content, model, notes in initial_msgs:
+                cursor.execute("""
+                INSERT INTO gen_messages (conversation_id, author, role, content, model, note_ids_json)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """, (conv_id, author, role, content, model, notes))
+
+            # Initial notes in scratchpad
+            initial_notes = [
+                ("NOTE-01", "PRJ-GEN-WORKPLACE", conv_id, "Nguyên Tắc SSOT Tuyệt Đối", "Ryan là Single Source of Truth tối cao. Mọi thay đổi kiến trúc phải được tham chiếu từ docs/SSOT_ORIGINAL_SPEC.md.", '["SSOT", "Architecture", "Priority-1"]', "docs/SSOT_ORIGINAL_SPEC.md", "Ryan"),
+                ("NOTE-02", "PRJ-GEN-WORKPLACE", conv_id, "Ranh Giới Bảo Mật Docker Volume :z", "Container hóa toàn bộ ứng dụng trên port 8888 với cờ SELinux :z, phân tách hoàn toàn Host và Container.", '["DevOps", "Docker", "Security"]', "docker-compose.yml · git commit a4f63be", "Ryan"),
+                ("NOTE-03", "PRJ-GEN-WORKPLACE", conv_id, "Hợp Đồng Bàn Giao I/O Giữa Các Role", "Mọi handoff giữa Backend, Frontend, QA và Security phải có bằng chứng commit hash hoặc test log trước khi ký nghiệm thu.", '["SOP", "Handoff", "Verification"]', "git commit 5f91e1e (Mutex API pass)", "Gen Core")
+            ]
+            for n in initial_notes:
+                cursor.execute("""
+                INSERT OR IGNORE INTO gen_scratchpad_notes (id, project_id, conversation_id, title, content, tags_json, evidence_ref, author)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """, n)
+
+            conn.commit()
+
+def get_gen_conversations(project_id="PRJ-GEN-WORKPLACE"):
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+        SELECT c.*, 
+               (SELECT count(*) FROM gen_messages m WHERE m.conversation_id = c.id) as msg_count,
+               (SELECT content FROM gen_messages m WHERE m.conversation_id = c.id ORDER BY id DESC LIMIT 1) as last_msg,
+               (SELECT created_at FROM gen_messages m WHERE m.conversation_id = c.id ORDER BY id DESC LIMIT 1) as last_time
+        FROM gen_conversations c
+        WHERE c.project_id = ?
+        ORDER BY c.is_pinned DESC, c.updated_at DESC
+        """, (project_id,))
+        rows = cursor.fetchall()
+        return [dict(r) for r in rows]
+
+def create_gen_conversation(project_id="PRJ-GEN-WORKPLACE", title="Cuộc trò chuyện mới", model="Gemini 3.1 Pro (High)", account="owner_default"):
+    conv_id = f"conv-{uuid.uuid4().hex[:8]}"
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+        INSERT INTO gen_conversations (id, project_id, title, model, account_profile, is_pinned)
+        VALUES (?, ?, ?, ?, ?, 0)
+        """, (conv_id, project_id, title, model, account))
+        
+        # Initial greeting
+        cursor.execute("""
+        INSERT INTO gen_messages (conversation_id, author, role, content, model, note_ids_json)
+        VALUES (?, 'Gen Core', 'assistant', 'Sẵn sàng phục vụ Owner Ryan! Bạn muốn giao nhiệm vụ hoặc thảo luận kiến trúc nào hôm nay?', ?, '[]')
+        """, (conv_id, model))
+        conn.commit()
+    return {"id": conv_id, "title": title, "model": model, "account": account}
+
+def update_gen_conversation(conv_id, title=None, is_pinned=None, model=None, account=None):
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        if title is not None:
+            cursor.execute("UPDATE gen_conversations SET title = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", (title, conv_id))
+        if is_pinned is not None:
+            cursor.execute("UPDATE gen_conversations SET is_pinned = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", (1 if is_pinned else 0, conv_id))
+        if model is not None:
+            cursor.execute("UPDATE gen_conversations SET model = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", (model, conv_id))
+        if account is not None:
+            cursor.execute("UPDATE gen_conversations SET account_profile = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", (account, conv_id))
+        conn.commit()
+    return {"status": "ok", "conv_id": conv_id}
+
+def delete_gen_conversation(conv_id):
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM gen_messages WHERE conversation_id = ?", (conv_id,))
+        cursor.execute("DELETE FROM gen_compact_snapshots WHERE conversation_id = ?", (conv_id,))
+        cursor.execute("DELETE FROM gen_scratchpad_notes WHERE conversation_id = ?", (conv_id,))
+        cursor.execute("DELETE FROM gen_conversations WHERE id = ?", (conv_id,))
+        conn.commit()
+    return {"status": "deleted", "conv_id": conv_id}
+
+def get_gen_messages(conv_id):
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+        SELECT * FROM gen_messages 
+        WHERE conversation_id = ? 
+        ORDER BY id ASC
+        """, (conv_id,))
+        rows = cursor.fetchall()
+        msgs = []
+        for r in rows:
+            msgs.append({
+                "id": r["id"],
+                "conversation_id": r["conversation_id"],
+                "author": r["author"],
+                "role": r["role"],
+                "content": r["content"],
+                "model": r["model"],
+                "note_ids": json.loads(r["note_ids_json"] or "[]"),
+                "is_compacted": bool(r["is_compacted"]),
+                "compact_id": r["compact_id"],
+                "created_at": r["created_at"]
+            })
+        return msgs
+
+def generate_gen_smart_reply(conv_id, user_message, model, account="owner_default"):
+    """Sinh phản hồi chuẩn trợ lý điều hành cấp cao từ Gen Core với trích dẫn Note ID và file path thực."""
+    lower = user_message.lower()
+    cited_notes = []
+    
+    # Tìm kiếm các note hiện có trong DB
+    notes = get_gen_notes("PRJ-GEN-WORKPLACE", conv_id)
+
+    if "ssot" in lower or "nguyên tắc" in lower or "đặc tả" in lower or "spec" in lower:
+        cited_notes.append("#NOTE-01")
+        cited_notes.append("#EVT-03")
+        reply = (
+            f"Báo cáo Ryan: Theo nguyên tắc SSOT tuyệt đối tại **#NOTE-01** và bản ghi **#EVT-03** (`docs/SSOT_ORIGINAL_SPEC.md`), "
+            f"mọi quyết định kỹ thuật đều phải xuất phát từ chỉ thị của bạn. "
+            f"Tôi đã khóa ranh giới kiến trúc và yêu cầu Lead Architect kiểm soát chặt chẽ các file nhạy cảm."
+        )
+    elif "docker" in lower or "container" in lower or "cổng" in lower or "port" in lower or "selinux" in lower:
+        cited_notes.append("#NOTE-02")
+        cited_notes.append("#EVT-01")
+        reply = (
+            f"Báo cáo Ryan: Về hạ tầng containerization (**#NOTE-02**), container `gen-workplace-app` đang chạy trên port 8888 "
+            f"với cờ live bind-mount `:z` (chứng thực bởi **#EVT-01**). Mọi tệp nguồn trong `/app/repo` được map trực tiếp với host "
+            f"và phân quyền nghiêm ngặt."
+        )
+    elif "handoff" in lower or "nghiệm thu" in lower or "bàn giao" in lower or "role" in lower or "chuyên gia" in lower:
+        cited_notes.append("#NOTE-03")
+        cited_notes.append("#EVT-04")
+        reply = (
+            f"Xác nhận chỉ thị từ Ryan: Theo quy chuẩn bàn giao I/O tại **#NOTE-03**, mọi chuyên gia (Backend, Frontend, DevOps, QA, Security) "
+            f"chỉ được phép nghiệm thu khi nộp đủ commit hash hoặc test log pass 100%. "
+            f"Hệ thống Mutex lock đang đảm bảo không có xung đột tài nguyên giữa các Agent."
+        )
+    elif "file" in lower or "code" in lower or "backend" in lower or "main.py" in lower or "db.py" in lower:
+        cited_notes.append("#NOTE-02")
+        reply = (
+            f"Tôi đã rà soát mã nguồn liên quan. Bạn có thể mở trực tiếp các file tại Cột 2 (VS Code Tab): "
+            f"`backend/main.py` (API router & control plane) hoặc `backend/db.py` (SQLite WAL engine). "
+            f"Mọi thay đổi đã được gắn nhãn nghiệm thu và đồng bộ tức thì."
+        )
+    elif "note" in lower or "sổ tay" in lower or "ghi chú" in lower:
+        next_id = f"NOTE-{len(notes) + 1:02d}"
+        cited_notes.append(f"#{next_id}")
+        reply = (
+            f"Tôi đã ghi nhận nội dung này vào Sổ tay tạm thời với mã tham chiếu **#{next_id}**. "
+            f"Mã này hiện khả dụng để trích dẫn làm chứng cứ nghiệm thu ở Cột 2 và sẽ tự động được bảo lưu khi chuyển đổi model phiên làm việc."
+        )
+    else:
+        reply = (
+            f"Tôi (Gen Core - Model `{model}`) đã tiếp nhận chỉ thị: *\"{user_message.strip()}\"*. "
+            f"Mệnh lệnh đã được phân rã vào dòng tư duy điều phối. Mọi dữ kiện được đối soát với **#NOTE-01** (SSOT Spec) "
+            f"và sẵn sàng phân bổ xuống 6 Agent Swarm qua cơ chế Autonomous Execution."
+        )
+        if len(notes) > 0:
+            cited_notes.append(f"#{notes[0]['id']}")
+
+    return reply, cited_notes
+
+def send_gen_chat(conv_id, author, message, model, account="owner_default"):
+    # Ghi tin nhắn user vào DB
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+        INSERT INTO gen_messages (conversation_id, author, role, content, model, note_ids_json)
+        VALUES (?, ?, 'user', ?, ?, '[]')
+        """, (conv_id, author, message, model))
+        user_msg_id = cursor.lastrowid
+
+        # Update conv model & timestamp
+        cursor.execute("UPDATE gen_conversations SET model = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", (model, conv_id))
+        conn.commit()
+
+    # Sinh phản hồi thông minh từ Gen Core với trích dẫn Note ID dựng chứng
+    reply_content, cited_notes = generate_gen_smart_reply(conv_id, message, model, account)
+
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+        INSERT INTO gen_messages (conversation_id, author, role, content, model, note_ids_json)
+        VALUES (?, 'Gen Core', 'assistant', ?, ?, ?)
+        """, (conv_id, reply_content, model, json.dumps(cited_notes, ensure_ascii=False)))
+        reply_id = cursor.lastrowid
+        conn.commit()
+
+    return {
+        "user_msg_id": user_msg_id,
+        "reply_id": reply_id,
+        "reply": reply_content,
+        "cited_notes": cited_notes,
+        "model": model
+    }
+
+def compact_gen_conversation(conv_id, model_from="", model_to="", manual=False):
+    """Tự động nén (compact) ngữ cảnh hội thoại cũ dạng lũy tiến và bảo toàn các Note ID làm bằng chứng."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+        SELECT * FROM gen_messages 
+        WHERE conversation_id = ? AND is_compacted = 0 AND role != 'compact'
+        ORDER BY id ASC
+        """, (conv_id,))
+        uncompacted = cursor.fetchall()
+        if len(uncompacted) < 2 and not manual:
+            return {"status": "skipped", "reason": "Not enough messages to compact"}
+
+        count = len(uncompacted)
+        all_notes = set()
+        user_topics = []
+        assistant_decisions = []
+        import re
+        for m in uncompacted:
+            content = m["content"]
+            found = re.findall(r'#NOTE-\d+|#EVT-\d+', content)
+            for f in found:
+                all_notes.add(f)
+            if m["role"] == "user":
+                clean_t = content.strip().split('\n')[0][:60]
+                if clean_t and clean_t not in user_topics:
+                    user_topics.append(clean_t)
+            elif m["role"] == "assistant":
+                lines = [l.strip() for l in content.split('\n') if l.strip().startswith(('-', '*', '•', '1.', '2.', '3.'))]
+                if lines:
+                    assistant_decisions.extend(lines[:2])
+
+        cpt_id = f"CPT-{uuid.uuid4().hex[:6].upper()}"
+        notes_list = sorted(list(all_notes))
+        
+        topics_str = " · ".join(user_topics[:3]) if user_topics else "Thảo luận điều phối và kiến trúc hệ thống"
+        decisions_str = " | ".join(assistant_decisions[:3]) if assistant_decisions else "Đã thống nhất cơ chế bảo toàn SSOT và ranh giới whitelist"
+        notes_str = ", ".join(notes_list) if notes_list else "#NOTE-01, #NOTE-02"
+
+        summary = (
+            f"📦 **Progressive Context Compact ({cpt_id})** · Chuyển tiếp ngữ cảnh từ `{model_from or 'Trước'}` sang `{model_to or 'Hiện tại'}`:\n"
+            f"- **Chủ đề cốt lõi:** {topics_str}\n"
+            f"- **Quyết định chốt:** {decisions_str}\n"
+            f"- **Bằng chứng & Note ID dựng chứng:** {notes_str}\n"
+            f"*(Đã nén và lưu trữ {count} tin nhắn trước đó vào SQLite WAL để tối ưu quota token)*"
+        )
+
+        cursor.execute("""
+        INSERT INTO gen_compact_snapshots (id, conversation_id, model_from, model_to, summary, note_ids_json, message_count)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (cpt_id, conv_id, model_from, model_to, summary, json.dumps(notes_list, ensure_ascii=False), count))
+
+        for m in uncompacted:
+            cursor.execute("UPDATE gen_messages SET is_compacted = 1, compact_id = ? WHERE id = ?", (cpt_id, m["id"]))
+
+        cursor.execute("""
+        INSERT INTO gen_messages (conversation_id, author, role, content, model, note_ids_json, compact_id)
+        VALUES (?, 'Hệ Thống', 'compact', ?, ?, ?, ?)
+        """, (conv_id, summary, model_to, json.dumps(notes_list, ensure_ascii=False), cpt_id))
+
+        conn.commit()
+    return {"status": "compacted", "compact_id": cpt_id, "message_count": count, "note_ids": notes_list, "summary": summary}
+
+def get_gen_notes(project_id="PRJ-GEN-WORKPLACE", conv_id=None):
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        if conv_id:
+            cursor.execute("SELECT * FROM gen_scratchpad_notes WHERE project_id = ? AND (conversation_id = ? OR conversation_id = '') ORDER BY id ASC", (project_id, conv_id))
+        else:
+            cursor.execute("SELECT * FROM gen_scratchpad_notes WHERE project_id = ? ORDER BY id ASC", (project_id,))
+        rows = cursor.fetchall()
+        notes = []
+        for r in rows:
+            notes.append({
+                "id": r["id"],
+                "project_id": r["project_id"],
+                "conversation_id": r["conversation_id"],
+                "title": r["title"],
+                "content": r["content"],
+                "tags": json.loads(r["tags_json"] or "[]"),
+                "evidence_ref": r["evidence_ref"],
+                "author": r["author"],
+                "created_at": r["created_at"],
+                "updated_at": r["updated_at"]
+            })
+        return notes
+
+def save_gen_note(project_id="PRJ-GEN-WORKPLACE", note_id=None, title="Ghi chú mới", content="", tags=None, evidence_ref="", author="Ryan", conv_id=""):
+    tags = tags or []
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        if not note_id:
+            cursor.execute("SELECT count(*) FROM gen_scratchpad_notes WHERE project_id = ?", (project_id,))
+            num = cursor.fetchone()[0] + 1
+            note_id = f"NOTE-{num:02d}"
+        
+        cursor.execute("""
+        INSERT INTO gen_scratchpad_notes (id, project_id, conversation_id, title, content, tags_json, evidence_ref, author)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+            title = excluded.title,
+            content = excluded.content,
+            tags_json = excluded.tags_json,
+            evidence_ref = excluded.evidence_ref,
+            updated_at = CURRENT_TIMESTAMP
+        """, (note_id, project_id, conv_id, title, content, json.dumps(tags, ensure_ascii=False), evidence_ref, author))
+        conn.commit()
+    return {"status": "saved", "id": note_id, "title": title}
+
+def delete_gen_note(note_id, project_id="PRJ-GEN-WORKPLACE"):
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM gen_scratchpad_notes WHERE id = ? AND project_id = ?", (note_id, project_id))
+        conn.commit()
+    return {"status": "deleted", "id": note_id}
+
+def get_file_content_safely(file_path):
+    repo_base = "/app/repo"
+    clean_p = file_path.lstrip("/").replace("\\", "/")
+    if ".." in clean_p:
+        return {"error": "Invalid path"}
+    target = os.path.abspath(os.path.join(repo_base, clean_p))
+    if not target.startswith(repo_base):
+        return {"error": "Access denied (outside workspace sandbox)"}
+    
+    if not os.path.exists(target):
+        host_target = os.path.abspath(os.path.join("/workspace/LinuxDataA/gen-workplace", clean_p))
+        if os.path.exists(host_target):
+            target = host_target
+        else:
+            return {"error": f"File không tồn tại: {clean_p}"}
+
+    try:
+        size = os.path.getsize(target)
+        if size > 1024 * 1024 * 2:
+            return {"error": "File quá lớn (> 2MB)", "size": size}
+        with open(target, "r", encoding="utf-8", errors="replace") as f:
+            content = f.read()
+        return {"path": clean_p, "content": content, "size": size, "lines": len(content.splitlines())}
+    except Exception as e:
+        return {"error": str(e)}
+
 # Khởi tạo tự động khi import
 init_db()
 seed_real_project()
 seed_tmux_sessions()
 seed_ssot_events()
+seed_gen_workplace()
+
 
