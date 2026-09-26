@@ -49,9 +49,58 @@ button { cursor: pointer; }
 .app {
   height: 100vh;
   display: grid;
-  grid-template-columns: 230px minmax(0, 1fr);
+  grid-template-columns: var(--sidebar-w, 230px) minmax(0, 1fr);
   grid-template-rows: 50px 1fr;
   overflow: hidden;
+  transition: grid-template-columns 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.app.sidebar-collapsed {
+  --sidebar-w: 58px !important;
+}
+.app.sidebar-collapsed .brand span,
+.app.sidebar-collapsed .brand .topmeta {
+  display: none !important;
+}
+.app.sidebar-collapsed .brand {
+  min-width: auto;
+}
+.app.sidebar-collapsed .sidebar .navLabel,
+.app.sidebar-collapsed .sidebar .projectList,
+.app.sidebar-collapsed .sidebar .sidebarFoot,
+.app.sidebar-collapsed .sidebar .navItem span:not(.navIcon),
+.app.sidebar-collapsed .sidebar .navItem .badge {
+  display: none !important;
+}
+.app.sidebar-collapsed .sidebar .navItem {
+  justify-content: center;
+  padding: 10px 0;
+}
+.app.sidebar-collapsed .sidebar .navIcon {
+  font-size: 16px;
+  margin: 0;
+}
+
+/* Sidebar Resizer */
+.sidebar {
+  position: relative;
+}
+.sidebarResizer {
+  position: absolute;
+  top: 0;
+  right: -2px;
+  width: 5px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 100;
+  transition: background 0.15s ease;
+}
+.sidebarResizer:hover, .sidebarResizer.active {
+  background: #0284c7;
+}
+
+body.resizing-active, body.resizing-active * {
+  cursor: col-resize !important;
+  user-select: none !important;
 }
 
 /* Header Top */
@@ -81,6 +130,25 @@ button { cursor: pointer; }
   color: var(--accent);
   font: 700 11px var(--mono);
   background: #161c24;
+}
+.btnSidebarToggle {
+  background: transparent;
+  border: 1px solid transparent;
+  color: #94a3b8;
+  padding: 4px 7px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.12s ease;
+  margin-right: 2px;
+}
+.btnSidebarToggle:hover {
+  background: #1e293b;
+  color: #38bdf8;
+  border-color: #334155;
 }
 .projectSelect {
   display: flex;
@@ -2635,22 +2703,20 @@ button { cursor: pointer; }
 /* GEN WORKPLACE IDE: 3-COLUMN STUDIO LAYOUT */
 /* ========================================================================= */
 .genWpShell {
-  display: grid;
-  grid-template-columns: 260px minmax(0, 1fr) 430px;
+  display: flex;
+  flex-direction: row;
   height: calc(100vh - 46px);
   max-height: calc(100vh - 46px);
   overflow: hidden;
   background: #090d14;
   border-top: 1px solid #161f2e;
-}
-@media (max-width: 1280px) {
-  .genWpShell {
-    grid-template-columns: 220px minmax(0, 1fr) 380px;
-  }
+  position: relative;
+  --gen-col1-w: 260px;
+  --gen-col3-w: 430px;
 }
 @media (max-width: 1024px) {
   .genWpShell {
-    grid-template-columns: 1fr;
+    flex-direction: column;
     height: auto;
     overflow-y: auto;
   }
@@ -2658,11 +2724,21 @@ button { cursor: pointer; }
 
 /* CỘT 1: CLAUDE.AI CHAT SESSIONS SIDEBAR */
 .genWpCol1 {
+  width: var(--gen-col1-w, 260px);
+  min-width: 160px;
+  max-width: 550px;
+  flex-shrink: 0;
   background: #0d121a;
   border-right: 1px solid #1a2332;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  transition: width 0.12s ease;
+}
+.genWpCol1.collapsed {
+  display: none !important;
+  width: 0 !important;
+  min-width: 0 !important;
 }
 .genWpCol1Head {
   padding: 10px 12px;
@@ -2778,11 +2854,12 @@ button { cursor: pointer; }
 
 /* CỘT 2: VS CODE MULTI-TAB CONTENT & VIEWER */
 .genWpCol2 {
+  flex: 1;
+  min-width: 250px;
   background: #080b10;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border-right: 1px solid #1a2332;
 }
 .genVsCodeTabBar {
   display: flex;
@@ -2909,10 +2986,46 @@ button { cursor: pointer; }
 
 /* CỘT 3: GEN CORE CHATROOM & TELEMETRY */
 .genWpCol3 {
+  width: var(--gen-col3-w, 430px);
+  min-width: 280px;
+  max-width: 750px;
+  flex-shrink: 0;
   background: #0b0e14;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  transition: width 0.12s ease;
+}
+.genWpCol3.collapsed {
+  display: none !important;
+  width: 0 !important;
+  min-width: 0 !important;
+}
+
+/* DRAGGABLE RESIZER SPLITTERS */
+.genResizer {
+  width: 5px;
+  background: #141c28;
+  cursor: col-resize;
+  flex-shrink: 0;
+  z-index: 25;
+  transition: background 0.15s ease;
+  position: relative;
+}
+.genResizer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -3px;
+  right: -3px;
+  z-index: 26;
+}
+.genResizer:hover, .genResizer.active {
+  background: #0284c7;
+}
+.genResizer.disabled {
+  display: none !important;
 }
 .genChatHead {
   padding: 10px 12px;
@@ -3147,6 +3260,7 @@ button { cursor: pointer; }
   <!-- TOP APP BAR -->
   <header class="top">
     <div class="brand">
+      <button class="btnSidebarToggle" id="btnToggleAppSidebar" onclick="toggleAppSidebar()" title="Thu gọn / Mở rộng Sidebar chính (Ctrl+B)">☰</button>
       <div class="brandMark">GW</div>
       <div>
         <span>Gen-workplace</span>
@@ -3236,6 +3350,8 @@ button { cursor: pointer; }
       <div class="env"><span>Runtimes</span><strong id="sideRuntime">6 online (Docker)</strong></div>
       <div class="env"><span>SSOT Fact</span><strong id="sideSsot">4 verified</strong></div>
     </div>
+    <!-- DRAGGABLE RESIZER CHO SIDEBAR CHÍNH -->
+    <div class="sidebarResizer" id="appSidebarResizer" title="Kéo để chỉnh độ rộng Sidebar chính"></div>
   </aside>
 
   <!-- MAIN VIEWPORT -->
@@ -3255,7 +3371,10 @@ button { cursor: pointer; }
                 <span style="font-size:14px">💬</span>
                 <strong style="font-size:12px;color:#f8fafc">Phiên Chat Gen</strong>
               </div>
-              <button class="btn small primary" style="font-size:10px;padding:2px 8px;border-radius:4px" onclick="openNewGenChatModal()" title="Mở phiên trò chuyện mới">+ Mới</button>
+              <div style="display:flex;align-items:center;gap:4px">
+                <button class="btn small primary" style="font-size:10px;padding:2px 8px;border-radius:4px" onclick="openNewGenChatModal()" title="Mở phiên trò chuyện mới">+ Mới</button>
+                <button class="btn small" id="btnCollapseGenCol1" style="font-size:11px;padding:2px 6px;border-radius:4px;color:#94a3b8" onclick="toggleGenCol1()" title="Thu gọn Cột Phiên Chat">◀</button>
+              </div>
             </div>
 
             <div class="genWpCol1Search">
@@ -3290,6 +3409,9 @@ button { cursor: pointer; }
             </div>
           </div>
 
+          <!-- SPLITTER RESIZER 1 (CỘT 1 <-> CỘT 2) -->
+          <div class="genResizer" id="genResizer1" title="Kéo sang trái/phải để chỉnh độ rộng Cột Phiên Chat"></div>
+
           <!-- CỘT 2: VS CODE MULTI-TAB CONTENT & VIEWER -->
           <div class="genWpCol2">
             <!-- VS Code Tab Strip -->
@@ -3323,16 +3445,20 @@ button { cursor: pointer; }
 
             <!-- VS Code Breadcrumbs Bar -->
             <div class="genVsCodeBreadcrumbBar">
-              <div class="genVsCodeBreadcrumbPath" id="genBreadcrumbPath">
-                <span>gen-workplace</span>
-                <span>›</span>
-                <span>backend</span>
-                <span>›</span>
-                <span style="color:#f8fafc">main.py</span>
+              <div style="display:flex;align-items:center;gap:8px">
+                <button class="btn small" id="btnExpandGenCol1" style="display:none;font-size:10px;padding:2px 7px;color:#38bdf8;border-color:#1e293b;background:#101722" onclick="toggleGenCol1()" title="Mở lại Cột Phiên Chat">💬 Phiên Chat</button>
+                <div class="genVsCodeBreadcrumbPath" id="genBreadcrumbPath">
+                  <span>gen-workplace</span>
+                  <span>›</span>
+                  <span>backend</span>
+                  <span>›</span>
+                  <span style="color:#f8fafc">main.py</span>
+                </div>
               </div>
               <div style="display:flex;align-items:center;gap:6px">
                 <button class="btn small" style="font-size:9.5px;padding:1px 6px" onclick="copyGenActiveContent()" title="Sao chép nội dung">📋 Copy</button>
                 <button class="btn small" style="font-size:9.5px;padding:1px 6px" onclick="reloadGenActiveTab()" title="Làm mới nội dung">↻ Reload</button>
+                <button class="btn small" id="btnExpandGenCol3" style="display:none;font-size:10px;padding:2px 7px;color:#38bdf8;border-color:#1e293b;background:#101722" onclick="toggleGenCol3()" title="Mở lại Cột Chatroom Gen Core">⚡ Gen Core</button>
               </div>
             </div>
 
@@ -3429,6 +3555,9 @@ button { cursor: pointer; }
             </div>
           </div>
 
+          <!-- SPLITTER RESIZER 2 (CỘT 2 <-> CỘT 3) -->
+          <div class="genResizer" id="genResizer2" title="Kéo sang trái/phải để chỉnh độ rộng Cột Chatroom Gen Core"></div>
+
           <!-- CỘT 3: CHATROOM VỚI GEN CORE & TELEMETRY -->
           <div class="genWpCol3">
             <div class="genChatHead">
@@ -3440,7 +3569,10 @@ button { cursor: pointer; }
                     <span style="font-size:9.5px;color:#38bdf8;margin-left:4px">Tổng Trợ Lý Điều Hành</span>
                   </div>
                 </div>
-                <span class="badge" style="background:#162436;color:#38bdf8;font-size:9px" id="genCurrentSessionBadge">Session 01</span>
+                <div style="display:flex;align-items:center;gap:6px">
+                  <span class="badge" style="background:#162436;color:#38bdf8;font-size:9px" id="genCurrentSessionBadge">Session 01</span>
+                  <button class="btn small" id="btnCollapseGenCol3" style="font-size:11px;padding:2px 6px;border-radius:4px;color:#94a3b8" onclick="toggleGenCol3()" title="Thu gọn Cột Chatroom Gen Core">▶</button>
+                </div>
               </div>
 
               <!-- Telemetry Quota Monitor -->
@@ -8861,6 +8993,213 @@ async function dropKanban(e, target) {
 }
 
 // =========================================================================
+// SIDEBAR COLLAPSE & DRAGGABLE COLUMN RESIZERS (WITH PERSISTENT STATE)
+// =========================================================================
+
+function toggleAppSidebar() {
+  const app = document.querySelector('.app');
+  if (!app) return;
+  const isCollapsed = app.classList.toggle('sidebar-collapsed');
+  localStorage.setItem('agy_app_sidebar_collapsed', isCollapsed ? 'true' : 'false');
+}
+
+function toggleGenCol1() {
+  const col1 = document.querySelector('.genWpCol1');
+  const resizer1 = $('genResizer1');
+  const btnExpand = $('btnExpandGenCol1');
+  if (!col1) return;
+  const isCollapsed = col1.classList.toggle('collapsed');
+  if (resizer1) {
+    if (isCollapsed) resizer1.classList.add('disabled');
+    else resizer1.classList.remove('disabled');
+  }
+  if (btnExpand) {
+    btnExpand.style.display = isCollapsed ? 'inline-flex' : 'none';
+  }
+  localStorage.setItem('agy_gen_col1_collapsed', isCollapsed ? 'true' : 'false');
+}
+
+function toggleGenCol3() {
+  const col3 = document.querySelector('.genWpCol3');
+  const resizer2 = $('genResizer2');
+  const btnExpand = $('btnExpandGenCol3');
+  if (!col3) return;
+  const isCollapsed = col3.classList.toggle('collapsed');
+  if (resizer2) {
+    if (isCollapsed) resizer2.classList.add('disabled');
+    else resizer2.classList.remove('disabled');
+  }
+  if (btnExpand) {
+    btnExpand.style.display = isCollapsed ? 'inline-flex' : 'none';
+  }
+  localStorage.setItem('agy_gen_col3_collapsed', isCollapsed ? 'true' : 'false');
+}
+
+function initResizersAndSidebars() {
+  const root = document.documentElement;
+  const app = document.querySelector('.app');
+
+  // 1. Restore App Sidebar state
+  try {
+    const savedAppSidebarW = localStorage.getItem('agy_app_sidebar_w');
+    if (savedAppSidebarW) {
+      const parsedW = parseInt(savedAppSidebarW, 10);
+      if (parsedW >= 140 && parsedW <= 450) {
+        root.style.setProperty('--sidebar-w', parsedW + 'px');
+      }
+    }
+    const isAppSidebarCollapsed = localStorage.getItem('agy_app_sidebar_collapsed') === 'true';
+    if (isAppSidebarCollapsed && app) {
+      app.classList.add('sidebar-collapsed');
+    }
+  } catch (e) {}
+
+  // 2. Restore Gen Workplace Col 1 & Col 3 state
+  const shell = document.querySelector('.genWpShell');
+  const col1 = document.querySelector('.genWpCol1');
+  const col3 = document.querySelector('.genWpCol3');
+  const resizer1 = $('genResizer1');
+  const resizer2 = $('genResizer2');
+  const btnExpand1 = $('btnExpandGenCol1');
+  const btnExpand3 = $('btnExpandGenCol3');
+
+  try {
+    if (shell) {
+      const savedCol1W = localStorage.getItem('agy_gen_col1_w');
+      if (savedCol1W) {
+        const w1 = parseInt(savedCol1W, 10);
+        if (w1 >= 150 && w1 <= 600) shell.style.setProperty('--gen-col1-w', w1 + 'px');
+      }
+      const savedCol3W = localStorage.getItem('agy_gen_col3_w');
+      if (savedCol3W) {
+        const w3 = parseInt(savedCol3W, 10);
+        if (w3 >= 250 && w3 <= 850) shell.style.setProperty('--gen-col3-w', w3 + 'px');
+      }
+    }
+
+    if (col1 && localStorage.getItem('agy_gen_col1_collapsed') === 'true') {
+      col1.classList.add('collapsed');
+      if (resizer1) resizer1.classList.add('disabled');
+      if (btnExpand1) btnExpand1.style.display = 'inline-flex';
+    }
+
+    if (col3 && localStorage.getItem('agy_gen_col3_collapsed') === 'true') {
+      col3.classList.add('collapsed');
+      if (resizer2) resizer2.classList.add('disabled');
+      if (btnExpand3) btnExpand3.style.display = 'inline-flex';
+    }
+  } catch (e) {}
+
+  // 3. Setup Draggable Resizer: Main App Sidebar
+  const appResizer = $('appSidebarResizer');
+  if (appResizer) {
+    let isDragging = false;
+    appResizer.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      isDragging = true;
+      document.body.classList.add('resizing-active');
+      appResizer.classList.add('active');
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      const newW = Math.max(160, Math.min(420, e.clientX));
+      root.style.setProperty('--sidebar-w', newW + 'px');
+      if (app && app.classList.contains('sidebar-collapsed')) {
+        app.classList.remove('sidebar-collapsed');
+        localStorage.setItem('agy_app_sidebar_collapsed', 'false');
+      }
+      localStorage.setItem('agy_app_sidebar_w', newW);
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (isDragging) {
+        isDragging = false;
+        document.body.classList.remove('resizing-active');
+        appResizer.classList.remove('active');
+      }
+    });
+  }
+
+  // 4. Setup Draggable Resizer: Gen Workplace Col 1
+  if (resizer1) {
+    let isDragging = false;
+    let startX = 0;
+    let startW = 0;
+
+    resizer1.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      if (!col1 || col1.classList.contains('collapsed')) return;
+      isDragging = true;
+      startX = e.clientX;
+      startW = col1.offsetWidth;
+      document.body.classList.add('resizing-active');
+      resizer1.classList.add('active');
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isDragging || !shell) return;
+      const delta = e.clientX - startX;
+      const newW = Math.max(160, Math.min(550, startW + delta));
+      shell.style.setProperty('--gen-col1-w', newW + 'px');
+      localStorage.setItem('agy_gen_col1_w', newW);
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (isDragging) {
+        isDragging = false;
+        document.body.classList.remove('resizing-active');
+        resizer1.classList.remove('active');
+      }
+    });
+  }
+
+  // 5. Setup Draggable Resizer: Gen Workplace Col 3
+  if (resizer2) {
+    let isDragging = false;
+    let startX = 0;
+    let startW = 0;
+
+    resizer2.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      if (!col3 || col3.classList.contains('collapsed')) return;
+      isDragging = true;
+      startX = e.clientX;
+      startW = col3.offsetWidth;
+      document.body.classList.add('resizing-active');
+      resizer2.classList.add('active');
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isDragging || !shell) return;
+      const delta = startX - e.clientX;
+      const newW = Math.max(280, Math.min(750, startW + delta));
+      shell.style.setProperty('--gen-col3-w', newW + 'px');
+      localStorage.setItem('agy_gen_col3_w', newW);
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (isDragging) {
+        isDragging = false;
+        document.body.classList.remove('resizing-active');
+        resizer2.classList.remove('active');
+      }
+    });
+  }
+
+  // 6. Shortcut Ctrl+B / Cmd+B for Sidebar toggle
+  window.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+      const activeTag = document.activeElement ? document.activeElement.tagName : '';
+      if (!['INPUT', 'TEXTAREA'].includes(activeTag) && !document.activeElement.isContentEditable) {
+        e.preventDefault();
+        toggleAppSidebar();
+      }
+    }
+  });
+}
+
+// =========================================================================
 // GEN WORKPLACE IDE: 3-COLUMN STUDIO LOGIC (OWNER ↔ GEN CORE ENGINE)
 // =========================================================================
 
@@ -10269,6 +10608,7 @@ async function sendWarRoomMessage() {
 }
 
 // Initial boot
+initResizersAndSidebars();
 loadPersisted();
 ensureProjectWorkspaces();
 restoreWorkspace(state.projects[state.activeProjectIndex || 0]?.workspace || snapshotWorkspace());
