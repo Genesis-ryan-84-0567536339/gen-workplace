@@ -3929,7 +3929,10 @@ body.resizing-active, body.resizing-active * {
                     <div style="display:flex;align-items:center;gap:8px">
                       <span style="font-size:15px">📂</span>
                       <div>
-                        <strong style="font-size:12.5px;color:#f8fafc" id="genSessionFilesTitle">Tệp Của Phiên: conv-gen-core-01</strong>
+                        <div style="display:flex;align-items:center;gap:6px">
+                          <strong style="font-size:12.5px;color:#f8fafc" id="genSessionFilesTitle">Tệp Của Phiên: conv-gen-core-01</strong>
+                          <button class="btn small" style="font-size:9px;padding:1px 5px" onclick="renameCurrentGenSession()" title="Đổi tên tiêu đề phiên này">✏️</button>
+                        </div>
                         <div style="font-size:10px;color:#94a3b8" id="genSessionFilesSubtitle">Không gian thư mục làm việc riêng biệt của phiên chat này</div>
                       </div>
                     </div>
@@ -4209,7 +4212,8 @@ body.resizing-active, body.resizing-active * {
                   </div>
                 </div>
                 <div style="display:flex;align-items:center;gap:6px">
-                  <span class="badge" style="background:#162436;color:#38bdf8;font-size:9px" id="genCurrentSessionBadge">Session 01</span>
+                  <span class="badge" style="background:#162436;color:#38bdf8;font-size:9.5px;cursor:pointer" id="genCurrentSessionBadge" onclick="renameCurrentGenSession()" title="Bấm để đổi tên phiên này">Session 01</span>
+                  <button class="btn small" style="font-size:9px;padding:2px 6px" onclick="renameCurrentGenSession()" title="Đổi tên tiêu đề phiên này">✏️ Đổi tên</button>
                   <button class="btn small" id="btnCollapseGenCol3" style="font-size:11px;padding:2px 6px;border-radius:4px;color:#94a3b8" onclick="toggleGenCol3()" title="Thu gọn Cột Chatroom Gen Core">▶</button>
                 </div>
               </div>
@@ -10015,13 +10019,14 @@ function renderGenConversationsList() {
     return `
       <div class="genSessionItem ${isAct ? 'active' : ''}" onclick="selectGenConversation('${c.id}')">
         <div class="genSessionItemTop">
-          <span class="genSessionTitle" title="${escapeHtml(c.title)}">${escapeHtml(c.title)}</span>
+          <span class="genSessionTitle" title="Bấm đúp để đổi tên" ondblclick="event.stopPropagation();renameGenSessionPrompt('${c.id}')">${escapeHtml(c.title)}</span>
           <span class="genSessionModelBadge">${escapeHtml((c.model || 'Gemini 3.1 Pro').split(' ')[0] + ' ' + ((c.model || '').split(' ')[1] || ''))}</span>
         </div>
         <div class="genSessionSnippet">${escapeHtml(c.last_msg || 'Chưa có tin nhắn...')}</div>
         <div class="genSessionItemFoot">
           <span>🕒 ${escapeHtml(timeStr)} · ${c.msg_count || 0} tin</span>
-          <div style="display:flex;align-items:center;gap:4px">
+          <div style="display:flex;align-items:center;gap:6px">
+            <span onclick="event.stopPropagation();renameGenSessionPrompt('${c.id}')" title="Đổi tên tiêu đề phiên này" style="cursor:pointer;opacity:0.75;font-size:11px">✏️</span>
             <span onclick="event.stopPropagation();togglePinGenSession('${c.id}', ${c.is_pinned ? 0 : 1})" title="${c.is_pinned ? 'Bỏ ghim' : 'Ghim phiên này'}" style="cursor:pointer;opacity:0.7">
               ${c.is_pinned ? '📌' : '📍'}
             </span>
@@ -10123,6 +10128,48 @@ async function deleteGenSession(convId) {
     await loadGenConversations();
   } catch (e) {
     showToast('Lỗi: ' + e.message);
+  }
+}
+
+async function renameCurrentGenSession() {
+  const c = genState.conversations.find(x => x.id === genState.currentConvId);
+  const oldTitle = c?.title || genState.currentConvId;
+  await renameGenSessionPrompt(genState.currentConvId, oldTitle);
+}
+
+async function renameGenSessionPrompt(convId, oldTitle) {
+  const newTitle = prompt('Nhập tiêu đề mới cho phiên làm việc:', oldTitle || '');
+  if (newTitle === null) return;
+  const trimmed = newTitle.trim();
+  if (!trimmed) {
+    showToast('Tiêu đề không được để trống!');
+    return;
+  }
+  if (trimmed === oldTitle) return;
+
+  try {
+    const res = await fetch('/api/gen/conversations/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        conv_id: convId,
+        title: trimmed
+      })
+    });
+    if (res.ok) {
+      const target = genState.conversations.find(x => x.id === convId);
+      if (target) target.title = trimmed;
+      renderGenConversationsList();
+      if (convId === genState.currentConvId) {
+        if ($('genCurrentSessionBadge')) $('genCurrentSessionBadge').textContent = trimmed.length > 20 ? trimmed.slice(0, 20) + '...' : trimmed;
+        if ($('genSessionFilesTitle')) $('genSessionFilesTitle').textContent = `Tệp Của Phiên: ${trimmed}`;
+      }
+      showToast(`Đã đổi tên phiên thành: "${trimmed}"`);
+    } else {
+      showToast('Lỗi cập nhật tiêu đề!');
+    }
+  } catch (err) {
+    showToast('Lỗi: ' + err.message);
   }
 }
 

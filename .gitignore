@@ -12,3 +12,5 @@ data/
 .DS_Store
 Thumbs.db
 roles/
+*.sqlite
+*.db
