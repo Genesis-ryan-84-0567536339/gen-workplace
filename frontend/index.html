@@ -10278,7 +10278,7 @@ async function sendGenMessage() {
   const btn = $('btnGenSend');
   if (btn) {
     btn.disabled = true;
-    btn.textContent = 'Đang xử lý...';
+    btn.textContent = '⚡ agy CLI đang xử lý...';
   }
 
   // Optimistic UI push
@@ -10309,7 +10309,10 @@ async function sendGenMessage() {
       const data = await res.json();
       await loadGenMessages(genState.currentConvId);
       await loadGenConversations();
-      if (data.cited_notes && data.cited_notes.length > 0) {
+      if (data.engine === 'agy-cli') {
+        const tokStr = data.usage?.total_tokens ? ` (${data.usage.total_tokens.toLocaleString()} tokens)` : '';
+        showToast(`⚡ Phản hồi từ Core Agent agy CLI [${data.model || 'Gemini'}]${tokStr}`);
+      } else if (data.cited_notes && data.cited_notes.length > 0) {
         showToast(`Gen Core đã đối soát ${data.cited_notes.join(', ')} tại Cột 2`);
       }
     }

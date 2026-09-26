@@ -24,6 +24,7 @@ services:
       - PORT=8888
       - DATA_DIR=/app/data
       - DOCKER_CONTAINER=1
+      - HOME=/workspace
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8888/api/status"]
       interval: 10s

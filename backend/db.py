@@ -316,7 +316,9 @@ def init_db():
             ("active_tab", "TEXT DEFAULT 'files_repo'"),
             ("active_file", "TEXT DEFAULT 'backend/main.py'"),
             ("open_tabs_json", "TEXT DEFAULT '[\"backend/main.py\"]'"),
-            ("active_evidence_id", "TEXT DEFAULT 'NOTE-01'")
+            ("active_evidence_id", "TEXT DEFAULT 'NOTE-01'"),
+            ("agy_conv_id", "TEXT DEFAULT ''"),
+            ("total_tokens", "INTEGER DEFAULT 0")
         ]:
             try:
                 cursor.execute(f"ALTER TABLE gen_conversations ADD COLUMN {col_name} {col_type};")
@@ -3123,6 +3125,104 @@ def generate_gen_smart_reply(conv_id, user_message, model, account="owner_defaul
 
     return reply, cited_notes
 
+def call_agy_cli_turn(conv_id, user_message, model=None, account="owner_default"):
+    """
+    Gọi Core Agent agy CLI thời gian thực:
+    - Kế thừa ngữ cảnh phiên (conversation_id continuity).
+    - Sử dụng tài khoản/profile OAuth đã xác thực.
+    - Trả về phản hồi thực sự từ mô hình AI (Gemini / Claude).
+    - Cập nhật số token thực tế vào DB.
+    """
+    agy_conv_id = None
+    try:
+        with get_connection() as conn:
+            c = conn.cursor()
+            c.execute("SELECT agy_conv_id FROM gen_conversations WHERE id = ?", (conv_id,))
+            row = c.fetchone()
+            if row and row["agy_conv_id"]:
+                agy_conv_id = row["agy_conv_id"].strip()
+    except Exception:
+        pass
+
+    # Chuẩn bị môi trường cho agy CLI
+    p_dir = "/workspace/.gemini"
+    if account and account != "owner_default":
+        p_dir = f"/workspace/.agy-profiles/{account}"
+
+    env = {
+        **os.environ,
+        "HOME": "/workspace",
+        "PATH": "/usr/local/bin:/usr/bin:/bin:/workspace/.local/bin",
+    }
+    if p_dir != "/workspace/.gemini" and os.path.exists(f"{p_dir}/antigravity-cli"):
+        env["ANTIGRAVITY_APP_DATA_DIR"] = f"{p_dir}/antigravity-cli"
+
+    cmd = [
+        "agy",
+        "--output-format", "json",
+        "--print", user_message,
+        "--dangerously-skip-permissions"
+    ]
+
+    valid_models = [
+        "Gemini 3.8 Flash (High)", "Gemini 3.8 Flash (Medium)", "Gemini 3.8 Flash (Low)",
+        "Gemini 3.7 Flash (High)", "Gemini 3.7 Flash (Medium)", "Gemini 3.7 Flash (Low)",
+        "Gemini 3.6 Flash (High)", "Gemini 3.6 Flash (Medium)", "Gemini 3.6 Flash (Low)",
+        "Gemini 3.1 Pro (High)", "Gemini 3.1 Pro (Low)",
+        "Claude Sonnet 4.6 (Thinking)", "Claude Opus 4.6 (Thinking)", "GPT-OSS 120B (Medium)"
+    ]
+    if model and str(model).strip():
+        m_str = str(model).strip()
+        matched = next((m for m in valid_models if m.lower() == m_str.lower()), None)
+        if matched:
+            cmd.extend(["--model", matched])
+        elif "flash" in m_str.lower():
+            cmd.extend(["--model", "Gemini 3.8 Flash (High)"])
+        elif "sonnet" in m_str.lower() or "claude" in m_str.lower():
+            cmd.extend(["--model", "Claude Sonnet 4.6 (Thinking)"])
+        else:
+            cmd.extend(["--model", "Gemini 3.1 Pro (High)"])
+
+    if agy_conv_id:
+        cmd.extend(["--conversation", agy_conv_id])
+
+    # Thư mục làm việc phiên (nếu có)
+    sess_dir = BASE_DIR / "workspace" / "sessions" / conv_id
+    if sess_dir.exists():
+        cmd.extend(["--add-dir", str(sess_dir)])
+
+    try:
+        res = subprocess.run(cmd, capture_output=True, text=True, env=env, timeout=50)
+        if res.returncode == 0 and res.stdout.strip():
+            try:
+                data = json.loads(res.stdout)
+                actual_reply = (data.get("response") or "").strip()
+                returned_conv_id = data.get("conversation_id")
+                usage = data.get("usage", {})
+                tokens = usage.get("total_tokens", 0)
+
+                if returned_conv_id:
+                    with get_connection() as conn:
+                        c = conn.cursor()
+                        c.execute("""
+                        UPDATE gen_conversations 
+                        SET agy_conv_id = ?, total_tokens = coalesce(total_tokens, 0) + ?
+                        WHERE id = ?
+                        """, (returned_conv_id, tokens, conv_id))
+                        conn.commit()
+
+                if actual_reply:
+                    return actual_reply, returned_conv_id, usage
+            except Exception:
+                if res.stdout.strip():
+                    return res.stdout.strip(), agy_conv_id, {}
+    except subprocess.TimeoutExpired:
+        print(f"[AGY Runner] Timeout (50s) for conv {conv_id}")
+    except Exception as e:
+        print(f"[AGY Runner] Exception: {e}")
+
+    return None, None, None
+
 def send_gen_chat(conv_id, author, message, model, account="owner_default"):
     # Đảm bảo conversation tồn tại trong DB để tránh lỗi FOREIGN KEY
     with get_connection() as conn:
@@ -3146,15 +3246,25 @@ def send_gen_chat(conv_id, author, message, model, account="owner_default"):
         cursor.execute("UPDATE gen_conversations SET model = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", (model, conv_id))
         conn.commit()
 
-    # Sinh phản hồi thông minh từ Gen Core với trích dẫn Note ID dựng chứng
-    reply_content, cited_notes = generate_gen_smart_reply(conv_id, message, model, account)
+    # THỰC THI QUA CORE AGENT AGY CLI THỜI GIAN THỰC
+    actual_reply, ret_conv_id, usage = call_agy_cli_turn(conv_id, message, model, account)
+    if actual_reply:
+        reply_content = actual_reply
+        engine_used = "agy-cli"
+        cited_notes = list(set(re.findall(r'#(?:NOTE|EVT|SEC|TOOL|FILE)-\d+', reply_content)))
+    else:
+        # Nếu agy CLI bận hoặc timeout thì kích hoạt Smart Fallback
+        reply_content, cited_notes = generate_gen_smart_reply(conv_id, message, model, account)
+        engine_used = "smart-fallback"
+
+    author_name = "Gen Core (agy CLI)" if engine_used == "agy-cli" else "Gen Core"
 
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
         INSERT INTO gen_messages (conversation_id, author, role, content, model, note_ids_json)
-        VALUES (?, 'Gen Core', 'assistant', ?, ?, ?)
-        """, (conv_id, reply_content, model, json.dumps(cited_notes, ensure_ascii=False)))
+        VALUES (?, ?, 'assistant', ?, ?, ?)
+        """, (conv_id, author_name, reply_content, model, json.dumps(cited_notes, ensure_ascii=False)))
         reply_id = cursor.lastrowid
         conn.commit()
 
@@ -3176,7 +3286,9 @@ def send_gen_chat(conv_id, author, message, model, account="owner_default"):
         "reply": reply_content,
         "cited_notes": cited_notes,
         "model": model,
-        "conv_title": updated_title
+        "conv_title": updated_title,
+        "engine": engine_used,
+        "usage": usage or {}
     }
 
 def compact_gen_conversation(conv_id, model_from="", model_to="", manual=False):
