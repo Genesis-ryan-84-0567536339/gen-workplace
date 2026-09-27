@@ -75,12 +75,7 @@ TOOLS = [
                 },
                 "account_id": {
                     "type": "string",
-                    "description": "ID profile tài khoản (vd: 'owner_default', 'profile1')."
-                },
-                "account_label": {
-                    "type": "string",
-                    "description": "Tên hiển thị nhãn tài khoản (vd: 'Ryan (Default)', 'Workspace Backup').",
-                    "default": ""
+                    "description": "ID profile tài khoản (vd: 'owner_default', 'profile1'). Nhãn hiển thị được tính tự động từ email thật của profile."
                 }
             },
             "required": ["account_id"]
@@ -693,8 +688,7 @@ def execute_tool(name: str, args: dict) -> dict:
         if name == "switch_google_account":
             account_id = args.get("account_id")
             session_id = args.get("session_id", "gw-lead-agy")
-            account_label = args.get("account_label") or ("Mặc định (Owner Gmail)" if account_id == "owner_default" else f"Tài khoản {account_id}")
-            db.update_tmux_account(session_id, account_id, account_label)
+            account_label = db.update_tmux_account(session_id, account_id)
             db.append_tmux_output(session_id, f"auth switch --account='{account_label}'", f"Đã chuyển cấu hình phiên sang: {account_label}")
             return {"content": [{"type": "text", "text": json.dumps({"status": "account_updated", "session_id": session_id, "account_label": account_label}, ensure_ascii=False, indent=2)}], "isError": False}
 

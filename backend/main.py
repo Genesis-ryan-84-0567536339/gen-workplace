@@ -586,10 +586,10 @@ class SwarmHandler(SimpleHTTPRequestHandler):
         if path == "/api/tmux/account":
             session_id = data.get("session_id")
             account_type = data.get("account_type", "owner_default")
-            account_label = data.get("account_label", "Mặc định (Owner Gmail)")
+            account_label = data.get("account_label", "")
             profile_dir = data.get("profile_dir", "")
             if session_id:
-                db.update_tmux_account(session_id, account_type, account_label, profile_dir)
+                account_label = db.update_tmux_account(session_id, account_type, account_label, profile_dir)
                 db.append_tmux_output(session_id, f"auth switch --account='{account_label}'", f"Đã chuyển cấu hình phiên sang: {account_label}")
                 self._send_json(200, {"status": "account_updated", "session_id": session_id, "account_label": account_label})
             else:

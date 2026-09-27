@@ -1151,6 +1151,15 @@ def get_oauth_profiles():
 
     return results
 
+def compute_account_label(account_type, oauth_map=None):
+    """Nhãn tài khoản TÍNH từ email thật của profile OAuth: 'profileN (email)' hoặc 'profileN (chưa đăng nhập)'; owner_default dùng tiền tố 'Mặc định'."""
+    if oauth_map is None:
+        oauth_map = {p["id"]: p for p in get_oauth_profiles()}
+    account_type = account_type or "owner_default"
+    email = (oauth_map.get(account_type) or {}).get("email")
+    prefix = "Mặc định" if account_type == "owner_default" else account_type
+    return f"{prefix} ({email})" if email else f"{prefix} (chưa đăng nhập)"
+
 # =========================================================================
 # MODEL QUOTA TELEMETRY ENGINE (GEMINI & ANTHROPIC FAMILIES)
 # =========================================================================
@@ -1764,8 +1773,8 @@ def ensure_real_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
             conv_id = s["conversation_id"] if "conversation_id" in s.keys() and s["conversation_id"] else f"conv-{sid}"
 
             p_info = oauth_map.get(acc_type, {})
-            email = p_info.get("email") or ("owner@genesis.local" if acc_type in ("owner_default", "profile1") else "Chưa đăng nhập")
-            is_auth = p_info.get("is_auth", bool(email and email != "Chưa đăng nhập"))
+            email = p_info.get("email") or "Chưa đăng nhập"
+            is_auth = bool(p_info.get("is_auth"))
             if not profile_dir and p_info.get("path"):
                 profile_dir = p_info["path"]
 
@@ -1852,7 +1861,7 @@ def seed_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
         for cfg in SWARM_DEFAULT_CONFIG:
             sid = cfg["id"]
             p_info = oauth_map.get(cfg["account_type"], {})
-            acc_label = p_info.get("label") or cfg["account_type"]
+            acc_label = compute_account_label(cfg["account_type"], oauth_map)
             profile_dir = p_info.get("path") or ""
 
             allowed_p = json.dumps(cfg.get("allowed_paths", []))
@@ -1901,8 +1910,8 @@ def get_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
         for r in rows:
             acc_type = r["account_type"]
             p_info = oauth_map.get(acc_type, {})
-            email = p_info.get("email") or ("owner@genesis.local" if acc_type in ("owner_default", "profile1") else None)
-            is_auth = p_info.get("is_auth", bool(email))
+            email = p_info.get("email") or None
+            is_auth = bool(p_info.get("is_auth"))
             
             # Luôn tính toán Quota thực tế thời gian thực
             quota_g, quota_a = get_quota_telemetry(acc_type, email or "")
@@ -1954,7 +1963,7 @@ def get_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
                 "role_name": r["role_name"],
                 "cli_tool": r["cli_tool"],
                 "account_type": acc_type,
-                "account_label": r["account_label"],
+                "account_label": compute_account_label(acc_type, oauth_map),
                 "profile_dir": r["profile_dir"],
                 "status": r["status"],
                 "pid": r["pid"],
@@ -1979,8 +1988,10 @@ def get_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
 
         return results
 
-def update_tmux_account(session_id, account_type, account_label, profile_dir=""):
-    """Đổi tài khoản OAuth cho phiên Tmux và cập nhật môi trường runtime ngay trong tmux."""
+def update_tmux_account(session_id, account_type, account_label="", profile_dir=""):
+    """Đổi tài khoản OAuth cho phiên Tmux và cập nhật môi trường runtime ngay trong tmux. Nhãn để trống sẽ được tính từ email thật; trả về nhãn đã dùng."""
+    if not account_label:
+        account_label = compute_account_label(account_type)
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
@@ -1999,6 +2010,7 @@ def update_tmux_account(session_id, account_type, account_label, profile_dir="")
         subprocess.run(["tmux", "send-keys", "-t", session_id, cmd, "Enter"], capture_output=True, timeout=2.0)
     except Exception:
         pass
+    return account_label
 
 def log_directive_audit(session_id, channel, command, allowed, reason=""):
     """Ghi nhật ký mọi lệnh/phím gửi vào tmux worker (cả cho phép lẫn từ chối) — phục vụ audit allowlist."""
@@ -2193,7 +2205,7 @@ def wake_tmux_session(session_id):
         prev_output = s["terminal_output"] or ""
 
         p_info = oauth_map.get(acc_type, {})
-        email = p_info.get("email") or "owner@genesis.local"
+        email = p_info.get("email") or "Chưa đăng nhập"
         p_dir_clean = profile_dir or p_info.get("path") or os.path.join(HOME_DIR, ".gemini")
         role_spec_file = generate_role_spec_file(session_id, role_name, conv_id=conv_id)
 
@@ -2608,7 +2620,7 @@ def assign_oauth_to_role(session_id, profile_id):
         return {"status": "error", "message": f"Không tìm thấy profile {profile_id}"}
 
     account_type = profile_id
-    account_label = p["label"]
+    account_label = compute_account_label(profile_id)
     profile_dir = p["path"]
 
     update_tmux_account(session_id, account_type, account_label, profile_dir)
