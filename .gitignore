@@ -17,3 +17,6 @@ roles/
 .env
 .env.*
 !.env.example
+
+# Worktree tạm của agent Claude Code
+.claude/worktrees/
