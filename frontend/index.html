@@ -229,6 +229,34 @@ body.resizing-active, body.resizing-active * {
   color: #10b981;
   text-shadow: 0 0 4px #10b981;
 }
+.mcpBadgeChip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(15, 23, 42, 0.85));
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  border-radius: 18px;
+  padding: 3px 10px 3px 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+  color: #34d399;
+}
+.mcpBadgeChip:hover {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.22), rgba(30, 41, 59, 0.95));
+  border-color: #10b981;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.3);
+  transform: translateY(-1px);
+}
+.mcpDot {
+  font-size: 8px;
+  color: #10b981;
+  animation: pulseMcpDot 2s infinite ease-in-out;
+}
+@keyframes pulseMcpDot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(0.85); }
+}
 .btn, .iconBtn {
   border: 1px solid var(--line2);
   background: #171b21;
@@ -4240,6 +4268,13 @@ body.resizing-active, body.resizing-active * {
         <span class="ownerStatusDot" title="Độc quyền sở hữu dữ liệu">●</span>
       </div>
 
+      <!-- MCP Server Badge for AI Agents -->
+      <div class="mcpBadgeChip" id="topMcpBadge" onclick="openMcpModal()" title="Cổng MCP Server cho AI Agent (Click để xem 27 Tools & Lấy cấu hình)">
+        <span class="mcpDot">●</span>
+        <span style="font-weight:700;font-size:11px;letter-spacing:0.2px">MCP Server</span>
+        <span class="badge" style="font-size:8px;background:rgba(16,185,129,0.25);color:#34d399;padding:1px 5px;border-radius:4px" id="topMcpToolBadge">27 Tools</span>
+      </div>
+
       <span class="topmeta" id="syncState">Đồng bộ Git: main</span>
       <span class="kbd">Ctrl K</span>
       <button class="iconBtn" onclick="showToast('Bảng lệnh tra cứu nhanh Catalog: Ctrl K')" title="Tra cứu nhanh">⌘</button>
@@ -4300,6 +4335,11 @@ body.resizing-active, body.resizing-active * {
         <button class="navItem" data-nav="data" onclick="go('data', this)">
           <span class="navIcon">▦</span>
           <span>Trung Tâm Dữ Liệu</span>
+        </button>
+        <button class="navItem" onclick="openMcpModal()" title="Cổng điều phối Model Context Protocol (MCP) Server cho AI Agents">
+          <span class="navIcon">🔌</span>
+          <span>MCP Server Core</span>
+          <span class="badge" style="font-size:8px;background:rgba(16,185,129,0.2);color:#34d399;margin-left:auto" id="sideMcpToolBadge">27 Tools</span>
         </button>
       </div>
 
@@ -6647,6 +6687,101 @@ body.resizing-active, body.resizing-active * {
           <button type="button" class="btn primary" onclick="saveSessionTodoFromModal()" id="btnSaveSessionTodo">💾 Lưu Nhiệm Vụ</button>
         </div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL MCP SERVER CONTROL PLANE (DUAL TRANSPORT & 27 TOOLS) -->
+<div class="modal" id="mcpModal">
+  <div class="modalBox" style="max-width:860px;width:95vw;max-height:90vh;display:flex;flex-direction:column;background:#0b0f17;border:1px solid #10b981;box-shadow:0 16px 50px rgba(0,0,0,0.85), 0 0 30px rgba(16,185,129,0.2)">
+    <div class="modalHead" style="border-bottom:1px solid rgba(16,185,129,0.3);padding:14px 20px;display:flex;align-items:center;justify-content:space-between">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:22px">🔌</span>
+        <div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <strong style="font-size:15px;color:#f8fafc">Model Context Protocol (MCP) Server Control Plane</strong>
+            <span class="badge" style="background:#064e3b;color:#34d399;font-weight:700;font-size:9.5px;padding:2px 7px;border-radius:4px">v1.0.0 · Online</span>
+          </div>
+          <div style="font-size:11px;color:#94a3b8">Cung cấp toàn bộ 100% tính năng WebApp cho AI Agents qua chuẩn giao thức MCP JSON-RPC 2.0</div>
+        </div>
+      </div>
+      <button class="iconBtn" onclick="closeMcpModal()" style="font-size:18px">×</button>
+    </div>
+
+    <div class="modalBody" style="padding:16px 20px;overflow-y:auto;display:flex;flex-direction:column;gap:14px">
+      <!-- 1. Endpoints & Transports Cards -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:12px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+            <span style="font-size:11px;font-weight:700;color:#38bdf8">🌐 HTTP / SSE Transport</span>
+            <span class="badge" style="background:#0369a1;color:#fff;font-size:8.5px">Port 8888</span>
+          </div>
+          <div style="font-family:var(--mono);font-size:11.5px;background:#020617;padding:6px 10px;border-radius:5px;border:1px solid #334155;color:#f8fafc;display:flex;align-items:center;justify-content:space-between">
+            <span id="mcpHttpUrl">http://localhost:8888/mcp</span>
+            <button class="btn small" style="font-size:9px;padding:2px 6px;color:#38bdf8" onclick="copyText('http://localhost:8888/mcp')">📋 Copy</button>
+          </div>
+          <div style="font-size:10px;color:#94a3b8;margin-top:4px">Hỗ trợ Streamable HTTP POST và Server-Sent Events (SSE).</div>
+        </div>
+
+        <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:12px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+            <span style="font-size:11px;font-weight:700;color:#10b981">⚡ Stdio CLI Executable Bridge</span>
+            <span class="badge" style="background:#065f46;color:#fff;font-size:8.5px">Zero Latency</span>
+          </div>
+          <div style="font-family:var(--mono);font-size:11.5px;background:#020617;padding:6px 10px;border-radius:5px;border:1px solid #334155;color:#f8fafc;display:flex;align-items:center;justify-content:space-between">
+            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:280px" title="/workspace/.local/bin/gen-workplace-mcp">~/.local/bin/gen-workplace-mcp</span>
+            <button class="btn small" style="font-size:9px;padding:2px 6px;color:#10b981" onclick="copyText('/workspace/.local/bin/gen-workplace-mcp')">📋 Copy</button>
+          </div>
+          <div style="font-size:10px;color:#94a3b8;margin-top:4px">Dành cho Antigravity CLI, Claude Desktop, Cursor, subagents.</div>
+        </div>
+      </div>
+
+      <!-- 2. One-Click Copy MCP Configurations -->
+      <div style="background:#0d131f;border:1px solid #1e2d42;border-radius:8px;padding:12px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <span style="font-size:11.5px;font-weight:700;color:#f8fafc">📋 Cấu Hình Tích Hợp 1-Click (Copy & Paste)</span>
+          <div style="display:flex;gap:6px">
+            <button class="btn small" onclick="switchMcpConfigTab('antigravity')" id="btnMcpTab-antigravity" style="font-size:9.5px;padding:2px 8px;background:#1e293b;color:#38bdf8">Antigravity / agy</button>
+            <button class="btn small" onclick="switchMcpConfigTab('claude')" id="btnMcpTab-claude" style="font-size:9.5px;padding:2px 8px;background:transparent;color:#94a3b8">Claude Desktop</button>
+            <button class="btn small" onclick="switchMcpConfigTab('cursor')" id="btnMcpTab-cursor" style="font-size:9.5px;padding:2px 8px;background:transparent;color:#94a3b8">Cursor / VS Code</button>
+          </div>
+        </div>
+        <div style="position:relative">
+          <pre id="mcpConfigSnippet" style="background:#040711;border:1px solid #1e293b;border-radius:6px;padding:10px 12px;font-family:var(--mono);font-size:11px;color:#e2e8f0;margin:0;max-height:110px;overflow-y:auto"></pre>
+          <button class="btn small primary" style="position:absolute;top:6px;right:8px;font-size:9.5px;padding:3px 8px" onclick="copyCurrentMcpSnippet()">📋 Copy JSON</button>
+        </div>
+      </div>
+
+      <!-- 3. Active 27 Tools Inspector & Quick Test -->
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div style="display:flex;align-items:center;gap:6px">
+            <strong style="font-size:12px;color:#f8fafc">🛠️ Danh Mục 27 Công Cụ Nghiệp Vụ (MCP Tools)</strong>
+            <span class="badge" style="background:#064e3b;color:#34d399;font-size:8.5px" id="mcpToolsTotalBadge">27 Tools Active</span>
+          </div>
+          <input type="text" id="mcpToolSearchInput" placeholder="🔍 Lọc tool theo tên hoặc chức năng..." oninput="filterMcpTools(this.value)" style="font-size:11px;padding:3px 8px;border-radius:5px;width:240px;background:#090d15;border:1px solid #1e293b;color:#f8fafc">
+        </div>
+
+        <div id="mcpToolsListContainer" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;max-height:260px;overflow-y:auto;padding-right:4px">
+          <!-- Dynamically populated tool cards with live Test button -->
+        </div>
+      </div>
+
+      <!-- 4. Interactive Tool Test Console -->
+      <div id="mcpLiveTestSection" style="display:none;background:#040711;border:1px solid #1e293b;border-radius:8px;padding:12px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <strong style="font-size:11.5px;color:#38bdf8" id="mcpTestToolTitle">⚡ Test Tool Trực Tiếp</strong>
+          <button class="iconBtn" onclick="document.getElementById('mcpLiveTestSection').style.display='none'" style="width:20px;height:20px;font-size:12px">×</button>
+        </div>
+        <pre id="mcpLiveTestOutput" style="background:#02050b;border:1px solid #1a2233;border-radius:5px;padding:8px 10px;font-family:var(--mono);font-size:10.5px;color:#a7f3d0;max-height:160px;overflow-y:auto;margin:0"></pre>
+      </div>
+    </div>
+
+    <div class="modalFoot" style="padding:10px 20px;border-top:1px solid #1a2333;display:flex;align-items:center;justify-content:space-between">
+      <div style="font-size:11px;color:#94a3b8">
+        Đã tự động liên kết với <code style="color:#38bdf8">~/.gemini/config/mcp_config.json</code>
+      </div>
+      <button class="btn" onclick="closeMcpModal()">Đóng</button>
     </div>
   </div>
 </div>
@@ -14352,6 +14487,189 @@ setInterval(async () => {
     autoSyncRunning = false;
   }
 }, 2500);
+
+// ==========================================
+// MCP SERVER CONTROL PLANE JAVASCRIPT
+// ==========================================
+let mcpActiveTab = 'antigravity';
+let mcpCachedTools = [];
+
+const mcpConfigs = {
+  antigravity: `{
+  "mcpServers": {
+    "gen-workplace": {
+      "command": "/workspace/.local/bin/gen-workplace-mcp"
+    }
+  }
+}`,
+  claude: `{
+  "mcpServers": {
+    "gen-workplace": {
+      "command": "/workspace/.local/bin/gen-workplace-mcp"
+    }
+  }
+}`,
+  cursor: `{
+  "mcpServers": {
+    "gen-workplace": {
+      "url": "http://localhost:8888/mcp"
+    }
+  }
+}`
+};
+
+function switchMcpConfigTab(tab) {
+  mcpActiveTab = tab;
+  ['antigravity', 'claude', 'cursor'].forEach(t => {
+    const btn = document.getElementById(`btnMcpTab-${t}`);
+    if (btn) {
+      if (t === tab) {
+        btn.style.background = '#1e293b';
+        btn.style.color = '#38bdf8';
+      } else {
+        btn.style.background = 'transparent';
+        btn.style.color = '#94a3b8';
+      }
+    }
+  });
+  const snippetEl = document.getElementById('mcpConfigSnippet');
+  if (snippetEl) {
+    snippetEl.textContent = mcpConfigs[tab] || '';
+  }
+}
+
+function copyCurrentMcpSnippet() {
+  const code = mcpConfigs[mcpActiveTab];
+  copyText(code);
+  showToast(`✅ Đã copy JSON cấu hình MCP cho ${mcpActiveTab.toUpperCase()}!`);
+}
+
+async function openMcpModal() {
+  const modal = document.getElementById('mcpModal');
+  if (!modal) return;
+  modal.classList.add('active');
+  switchMcpConfigTab(mcpActiveTab);
+
+  // Tải danh sách tools mới nhất từ backend
+  try {
+    const res = await fetch('/mcp/tools');
+    if (res.ok) {
+      const data = await res.json();
+      mcpCachedTools = data.tools || [];
+      const totalBadge = document.getElementById('mcpToolsTotalBadge');
+      const topBadge = document.getElementById('topMcpToolBadge');
+      const sideBadge = document.getElementById('sideMcpToolBadge');
+      const countText = `${mcpCachedTools.length} Tools Active`;
+      if (totalBadge) totalBadge.textContent = countText;
+      if (topBadge) topBadge.textContent = `${mcpCachedTools.length} Tools`;
+      if (sideBadge) sideBadge.textContent = `${mcpCachedTools.length} Tools`;
+      renderMcpToolsList(mcpCachedTools);
+    }
+  } catch (err) {
+    console.error('Lỗi nạp tools MCP:', err);
+  }
+}
+
+function closeMcpModal() {
+  const modal = document.getElementById('mcpModal');
+  if (modal) modal.classList.remove('active');
+}
+
+function renderMcpToolsList(tools) {
+  const container = document.getElementById('mcpToolsListContainer');
+  if (!container) return;
+
+  if (!tools || tools.length === 0) {
+    container.innerHTML = '<div style="color:#94a3b8;font-size:11px;grid-column:1/-1;text-align:center;padding:16px">Không tìm thấy công cụ MCP nào</div>';
+    return;
+  }
+
+  container.innerHTML = tools.map(t => {
+    const props = (t.inputSchema && t.inputSchema.properties) ? Object.keys(t.inputSchema.properties) : [];
+    const propsTag = props.length > 0 ? props.slice(0, 3).map(p => `<span style="font-size:9px;color:#93c5fd;background:#172554;padding:1px 4px;border-radius:3px">${p}</span>`).join(' ') : '<span style="font-size:9px;color:#94a3b8">Không cần tham số</span>';
+    
+    return `
+      <div style="background:#090d16;border:1px solid #1a2436;border-radius:6px;padding:9px 11px;display:flex;flex-direction:column;justify-content:space-between;gap:6px">
+        <div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px">
+            <span style="font-family:var(--mono);font-size:11px;font-weight:700;color:#38bdf8">${t.name}</span>
+            <button class="btn small" style="font-size:9px;padding:2px 7px;color:#34d399;border-color:#065f46" onclick="testMcpTool('${t.name}')">⚡ Test</button>
+          </div>
+          <div style="font-size:10.5px;color:#cbd5e1;line-height:1.35;margin-bottom:5px">${t.description}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap">
+          <span style="font-size:9px;color:#64748b">Params:</span>
+          ${propsTag}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function filterMcpTools(query) {
+  const q = (query || '').toLowerCase().trim();
+  if (!q) {
+    renderMcpToolsList(mcpCachedTools);
+    return;
+  }
+  const filtered = mcpCachedTools.filter(t => 
+    t.name.toLowerCase().includes(q) || 
+    (t.description && t.description.toLowerCase().includes(q))
+  );
+  renderMcpToolsList(filtered);
+}
+
+async function testMcpTool(toolName) {
+  const testSec = document.getElementById('mcpLiveTestSection');
+  const titleEl = document.getElementById('mcpTestToolTitle');
+  const outEl = document.getElementById('mcpLiveTestOutput');
+  if (!testSec || !titleEl || !outEl) return;
+
+  testSec.style.display = 'block';
+  titleEl.innerHTML = `⚡ Đang thử nghiệm công cụ: <code style="color:#fbbf24">${toolName}</code> ...`;
+  outEl.textContent = 'Đang gửi JSON-RPC tools/call tới /mcp...';
+
+  const defaultArgs = {};
+  if (toolName === 'get_live_quota') { defaultArgs.profile_id = 'owner_default'; defaultArgs.force_refresh = false; }
+  if (toolName === 'list_kanban_tasks') { defaultArgs.conv_id = 'conv-gen-core-01'; }
+  if (toolName === 'read_workspace_file') { defaultArgs.file_path = 'backend/main.py'; }
+  if (toolName === 'get_worker_terminal_output') { defaultArgs.session_id = 'gw-lead-agy'; defaultArgs.lines = 20; }
+
+  try {
+    const payload = {
+      jsonrpc: "2.0",
+      id: Date.now(),
+      method: "tools/call",
+      params: {
+        name: toolName,
+        arguments: defaultArgs
+      }
+    };
+    const res = await fetch('/mcp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    titleEl.innerHTML = `⚡ Kết quả thực thi công cụ: <code style="color:#34d399">${toolName}</code>`;
+    outEl.textContent = JSON.stringify(data, null, 2);
+  } catch (err) {
+    titleEl.innerHTML = `❌ Lỗi thực thi công cụ: <code style="color:#ef4444">${toolName}</code>`;
+    outEl.textContent = String(err);
+  }
+}
+
+// Tự động kiểm tra trạng thái MCP khi trang tải
+setTimeout(() => {
+  fetch('/mcp/tools').then(r => r.json()).then(d => {
+    if (d && d.tools_count) {
+      const topBadge = document.getElementById('topMcpToolBadge');
+      const sideBadge = document.getElementById('sideMcpToolBadge');
+      if (topBadge) topBadge.textContent = `${d.tools_count} Tools`;
+      if (sideBadge) sideBadge.textContent = `${d.tools_count} Tools`;
+    }
+  }).catch(() => {});
+}, 1200);
 
 </script>
 </body>

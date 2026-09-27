@@ -22,12 +22,13 @@ default_data = "/app/data" if (os.path.exists("/app") or os.environ.get("DOCKER_
 DATA_DIR = Path(os.environ.get("DATA_DIR", default_data))
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-# Tự động nạp SQLite DB Module
+# Tự động nạp SQLite DB Module & MCP Core
 sys.path.insert(0, str(BASE_DIR))
 try:
-    from backend import db
+    from backend import db, mcp_core
 except ImportError:
     import db
+    import mcp_core
 
 class SwarmHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
@@ -53,6 +54,33 @@ class SwarmHandler(SimpleHTTPRequestHandler):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
         query = urllib.parse.parse_qs(parsed.query)
+
+        # 0. API Model Context Protocol (MCP) SSE & Inspector
+        if path in ("/mcp", "/sse"):
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Cache-Control", "no-cache")
+            self.send_header("Connection", "keep-alive")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            try:
+                self.wfile.write(b"event: endpoint\r\ndata: /mcp\r\n\r\n")
+                self.wfile.flush()
+            except Exception:
+                pass
+            return
+
+        if path in ("/mcp/tools", "/api/mcp/tools", "/api/mcp/status"):
+            self._send_json(200, {
+                "status": "online",
+                "serverInfo": mcp_core.MCP_SERVER_INFO,
+                "protocolVersion": mcp_core.MCP_PROTOCOL_VERSION,
+                "tools_count": len(mcp_core.TOOLS),
+                "tools": mcp_core.TOOLS,
+                "resources": mcp_core.RESOURCES,
+                "prompts": mcp_core.PROMPTS
+            })
+            return
 
         # 1. API Status
         if path == "/api/status":
@@ -308,6 +336,17 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             data = json.loads(body)
         except Exception:
             data = {}
+
+        # 0. API Model Context Protocol (MCP) JSON-RPC 2.0 Handler
+        if path in ("/mcp", "/api/mcp"):
+            resp = mcp_core.handle_jsonrpc(data)
+            if resp is None:
+                self.send_response(204)
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                return
+            self._send_json(200, resp)
+            return
 
         # 1. Thêm tin nhắn chat vào SQLite
         if path == "/api/chat":
