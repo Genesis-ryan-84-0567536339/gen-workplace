@@ -109,17 +109,17 @@ Không gian làm việc chính của Owner và Gen Core (`#gen_workplace`) đư�
   - `./workspace:/workspace:z`: Thư mục chứa các phiên làm việc và spec của các role.
   - `./backend:/app/backend:z`: Backend Python (hỗ trợ live reload khi sửa mã).
   - `./frontend:/app/frontend:ro,z`: Single Page Application HTML/JS/CSS.
-  - `/workspace/.gemini:/workspace/.gemini:z`: Lưu trữ cấu hình và token xác thực Google OAuth mặc định.
-  - `/workspace/.agy-profiles:/workspace/.agy-profiles:z`: Chứa các profile đăng nhập bổ sung (`profile1`, `profile2`,...).
-  - `/workspace/.local/bin/agy:/usr/local/bin/agy:ro,z`: Mount trực tiếp binary Antigravity CLI v1.2.11 vào container.
-  - `HOME=/workspace`: Đảm bảo `agy` CLI luôn tìm đúng thư mục chứa token xác thực.
+  - `${HOME}/.gemini:${HOME}/.gemini:z`: Lưu trữ cấu hình và token xác thực Google OAuth mặc định.
+  - `${HOME}/.agy-profiles:${HOME}/.agy-profiles:z`: Chứa các profile đăng nhập bổ sung (`profile1`, `profile2`,...).
+  - `${HOME}/.local/bin/agy:/usr/local/bin/agy:ro,z`: Mount trực tiếp binary Antigravity CLI v1.2.11 vào container.
+  - `HOME=${HOME:-/root}`: Đảm bảo `agy` CLI luôn tìm đúng thư mục chứa token xác thực.
 
 ### 4.2. Cơ Chế Gọi agy CLI Thời Gian Thực (`call_agy_cli_turn`)
 Trong file `backend/db.py`:
 ```python
 def call_agy_cli_turn(conv_id, user_message, model=None, account="owner_default"):
     # 1. Tra cứu agy_conv_id đã liên kết với phiên (duy trì mạch tư duy)
-    # 2. Cấu hình môi trường (HOME=/workspace, ANTIGRAVITY_APP_DATA_DIR)
+    # 2. Cấu hình môi trường (HOME=${HOME:-/root}, ANTIGRAVITY_APP_DATA_DIR)
     # 3. Chạy lệnh: agy --output-format json --print <msg> --dangerously-skip-permissions --model <model> [--conversation <agy_conv_id>]
     # 4. Parse JSON trả về: response, conversation_id mới, token usage (input, output, thinking)
     # 5. Lưu conversation_id và cộng dồn token vào gen_conversations

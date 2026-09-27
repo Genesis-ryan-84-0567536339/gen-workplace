@@ -16,15 +16,15 @@ services:
       - ./assets:/app/assets:ro,z
       - ./docs:/app/docs:ro,z
       - ./:/app/repo:ro,z
-      - /workspace/.agy-profiles:/workspace/.agy-profiles:z
-      - /workspace/.gemini:/workspace/.gemini:z
-      - /workspace/.local/bin/agy:/usr/local/bin/agy:ro,z
-      - /tmp/tmux-1000:/tmp/tmux-1000:z
+      - ${HOME:-/root}/.agy-profiles:${HOME:-/root}/.agy-profiles:z
+      - ${HOME:-/root}/.gemini:${HOME:-/root}/.gemini:z
+      - ${HOME:-/root}/.local/bin/agy:/usr/local/bin/agy:ro,z
+      - /tmp/tmux-${UID:-1000}:/tmp/tmux-1000:z
     environment:
       - PORT=8888
       - DATA_DIR=/app/data
       - DOCKER_CONTAINER=1
-      - HOME=/workspace
+      - HOME=${HOME:-/root}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8888/api/status"]
       interval: 10s

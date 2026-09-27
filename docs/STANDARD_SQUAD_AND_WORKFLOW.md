@@ -55,8 +55,8 @@ flowchart TD
 | **`gw-lead-agy`** | **Lead Architect** | Chỉ huy kiến trúc, duy trì SSOT, thiết kế DAG phụ thuộc, kiểm duyệt bằng chứng và nghiệm thu sản phẩm. | `docs/**`, `workspace/roles/**`, `AGENTS.md`, `README.md`, `ROADMAP.md` | *(Toàn quyền đọc/thẩm định, cấm commit đè code module)* | Mặc định Owner (`owner@genesis.local`) |
 | **`gw-backend-agy`** | **Backend & DB Specialist** | Thiết kế CSDL SQLite WAL, FTS5 catalog, các endpoint API nghiệp vụ, cơ chế task mutex và process runner. | `backend/**`, `data/**`, `migrations/**` | `frontend/**`, `Dockerfile`, `docker-compose.yml` | Profile #1 (`owner@genesis.local`) |
 | **`gw-frontend-agy`** | **Frontend Specialist** | Xây dựng Web UI chuẩn Nocturne Slate, tương tác thời gian thực, Command Deck, thẻ chuyên gia và dashboard. | `frontend/**`, `assets/**` | `backend/**`, `data/**`, `Dockerfile` | Profile #2 (`claude.bot@genesis.local`) |
-| **`gw-devops-agy`** | **DevOps & Packaging** | Container hóa hệ thống, cấu hình volume live-mount SELinux `:z`, kịch bản cài đặt TUI và desktop shortcut. | `Dockerfile`, `docker-compose.yml`, `install.sh`, `installer_tui.py`, `*.desktop`, `scripts/**` | `backend/main.py`, `frontend/**` | Profile #3 (`admin@genesis.local`) |
-| **`gw-qa-agy`** | **QA Tester** | Kiểm thử chu kỳ tự động, auto-wake 68ms, API regression test, đối soát tiêu chuẩn nghiệm thu của Roadmap. | `tests/**`, `qa_reports/**`, `fixtures/**` | `backend/**`, `frontend/**`, `Dockerfile` | Profile #4 (`admin@genesis.local`) |
+| **`gw-devops-agy`** | **DevOps & Packaging** | Container hóa hệ thống, cấu hình volume live-mount SELinux `:z`, kịch bản cài đặt TUI và desktop shortcut. | `Dockerfile`, `docker-compose.yml`, `install.sh`, `installer_tui.py`, `*.desktop`, `scripts/**` | `backend/main.py`, `frontend/**` | Profile #3 (`shared.bot@genesis.local`) |
+| **`gw-qa-agy`** | **QA Tester** | Kiểm thử chu kỳ tự động, auto-wake 68ms, API regression test, đối soát tiêu chuẩn nghiệm thu của Roadmap. | `tests/**`, `qa_reports/**`, `fixtures/**` | `backend/**`, `frontend/**`, `Dockerfile` | Profile #4 (`shared.bot@genesis.local`) |
 | **`gw-security-agy`** | **Security Auditor** | Kiểm toán mã nguồn, bảo vệ bí mật OAuth/API key, phân quyền file, kiểm tra an toàn SELinux và Vault. | `vault/**`, `security_audits/**`, `.env.example` | `backend/**`, `frontend/**` | Mặc định Owner (`owner@genesis.local`) |
 
 ---
@@ -146,7 +146,7 @@ sequenceDiagram
 - **Đầu vào (Input)**: Yêu cầu tự nhiên của Owner (Ryan).
 - **Thực thi**:
   - `Gen` tiếp nhận yêu cầu, phân loại mục tiêu.
-  - `gw-lead-agy` trích xuất nguyên văn vào file [`docs/SSOT_ORIGINAL_SPEC.md`](file:///workspace/LinuxDataA/gen-workplace/docs/SSOT_ORIGINAL_SPEC.md) và nạp vào bảng CSDL `master_ssot`.
+  - `gw-lead-agy` trích xuất nguyên văn vào file [`docs/SSOT_ORIGINAL_SPEC.md`](file:///workspace/docs/SSOT_ORIGINAL_SPEC.md) và nạp vào bảng CSDL `master_ssot`.
 - **Tiêu chuẩn nghiệm thu (Exit Criteria)**:
   - Tài liệu SSOT không bị biến tấu, suy diễn lệch lạc.
   - Đã có commit hash neo vào Git.

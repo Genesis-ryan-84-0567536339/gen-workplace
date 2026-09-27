@@ -1,11 +1,18 @@
-# 🏛️ GEN-WORKPLACE · Multi-Agent Swarm Orchestrator & Autonomous Console
-> **Bảng điều khiển và bộ công cụ phân bổ công việc đa tác nhân (Multi-Agent Swarm Workbench) chuyên biệt cho quy trình phát triển phần mềm tự động hóa cao cấp.**  
-> **Chủ sở hữu (Owner & SSOT):** Ryan · **Phiên bản:** v1.2-PRODUCTION · **Kiến trúc:** SQLite WAL + Docker Container Sandbox
+# 🏛️ GEN-WORKPLACE · Multi-Agent Swarm Workplace & Autonomous Mission Control OS
+> **Hệ điều hành và trung tâm chỉ huy đa tác nhân (Multi-Agent Swarm Workbench) chuyên biệt cho quy trình phát triển phần mềm tự động hóa cao cấp.**  
+> **Chủ sở hữu:** Ryan · **Phiên bản:** v1.2-RELEASE · **Kiến trúc:** SQLite WAL + FTS5 + Docker Sandbox + MCP Server (27 Tools)
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)](docker-compose.yml)
+[![MCP](https://img.shields.io/badge/MCP-27_Tools_Ready-8B5CF6)](backend/mcp_core.py)
+[![SQLite](https://img.shields.io/badge/SQLite-WAL_%2B_FTS5-003B57?logo=sqlite&logoColor=white)](backend/db.py)
 
 ---
 
 ## 🌟 TỔNG QUAN HỆ THỐNG
 **Gen-workplace** cung cấp môi trường tích hợp (Mission Control SPA) giúp Owner quản trị nhiều dự án, tự động phân rã mục tiêu từ Plan & Chat tổng, phân công Role và chỉ định CLI Engine chuyên biệt (`Gemini CLI - agy`, `Claude Code CLI`, `Cursor CLI`, `Codex Security CLI`), theo dõi tiến trình qua Live Workflow Graph từng node, điều hành qua Swarm Chatroom thuần Việt với @mention/reaction emojis, và quản trị bộ nhớ Single Source of Truth (SSOT).
+
+Đặc biệt, hệ thống tích hợp sẵn **Model Context Protocol (MCP) Server chuẩn quốc tế** với **27 công cụ tự động hóa**, hỗ trợ kết nối 2 chiều cho mọi AI Agent ngoài (Cursor, Claude Desktop, Antigravity, OpenCode).
 
 Tài liệu đặc tả nguồn gốc chính thức: [`docs/SSOT_ORIGINAL_SPEC.md`](docs/SSOT_ORIGINAL_SPEC.md) & [`docs/STANDARD_SQUAD_AND_WORKFLOW.md`](docs/STANDARD_SQUAD_AND_WORKFLOW.md).
 
@@ -16,7 +23,7 @@ Tài liệu đặc tả nguồn gốc chính thức: [`docs/SSOT_ORIGINAL_SPEC.m
 ```mermaid
 flowchart TD
     subgraph TIER0["TẦNG 0: CHIẾN LƯỢC TOÀN CỤC & TÀI NGUYÊN"]
-        Gen["👑 Gen (Core Orchestrator)<br/>• Tiếp nhận bài toán từ Ryan<br/>• Quản trị vòng đời Swarm (Spawn / Sleep / Reclaim)"]
+        Gen["👑 Gen (Core Orchestrator)<br/>• Tiếp nhận bài toán từ Owner<br/>• Quản trị vòng đời Swarm (Spawn / Sleep / Reclaim)"]
     end
 
     subgraph TIER1["TẦNG 1: CHỈ HUY KỸ THUẬT"]
@@ -50,51 +57,67 @@ flowchart TD
 
 ---
 
-## 💎 CÁC ĐIỂM SÁNG KIẾN TRÚC ĐỘC BẢN
-
-### 1. Khu Implementation 3 Hàng Chuẩn SSOT Của Ryan
-- **Hàng 01 (1 hàng 3 cột cân xứng)**:
-  - *Cột 1*: **Input & File Plan Gốc**: Điểm nạp chỉ thị duy nhất dùng để chỉ đạo và đồng bộ toàn bộ Role.
-  - *Cột 2*: **Lộ Trình Roadmap (5 Phase)**: Phân rã mục tiêu tuần tự.
-  - *Cột 3*: **Todo DAG Tasks**: Danh sách nhiệm vụ chi tiết kèm chuỗi phụ thuộc (`depends_on`).
-- **Hàng 02**: **Bảng Agent Roles & CLI Engine Selector** (toàn chiều rộng): Lựa chọn CLI Engine cho từng vai trò chuyên môn, khóa Instruction SSOT theo Input tổng.
-- **Hàng 03**: **Sơ Đồ Live Workflow Từng Node** (toàn chiều rộng Canvas): Trực quan hóa step-by-step với Checklist INPUT bắt buộc, Checklist OUTPUT nghiệm thu và Checkpoint bàn giao.
-
-### 2. Sơ Đồ Mạch Tư Duy Trực Quan (Visual Pipeline Circuit)
-- **Tầng trên**: 5 Node trạm mốc phát sáng nối tiếp bằng luồng dữ liệu neon (`🎯 Mục tiêu` ➔ `🔍 Rà soát DAG` ➔ `⚙️ Lập kế hoạch & Tool` ➔ `🛡️ Kiểm thẩm an ninh` ➔ `🏁 Nghiệm thu`).
-- **Tầng dưới**: Bàn làm việc sâu chiếm trọn bề ngang (~1.000px), đọc suy nghĩ nội tâm (CoT), lệnh terminal tool call và chứng thực an ninh.
-
-### 3. Phòng Giao Ban Swarm (War Room) Thuần Việt
-- Kênh giao ban chỉ huy thời gian thực: Ryan ↔ Core Gen ↔ Lead Architect ↔ Nhân viên.
-- Giao việc qua `@mention`, phản hồi theo thread và cập nhật trạng thái bằng hệ emoji chuẩn nghiệp vụ (`📥 Đã nhận`, `⚠️ Cảnh báo`, `❌ Fail/Lỗi`, `✅ Nghiệm thu`, `❓ Cần làm rõ`).
-
-### 4. Cơ Chế Bộ Nhớ Hai Cột & Tra Cứu Catalog Siêu Tốc (SQLite FTS5)
-- *Cột 1*: Memory Tổng (SSOT Bất Biến) do Lead tổng hợp từ các sự kiện đã kiểm chứng.
-- *Cột 2*: Memory Từng Role đồng bộ live từ các CLI runtime.
-- *Catalog FTS5*: Tra cứu ID siêu tốc (`EVT-`, `VLT-`, `TOOL-`, `FILE-`, `DB-`, `CRD-`) mất < 2ms, tiết kiệm 95% token so với việc quét toàn bộ repository.
-
----
-
 ## 🚀 CÀI ĐẶT 1 LỆNH (ONE-COMMAND ALL-IN-ONE INSTALLER)
 
 Hỗ trợ tự động trên **Linux**, **macOS** và **Windows (WSL2 / Docker Desktop)**.
 
 ### Cách 1: Chạy từ mã nguồn repo
 ```bash
-cd /workspace/LinuxDataA/gen-workplace
+git clone https://github.com/Genesis-ryan-84-0567536339/gen-workplace.git
+cd gen-workplace
 ./install.sh
 ```
 
 ### Cách 2: Chạy trực tiếp từ GitHub (1 lệnh qua curl)
 ```bash
-curl -fsSL https://raw.githubusercontent.com/<OWNER>/gen-workplace/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Genesis-ryan-84-0567536339/gen-workplace/main/install.sh | bash
 ```
 
 ### ⚡ Các tính năng nổi bật của bộ cài đặt TUI:
 - **Giao diện Terminal User Interface (TUI)** chuyên nghiệp, có **thanh loading % tiến độ cài đặt**.
-- **Tự động Pre-flight Check môi trường**: Kiểm tra OS, Git, Curl, Docker Engine và Docker Compose. Nếu thiếu thành phần nào, kịch bản tự động tải và cấu hình bổ sung.
+- **Chẩn đoán toàn diện (System Doctor)**: Tự động kiểm tra OS, Git, Curl, Docker Engine và Docker Compose.
 - **Môi trường Docker hóa 100%**: Mọi thành phần (Backend, Frontend, Agent Runtimes) chạy an toàn và độc lập trong container Docker với cờ SELinux `:z`.
-- **Tự động tạo Desktop Icon Launcher**: Tự sinh shortcut trên màn hình Desktop (`Gen-workplace.desktop` trên Linux, `.command` trên macOS, `.bat` trên Windows) để Owner nhấp đúp là gọi ra WebApp ngay lập tức.
+- **Hỗ trợ Native Standalone Fallback**: Chạy trực tiếp bằng Python nếu máy chủ chưa cài đặt Docker.
+- **Tự động tạo Desktop Icon Launcher**: Tự sinh shortcut trên màn hình Desktop (`Gen-workplace.desktop` trên Linux, `.command` trên macOS, `.bat` trên Windows).
+
+---
+
+## 🔌 MODEL CONTEXT PROTOCOL (MCP SERVER & GATEWAY)
+
+Gen-workplace tích hợp sẵn **MCP Server v1.0.0** tuân thủ đặc tả giao thức MCP 2024-11-05, cung cấp **27 công cụ (tools)**, **4 tài nguyên (resources)**, và **2 mẫu chỉ thị (prompts)**.
+
+### Cấu hình kết nối cho AI Agent bên ngoài:
+
+#### 1. Claude Desktop (`claude_desktop_config.json`)
+```json
+{
+  "mcpServers": {
+    "gen-workplace": {
+      "command": "/usr/local/bin/gen-workplace-mcp"
+    }
+  }
+}
+```
+
+#### 2. Cursor IDE (`.cursor/mcp.json`)
+```json
+{
+  "mcpServers": {
+    "gen-workplace": {
+      "url": "http://localhost:8888/sse?token=YOUR_AGENT_TOKEN"
+    }
+  }
+}
+```
+
+#### 3. Bộ 27 MCP Tools Sẵn Sàng:
+| Phân hệ | Danh sách Tools |
+| :--- | :--- |
+| **Quota & Google OAuth** | `get_live_quota`, `list_google_accounts`, `switch_google_account`, `get_oauth_login_url` |
+| **Swarm Workers & War Room** | `list_swarm_workers`, `send_worker_directive`, `manage_worker_lifecycle`, `get_worker_terminal_output`, `post_warroom_message`, `get_warroom_messages` |
+| **Kanban & Governance** | `list_kanban_tasks`, `create_kanban_task`, `claim_task`, `complete_task`, `update_task_checklist` |
+| **Chat & Compaction** | `gen_chat`, `list_conversations`, `create_conversation`, `get_conversation_messages`, `compact_conversation` |
+| **Notes & Files** | `list_notes`, `save_note`, `delete_note`, `read_workspace_file`, `create_workspace_file`, `list_workspace_files`, `get_system_status` |
 
 ---
 
@@ -105,12 +128,18 @@ gen-workplace/
 │   └── icon.svg                     # Biểu tượng nhận diện ứng dụng SVG
 ├── backend/
 │   ├── db.py                        # SQLite 3 WAL Core DB & FTS5 Fast Catalog Engine
-│   └── main.py                      # Control Plane API Daemon & Task Mutex
+│   ├── main.py                      # Control Plane API Daemon & Task Mutex
+│   ├── mcp_core.py                  # MCP Protocol Engine & 27 Tools Registry
+│   └── mcp_server.py                # MCP Stdio Bridge Process
 ├── frontend/
 │   └── index.html                   # Giao diện SPA chuẩn Nocturne Slate v1.2
 ├── docs/
 │   ├── SSOT_ORIGINAL_SPEC.md        # Nguồn sự thật duy nhất (Mô tả nguyên văn của Owner)
-│   └── STANDARD_SQUAD_AND_WORKFLOW.md # Quy chuẩn đội ngũ và quy trình 5 giai đoạn SOP
+│   ├── STANDARD_SQUAD_AND_WORKFLOW.md # Quy chuẩn đội ngũ và quy trình 5 giai đoạn SOP
+│   ├── ARCHITECTURE_STATE.md        # Kiến trúc tổng thể hệ thống
+│   └── PROJECT_HANDOFF_SSOT.md      # Tài liệu bàn giao kỹ thuật
+├── scripts/
+│   └── test_mcp_suite.py            # Bộ kiểm thử tự động 40 test cases (100% PASS)
 ├── docker-compose.yml               # Cấu hình container đa nền tảng (:z SELinux)
 ├── Dockerfile                       # Đóng gói image độc lập
 ├── install.sh                       # Script khởi động 1 lệnh
@@ -124,3 +153,4 @@ gen-workplace/
 - **Trình duyệt máy chủ**: [http://localhost:8888](http://localhost:8888)
 - **Truy cập mạng nội bộ**: `http://<IP_MAY_CHU>:8888`
 - **Icon Desktop**: Nhấp đúp vào biểu tượng **"Gen-workplace Console"** trên Desktop.
+- **Kiểm thử tự động MCP**: `python3 scripts/test_mcp_suite.py`

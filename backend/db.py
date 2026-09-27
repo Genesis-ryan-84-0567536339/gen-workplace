@@ -23,6 +23,7 @@ default_data = "/app/data" if (os.path.exists("/app") or os.environ.get("DOCKER_
 DATA_DIR = Path(os.environ.get("DATA_DIR", default_data))
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 DB_PATH = DATA_DIR / "gen-workplace.db"
+HOME_DIR = os.environ.get("HOME") or str(Path.home())
 
 def normalize_project_id(pid):
     """Chuẩn hóa ID dự án linh hoạt: gen-workplace -> PRJ-GEN-WORKPLACE."""
@@ -437,12 +438,12 @@ def init_db():
             'owner@genesis.local',
             '👑',
             'Single Source of Truth tối cao và chủ sở hữu độc quyền toàn bộ dữ liệu hệ thống Gen Workplace & Genesis Swarm.',
-            '/workspace',
-            '/workspace/LinuxDataA/gen-workplace/workspace',
+            ?,
+            ?,
             '{"theme":"dark","default_model":"Gemini 3.1 Pro (High)","persona":"executive_assistant","auto_compact":true,"data_ownership":"exclusive_ryan","isolation_level":"strict"}',
             1
         );
-        """)
+        """, (HOME_DIR, str(BASE_DIR / "workspace")))
 
         # Backfill ownership: all existing data belongs to Ryan
         cursor.execute("UPDATE projects SET owner_id = 'owner-ryan' WHERE owner_id IS NULL OR owner_id = ''")
@@ -565,7 +566,7 @@ def seed_real_project():
         """, (
             'PRJ-GEN-WORKPLACE',
             'gen-workplace',
-            '/workspace/LinuxDataA/gen-workplace',
+            str(BASE_DIR),
             'main',
             'docs/SSOT_ORIGINAL_SPEC.md',
             default_source_text,
@@ -586,7 +587,7 @@ def seed_real_project():
 
         # 3. Todos thật
         todos = [
-            ('TODO-01', 'RM-01', 'Khởi tạo Git repo /workspace/LinuxDataA/gen-workplace', 'Lead Architect', 'done'),
+            ('TODO-01', 'RM-01', 'Khởi tạo Git repo và lưu cấu trúc dự án', 'Lead Architect', 'done'),
             ('TODO-02', 'RM-01', 'Lưu đặc tả gốc vào docs/SSOT_ORIGINAL_SPEC.md', 'Lead Architect', 'done'),
             ('TODO-03', 'RM-01', 'Chuyển đổi giao diện sang phong cách Gen-workplace v1.1', 'Frontend Specialist', 'done'),
             ('TODO-04', 'RM-02', 'Viết Dockerfile container hóa Python backend + WebApp', 'DevOps Engineer', 'done'),
@@ -632,22 +633,22 @@ def seed_real_project():
 
         # 6. Runtimes thật
         runtimes = [
-            ('runtime-01', 'Lead Architect', 'Gemini CLI (agy)', 'RM-04', 'main', 'running', '/workspace/LinuxDataA/gen-workplace',
+            ('runtime-01', 'Lead Architect', 'Gemini CLI (agy)', 'RM-04', 'main', 'running', str(BASE_DIR),
              json.dumps({'input': 'Owner Request', 'output': 'gen-workplace git repo', 'request': 'init real project', 'conclusion': 'live & running'}, ensure_ascii=False),
              json.dumps(['20:34 repo created', '20:35 SSOT spec written', '20:47 live mount verified'], ensure_ascii=False)),
-            ('runtime-02', 'Backend & DB Specialist', 'Claude Code CLI', 'TODO-09', 'main', 'running', '/workspace/LinuxDataA/gen-workplace',
+            ('runtime-02', 'Backend & DB Specialist', 'Claude Code CLI', 'TODO-09', 'main', 'running', str(BASE_DIR),
              json.dumps({'input': 'Database spec', 'output': 'SQLite FTS5 schema', 'request': 'build zero-audit catalog', 'conclusion': 'in progress'}, ensure_ascii=False),
              json.dumps(['20:35 installer_tui.py implemented', '20:56 designing SQLite FTS5 catalog'], ensure_ascii=False)),
-            ('runtime-03', 'Frontend Specialist', 'Cursor CLI', 'TODO-03', 'main', 'running', '/workspace/LinuxDataA/gen-workplace',
+            ('runtime-03', 'Frontend Specialist', 'Cursor CLI', 'TODO-03', 'main', 'running', str(BASE_DIR),
              json.dumps({'input': 'Gen-workplace-v1.1-dynamic.html', 'output': 'frontend/index.html', 'request': 'apply technical dark theme', 'conclusion': 'done'}, ensure_ascii=False),
              json.dumps(['20:10 applied v1.1 palette', '20:57 wiped mock data, replaced with real repo data'], ensure_ascii=False)),
-            ('runtime-04', 'DevOps & Packaging', 'Gemini CLI (agy)', 'TODO-05', 'main', 'done', '/workspace/LinuxDataA/gen-workplace',
+            ('runtime-04', 'DevOps & Packaging', 'Gemini CLI (agy)', 'TODO-05', 'main', 'done', str(BASE_DIR),
              json.dumps({'input': 'docker-compose.yml', 'output': 'container gen-workplace-app', 'request': 'containerize app', 'conclusion': 'done'}, ensure_ascii=False),
              json.dumps(['20:35 Dockerfile created', '20:36 image built', '20:47 container live-mounted'], ensure_ascii=False)),
-            ('runtime-05', 'QA Tester', 'Gemini CLI', 'TODO-08', 'main', 'done', '/workspace/LinuxDataA/gen-workplace',
+            ('runtime-05', 'QA Tester', 'Gemini CLI', 'TODO-08', 'main', 'done', str(BASE_DIR),
              json.dumps({'input': 'Gen-workplace.desktop', 'output': 'QA pass', 'request': 'verify desktop icon', 'conclusion': 'done'}, ensure_ascii=False),
              json.dumps(['20:37 checked desktop entry', '20:37 curl status 200 OK'], ensure_ascii=False)),
-            ('runtime-06', 'Security Auditor', 'Codex Security CLI', 'TODO-05', 'main', 'done', '/workspace/LinuxDataA/gen-workplace',
+            ('runtime-06', 'Security Auditor', 'Codex Security CLI', 'TODO-05', 'main', 'done', str(BASE_DIR),
              json.dumps({'input': 'SELinux policy', 'output': 'secure volume mount', 'request': 'enforce security', 'conclusion': 'done'}, ensure_ascii=False),
              json.dumps(['20:46 audit getenforce', '20:47 confirmed zero permission leak'], ensure_ascii=False))
         ]
@@ -659,13 +660,13 @@ def seed_real_project():
 
         # 7. Chat messages thật
         messages = [
-            ('runtime-01', 'Lead Architect', '20:34:26', 'Repo Init', 'Đã khởi tạo repo <code>/workspace/LinuxDataA/gen-workplace</code> và lưu đặc tả gốc vào <code>docs/SSOT_ORIGINAL_SPEC.md</code>.', json.dumps(['📥 đã nhận', '✅ done'], ensure_ascii=False)),
+            ('runtime-01', 'Lead Architect', '20:34:26', 'Repo Init', 'Đã khởi tạo repo và lưu đặc tả gốc vào <code>docs/SSOT_ORIGINAL_SPEC.md</code>.', json.dumps(['📥 đã nhận', '✅ done'], ensure_ascii=False)),
             ('runtime-01', 'Lead Architect', '20:47:08', 'Live Mount', 'Đã cấu hình Live Mount với cờ SELinux <code>:z</code>. Mọi chỉnh sửa trên host sẽ tự động phản ánh tức thì vào container!', json.dumps(['🚀 live reload', '✅ xác nhận'], ensure_ascii=False)),
             ('runtime-02', 'Backend & DB Specialist', '20:35:45', 'Installer', 'Đã xây dựng xong bộ cài đặt <code>installer_tui.py</code> có thanh loading progress bar % và kiểm tra môi trường.', json.dumps(['✅ done', '🔥 mượt mà'], ensure_ascii=False)),
             ('runtime-02', 'Backend & DB Specialist', '20:56:00', 'Database', 'Đang triển khai SQLite WAL Core Database và FTS5 Virtual Table cho Catalog tra nhanh ID.', json.dumps(['⏳ đang chạy'], ensure_ascii=False)),
             ('runtime-03', 'Frontend Specialist', '20:10:23', 'Style v1.1', 'Đã chuyển đổi toàn bộ layout sang phong cách Gen-workplace v1.1 tinh tế, không rối mắt.', json.dumps(['✅ done'], ensure_ascii=False)),
             ('runtime-04', 'DevOps & Packaging', '20:36:58', 'Docker Up', 'Container <code>gen-workplace-app</code> đã khởi động thành công trên cổng 8888.', json.dumps(['✅ done', '🚀 online'], ensure_ascii=False)),
-            ('runtime-05', 'QA Tester', '20:37:05', 'Shortcut', 'Đã xác thực shortcut <code>/workspace/Desktop/Gen-workplace.desktop</code> tồn tại và mở được WebApp.', json.dumps(['✅ verified'], ensure_ascii=False)),
+            ('runtime-05', 'QA Tester', '20:37:05', 'Shortcut', 'Đã xác thực shortcut Desktop tồn tại và mở được WebApp.', json.dumps(['✅ verified'], ensure_ascii=False)),
             ('runtime-06', 'Security Auditor', '20:46:47', 'SELinux', 'Đã kiểm tra SELinux Enforcing trên host và gán nhãn <code>:z</code> an toàn cho Docker mounts.', json.dumps(['✅ secure'], ensure_ascii=False))
         ]
         for m in messages:
@@ -713,12 +714,12 @@ def seed_real_project():
             ('#FILE-03', 'FILE', 'backend/main.py', 'Control Plane Server & API endpoint (/api/status, /api/state)', 'backend/main.py', json.dumps({'type': 'python', 'port': 8888})),
             ('#FILE-04', 'FILE', 'installer_tui.py', 'Bộ cài đặt giao diện dòng lệnh TUI với progress bar % và dependency check', 'installer_tui.py', json.dumps({'type': 'tui'})),
             ('#FILE-05', 'FILE', 'docker-compose.yml', 'Cấu hình docker-compose live mount với cờ SELinux :z', 'docker-compose.yml', json.dumps({'services': ['gen-workplace']})),
-            ('#FILE-06', 'FILE', '/workspace/Desktop/Gen-workplace.desktop', 'Shortcut Desktop mở WebApp bằng trình duyệt mặc định', '/workspace/Desktop/Gen-workplace.desktop', json.dumps({'type': 'desktop-entry'})),
+            ('#FILE-06', 'FILE', 'Gen-workplace.desktop', 'Shortcut Desktop mở WebApp bằng trình duyệt mặc định', 'Gen-workplace.desktop', json.dumps({'type': 'desktop-entry'})),
             ('#SEC-01', 'SEC', 'Docker Container Sandbox Boundary', 'Cách ly toàn bộ mã thực thi của các CLI Agent trong Docker container', '/etc/docker/daemon.json', json.dumps({'isolation': 'docker'})),
             ('#SEC-02', 'SEC', 'Master Prompt Instruction Lock', 'Chỉ có thể chỉnh sửa hướng dẫn Agent Role thông qua ô Chat Input Tổng', 'frontend/index.html', json.dumps({'locked': True})),
             ('#MCP-01', 'MCP', 'google-drive MCP Server', 'Tích hợp đọc tài liệu, trang tính từ Google Drive', 'antigravity-cli/mcp/google-drive', json.dumps({'tools': 42})),
             ('#MCP-02', 'MCP', 'git-ops CLI Integration', 'Tự động kiểm soát commit, branch và pull request cho các subagent', 'builtin/git-ops', json.dumps({'cli': 'git'})),
-            ('#TOOL-01', 'TOOL', 'Gemini CLI (agy)', 'Antigravity CLI v1.2.8 hỗ trợ chế độ autonomous và high-effort', '/workspace/.local/bin/agy', json.dumps({'version': '1.2.8'})),
+            ('#TOOL-01', 'TOOL', 'Gemini CLI (agy)', 'Antigravity CLI hỗ trợ chế độ autonomous và high-effort', 'agy', json.dumps({'version': '1.2.11'})),
             ('#TOOL-02', 'TOOL', 'Claude Code CLI', 'Engine tư duy và kiểm chứng mã nguồn độc lập', 'claude-code', json.dumps({'model': 'sonnet'})),
             ('#TOOL-03', 'TOOL', 'Codex Security CLI', 'Thẩm định an toàn, quyền truy cập tệp và phân tách bí mật', 'codex-cli', json.dumps({'sandbox': 'read-only'})),
             ('#DB-01', 'DB', 'SQLite 3 WAL Database', 'Cơ sở dữ liệu cốt lõi lưu trữ toàn bộ thực thể và FTS5 Catalog tra cứu', '/app/data/gen-workplace.db', json.dumps({'journal': 'WAL', 'fts': 'fts5'})),
@@ -1036,9 +1037,9 @@ def parse_id_token(id_token):
 
 def get_oauth_profiles():
     """Quét toàn bộ hồ sơ profile Google OAuth trên hệ thống và đối chiếu với các role."""
-    base_dir = "/workspace/.agy-profiles"
+    base_dir = os.path.join(HOME_DIR, ".agy-profiles")
     candidates = [
-        ("owner_default", "👑 Ryan (Owner) - Hồ Sơ Mặc Định", "/workspace/.gemini"),
+        ("owner_default", "👑 Ryan (Owner) - Hồ Sơ Mặc Định", os.path.join(HOME_DIR, ".gemini")),
     ]
     if os.path.exists(base_dir):
         try:
@@ -1127,10 +1128,10 @@ def refresh_google_oauth_token(profile_id="owner_default"):
     Tự động làm mới OAuth Access Token từ Google OAuth endpoint bằng refresh_token
     khi access token hết hạn. Hỗ trợ cả owner_default và profile1-4.
     """
-    target_dir = "/workspace/.gemini" if profile_id == "owner_default" else f"/workspace/.agy-profiles/{profile_id}"
+    target_dir = os.path.join(HOME_DIR, ".gemini") if profile_id == "owner_default" else os.path.join(HOME_DIR, ".agy-profiles", profile_id)
     token_file = os.path.join(target_dir, "antigravity-cli", "antigravity-oauth-token")
     if not os.path.exists(token_file):
-        token_file = "/workspace/.gemini/antigravity-cli/antigravity-oauth-token"
+        token_file = os.path.join(HOME_DIR, ".gemini", "antigravity-cli", "antigravity-oauth-token")
     if not os.path.exists(token_file):
         return None
 
@@ -1189,9 +1190,9 @@ def fetch_live_google_quota(profile_id="owner_default", force=False):
         if now - _LIVE_QUOTA_CACHE_TIME.get(profile_id, 0) < QUOTA_CACHE_TTL:
             return _LIVE_QUOTA_CACHE[profile_id]
 
-    target_dir = "/workspace/.gemini" if profile_id == "owner_default" else f"/workspace/.agy-profiles/{profile_id}"
+    target_dir = os.path.join(HOME_DIR, ".gemini") if profile_id == "owner_default" else os.path.join(HOME_DIR, ".agy-profiles", profile_id)
     token_path = os.path.join(target_dir, "antigravity-cli", "antigravity-oauth-token")
-    owner_token_path = "/workspace/.gemini/antigravity-cli/antigravity-oauth-token"
+    owner_token_path = os.path.join(HOME_DIR, ".gemini", "antigravity-cli", "antigravity-oauth-token")
     
     token = None
     if os.path.exists(token_path):
@@ -1458,7 +1459,7 @@ def get_quota_telemetry(profile_id, email=""):
         return live
 
     # 2. Fallback sang thanh tra nhật ký cục bộ nếu mất mạng hoặc token hết hạn
-    target_dir = "/workspace/.gemini" if profile_id == "owner_default" else f"/workspace/.agy-profiles/{profile_id}"
+    target_dir = os.path.join(HOME_DIR, ".gemini") if profile_id == "owner_default" else os.path.join(HOME_DIR, ".agy-profiles", profile_id)
     log_dir = os.path.join(target_dir, "antigravity-cli", "log")
     
     gemini_rate_limited = False
@@ -1634,7 +1635,7 @@ def generate_role_spec_file(sid, role_name, scope="", mission="", conv_id="", al
     Sinh file Role Specification (ROLE.md) cô lập ngữ cảnh và trách nhiệm cho từng Agent.
     Đảm bảo 0-conflict, khóa chặt boundary thư mục và liên kết trực tiếp tới Brain SSOT.
     """
-    workspace_dir = "/workspace" if os.path.exists("/workspace") else "/workspace/LinuxDataA/gen-workplace"
+    workspace_dir = "/workspace" if os.path.exists("/workspace") else str(BASE_DIR)
     roles_dir = Path(workspace_dir) / "roles"
     roles_dir.mkdir(parents=True, exist_ok=True)
     role_spec_path = roles_dir / f"{sid}_ROLE.md"
@@ -1655,7 +1656,7 @@ def generate_role_spec_file(sid, role_name, scope="", mission="", conv_id="", al
 - **Active Mission**: {use_mission}
 - **Conversation Thread**: `{use_conv}`
 - **Master SSOT**: `docs/SSOT_ORIGINAL_SPEC.md`
-- **Genesis Brain Link**: branch `main` của repo `Genesis-ryan-84-0567536339/Brain` (`BOOTSTRAP.md`)
+- **Genesis Brain Link**: `BOOTSTRAP.md` (Genesis Brain SSOT Protocol)
 - **Execution Policy**: Autonomous Execution & Full Bypass Policy (auto-accept, không dừng bước trung gian)
 
 ---
@@ -1697,7 +1698,7 @@ def ensure_real_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
         pass
 
     oauth_map = {p["id"]: p for p in get_oauth_profiles()}
-    workspace_dir = "/workspace" if os.path.exists("/workspace") else "/workspace/LinuxDataA/gen-workplace"
+    workspace_dir = "/workspace" if os.path.exists("/workspace") else str(BASE_DIR)
 
     # Đảm bảo symlink docs trong /workspace để agent luôn đọc được SSOT spec
     try:
@@ -1738,7 +1739,7 @@ def ensure_real_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
             if sid not in live_sessions:
                 init_script_path = f"/tmp/tmux_init_{sid}.sh"
                 try:
-                    p_dir_clean = profile_dir or "/workspace/.gemini"
+                    p_dir_clean = profile_dir or os.path.join(HOME_DIR, ".gemini")
                     with open(init_script_path, "w") as f:
                         f.write(f"""clear
 echo "================================================================================"
@@ -1952,7 +1953,7 @@ def update_tmux_account(session_id, account_type, account_label, profile_dir="")
 
     # Cập nhật biến môi trường trực tiếp vào phiên tmux đang chạy
     try:
-        p_dir = profile_dir or "/workspace/.gemini"
+        p_dir = profile_dir or os.path.join(HOME_DIR, ".gemini")
         cmd = f"export GEMINI_DIR='{p_dir}'; alias agy=\"agy --gemini_dir='{p_dir}' --dangerously-skip-permissions\"; echo '[AUTH] Đã kích hoạt tài khoản: {account_label}'"
         subprocess.run(["tmux", "send-keys", "-t", session_id, cmd, "Enter"], capture_output=True, timeout=2.0)
     except Exception:
@@ -2098,7 +2099,7 @@ def wake_tmux_session(session_id):
     Đánh thức / Gọi lại đúng phiên làm việc đã ngủ đông.
     Khởi tạo lại tmux session, phục hồi đúng Conversation ID, profile, workspace và SSOT.
     """
-    workspace_dir = "/workspace" if os.path.exists("/workspace") else "/workspace/LinuxDataA/gen-workplace"
+    workspace_dir = "/workspace" if os.path.exists("/workspace") else str(BASE_DIR)
     oauth_map = {p["id"]: p for p in get_oauth_profiles()}
 
     with get_connection() as conn:
@@ -2116,7 +2117,7 @@ def wake_tmux_session(session_id):
 
         p_info = oauth_map.get(acc_type, {})
         email = p_info.get("email") or "owner@genesis.local"
-        p_dir_clean = profile_dir or p_info.get("path") or "/workspace/.gemini"
+        p_dir_clean = profile_dir or p_info.get("path") or os.path.join(HOME_DIR, ".gemini")
         role_spec_file = generate_role_spec_file(session_id, role_name, conv_id=conv_id)
 
         init_script_path = f"/tmp/tmux_init_{session_id}.sh"
@@ -2205,11 +2206,11 @@ def manage_tmux_swarm_lifecycle(action, target_id="all", project_id="PRJ-GEN-WOR
 def start_oauth_login(profile_id, custom_path=""):
     """Khởi tạo phiên đăng nhập OAuth hoặc thư mục profile mới."""
     if profile_id == "owner_default":
-        target_dir = "/workspace/.gemini"
+        target_dir = os.path.join(HOME_DIR, ".gemini")
     elif custom_path:
         target_dir = custom_path
     else:
-        target_dir = f"/workspace/.agy-profiles/{profile_id}"
+        target_dir = os.path.join(HOME_DIR, ".agy-profiles", profile_id)
 
     cli_dir = os.path.join(target_dir, "antigravity-cli")
     os.makedirs(cli_dir, exist_ok=True)
@@ -2222,7 +2223,7 @@ def start_oauth_login(profile_id, custom_path=""):
     try:
         subprocess.run(["tmux", "kill-session", "-t", session_name], capture_output=True)
         cmd = f"agy --gemini_dir={target_dir} || bash"
-        res = subprocess.run(["tmux", "new-session", "-d", "-s", session_name, "-c", "/workspace/LinuxDataA/gen-workplace", cmd], capture_output=True, timeout=2.0)
+        res = subprocess.run(["tmux", "new-session", "-d", "-s", session_name, "-c", str(BASE_DIR), cmd], capture_output=True, timeout=2.0)
         tmux_created = (res.returncode == 0)
     except Exception:
         pass
@@ -2240,9 +2241,9 @@ def start_oauth_login(profile_id, custom_path=""):
 def check_oauth_status(profile_id):
     """Kiểm tra trạng thái xác thực tức thì của một profile."""
     if profile_id == "owner_default":
-        target_dir = "/workspace/.gemini"
+        target_dir = os.path.join(HOME_DIR, ".gemini")
     else:
-        target_dir = f"/workspace/.agy-profiles/{profile_id}"
+        target_dir = os.path.join(HOME_DIR, ".agy-profiles", profile_id)
 
     token_file = os.path.join(target_dir, "antigravity-cli", "antigravity-oauth-token")
     if not os.path.exists(token_file):
@@ -2278,9 +2279,9 @@ def check_oauth_status(profile_id):
 def save_oauth_token(profile_id, token_data):
     """Lưu token OAuth trực tiếp vào hồ sơ profile."""
     if profile_id == "owner_default":
-        target_dir = "/workspace/.gemini"
+        target_dir = os.path.join(HOME_DIR, ".gemini")
     else:
-        target_dir = f"/workspace/.agy-profiles/{profile_id}"
+        target_dir = os.path.join(HOME_DIR, ".agy-profiles", profile_id)
 
     cli_dir = os.path.join(target_dir, "antigravity-cli")
     os.makedirs(cli_dir, exist_ok=True)
@@ -2334,9 +2335,9 @@ def assign_oauth_to_role(session_id, profile_id):
 def logout_oauth_profile(profile_id):
     """Đăng xuất / thu hồi token của profile."""
     if profile_id == "owner_default":
-        target_dir = "/workspace/.gemini"
+        target_dir = os.path.join(HOME_DIR, ".gemini")
     else:
-        target_dir = f"/workspace/.agy-profiles/{profile_id}"
+        target_dir = os.path.join(HOME_DIR, ".agy-profiles", profile_id)
 
     token_file = os.path.join(target_dir, "antigravity-cli", "antigravity-oauth-token")
     if os.path.exists(token_file):
@@ -2399,7 +2400,7 @@ def spawn_worker(role_name, project_id="PRJ-GEN-WORKPLACE", account_type="owner_
     clean_mission = mission or f"Thực thi các hạng mục chuyên môn cho vai trò {role_name} theo chuẩn SSOT."
     clean_scope = scope or "Thực hiện theo chỉ định của Orchestrator trong workspace dự án."
 
-    workspace_dir = "/workspace" if os.path.exists("/workspace") else "/workspace/LinuxDataA/gen-workplace"
+    workspace_dir = "/workspace" if os.path.exists("/workspace") else str(BASE_DIR)
     role_spec_path = generate_role_spec_file(sid, role_name, scope=clean_scope, mission=clean_mission, conv_id=conv_id)
 
     # 1. Lưu vào SQLite
@@ -2414,11 +2415,11 @@ def spawn_worker(role_name, project_id="PRJ-GEN-WORKPLACE", account_type="owner_
                 id, project_id, role_name, cli_tool, status, pid, cwd,
                 terminal_output, account_type, account_label, profile_dir, conversation_id,
                 quota_gemini_json, quota_anthropic_json
-            ) VALUES (?, ?, ?, 'agy', 'active', 0, ?, ?, ?, 'Mặc định (Owner Gmail: ~/.gemini)', '/workspace/.gemini', ?, ?, ?)
+            ) VALUES (?, ?, ?, 'agy', 'active', 0, ?, ?, ?, 'Mặc định (Owner Gmail: ~/.gemini)', ?, ?, ?, ?)
             """, (
                 sid, project_id, role_name, workspace_dir,
                 f"[{role_name} ({sid}) spawned by Orchestrator]\nRole spec generated: {role_spec_path}\nReady for tasks.",
-                account_type, conv_id,
+                account_type, os.path.join(HOME_DIR, ".gemini"), conv_id,
                 json.dumps({"percent": 85, "limit": 100}),
                 json.dumps({"percent": 90, "limit": 100})
             ))
@@ -2950,7 +2951,7 @@ def update_role_model(role_id, model_name, project_id="PRJ-GEN-WORKPLACE"):
 # =========================================================================
 
 def find_repo_path():
-    for p in ["/app/repo", "/workspace", str(BASE_DIR), "/workspace/LinuxDataA/gen-workplace"]:
+    for p in ["/app/repo", "/workspace", str(BASE_DIR)]:
         if os.path.exists(os.path.join(p, ".git")):
             return p
     return str(BASE_DIR)
@@ -3217,7 +3218,7 @@ def create_new_project(name, repo_path, plan_text=""):
     if not name:
         return {"error": "Missing name"}
     pid = "PRJ-" + name.upper().replace(" ", "-").replace("_", "-")
-    repo = repo_path or f"/workspace/LinuxDataA/{name}"
+    repo = repo_path or str(BASE_DIR.parent / name)
     
     with get_connection() as conn:
         cursor = conn.cursor()
@@ -3254,7 +3255,11 @@ def get_role_thinking_trace(session_id, project_id="PRJ-GEN-WORKPLACE"):
     }
 
 def get_system_skills():
-    skills_paths = ["/workspace/.agents/skills", "/workspace/.gemini/config/skills", "/workspace/.gemini/antigravity-cli/builtin/skills"]
+    skills_paths = [
+        os.path.join(HOME_DIR, ".agents", "skills"),
+        os.path.join(HOME_DIR, ".gemini", "config", "skills"),
+        os.path.join(HOME_DIR, ".gemini", "antigravity-cli", "builtin", "skills")
+    ]
     skills = []
     seen = set()
     for sp in skills_paths:
@@ -3289,7 +3294,7 @@ def get_system_skills():
     return skills
 
 def get_system_mcps():
-    mcp_path = "/workspace/.gemini/antigravity-cli/mcp"
+    mcp_path = os.path.join(HOME_DIR, ".gemini", "antigravity-cli", "mcp")
     mcps = []
     if os.path.isdir(mcp_path):
         for item in sorted(os.listdir(mcp_path)):
@@ -3382,8 +3387,8 @@ def get_owner_profile(owner_id="owner-ryan"):
                 "email": "owner@genesis.local",
                 "avatar": "👑",
                 "bio": "Single Source of Truth tối cao và chủ sở hữu độc quyền toàn bộ dữ liệu hệ thống Gen Workplace & Genesis Swarm.",
-                "storage_path": "/workspace",
-                "workspace_root": "/workspace/LinuxDataA/gen-workplace/workspace",
+                "storage_path": HOME_DIR,
+                "workspace_root": str(BASE_DIR / "workspace"),
                 "settings": {"theme": "dark", "data_ownership": "exclusive_ryan", "isolation_level": "strict"},
                 "stats": {
                     "total_projects": 1,
@@ -3831,16 +3836,16 @@ def call_agy_cli_turn(conv_id, user_message, model=None, account="owner_default"
         pass
 
     # Chuẩn bị môi trường cho agy CLI
-    p_dir = "/workspace/.gemini"
+    p_dir = os.path.join(HOME_DIR, ".gemini")
     if account and account != "owner_default":
-        p_dir = f"/workspace/.agy-profiles/{account}"
+        p_dir = os.path.join(HOME_DIR, ".agy-profiles", account)
 
     env = {
         **os.environ,
-        "HOME": "/workspace",
-        "PATH": "/usr/local/bin:/usr/bin:/bin:/workspace/.local/bin",
+        "HOME": HOME_DIR,
+        "PATH": f"/usr/local/bin:/usr/bin:/bin:{HOME_DIR}/.local/bin",
     }
-    if p_dir != "/workspace/.gemini" and os.path.exists(f"{p_dir}/antigravity-cli"):
+    if p_dir != os.path.join(HOME_DIR, ".gemini") and os.path.exists(f"{p_dir}/antigravity-cli"):
         env["ANTIGRAVITY_APP_DATA_DIR"] = f"{p_dir}/antigravity-cli"
 
     # Lấy Kanban & Checklist chuyên dụng của phiên để định hướng Agent
@@ -4333,7 +4338,7 @@ def get_file_content_safely(file_path):
         return {"error": "Access denied (outside workspace sandbox)"}
     
     if not os.path.exists(target):
-        host_target = os.path.abspath(os.path.join("/workspace/LinuxDataA/gen-workplace", clean_p))
+        host_target = os.path.abspath(os.path.join(str(BASE_DIR), clean_p))
         if os.path.exists(host_target):
             target = host_target
         else:

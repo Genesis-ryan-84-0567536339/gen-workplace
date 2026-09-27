@@ -24,7 +24,7 @@
        ▼
  [call_agy_cli_turn()]
        │  (4) subprocess.run(["agy", "--output-format", "json", "--print", ...])
-       │      với ENV: HOME=/workspace, token OAuth từ ~/.gemini hoặc ~/.agy-profiles
+       │      với ENV: HOME=${HOME:-/root}, token OAuth từ ~/.gemini hoặc ~/.agy-profiles
        ▼
  [Google Antigravity Engine: agy v1.2.11]
        │  (5) Kết nối Google Cloud Code Assist / Gemini Foundation Models

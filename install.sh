@@ -22,4 +22,4 @@ if ! command -v python3 &>/dev/null; then
 fi
 
 # Chạy TUI Installer với giao diện trực quan
-python3 "${SCRIPT_DIR}/installer_tui.py"
+python3 "${SCRIPT_DIR}/installer_tui.py" "$@"

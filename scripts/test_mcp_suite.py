@@ -14,10 +14,11 @@ import http.client
 import urllib.request
 import urllib.error
 import subprocess
+import os
 from pathlib import Path
 
 BASE_URL = "http://localhost:8888"
-STDIO_BIN = "/workspace/.local/bin/gen-workplace-mcp"
+STDIO_BIN = os.path.expanduser("~/.local/bin/gen-workplace-mcp")
 
 def http_req(path, data=None, headers=None, method=None, timeout=15):
     url = f"{BASE_URL}{path}"

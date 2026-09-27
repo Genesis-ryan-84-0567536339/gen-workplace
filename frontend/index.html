@@ -4874,8 +4874,8 @@ body.resizing-active, body.resizing-active * {
                       <option value="owner_default">👑 Owner Ryan (owner@genesis.local)</option>
                       <option value="profile1">Profile #1 (owner@genesis.local)</option>
                       <option value="profile2">⚡ Profile #2 (claude.bot@genesis.local) [Có Claude Quota]</option>
-                      <option value="profile3">Profile #3 (admin@genesis.local)</option>
-                      <option value="profile4">Profile #4 (admin@genesis.local)</option>
+                      <option value="profile3">Profile #3 (shared.bot@genesis.local)</option>
+                      <option value="profile4">Profile #4 (shared.bot@genesis.local)</option>
                     </select>
                     <span id="genQuotaLiveSourceBadge" class="badge" style="font-size:8px;padding:1px 4px;background:#064e3b;color:#34d399;border:1px solid rgba(52,211,153,0.3);white-space:nowrap;flex-shrink:0">● Live</span>
                   </div>
@@ -5915,7 +5915,7 @@ body.resizing-active, body.resizing-active * {
               <div class="cardHead" style="padding:8px 14px">
                 <div>
                   <strong style="font-size:12.5px;color:#f8fafc">Project đang chọn: gen-workplace</strong>
-                  <div class="hint" id="dashboardSelectedMeta" style="font-size:10.5px">/workspace/LinuxDataA/gen-workplace</div>
+                  <div class="hint" id="dashboardSelectedMeta" style="font-size:10.5px">/workspace</div>
                 </div>
                 <span class="chip done">Branch main · Clean</span>
               </div>
@@ -6141,7 +6141,7 @@ body.resizing-active, body.resizing-active * {
             <div class="card">
               <div class="cardHead">
                 <strong>Workspace Branch Scope</strong>
-                <span class="hint">/workspace/LinuxDataA/gen-workplace</span>
+                <span class="hint">/workspace</span>
               </div>
               <div class="cardBody">
                 <div class="codeBox" id="repoWorkspace"></div>
@@ -6340,16 +6340,16 @@ body.resizing-active, body.resizing-active * {
         <select id="accountSelect" onchange="onAccountOptionChange()">
           <option value="owner_default">Mặc định (Owner Gmail: ~/.gemini)</option>
           <option value="profile1">Profile #1 (claude.bot@genesis.local)</option>
-          <option value="profile2">Profile #2 (/workspace/.agy-profiles/profile2)</option>
-          <option value="profile3">Profile #3 (/workspace/.agy-profiles/profile3)</option>
-          <option value="profile4">Profile #4 (/workspace/.agy-profiles/profile4)</option>
-          <option value="profile5">Profile #5 (/workspace/.agy-profiles/profile5)</option>
+          <option value="profile2">Profile #2 (~/.agy-profiles/profile2)</option>
+          <option value="profile3">Profile #3 (~/.agy-profiles/profile3)</option>
+          <option value="profile4">Profile #4 (~/.agy-profiles/profile4)</option>
+          <option value="profile5">Profile #5 (~/.agy-profiles/profile5)</option>
           <option value="custom">Tùy chỉnh đường dẫn Profile...</option>
         </select>
       </div>
       <div class="field" id="customProfileGroup" style="display:none">
         <label>Đường dẫn thư mục Profile (--gemini_dir)</label>
-        <input type="text" id="accountCustomDir" placeholder="/workspace/.agy-profiles/my_profile">
+        <input type="text" id="accountCustomDir" placeholder="~/.agy-profiles/my_profile">
       </div>
       <div class="field">
         <label>Nhãn hiển thị tài khoản</label>
@@ -6570,9 +6570,9 @@ body.resizing-active, body.resizing-active * {
       <div style="margin-bottom:16px;background:#10151f;border:1px solid #1e293b;border-radius:8px;padding:12px">
         <label style="font-size:10.5px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:6px">📁 Đường Dẫn Không Gian Lưu Trữ Của Ryan</label>
         <div style="font-size:11px;font-family:var(--mono);color:#e2e8f0;display:flex;flex-direction:column;gap:4px">
-          <div><span style="color:#64748b">Workspace Root:</span> <span style="color:#38bdf8">/workspace/LinuxDataA/gen-workplace/workspace/</span></div>
-          <div><span style="color:#64748b">Sessions Directory:</span> <span style="color:#38bdf8">/workspace/LinuxDataA/gen-workplace/workspace/sessions/</span></div>
-          <div><span style="color:#64748b">OAuth Token Path:</span> <span style="color:#38bdf8">/workspace/.gemini/antigravity-cli/antigravity-oauth-token</span></div>
+          <div><span style="color:#64748b">Workspace Root:</span> <span style="color:#38bdf8">/workspace/workspace/</span></div>
+          <div><span style="color:#64748b">Sessions Directory:</span> <span style="color:#38bdf8">/workspace/workspace/sessions/</span></div>
+          <div><span style="color:#64748b">OAuth Token Path:</span> <span style="color:#38bdf8">~/.gemini/antigravity-cli/antigravity-oauth-token</span></div>
           <div><span style="color:#64748b">Database Engine:</span> <span style="color:#38bdf8">/app/data/gen-workplace.db (SQLite WAL Mode)</span></div>
         </div>
       </div>
@@ -6762,7 +6762,7 @@ body.resizing-active, body.resizing-active * {
                 <span class="badge" style="background:#065f46;color:#fff;font-size:8px">Zero Latency</span>
               </div>
               <div style="display:flex;gap:6px">
-                <input type="text" id="mcpFieldStdio" readonly class="input mono" style="font-size:11px;flex:1;background:#02050b;color:#f8fafc;padding:5px 8px;border:1px solid #334155;border-radius:4px" value="/workspace/.local/bin/gen-workplace-mcp">
+                <input type="text" id="mcpFieldStdio" readonly class="input mono" style="font-size:11px;flex:1;background:#02050b;color:#f8fafc;padding:5px 8px;border:1px solid #334155;border-radius:4px" value="~/.local/bin/gen-workplace-mcp">
                 <button type="button" class="btn small" style="color:#10b981;padding:4px 8px;font-size:10px" onclick="copyMcpField('mcpFieldStdio', 'Đường dẫn Stdio CLI')">📋 Copy</button>
               </div>
               <div style="font-size:9.5px;color:#94a3b8;margin-top:4px">Kênh stdin/stdout chuyên dụng cho Antigravity CLI & Claude</div>
@@ -7012,7 +7012,7 @@ try {
 const state = {
   project: {
     name: 'gen-workplace',
-    repo: '/workspace/LinuxDataA/gen-workplace',
+    repo: '/workspace',
     branch: 'main',
     plan: 'docs/SSOT_ORIGINAL_SPEC.md'
   },
@@ -7028,7 +7028,7 @@ const state = {
     {
       name: 'gen-workplace',
       meta: '6 role · Docker live mount · Active',
-      repo: '/workspace/LinuxDataA/gen-workplace'
+      repo: '/workspace'
     }
   ],
   sourceSaved: true,
@@ -7054,7 +7054,7 @@ const state = {
   ],
   todos: [
     [
-      { id: 'TODO-01', title: 'Khởi tạo Git repo /workspace/LinuxDataA/gen-workplace', role: 'Lead Architect', status: 'done' },
+      { id: 'TODO-01', title: 'Khởi tạo Git repo /workspace', role: 'Lead Architect', status: 'done' },
       { id: 'TODO-02', title: 'Lưu đặc tả gốc vào docs/SSOT_ORIGINAL_SPEC.md', role: 'Lead Architect', status: 'done' },
       { id: 'TODO-03', title: 'Chuyển đổi giao diện sang phong cách Gen-workplace v1.1', role: 'Frontend Specialist', status: 'done' }
     ],
@@ -7094,16 +7094,16 @@ const state = {
   ],
   runtimes: [
     {
-      id: 'runtime-01', role: 'Lead Architect', cli: 'Gemini CLI (agy)', task: 'RM-04', branch: 'main', status: 'running', path: '/workspace/LinuxDataA/gen-workplace',
+      id: 'runtime-01', role: 'Lead Architect', cli: 'Gemini CLI (agy)', task: 'RM-04', branch: 'main', status: 'running', path: '/workspace',
       messages: [
-        { author: 'Lead Architect', time: '20:34:26', tag: 'Repo Init', body: 'Đã khởi tạo repo <code>/workspace/LinuxDataA/gen-workplace</code> và lưu đặc tả gốc vào <code>docs/SSOT_ORIGINAL_SPEC.md</code>.', react: ['📥 đã nhận', '✅ done'] },
+        { author: 'Lead Architect', time: '20:34:26', tag: 'Repo Init', body: 'Đã khởi tạo repo <code>/workspace</code> và lưu đặc tả gốc vào <code>docs/SSOT_ORIGINAL_SPEC.md</code>.', react: ['📥 đã nhận', '✅ done'] },
         { author: 'Lead Architect', time: '20:47:08', tag: 'Live Mount', body: 'Đã cấu hình Live Mount với cờ SELinux <code>:z</code>. Mọi chỉnh sửa trên host sẽ tự động phản ánh tức thì vào container!', react: ['🚀 live reload', '✅ xác nhận'] }
       ],
       trace: ['20:34 repo created', '20:35 SSOT spec written', '20:47 live mount verified'],
       io: { input: 'Owner Request', output: 'gen-workplace git repo', request: 'init real project', conclusion: 'live & running' }
     },
     {
-      id: 'runtime-02', role: 'Backend & DB Specialist', cli: 'Claude Code CLI', task: 'TODO-09', branch: 'main', status: 'running', path: '/workspace/LinuxDataA/gen-workplace',
+      id: 'runtime-02', role: 'Backend & DB Specialist', cli: 'Claude Code CLI', task: 'TODO-09', branch: 'main', status: 'running', path: '/workspace',
       messages: [
         { author: 'Backend', time: '20:35:45', tag: 'Installer', body: 'Đã xây dựng xong bộ cài đặt <code>installer_tui.py</code> có thanh loading progress bar % và kiểm tra môi trường.', react: ['✅ done', '🔥 mượt mà'] },
         { author: 'Backend', time: '20:56:00', tag: 'Database', body: 'Đang triển khai SQLite WAL Core Database và FTS5 Virtual Table cho Catalog tra nhanh ID.', react: ['⏳ đang chạy'] }
@@ -7112,25 +7112,25 @@ const state = {
       io: { input: 'Database spec', output: 'SQLite FTS5 schema', request: 'build zero-audit catalog', conclusion: 'in progress' }
     },
     {
-      id: 'runtime-03', role: 'Frontend Specialist', cli: 'Cursor CLI', task: 'TODO-03', branch: 'main', status: 'running', path: '/workspace/LinuxDataA/gen-workplace',
+      id: 'runtime-03', role: 'Frontend Specialist', cli: 'Cursor CLI', task: 'TODO-03', branch: 'main', status: 'running', path: '/workspace',
       messages: [{ author: 'Frontend', time: '20:10:23', tag: 'Style v1.1', body: 'Đã chuyển đổi toàn bộ layout sang phong cách Gen-workplace v1.1 tinh tế, không rối mắt.', react: ['✅ done'] }],
       trace: ['20:10 applied v1.1 palette', '20:57 wiped mock data, replaced with real repo data'],
       io: { input: 'Gen-workplace-v1.1-dynamic.html', output: 'frontend/index.html', request: 'apply technical dark theme', conclusion: 'done' }
     },
     {
-      id: 'runtime-04', role: 'DevOps & Packaging', cli: 'Gemini CLI (agy)', task: 'TODO-05', branch: 'main', status: 'done', path: '/workspace/LinuxDataA/gen-workplace',
+      id: 'runtime-04', role: 'DevOps & Packaging', cli: 'Gemini CLI (agy)', task: 'TODO-05', branch: 'main', status: 'done', path: '/workspace',
       messages: [{ author: 'DevOps', time: '20:36:58', tag: 'Docker Up', body: 'Container <code>gen-workplace-app</code> đã khởi động thành công trên cổng 8888.', react: ['✅ done', '🚀 online'] }],
       trace: ['20:35 Dockerfile created', '20:36 image built', '20:47 container live-mounted'],
       io: { input: 'docker-compose.yml', output: 'container 28a7c6b51b94', request: 'containerize app', conclusion: 'done' }
     },
     {
-      id: 'runtime-05', role: 'QA Tester', cli: 'Gemini CLI', task: 'TODO-08', branch: 'main', status: 'done', path: '/workspace/LinuxDataA/gen-workplace',
-      messages: [{ author: 'QA', time: '20:37:05', tag: 'Shortcut', body: 'Đã xác thực shortcut <code>/workspace/Desktop/Gen-workplace.desktop</code> tồn tại và mở được WebApp.', react: ['✅ verified'] }],
+      id: 'runtime-05', role: 'QA Tester', cli: 'Gemini CLI', task: 'TODO-08', branch: 'main', status: 'done', path: '/workspace',
+      messages: [{ author: 'QA', time: '20:37:05', tag: 'Shortcut', body: 'Đã xác thực shortcut <code>~/Desktop/Gen-workplace.desktop</code> tồn tại và mở được WebApp.', react: ['✅ verified'] }],
       trace: ['20:37 checked desktop entry', '20:37 curl status 200 OK'],
       io: { input: 'Gen-workplace.desktop', output: 'QA pass', request: 'verify desktop icon', conclusion: 'done' }
     },
     {
-      id: 'runtime-06', role: 'Security Auditor', cli: 'Codex Security CLI', task: 'TODO-05', branch: 'main', status: 'done', path: '/workspace/LinuxDataA/gen-workplace',
+      id: 'runtime-06', role: 'Security Auditor', cli: 'Codex Security CLI', task: 'TODO-05', branch: 'main', status: 'done', path: '/workspace',
       messages: [{ author: 'Security', time: '20:46:47', tag: 'SELinux', body: 'Đã kiểm tra SELinux Enforcing trên host và gán nhãn <code>:z</code> an toàn cho Docker mounts.', react: ['✅ secure'] }],
       trace: ['20:46 audit getenforce', '20:47 confirmed zero permission leak'],
       io: { input: 'SELinux policy', output: 'secure volume mount', request: 'enforce security', conclusion: 'done' }
@@ -7148,7 +7148,7 @@ const state = {
       ['TODO-09', 'Khởi tạo SQLite WAL DB & FTS5 virtual table', 'Backend']
     ],
     done: [
-      ['TODO-01', 'Khởi tạo Git repo /workspace/LinuxDataA/gen-workplace', 'Lead'],
+      ['TODO-01', 'Khởi tạo Git repo /workspace', 'Lead'],
       ['TODO-02', 'Lưu đặc tả gốc vào docs/SSOT_ORIGINAL_SPEC.md', 'Lead'],
       ['TODO-03', 'Chuyển đổi giao diện sang phong cách Gen-workplace v1.1', 'Frontend'],
       ['TODO-04', 'Viết Dockerfile container hóa Python backend + WebApp', 'DevOps'],
@@ -7164,7 +7164,7 @@ const state = {
     { id: 'SSOT-LIVE-MOUNT-04', title: 'Cơ Chế Live Mount Hot-Reload', body: 'Thư mục frontend/ và backend/ được mount trực tiếp vào container với cờ SELinux :z, đảm bảo mọi thay đổi code trên repo được cập nhật tức thì trên WebApp khi F5.', source: 'COMMIT ae4e196', verified: '20:47' }
   ],
   roleMemory: [
-    { role: 'Lead Architect', runtime: 'runtime-01', summary: 'SSOT verified · Git repo live', detail: 'Quản trị repo chính thức /workspace/LinuxDataA/gen-workplace, đã chốt 4 quy tắc SSOT.' },
+    { role: 'Lead Architect', runtime: 'runtime-01', summary: 'SSOT verified · Git repo live', detail: 'Quản trị repo chính thức /workspace, đã chốt 4 quy tắc SSOT.' },
     { role: 'Backend Specialist', runtime: 'runtime-02', summary: 'Installer TUI complete · SQLite FTS5 active', detail: 'Đã hoàn thành installer_tui.py và đang xây dựng cơ sở dữ liệu SQLite tra cứu nhanh.' },
     { role: 'Frontend Specialist', runtime: 'runtime-03', summary: 'Theme v1.1 synced · Mock data purged', detail: 'Đã dọn dẹp sạch toàn bộ dữ liệu giả cũ, nạp 100% dữ liệu thực của repo gen-workplace.' },
     { role: 'DevOps & Packaging', runtime: 'runtime-04', summary: 'Docker live mount running on port 8888', detail: 'Container gen-workplace-app đang phục vụ ổn định với live volume bind mounts.' },
@@ -7469,7 +7469,7 @@ function ensureProjectWorkspaces() {
 
 async function modalSubmit() {
   const name = ($('mProjectName')?.value || 'new-swarm-app').trim() || 'new-swarm-app';
-  const repo = ($('mProjectRepo')?.value || '/workspace/LinuxDataA/' + name).trim();
+  const repo = ($('mProjectRepo')?.value || '~/LinuxDataA/' + name).trim();
   saveActiveWorkspace();
   state.projects.unshift({ name, meta: 'mới tạo · 6 role · 0 runtime', repo, workspace: blankWorkspace() });
   persist();
@@ -8169,10 +8169,10 @@ async function refreshTmuxSessions(showNotify = false) {
   if (!state.tmuxSessions || state.tmuxSessions.length === 0) {
     state.tmuxSessions = [
       { id: 'gw-lead-agy', role_name: 'Lead Architect', cli_tool: 'agy', account_type: 'owner_default', account_label: 'Mặc định (Owner Gmail)', email: 'owner@genesis.local', is_auth: true, profile_dir: '', status: 'active', pid: 30129, terminal_output: '[gw-lead-agy:0] agy CLI ready.' },
-      { id: 'gw-backend-agy', role_name: 'Backend Dev', cli_tool: 'agy', account_type: 'profile1', account_label: 'Profile #1 (owner@genesis.local)', email: 'owner@genesis.local', is_auth: true, profile_dir: '/workspace/.agy-profiles/profile1', status: 'active', pid: 30130, terminal_output: '[gw-backend-agy:0] agy CLI ready.' },
+      { id: 'gw-backend-agy', role_name: 'Backend Dev', cli_tool: 'agy', account_type: 'profile1', account_label: 'Profile #1 (owner@genesis.local)', email: 'owner@genesis.local', is_auth: true, profile_dir: '~/.agy-profiles/profile1', status: 'active', pid: 30130, terminal_output: '[gw-backend-agy:0] agy CLI ready.' },
       { id: 'gw-frontend-agy', role_name: 'Frontend Dev', cli_tool: 'agy', account_type: 'profile2', account_label: 'Profile #2 (claude.bot@genesis.local)', email: 'claude.bot@genesis.local', is_auth: true, profile_dir: '', status: 'active', pid: 30131, terminal_output: '[gw-frontend-agy:0] agy CLI ready.' },
-      { id: 'gw-devops-agy', role_name: 'DevOps & Docker', cli_tool: 'agy', account_type: 'profile3', account_label: 'Profile #3 (admin@genesis.local)', email: 'admin@genesis.local', is_auth: true, profile_dir: '/workspace/.agy-profiles/profile3', status: 'active', pid: 30132, terminal_output: '[gw-devops-agy:0] agy CLI ready.' },
-      { id: 'gw-qa-agy', role_name: 'QA & Verification', cli_tool: 'agy', account_type: 'profile4', account_label: 'Profile #4 (admin@genesis.local)', email: 'admin@genesis.local', is_auth: true, profile_dir: '/workspace/.agy-profiles/profile4', status: 'active', pid: 30133, terminal_output: '[gw-qa-agy:0] agy CLI ready.' },
+      { id: 'gw-devops-agy', role_name: 'DevOps & Docker', cli_tool: 'agy', account_type: 'profile3', account_label: 'Profile #3 (shared.bot@genesis.local)', email: 'shared.bot@genesis.local', is_auth: true, profile_dir: '~/.agy-profiles/profile3', status: 'active', pid: 30132, terminal_output: '[gw-devops-agy:0] agy CLI ready.' },
+      { id: 'gw-qa-agy', role_name: 'QA & Verification', cli_tool: 'agy', account_type: 'profile4', account_label: 'Profile #4 (shared.bot@genesis.local)', email: 'shared.bot@genesis.local', is_auth: true, profile_dir: '~/.agy-profiles/profile4', status: 'active', pid: 30133, terminal_output: '[gw-qa-agy:0] agy CLI ready.' },
       { id: 'gw-security-agy', role_name: 'Security & Secret Vault', cli_tool: 'agy', account_type: 'owner_default', account_label: 'Mặc định (Owner Gmail)', email: 'owner@genesis.local', is_auth: true, profile_dir: '', status: 'active', pid: 30134, terminal_output: '[gw-security-agy:0] agy CLI ready.' }
     ];
   }
@@ -9521,7 +9521,7 @@ function renderOrchMemory() {
         <div class="orchMemoryEntry">
           <span class="orchMemTag">WORKSPACE</span>
           <div class="orchMemText">
-            <strong>Thư mục làm việc:</strong> <code>/workspace/LinuxDataA/gen-workplace</code> (Container Mount: <code>/workspace:z</code>). Cổng phục vụ UI: <code>http://localhost:8888</code>.
+            <strong>Thư mục làm việc:</strong> <code>/workspace</code> (Container Mount: <code>/workspace:z</code>). Cổng phục vụ UI: <code>http://localhost:8888</code>.
           </div>
         </div>
       </div>
@@ -10107,7 +10107,7 @@ async function submitAccountChange() {
     if (!label) label = 'Custom Profile (' + dir + ')';
   } else {
     const num = type.replace('profile', '');
-    dir = '/workspace/.agy-profiles/' + type;
+    dir = '~/.agy-profiles/' + type;
     if (!label) label = 'Profile #' + num + (type === 'profile1' ? ' (claude.bot@genesis.local)' : '');
   }
 
@@ -13940,12 +13940,12 @@ async function loadGitData() {
         branchBadge.textContent = `Branch ${stat.branch} · ${stat.clean ? 'Clean' : 'Modified (' + stat.changed_files.length + ')'}`;
       }
       if (repoWs) {
-        repoWs.textContent = `Repository: ${stat.repo_path || '/workspace/LinuxDataA/gen-workplace'}
+        repoWs.textContent = `Repository: ${stat.repo_path || '/workspace'}
 Branch: ${stat.branch} (Head: ${stat.head})
 Status: ${stat.clean ? 'Clean (0 uncommitted changes)' : 'Modified files: ' + stat.changed_files.join(', ')}
 Total Commits: ${stat.total_commits} commits
 Docker Container: gen-workplace-app (Live mount: /app/repo)
-Desktop Entry: /workspace/Desktop/Gen-workplace.desktop
+Desktop Entry: ~/Desktop/Gen-workplace.desktop
 Web Endpoint: http://localhost:8888`;
       }
     }
@@ -14745,14 +14745,14 @@ function updateMcpConfigSnippets() {
     antigravity: `{
   "mcpServers": {
     "gen-workplace": {
-      "command": "/workspace/.local/bin/gen-workplace-mcp"
+      "command": "~/.local/bin/gen-workplace-mcp"
     }
   }
 }`,
     claude: `{
   "mcpServers": {
     "gen-workplace": {
-      "command": "/workspace/.local/bin/gen-workplace-mcp"
+      "command": "~/.local/bin/gen-workplace-mcp"
     }
   }
 }`,
