@@ -1551,97 +1551,184 @@ def fetch_live_google_quota(profile_id="owner_default", force=False):
         print(f"[Live Quota] Error processing quota models: {e}")
         return _LIVE_QUOTA_CACHE.get(profile_id)
 
+QUOTA_PROBE_MAX_AGE_SEC = 6 * 3600
+
+def _agy_bin():
+    """Đường dẫn CLI agy; ghi đè bằng GW_AGY_BIN (script giả) để test không cần agy thật."""
+    return os.environ.get("GW_AGY_BIN") or "agy"
+
+def _profile_dir(profile_id):
+    """Thư mục hồ sơ agy: ~/.gemini cho owner_default, ~/.agy-profiles/<id> cho profile khác."""
+    if not profile_id or profile_id == "owner_default":
+        return os.path.join(HOME_DIR, ".gemini")
+    return os.path.join(HOME_DIR, ".agy-profiles", profile_id)
+
+def _agy_env(p_dir):
+    """Biến môi trường chạy agy với hồ sơ p_dir (ANTIGRAVITY_APP_DATA_DIR cho profile phụ)."""
+    env = {**os.environ, "HOME": HOME_DIR, "PATH": f"/usr/local/bin:/usr/bin:/bin:{HOME_DIR}/.local/bin:" + os.environ.get("PATH", "")}
+    if p_dir != os.path.join(HOME_DIR, ".gemini") and os.path.exists(os.path.join(p_dir, "antigravity-cli")):
+        env["ANTIGRAVITY_APP_DATA_DIR"] = os.path.join(p_dir, "antigravity-cli")
+    return env
+
+def classify_agy_result(returncode, output):
+    """Phân loại kết quả 1 lần gọi agy: ('ok', ''), ('rate_limited', reset) khi 429/RESOURCE_EXHAUSTED, ('error', '') còn lại."""
+    out = output or ""
+    if returncode == 0:
+        return "ok", ""
+    if re.search(r"RESOURCE_EXHAUSTED|Individual quota reached|\b429\b|quota (exceeded|reached|exhausted)", out, re.IGNORECASE):
+        m = re.search(r"Resets? (?:in|at) ([^\n\"]{1,40})", out)
+        return "rate_limited", (m.group(1).strip() if m else "")
+    return "error", ""
+
+def record_quota_probe(profile_id, model, status, reset_at="", raw=""):
+    """Ghi 1 dòng kết quả gọi agy thật (ok / rate_limited / error / timeout) vào bảng quota_probe (#6)."""
+    try:
+        with get_connection() as conn:
+            conn.execute("INSERT INTO quota_probe (profile_id, model, status, reset_at, raw) VALUES (?, ?, ?, ?, ?)",
+                         (profile_id or "owner_default", model or "", status, reset_at or "", (raw or "")[-2000:]))
+            conn.commit()
+    except Exception as e:
+        print(f"[quota_probe] Không ghi được: {e}")
+
+def record_quota_probe_from_result(profile_id, model, res):
+    """Ghi quota_probe từ CompletedProcess của agy (dùng chung cho runner chat, probe và dispatch)."""
+    output = ((res.stdout or "") + "\n" + (res.stderr or "")).strip()
+    status, reset_at = classify_agy_result(res.returncode, output)
+    record_quota_probe(profile_id, model, status, reset_at, output)
+    return status, reset_at
+
+def get_latest_quota_probe(profile_id, family="gemini", max_age_sec=QUOTA_PROBE_MAX_AGE_SEC):
+    """Dòng quota_probe mới nhất (< max_age_sec giây) của profile; family 'claude' lấy model claude/sonnet/opus, 'gemini' lấy còn lại."""
+    try:
+        with get_connection() as conn:
+            rows = conn.execute("""
+            SELECT id, profile_id, model, status, reset_at, checked_at, raw FROM quota_probe
+            WHERE profile_id = ? AND (strftime('%s', 'now') - strftime('%s', checked_at)) < ?
+            ORDER BY id DESC LIMIT 30
+            """, (profile_id or "owner_default", int(max_age_sec))).fetchall()
+    except Exception:
+        return None
+    for r in rows:
+        m = (r["model"] or "").lower()
+        is_claude = any(k in m for k in ("claude", "sonnet", "opus"))
+        if (family == "claude") != is_claude:
+            continue
+        return dict(r)
+    return None
+
+def _quota_from_probe(probe, live, base):
+    """Ghép quota hiển thị: ưu tiên dòng probe rate_limited < 6h, rồi số liệu live Cloud Code, rồi probe ok, cuối cùng 'unknown' không có %."""
+    q = dict(live) if live else dict(base)
+    q.setdefault("percent", None)
+    q.setdefault("reset_time", "")
+    if probe and probe["status"] == "rate_limited":
+        reset = probe.get("reset_at") or ""
+        q.update({
+            "status": "rate_limited",
+            "status_label": f"429 · hồi {reset or 'chưa rõ'}",
+            "percent": 0,
+            "reset_time": reset or q.get("reset_time") or "",
+            "color": "#ef4444",
+            "detail": f"Lệnh agy lúc {probe['checked_at']} bị 429 (RESOURCE_EXHAUSTED). " + (probe.get("raw") or "")[-200:],
+            "source": "agy_probe",
+            "probe_checked_at": probe["checked_at"],
+        })
+        return q
+    if live:
+        q["source"] = "cloudcode_api_live"
+        if probe:
+            q["probe_checked_at"] = probe["checked_at"]
+            q["probe_status"] = probe["status"]
+        return q
+    if probe and probe["status"] == "ok":
+        q.update({
+            "status": "ready",
+            "status_label": f"Gọi thật OK lúc {probe['checked_at']}",
+            "percent": None,
+            "color": "#38bdf8",
+            "detail": f"Lệnh agy ({probe.get('model') or 'mặc định'}) chạy thành công lúc {probe['checked_at']}; chưa có số % từ Cloud Code API.",
+            "source": "agy_probe",
+            "probe_checked_at": probe["checked_at"],
+        })
+        return q
+    if probe:
+        q.update({
+            "status": "unknown",
+            "status_label": f"Lỗi gọi agy ({probe['status']}) lúc {probe['checked_at']}",
+            "percent": None,
+            "color": "#f59e0b",
+            "detail": (probe.get("raw") or "")[-300:] or "Không có output.",
+            "source": "agy_probe",
+            "probe_checked_at": probe["checked_at"],
+        })
+        return q
+    q.update({
+        "status": "unknown",
+        "status_label": "Chưa có dữ liệu gọi thật",
+        "percent": None,
+        "color": "#6b7280",
+        "detail": "Chưa có lần gọi agy nào trong 6 giờ qua. Bấm kiểm tra quota (POST /api/quota/probe) để chạy lệnh agy tối thiểu.",
+        "source": "none",
+    })
+    return q
+
 def get_quota_telemetry(profile_id, email=""):
     """
-    Theo dõi và tính toán Quota thực tế còn lại cho 2 nhóm Model:
-    1. Nhóm Google Gemini (Gemini 3.8 Flash, Gemini 3.1 Pro)
-    2. Nhóm Anthropic Claude (Claude Sonnet 4.6 Thinking, Claude Opus 4.6 Thinking)
+    Quota hiển thị cho 2 nhóm model (Gemini / Claude) từ dữ liệu THẬT (#6):
+    ưu tiên dòng quota_probe < 6h (rate_limited → 429 + giờ hồi), rồi Cloud Code API live,
+    không có gì → status 'unknown', không có %. Giữ nguyên các key status/status_label/percent/reset_time/detail.
     """
-    # 1. Ưu tiên truy vấn trực tiếp thời gian thực từ Google Cloud Code API của agy CLI
     live = fetch_live_google_quota(profile_id)
-    if live:
-        return live
-
-    # 2. Fallback sang thanh tra nhật ký cục bộ nếu mất mạng hoặc token hết hạn
-    target_dir = os.path.join(HOME_DIR, ".gemini") if profile_id == "owner_default" else os.path.join(HOME_DIR, ".agy-profiles", profile_id)
-    log_dir = os.path.join(target_dir, "antigravity-cli", "log")
-    
-    gemini_rate_limited = False
-    gemini_reset_str = ""
-    gemini_reason = ""
-
-    if os.path.exists(log_dir):
-        try:
-            log_files = sorted(
-                [os.path.join(log_dir, f) for f in os.listdir(log_dir) if f.startswith("cli-")],
-                key=lambda x: os.path.getmtime(x),
-                reverse=True
-            )
-            if log_files:
-                with open(log_files[0], "r", errors="ignore") as lf:
-                    lines = lf.readlines()[-300:]
-                    err_idx = -1
-                    success_after_err = False
-                    for i, l in enumerate(lines):
-                        if "mcp_auth.go" in l or "dynamic client registration" in l:
-                            continue
-                        
-                        if re.search(r'\b(RESOURCE_EXHAUSTED|Individual quota reached)\b', l, re.IGNORECASE):
-                            err_idx = i
-                            gemini_reason = l.strip()[-140:]
-                            m = re.search(r'Resets in (?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?', l)
-                            if m:
-                                gemini_reset_str = m.group(0)
-                        elif err_idx != -1 and ("streamGenerateContent" in l or "loadCodeAssist" in l or "fetchAvailableModels" in l):
-                            if "URL: https://" in l or "ResponseID:" in l:
-                                success_after_err = True
-
-                    if err_idx != -1 and not success_after_err:
-                        gemini_rate_limited = True
-        except Exception:
-            pass
-
-    gemini_percent = 0 if gemini_rate_limited else 71
-    gemini_status = "rate_limited" if gemini_rate_limited else "ready"
-    gemini_status_label = f"429 Rate Limit ({gemini_reset_str or 'Đang chờ hồi'})" if gemini_rate_limited else f"Khả dụng {gemini_percent}% (Sẵn sàng)"
-    gemini_color = "#ef4444" if gemini_rate_limited else "#38bdf8"
-    gemini_detail = gemini_reason if gemini_rate_limited else f"Tokens/Min: 4.0M | Request/Min: 60 | Quota: {gemini_percent}%"
-
-    gemini_quota = {
+    live_g, live_c = live if live else (None, None)
+    base_g = {
         "family": "Google Gemini",
         "model": "Gemini 3.8 Flash (High)",
         "alt_model": "Gemini 3.1 Pro (High)",
-        "status": gemini_status,
-        "status_label": gemini_status_label,
-        "percent": gemini_percent,
-        "used_requests": 1500 if gemini_rate_limited else 12,
-        "limit_requests": 1500,
-        "rpm": 60,
-        "tpm": 4000000,
-        "reset_time": "00:00 UTC (hằng ngày)",
-        "tier": "Cloud Code / AI Studio Enterprise",
-        "color": gemini_color,
-        "detail": gemini_detail
+        "tier": "Cloud Code / AI Studio",
+        "reset_time": "",
     }
-
-    anthropic_quota = {
+    base_c = {
         "family": "Anthropic Claude",
         "model": "Claude Sonnet 4.6 (Thinking)",
         "alt_model": "Claude Opus 4.6 (Thinking)",
-        "status": "rate_limited",
-        "status_label": "0% (429 Quota Exceeded · Hồi sau rolling window)",
-        "percent": 0,
-        "used_tokens": 200000,
-        "limit_tokens": 200000,
-        "rpm": 50,
-        "tpm": 200000,
-        "reset_time": "Rolling 5h",
-        "tier": "Sonnet 4.6 Tier 4 Entitlement",
-        "color": "#ef4444",
-        "detail": "Hạn ngạch cá nhân đã cạn (0%) · Đang chờ hồi"
+        "tier": "Sonnet 4.6 Entitlement",
+        "reset_time": "",
     }
-
+    gemini_quota = _quota_from_probe(get_latest_quota_probe(profile_id, "gemini"), live_g, base_g)
+    anthropic_quota = _quota_from_probe(get_latest_quota_probe(profile_id, "claude"), live_c, base_c)
     return gemini_quota, anthropic_quota
+
+def probe_quota(profile_id="owner_default", timeout=60):
+    """Chạy lệnh agy tối thiểu (--gemini_dir=<dir> --mode plan -p 'ping') với hồ sơ profile_id, ghi quota_probe và trả quota mới (#6)."""
+    p_dir = _profile_dir(profile_id)
+    cmd = [_agy_bin(), f"--gemini_dir={p_dir}", "--mode", "plan", "-p", "ping"]
+    started = time.time()
+    try:
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, cwd=str(BASE_DIR), env=_agy_env(p_dir))
+        output = ((res.stdout or "") + "\n" + (res.stderr or "")).strip()
+        status, reset_at = record_quota_probe_from_result(profile_id, "default", res)
+        code = res.returncode
+    except subprocess.TimeoutExpired:
+        status, reset_at, code = "timeout", "", -1
+        output = f"agy không phản hồi sau {timeout}s"
+        record_quota_probe(profile_id, "default", status, "", output)
+    except Exception as e:
+        status, reset_at, code = "error", "", -1
+        output = f"Không chạy được agy ({_agy_bin()}): {e}"
+        record_quota_probe(profile_id, "default", status, "", output)
+    g_q, a_q = get_quota_telemetry(profile_id)
+    return {
+        "ok": status == "ok",
+        "profile_id": profile_id,
+        "status": status,
+        "reset_at": reset_at,
+        "exit_code": code,
+        "elapsed_sec": round(time.time() - started, 1),
+        "command": " ".join(cmd),
+        "output": output[-1500:],
+        "gemini": g_q,
+        "claude": a_q,
+    }
 
 # =========================================================================
 # REAL TMUX SWARM ENGINE (6 INTERACTIVE PROCESSES & SHARED CONTEXT)
@@ -4249,7 +4336,7 @@ def call_agy_cli_turn(conv_id, user_message, model=None, account="owner_default"
     model_slug = resolve_agy_model_slug(model)
 
     cmd = [
-        "agy",
+        _agy_bin(),
         "--output-format", "json",
         "--print", prompt_payload,
         "--dangerously-skip-permissions",
@@ -4259,8 +4346,8 @@ def call_agy_cli_turn(conv_id, user_message, model=None, account="owner_default"
     if agy_conv_id:
         cmd.extend(["--conversation", agy_conv_id])
 
-    # Xác định thư mục làm việc (ưu tiên thư mục cô lập của phiên)
-    work_dir = "/workspace"
+    # Xác định thư mục làm việc (ưu tiên thư mục cô lập của phiên; máy không có /workspace → BASE_DIR)
+    work_dir = "/workspace" if os.path.isdir("/workspace") else str(BASE_DIR)
     sess_dir = Path("/workspace/sessions") / conv_id
     if not sess_dir.exists():
         sess_dir = BASE_DIR / "workspace" / "sessions" / conv_id
@@ -4270,6 +4357,7 @@ def call_agy_cli_turn(conv_id, user_message, model=None, account="owner_default"
 
     try:
         res = subprocess.run(cmd, capture_output=True, text=True, env=env, cwd=work_dir, timeout=180)
+        record_quota_probe_from_result(account, model_slug, res)
         if res.returncode == 0 and res.stdout.strip():
             try:
                 data = json.loads(res.stdout)
@@ -4323,6 +4411,7 @@ def call_agy_cli_turn(conv_id, user_message, model=None, account="owner_default"
                     fresh_cmd.append(token)
 
                 res_retry = subprocess.run(fresh_cmd, capture_output=True, text=True, env=env, cwd=work_dir, timeout=180)
+                record_quota_probe_from_result(account, model_slug, res_retry)
                 if res_retry.returncode == 0 and res_retry.stdout.strip():
                     try:
                         data = json.loads(res_retry.stdout)
@@ -4346,6 +4435,7 @@ def call_agy_cli_turn(conv_id, user_message, model=None, account="owner_default"
 
     except subprocess.TimeoutExpired:
         print(f"[AGY Runner] Timeout (180s) for conv {conv_id}")
+        record_quota_probe(account, model_slug, "timeout", "", "agy không phản hồi sau 180s")
         timeout_msg = (
             f"⏱️ **Thông báo Quá giờ:** Lệnh agy CLI (`{model_slug}`) đã vượt quá thời hạn chờ tối đa 180s do tác vụ phức tạp.\n\n"
             f"👉 **Khuyến nghị:** Sếp có thể đổi sang **Gemini 3.8 Flash (High Speed)** để nhận phản hồi siêu tốc dưới 15 giây."

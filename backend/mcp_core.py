@@ -55,6 +55,20 @@ TOOLS = [
         }
     },
     {
+        "name": "probe_quota",
+        "description": "Chạy 1 lệnh agy tối thiểu (--mode plan -p 'ping') với profile chỉ định để cập nhật quota từ kết quả gọi THẬT (ok / 429 rate_limited + giờ hồi). Kết quả được ghi vào bảng quota_probe và dùng cho get_live_quota.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "profile_id": {
+                    "type": "string",
+                    "description": "ID tài khoản / profile OAuth (mặc định 'owner_default').",
+                    "default": "owner_default"
+                }
+            }
+        }
+    },
+    {
         "name": "list_google_accounts",
         "description": "Liệt kê toàn bộ các tài khoản Google / OAuth profiles có trong hệ thống và trạng thái đăng nhập/hiệu lực của token.",
         "inputSchema": {
@@ -673,11 +687,17 @@ def execute_tool(name: str, args: dict) -> dict:
                 g_q, a_q = db.get_quota_telemetry(profile_id)
                 data = {
                     "ok": True,
-                    "source": "log_telemetry_fallback",
+                    "source": "agy_probe_or_unknown",
                     "gemini": g_q,
                     "claude": a_q
                 }
             return {"content": [{"type": "text", "text": json.dumps(data, ensure_ascii=False, indent=2)}], "isError": False}
+
+        # 1b. probe_quota
+        if name == "probe_quota":
+            profile_id = args.get("profile_id", "owner_default")
+            res = db.probe_quota(profile_id)
+            return {"content": [{"type": "text", "text": json.dumps(res, ensure_ascii=False, indent=2)}], "isError": False}
 
         # 2. list_google_accounts
         if name == "list_google_accounts":

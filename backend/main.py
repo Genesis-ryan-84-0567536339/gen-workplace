@@ -279,7 +279,7 @@ class SwarmHandler(SimpleHTTPRequestHandler):
                 g_q, a_q = db.get_quota_telemetry(profile_id)
                 self._send_json(200, {
                     "ok": True,
-                    "source": "log_telemetry_fallback",
+                    "source": "agy_probe_or_unknown",
                     "gemini": g_q,
                     "claude": a_q
                 })
@@ -668,6 +668,13 @@ class SwarmHandler(SimpleHTTPRequestHandler):
                 "results": results,
                 "time": time.strftime("%H:%M:%S")
             })
+            return
+
+        # 6.3. Kiểm tra quota bằng 1 lệnh agy thật (ghi quota_probe) (#6)
+        if path == "/api/quota/probe":
+            profile_id = (data.get("profile_id") or data.get("profile") or "owner_default").strip()
+            res = db.probe_quota(profile_id)
+            self._send_json(200, res)
             return
 
         # 7. Bắt đầu luồng đăng nhập OAuth cho Profile
