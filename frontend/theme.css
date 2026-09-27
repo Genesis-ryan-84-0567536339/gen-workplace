@@ -1,0 +1,368 @@
+/* =========================================================================
+   Gen-workplace · lớp giao diện thống nhất (theme.css)
+   Nạp SAU khối <style> trong index.html; ghi đè token màu, chữ, khoảng cách
+   và các thành phần dùng chung để toàn bộ màn hình nhìn cùng một hệ.
+   ========================================================================= */
+
+:root {
+  --bg: #0f1115;
+  --panel: #161920;
+  --panel2: #12151b;
+  --panel3: #1b1f28;
+  --panel4: #222732;
+  --line: #262b35;
+  --line2: #333a47;
+  --text: #e8ecf1;
+  --muted: #9aa4b2;
+  --muted2: #6f7a89;
+  --accent: #7aa2f7;
+  --accent2: #a4c0ff;
+  --accent-soft: rgba(122, 162, 247, 0.14);
+  --green: #62c58c;
+  --yellow: #e0b35a;
+  --red: #e06c75;
+  --cyan: #6ccfe0;
+  --purple: #b48ef2;
+  --radius: 8px;
+  --radius-sm: 6px;
+  --sans: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+html, body {
+  font-family: var(--sans);
+  font-size: 13px;
+  line-height: 1.45;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Chữ quá nhỏ (8–10.5px) trong inline style -> nâng lên mức đọc được */
+[style*="font-size:8"], [style*="font-size: 8"],
+[style*="font-size:9"], [style*="font-size: 9"],
+[style*="font-size:10"], [style*="font-size: 10"] {
+  font-size: 11px !important;
+}
+.badge, .chip, .kbd, .hint, .topmeta, .ref {
+  font-size: 11px !important;
+  line-height: 1.3;
+}
+
+/* Bỏ hiệu ứng phát sáng / gradient tràn lan */
+*[style*="box-shadow"], .ownerBadgeChip, .mcpBadgeChip, .expertCard, .deckAvatar,
+.expertAvatar, .orchItemIcon, .wrMemberAvatar, .genSessionItem, .taskCard {
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+
+/* ---------- Khung app ---------- */
+.app {
+  grid-template-columns: var(--sidebar-w, 236px) minmax(0, 1fr);
+  grid-template-rows: 52px minmax(0, 1fr);
+}
+.top {
+  background: var(--panel2);
+  border-bottom: 1px solid var(--line);
+  padding: 0 12px 0 10px;
+  gap: 12px;
+}
+.brand { min-width: 200px; gap: 8px; }
+.brand > div > span { font-size: 13.5px; font-weight: 600; letter-spacing: -0.01em; }
+.brandMark {
+  width: 28px; height: 28px; border-radius: 7px;
+  background: var(--accent); color: #0b1220; border: 0;
+  font: 700 11px var(--mono);
+}
+.btnSidebarToggle { color: var(--muted); font-size: 15px; }
+.btnSidebarToggle:hover { background: var(--panel3); color: var(--text); border-color: transparent; }
+.projectSelect {
+  min-width: 220px; max-width: 360px; height: 32px; padding: 0 10px;
+  background: var(--panel); border-color: var(--line); border-radius: var(--radius-sm);
+}
+.projectSelect:hover { background: var(--panel3); }
+.projectSelect strong { font-weight: 600; font-size: 12.5px; }
+.projectSelect .topmeta { font-size: 11px !important; }
+.projectCaret { margin-left: auto; color: var(--muted2); }
+.topRight { gap: 8px; }
+.topmeta { color: var(--muted2); }
+.mcpDot { color: var(--green); font-size: 9px; animation: none; }
+.ownerDisplayName { color: var(--text); font-weight: 500; font-size: 12px; }
+
+/* ---------- Nút, ô nhập, chip ---------- */
+.btn, .iconBtn {
+  height: 30px; padding: 0 12px; font-size: 12px; font-weight: 500;
+  background: var(--panel3); border: 1px solid var(--line2); border-radius: var(--radius-sm);
+  color: var(--text); gap: 6px; white-space: nowrap; line-height: 1;
+}
+.btn:hover, .iconBtn:hover { background: var(--panel4); border-color: var(--muted2); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #0b1220; font-weight: 600; }
+.btn.primary:hover { background: var(--accent2); border-color: var(--accent2); }
+.btn.ghost { background: transparent; border-color: transparent; color: var(--muted); }
+.btn.ghost:hover { background: var(--panel3); color: var(--text); }
+.btn.small { height: 26px; padding: 0 9px; font-size: 11.5px !important; }
+.iconBtn { width: 30px; padding: 0; }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.badge, .chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 7px !important; border-radius: 5px !important;
+  background: var(--panel3); border: 1px solid var(--line2); color: var(--muted);
+  font-weight: 500; letter-spacing: 0; text-transform: none;
+}
+.badge.subtle { background: transparent; border-color: var(--line2); color: var(--muted2); }
+.chip.live { color: var(--accent2); border-color: rgba(122,162,247,.35); background: var(--accent-soft); }
+.chip.done { color: var(--green); border-color: rgba(98,197,140,.35); background: rgba(98,197,140,.12); }
+.chip.wait { color: var(--yellow); border-color: rgba(224,179,90,.35); background: rgba(224,179,90,.12); }
+.chip.bad { color: var(--red); border-color: rgba(224,108,117,.35); background: rgba(224,108,117,.12); }
+.kbd { border-color: var(--line2); color: var(--muted2); border-radius: 4px; }
+
+input[type="text"], input[type="search"], input[type="email"], input[type="password"], input[type="number"],
+input:not([type]), select, textarea {
+  background: var(--panel2); border: 1px solid var(--line2); border-radius: var(--radius-sm);
+  color: var(--text); padding: 6px 10px; font-size: 12.5px; outline: none;
+  transition: border-color .12s, box-shadow .12s;
+}
+input:focus, select:focus, textarea:focus {
+  border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft) !important;
+}
+input::placeholder, textarea::placeholder { color: var(--muted2); }
+select { padding-right: 24px; }
+
+/* ---------- Thanh bên ---------- */
+.sidebar { background: var(--panel2); border-right: 1px solid var(--line); }
+.nav { padding: 10px 10px; }
+.navGroup { margin-bottom: 16px; }
+.navLabel { font-size: 10.5px; letter-spacing: .06em; color: var(--muted2); padding: 4px 10px 6px; }
+.navItem {
+  height: 34px; padding: 0 10px; gap: 10px; font-size: 13px; color: var(--muted);
+  border-radius: var(--radius-sm); font-weight: 450;
+}
+.navItem:hover { background: var(--panel3); color: var(--text); }
+.navItem.active { background: var(--accent-soft); color: var(--text); font-weight: 550; }
+.navItem.active .navIcon { color: var(--accent); }
+.navItem.navSub { padding-left: 22px; font-size: 12.5px; }
+.navItem .badge { margin-left: auto; }
+.navIcon { width: 18px; font-size: 13px; color: var(--muted2); }
+.projectList { padding: 0 6px; }
+.projectRow { padding: 8px 10px; border-radius: var(--radius-sm); color: var(--muted); }
+.projectRow strong { color: var(--text); font-size: 12.5px; }
+.sidebarFoot { border-top: 1px solid var(--line); padding: 10px 14px; }
+.env { font-size: 11px; color: var(--muted2); padding: 3px 0; }
+.env strong { color: var(--muted); font-family: var(--mono); font-weight: 500; font-size: 11px; }
+
+/* ---------- Vùng nội dung ---------- */
+.main { background: var(--bg); }
+.subtop { height: 42px; background: var(--panel2); border-bottom: 1px solid var(--line); }
+.subtopDomainText { font-size: 12.5px; font-weight: 600; color: var(--text); }
+.subtopDomainIcon { display: none; }
+.subTab { height: 42px; font-size: 12.5px; font-weight: 500; color: var(--muted); padding: 0 12px; }
+.subTab:hover { color: var(--text); background: transparent; }
+.subTab.active { color: var(--text); border-bottom-color: var(--accent); }
+.content { padding: 18px 20px; }
+.pageHead { align-items: flex-start; margin-bottom: 16px; gap: 20px; }
+.pageHead h1 { font-size: 18px; font-weight: 650; letter-spacing: -0.015em; margin: 0 0 4px; color: var(--text); }
+.pageHead p { font-size: 12.5px; color: var(--muted); max-width: 720px; }
+.actions { gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+
+.card, .sectionCard, .orchPanel, .warroomSidebar, .warroomChatPane, .cockpitListPane, .cockpitDetailPane,
+.commandDeck, .memoryIndex, .memoryDetail, .stat, .projectCard, .kanCol, .implCardCol, .runtimeItem,
+.genRepoDashboard, .circuitDeepCanvas, .oauthStatCard, .modalBox {
+  background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+}
+.cardHead { min-height: 42px; padding: 0 14px; border-bottom: 1px solid var(--line); }
+.cardHead strong { font-size: 12.5px; font-weight: 600; color: var(--text); }
+.cardBody { padding: 14px; }
+.hint { color: var(--muted2); }
+
+/* Tiêu đề nhóm viết hoa nhỏ dùng khắp nơi */
+.wrSectionTitle, .cockpitPaneTitle, .orchListGroupTitle, .genSectionLabel, .navLabel, .roleTable th, .dataTable th, .eventTable th {
+  font-size: 10.5px !important; letter-spacing: .06em; text-transform: uppercase; font-weight: 600; color: var(--muted2) !important;
+}
+
+/* Bảng */
+.roleTable, .dataTable, .eventTable { border-collapse: separate; border-spacing: 0; width: 100%; }
+.roleTable th, .dataTable th, .eventTable th { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; }
+.roleTable td, .dataTable td, .eventTable td { padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.roleTable tr:hover td, .dataTable tr:hover td, .eventTable tr:hover td { background: var(--panel3); }
+
+/* Thống kê */
+.overviewStats { gap: 12px; }
+.stat { padding: 14px 16px; }
+.stat strong, .stat b, .oauthStatVal { font-size: 22px; font-weight: 650; letter-spacing: -0.02em; color: var(--text); }
+.stat span, .oauthStatLabel { color: var(--muted); font-size: 12px; }
+
+/* Kanban */
+.kanban { gap: 12px; }
+.kanCol { padding: 10px; }
+.kanHead { font-size: 12px; font-weight: 600; color: var(--text); padding: 4px 4px 10px; }
+.taskCard { background: var(--panel3); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 10px 11px; margin-bottom: 8px; }
+.taskCard:hover { border-color: var(--line2); }
+.taskCard .ref { color: var(--accent2); }
+
+/* ---------- Phòng giao ban ---------- */
+.warroomChannelItem, .wrMemberCard, .orchListItem, .genSessionItem, .runtimeItem, .resource, .ssotItem, .memoryItem, .roadmapRow, .todoItem {
+  background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-sm);
+}
+.warroomChannelItem:hover, .wrMemberCard:hover, .orchListItem:hover, .genSessionItem:hover, .runtimeItem:hover, .resource:hover { background: var(--panel3); }
+.warroomChannelItem.active, .orchListItem.active, .genSessionItem.active, .runtimeItem.active { border-color: var(--accent); background: var(--accent-soft); }
+.wrChanBadge, .wrMentionBtn { background: var(--panel3) !important; border: 1px solid var(--line2) !important; color: var(--muted) !important; border-radius: 5px !important; }
+.wrMentionBtn:hover { color: var(--accent) !important; border-color: var(--accent) !important; }
+.wrMemberAvatar, .orchItemIcon, .expertAvatar, .deckAvatar, .resIcon, .stepNo, .rmNo {
+  background: var(--panel3) !important; border: 1px solid var(--line2) !important; color: var(--accent) !important;
+  border-radius: 8px !important; font: 600 12px var(--mono) !important; display: grid; place-items: center;
+}
+.wrBubble, .orchMsgAgent, .msgBody { background: var(--panel3); border: 1px solid var(--line); border-radius: 10px; line-height: 1.55; font-size: 13px; }
+.orchMsgUser { background: var(--accent-soft); border: 1px solid rgba(122,162,247,.35); border-radius: 10px; }
+.wrTag { border-radius: 5px !important; font-size: 10.5px !important; padding: 1px 6px !important; background: var(--panel4) !important; border: 1px solid var(--line2) !important; color: var(--muted) !important; }
+.wrAuthor { font-weight: 600; color: var(--text); }
+.wrTime { color: var(--muted2); font-family: var(--mono); font-size: 11px; }
+.wrComposer { background: var(--panel2); border-top: 1px solid var(--line); padding: 12px 14px; }
+.wrTextarea, .composer textarea, .orchInputRow textarea { min-height: 64px; background: var(--panel); }
+.wrSendBtn, .orchSendBtn { background: var(--accent) !important; color: #0b1220 !important; border: 0 !important; border-radius: var(--radius-sm) !important; font-weight: 600 !important; }
+.wrSendBtn:hover, .orchSendBtn:hover { background: var(--accent2) !important; }
+
+/* ---------- Worker & terminal ---------- */
+.expertCard { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; }
+.expertCard.active, .expertCard.selected { border-color: var(--accent); background: var(--accent-soft); }
+.expertRoleTitle { font-size: 13px; font-weight: 600; color: var(--text); }
+.expertSidBadge { font: 500 11px var(--mono); color: var(--muted2); background: transparent; border: 0; padding: 0; }
+.expertMiniBtn { background: var(--panel3); border: 1px solid var(--line2); color: var(--muted); border-radius: 5px; width: 24px; height: 22px; }
+.expertMiniBtn:hover { color: var(--text); border-color: var(--muted2); }
+.expertStatusChip { border-radius: 5px !important; padding: 2px 7px !important; font-size: 11px !important; }
+.microBarTrack { background: var(--panel4); border-radius: 3px; height: 4px; }
+.microBarFill { border-radius: 3px; }
+.commandDeckHead { background: var(--panel); border-bottom: 1px solid var(--line); padding: 12px 14px; }
+.deckNavTab, .cockpitTabBtn, .chatTab, .insTab, .dataTab, .oauthTabBtn, .agentViewBtn, .genSessionScopeBtn, .genVsCodeTab {
+  background: transparent; border: 0; border-bottom: 2px solid transparent; color: var(--muted);
+  font-size: 12.5px; font-weight: 500; padding: 8px 12px; border-radius: 0;
+}
+.deckNavTab:hover, .cockpitTabBtn:hover, .chatTab:hover, .insTab:hover, .dataTab:hover, .oauthTabBtn:hover, .genVsCodeTab:hover { color: var(--text); background: transparent; }
+.deckNavTab.active, .cockpitTabBtn.active, .chatTab.active, .insTab.active, .dataTab.active, .oauthTabBtn.active, .agentViewBtn.active, .genSessionScopeBtn.active, .genVsCodeTab.active {
+  color: var(--text); border-bottom-color: var(--accent); background: transparent; font-weight: 600;
+}
+.deckQuotaPill { background: var(--panel3) !important; border: 1px solid var(--line2) !important; border-radius: 5px !important; color: var(--muted) !important; }
+.streamlinedConsoleBody, .log, .codeBox, pre, .terminalOut, .wbTerminal, #wbTerminalOutput {
+  background: #0b0d11 !important; border: 1px solid var(--line) !important; border-radius: var(--radius-sm);
+  font-family: var(--mono) !important; font-size: 12px !important; line-height: 1.5; color: #d5dbe3;
+}
+
+/* ---------- Bàn làm việc Gen (IDE) ---------- */
+.genWpShell { background: var(--bg); border-top: 0; --gen-col1-w: 250px; --gen-col3-w: 420px; }
+.genWpCol1, .genWpCol2, .genWpCol3 { background: var(--panel2); }
+.genWpCol1 { border-right: 1px solid var(--line); }
+.genWpCol3 { border-left: 1px solid var(--line); }
+.genWpCol1Head, .genChatHead, .genVsCodeTabBar, .genVsCodeBreadcrumbBar, .genWpCol1Foot { background: var(--panel2); border-color: var(--line) !important; }
+.genWpCol1Head { padding: 10px 12px; min-height: 44px; }
+.genWpCol1Search { padding: 8px 10px; border-bottom: 1px solid var(--line); }
+.genWpCol1Search input { width: 100%; }
+.genSessionItem { padding: 10px 11px; margin-bottom: 6px; }
+.genSessionTitle { font-size: 12.5px; font-weight: 600; color: var(--text); }
+.genSessionSnippet { color: var(--muted); font-size: 11.5px; }
+.genSessionModelBadge { background: transparent !important; border: 1px solid var(--line2) !important; color: var(--muted2) !important; border-radius: 4px !important; }
+.genVsCodeTab { height: 38px; padding: 0 12px; }
+.genVsCodeTab.active { background: var(--panel); border-top: 2px solid var(--accent); border-bottom: 0; }
+.genVsCodeBreadcrumbPath { color: var(--muted2); font-family: var(--mono); font-size: 11px; }
+.genSessionFilesHeader, .genRepoDashboard { background: var(--panel); }
+.genSessionPathBadge { background: var(--panel3) !important; border: 1px solid var(--line2) !important; color: var(--muted) !important; font-family: var(--mono); border-radius: 5px !important; }
+.genFolderHead { background: var(--panel3); border: 1px solid var(--line); border-radius: var(--radius-sm); color: var(--text); font-weight: 600; }
+.genFileTreeRow { border-radius: 5px; }
+.genFileTreeRow:hover { background: var(--panel3); }
+.genTelemetryQuotaBox { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 8px 10px; }
+.genAccountSelectTop { height: 26px !important; font-size: 11.5px !important; background: var(--panel2) !important; border: 1px solid var(--line2) !important; }
+.genChatHead .badge { background: transparent; }
+
+/* ---------- Modal, toast ---------- */
+.modal { background: rgba(6, 8, 12, 0.7); backdrop-filter: blur(4px); }
+.modalBox { box-shadow: var(--shadow); }
+.modalHead, .modalFoot { padding: 14px 18px; border-color: var(--line); }
+.modalHead strong, .modalHead h3 { font-size: 14px; font-weight: 600; }
+.modalBody { padding: 18px; }
+.field label { font-size: 12px; color: var(--muted); font-weight: 500; }
+.toast { background: var(--panel4); border: 1px solid var(--line2); color: var(--text); border-radius: var(--radius-sm); box-shadow: var(--shadow); font-size: 12.5px; }
+
+/* ---------- Thanh cuộn ---------- */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--line2); border-radius: 4px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted2); background-clip: padding-box; }
+
+/* ---------- Màn hình hẹp ---------- */
+@media (max-width: 1280px) {
+  .top .kbd, #syncState, .projectSelect .topmeta { display: none; }
+  .projectSelect { min-width: 160px; }
+  .content { padding: 14px; }
+}
+@media (max-width: 1024px) {
+  .app { grid-template-columns: 60px minmax(0, 1fr); }
+  .sidebar .navLabel, .sidebar .projectList, .sidebar .sidebarFoot, .sidebar .navItem span:not(.navIcon), .sidebar .navItem .badge { display: none; }
+  .sidebar .navItem { justify-content: center; padding: 0; }
+  .brand > div { display: none; }
+  .brand { min-width: auto; }
+  .genWpShell { --gen-col1-w: 200px; --gen-col3-w: 320px; }
+}
+
+/* ---------- Bàn làm việc Gen: đầu cột ---------- */
+.genWpCol1Head { display: flex; align-items: center; justify-content: space-between; }
+.genWpCol1Head strong { font-size: 13px; font-weight: 600; }
+.genChatHead { padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.genChatHeadRow { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 28px; }
+.genChatHeadTitle { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.genChatAvatar { width: 28px; height: 28px; border-radius: 8px; background: var(--accent); color: #0b1220; font: 700 12px var(--mono); display: grid; place-items: center; flex-shrink: 0; }
+.genChatHeadText { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.genChatHeadText strong { font-size: 13px; font-weight: 600; }
+.genSessionName { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; cursor: pointer; }
+.genChatHeadActions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.iconBtn.small { width: 26px; height: 26px; font-size: 12px; }
+.badge.mono { font-family: var(--mono); }
+.genAccountRow { display: flex; align-items: center; gap: 6px; }
+.genAccountRow .genAccountSelectTop { flex: 1; min-width: 0; text-overflow: ellipsis; }
+.genAccountBtns { display: flex; gap: 4px; flex-shrink: 0; }
+.genQuotaSummaryRow { display: flex; justify-content: space-between; gap: 10px; font: 11px var(--mono); color: var(--muted); padding: 6px 0 2px; }
+.genQuotaSummaryRow b { color: var(--text); font-weight: 600; margin-right: 4px; }
+.genQuotaDetailsBody { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; border-top: 1px solid var(--line); padding-top: 8px; margin-top: 4px; }
+.genQuotaTierRow { display: flex; align-items: center; gap: 6px; font-size: 11px; margin-top: 4px; }
+.genQuotaTierLabel { color: var(--muted2); width: 32px; }
+.genQuotaTierVal { color: var(--text); font-family: var(--mono); font-weight: 600; }
+.genQuotaReset { margin-left: auto; font: 10.5px var(--mono); color: var(--muted2); }
+.genQuotaProgress { height: 4px; background: var(--panel4); border-radius: 3px; overflow: hidden; margin-top: 3px; }
+.genQuotaProgressFill { height: 100%; border-radius: 3px; }
+.genModelRow { display: flex; align-items: center; gap: 8px; }
+.genModelLabel { font-size: 11px; color: var(--muted2); font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
+.genModelRow .genChatSelect { flex: 1; height: 28px; font-size: 12px; padding: 2px 8px; }
+.genActiveTaskBanner, .genMiniScratchpad, .genCompactBanner {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  margin: 0 12px 8px; padding: 6px 10px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-sm); font-size: 12px;
+}
+.genActiveTaskText { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--text); font-weight: 500; }
+.genActiveTaskRight { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.genLink { color: var(--accent); font-size: 12px; }
+.genMiniScratchpad input { flex: 1; min-width: 0; height: 26px; font-size: 12px; }
+.genCompactBanner { color: var(--muted); }
+.genChatStream { padding: 12px; }
+.genWpCol2 { background: var(--bg); }
+.genVsCodeTab { border-right: 0; font-size: 12.5px; }
+.genVsCodeTab .badge { margin-left: 4px; }
+.genVsCodeTab.active { background: var(--panel2); color: var(--text); }
+.genVsCodeBreadcrumbBar { background: var(--panel2); border-bottom: 1px solid var(--line); padding: 6px 12px; }
+
+/* Tổng quan: thẻ số không kéo dãn theo cột bên cạnh */
+.overviewStats { align-content: start; }
+.stat { height: auto; }
+
+/* Phòng giao ban: nút gửi vừa phải */
+.wrSendBtn { height: 40px !important; padding: 0 18px !important; align-self: flex-end; }
+.wrInputBox { align-items: flex-end; }
+
+/* Chiều cao khung 2 cột theo màn hình (header 52 + subtop 42 + padding + tiêu đề) */
+.warroomContainer, .orchDualLayout, .cockpitShell { height: calc(100vh - 212px); min-height: 480px; }
+.wbRibbonCard { min-width: 0; background: var(--panel) !important; border: 1px solid var(--line) !important; }
+.wbRibbon { gap: 12px !important; }
+.streamlinedConsole { border-color: var(--line) !important; background: var(--panel) !important; }
+.genAccountRow { flex-wrap: wrap; }
+.genAccountRow .genAccountSelectTop { flex: 1 1 100%; }
+.genAccountRow .badge { order: 3; }
+.genAccountBtns { order: 2; margin-left: auto; }
+.genQuotaSummaryRow > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.genQuotaReset { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 55%; }
