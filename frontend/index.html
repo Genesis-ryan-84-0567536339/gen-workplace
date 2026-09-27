@@ -6691,69 +6691,259 @@ body.resizing-active, body.resizing-active * {
   </div>
 </div>
 
-<!-- MODAL MCP SERVER CONTROL PLANE (DUAL TRANSPORT & 27 TOOLS) -->
+<!-- MODAL MCP SERVER CONTROL PLANE (GEN-HUB STANDARD LINKS & AUTH) -->
 <div class="modal" id="mcpModal">
-  <div class="modalBox" style="max-width:860px;width:95vw;max-height:90vh;display:flex;flex-direction:column;background:#0b0f17;border:1px solid #10b981;box-shadow:0 16px 50px rgba(0,0,0,0.85), 0 0 30px rgba(16,185,129,0.2)">
+  <div class="modalBox" style="max-width:960px;width:95vw;max-height:92vh;display:flex;flex-direction:column;background:#0b0f17;border:1px solid #10b981;box-shadow:0 16px 50px rgba(0,0,0,0.85), 0 0 35px rgba(16,185,129,0.2)">
+    <!-- Modal Head -->
     <div class="modalHead" style="border-bottom:1px solid rgba(16,185,129,0.3);padding:14px 20px;display:flex;align-items:center;justify-content:space-between">
       <div style="display:flex;align-items:center;gap:10px">
-        <span style="font-size:22px">🔌</span>
+        <span style="font-size:24px">🔌</span>
         <div>
           <div style="display:flex;align-items:center;gap:8px">
-            <strong style="font-size:15px;color:#f8fafc">Model Context Protocol (MCP) Server Control Plane</strong>
-            <span class="badge" style="background:#064e3b;color:#34d399;font-weight:700;font-size:9.5px;padding:2px 7px;border-radius:4px">v1.0.0 · Online</span>
+            <strong style="font-size:15px;color:#f8fafc">Model Context Protocol (MCP) Server & Auth Gateway</strong>
+            <span class="badge" style="background:#064e3b;color:#34d399;font-weight:700;font-size:9.5px;padding:2px 7px;border-radius:4px" id="mcpModalStatusBadge">v1.0.0 · Online</span>
           </div>
-          <div style="font-size:11px;color:#94a3b8">Cung cấp toàn bộ 100% tính năng WebApp cho AI Agents qua chuẩn giao thức MCP JSON-RPC 2.0</div>
+          <div style="font-size:11px;color:#94a3b8">Cổng cấp link MCP, quản lý xác thực Bearer token và kiểm soát quyền truy cập cho AI Agents như Gen-hub</div>
         </div>
       </div>
       <button class="iconBtn" onclick="closeMcpModal()" style="font-size:18px">×</button>
     </div>
 
+    <!-- Main Navigation Tabs -->
+    <div style="display:flex;gap:4px;padding:8px 20px;background:#080c14;border-bottom:1px solid #1a2333">
+      <button class="btn small" onclick="switchMcpMainTab('links')" id="btnMcpMainTab-links" style="background:#1e293b;color:#38bdf8;font-weight:600;font-size:11px;padding:4px 12px;border-radius:5px">
+        🔗 Lấy Links & Xác Thực Agent
+      </button>
+      <button class="btn small" onclick="switchMcpMainTab('tools')" id="btnMcpMainTab-tools" style="background:transparent;color:#94a3b8;font-size:11px;padding:4px 12px;border-radius:5px">
+        🛠️ 27 MCP Tools & Test Console
+      </button>
+      <button class="btn small" onclick="switchMcpMainTab('configs')" id="btnMcpMainTab-configs" style="background:transparent;color:#94a3b8;font-size:11px;padding:4px 12px;border-radius:5px">
+        📋 Cấu Hình Client (Antigravity / Claude / Cursor)
+      </button>
+    </div>
+
     <div class="modalBody" style="padding:16px 20px;overflow-y:auto;display:flex;flex-direction:column;gap:14px">
-      <!-- 1. Endpoints & Transports Cards -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:12px">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-            <span style="font-size:11px;font-weight:700;color:#38bdf8">🌐 HTTP / SSE Transport</span>
-            <span class="badge" style="background:#0369a1;color:#fff;font-size:8.5px">Port 8888</span>
+      <!-- ================= TAB 1: LINKS & AUTHENTICATION ================= -->
+      <div id="mcpPane-links" style="display:flex;flex-direction:column;gap:14px">
+        
+        <!-- 1.1 Khung Chọn Token & Lấy Links Kết Nối -->
+        <div style="background:#0d131f;border:1px solid #1e2d42;border-radius:8px;padding:14px;display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="font-size:14px">🌐</span>
+              <strong style="font-size:12.5px;color:#f8fafc">Đường Dẫn Kết Nối MCP & Khóa Xác Thực (Authenticated Links)</strong>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:11px;color:#94a3b8">Gắn khóa Token:</span>
+              <select id="mcpTokenSelect" onchange="onMcpTokenSelectChange()" style="font-size:11px;padding:3px 8px;background:#090d16;border:1px solid #334155;color:#38bdf8;border-radius:5px;max-width:280px">
+                <!-- Dynamically populated tokens -->
+              </select>
+            </div>
           </div>
-          <div style="font-family:var(--mono);font-size:11.5px;background:#020617;padding:6px 10px;border-radius:5px;border:1px solid #334155;color:#f8fafc;display:flex;align-items:center;justify-content:space-between">
-            <span id="mcpHttpUrl">http://localhost:8888/mcp</span>
-            <button class="btn small" style="font-size:9px;padding:2px 6px;color:#38bdf8" onclick="copyText('http://localhost:8888/mcp')">📋 Copy</button>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <!-- Link HTTP Authenticated -->
+            <div style="background:#080c14;border:1px solid #1a2436;border-radius:6px;padding:10px">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
+                <span style="font-size:11px;font-weight:700;color:#38bdf8">🌐 MCP HTTP URL (Gắn Sẵn Token)</span>
+                <span class="badge" style="background:#0369a1;color:#fff;font-size:8px">Streamable HTTP</span>
+              </div>
+              <div style="display:flex;gap:6px">
+                <input type="text" id="mcpFieldAuthUrl" readonly class="input mono" style="font-size:11px;flex:1;background:#02050b;color:#f8fafc;padding:5px 8px;border:1px solid #334155;border-radius:4px" value="http://localhost:8888/mcp">
+                <button type="button" class="btn small" style="color:#38bdf8;padding:4px 8px;font-size:10px" onclick="copyMcpField('mcpFieldAuthUrl', 'Link MCP Authenticated')">📋 Copy</button>
+              </div>
+              <div style="font-size:9.5px;color:#94a3b8;margin-top:4px">Được xác thực trực tiếp qua query <code style="color:#38bdf8">?token=...</code></div>
+            </div>
+
+            <!-- Link Stdio CLI -->
+            <div style="background:#080c14;border:1px solid #1a2436;border-radius:6px;padding:10px">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
+                <span style="font-size:11px;font-weight:700;color:#10b981">⚡ Stdio CLI Executable Bridge</span>
+                <span class="badge" style="background:#065f46;color:#fff;font-size:8px">Zero Latency</span>
+              </div>
+              <div style="display:flex;gap:6px">
+                <input type="text" id="mcpFieldStdio" readonly class="input mono" style="font-size:11px;flex:1;background:#02050b;color:#f8fafc;padding:5px 8px;border:1px solid #334155;border-radius:4px" value="/workspace/.local/bin/gen-workplace-mcp">
+                <button type="button" class="btn small" style="color:#10b981;padding:4px 8px;font-size:10px" onclick="copyMcpField('mcpFieldStdio', 'Đường dẫn Stdio CLI')">📋 Copy</button>
+              </div>
+              <div style="font-size:9.5px;color:#94a3b8;margin-top:4px">Kênh stdin/stdout chuyên dụng cho Antigravity CLI & Claude</div>
+            </div>
+
+            <!-- Link SSE Stream -->
+            <div style="background:#080c14;border:1px solid #1a2436;border-radius:6px;padding:10px">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
+                <span style="font-size:11px;font-weight:700;color:#a78bfa">📡 Server-Sent Events (SSE) Stream</span>
+                <span class="badge" style="background:#5b21b6;color:#fff;font-size:8px">SSE Stream</span>
+              </div>
+              <div style="display:flex;gap:6px">
+                <input type="text" id="mcpFieldSseUrl" readonly class="input mono" style="font-size:11px;flex:1;background:#02050b;color:#f8fafc;padding:5px 8px;border:1px solid #334155;border-radius:4px" value="http://localhost:8888/sse">
+                <button type="button" class="btn small" style="color:#a78bfa;padding:4px 8px;font-size:10px" onclick="copyMcpField('mcpFieldSseUrl', 'Link SSE Stream')">📋 Copy</button>
+              </div>
+              <div style="font-size:9.5px;color:#94a3b8;margin-top:4px">Hỗ trợ MCP client giao tiếp qua chuẩn Server-Sent Events</div>
+            </div>
+
+            <!-- Bearer Token Thô -->
+            <div style="background:#080c14;border:1px solid #1a2436;border-radius:6px;padding:10px">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
+                <span style="font-size:11px;font-weight:700;color:#f59e0b">🛡️ Khóa Bearer Token (API Key)</span>
+                <span class="badge" style="background:#78350f;color:#fcd34d;font-size:8px">Bearer Auth</span>
+              </div>
+              <div style="display:flex;gap:6px">
+                <input type="text" id="mcpFieldBearerToken" readonly class="input mono" style="font-size:11px;flex:1;background:#02050b;color:#fbbf24;padding:5px 8px;border:1px solid #334155;border-radius:4px" value="">
+                <button type="button" class="btn small" style="color:#fbbf24;padding:4px 8px;font-size:10px" onclick="copyMcpField('mcpFieldBearerToken', 'Khóa Bearer Token')">📋 Copy</button>
+              </div>
+              <div style="font-size:9.5px;color:#94a3b8;margin-top:4px">Dùng trong Header: <code style="color:#fbbf24">Authorization: Bearer &lt;token&gt;</code></div>
+            </div>
           </div>
-          <div style="font-size:10px;color:#94a3b8;margin-top:4px">Hỗ trợ Streamable HTTP POST và Server-Sent Events (SSE).</div>
         </div>
 
-        <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:12px">
+        <!-- 1.2 Khung Quản Trị Xác Thực & Bật/Tắt Chế Độ Nghiêm Ngặt -->
+        <div style="background:#090e18;border:1px solid #1a2538;border-radius:8px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+          <div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <strong style="font-size:12px;color:#f8fafc">Cơ Chế Kiểm Soát Quyền Truy Cập (Access Control Policy)</strong>
+              <span id="mcpStrictAuthBadge" class="badge" style="font-size:9px;padding:2px 7px;border-radius:4px;background:#1e293b;color:#94a3b8">Đang kiểm tra...</span>
+            </div>
+            <div style="font-size:10.5px;color:#94a3b8;margin-top:2px">
+              Khi bật <b style="color:#f8fafc">Strict Auth</b>, mọi agent gọi HTTP bắt buộc phải có Token hợp lệ; nếu không sẽ bị từ chối 401 như Gen-hub.
+            </div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn small" id="btnToggleMcpAuth" onclick="toggleMcpStrictAuth()" style="font-size:10.5px;padding:4px 10px">
+              🛡️ Bật/Tắt Strict Auth
+            </button>
+            <button class="btn small primary" onclick="toggleMcpCreateForm()" style="background:#047857;border-color:#10b981;color:#fff;font-weight:700;font-size:10.5px;padding:4px 12px">
+              ➕ Kết Nối Agent / Tạo Token Mới
+            </button>
+          </div>
+        </div>
+
+        <!-- 1.3 Form Tạo Agent Token Mới (Collapsible) -->
+        <div id="mcpCreateTokenFormCard" style="display:none;background:#050912;border:1px solid #059669;border-radius:8px;padding:14px;box-shadow:0 8px 25px rgba(5,150,105,0.15)">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="font-size:16px">🔐</span>
+              <strong style="font-size:13px;color:#34d399">Tạo Token Xác Thực Cho Agent Mới (Chuẩn Gen-hub)</strong>
+            </div>
+            <button class="iconBtn" onclick="toggleMcpCreateForm(false)" style="font-size:14px;width:22px;height:22px">×</button>
+          </div>
+
+          <form id="formCreateMcpToken" onsubmit="submitCreateMcpToken(event)" style="display:flex;flex-direction:column;gap:10px">
+            <div style="display:grid;grid-template-columns:2fr 1fr;gap:10px">
+              <div class="field" style="margin-bottom:0">
+                <label style="font-size:10.5px;font-weight:700;color:#f8fafc">Tên Gợi Nhớ Cho Agent *</label>
+                <input type="text" id="mcpNewAgentName" placeholder="vd: Claude Code CLI, Codex Security, Subagent Tester" required style="font-size:11.5px;padding:5px 9px;background:#0d131f;border:1px solid #334155;color:#f8fafc;border-radius:5px">
+              </div>
+              <div class="field" style="margin-bottom:0">
+                <label style="font-size:10.5px;font-weight:700;color:#f8fafc">Hạn Dùng Token</label>
+                <select id="mcpNewAgentExpires" style="font-size:11.5px;padding:5px 9px;background:#0d131f;border:1px solid #334155;color:#f8fafc;border-radius:5px">
+                  <option value="90" selected>90 ngày (Khuyên dùng như Gen-hub)</option>
+                  <option value="30">30 ngày</option>
+                  <option value="365">1 năm</option>
+                  <option value="0">Không hết hạn (Vĩnh viễn)</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Tool Permissions Scopes -->
+            <div style="background:#090f1a;border:1px solid #1a2538;border-radius:6px;padding:10px">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+                <label style="font-size:10.5px;font-weight:700;color:#38bdf8;margin-bottom:0">CẤP QUYỀN CÔNG CỤ (TOOL SCOPES)</label>
+                <label style="font-size:10px;color:#94a3b8;cursor:pointer;display:flex;align-items:center;gap:4px">
+                  <input type="checkbox" id="mcpCheckAllPerms" checked onchange="toggleAllPermChecks(this.checked)"> Chọn tất cả 27 Tools
+                </label>
+              </div>
+              <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(160px, 1fr));gap:6px" id="mcpPermOptionsContainer">
+                <label style="font-size:10.5px;color:#cbd5e1;display:flex;align-items:center;gap:5px;cursor:pointer">
+                  <input type="checkbox" class="mcpPermCheck" value="quota" checked> 💳 Quota & Google Accounts
+                </label>
+                <label style="font-size:10.5px;color:#cbd5e1;display:flex;align-items:center;gap:5px;cursor:pointer">
+                  <input type="checkbox" class="mcpPermCheck" value="swarm" checked> 🤖 Swarm Workers & War Room
+                </label>
+                <label style="font-size:10.5px;color:#cbd5e1;display:flex;align-items:center;gap:5px;cursor:pointer">
+                  <input type="checkbox" class="mcpPermCheck" value="kanban" checked> 📌 Kanban Tasks & Checklists
+                </label>
+                <label style="font-size:10.5px;color:#cbd5e1;display:flex;align-items:center;gap:5px;cursor:pointer">
+                  <input type="checkbox" class="mcpPermCheck" value="chat" checked> 💬 Chat & Progressive Compaction
+                </label>
+                <label style="font-size:10.5px;color:#cbd5e1;display:flex;align-items:center;gap:5px;cursor:pointer">
+                  <input type="checkbox" class="mcpPermCheck" value="files" checked> 🗄️ Notes, Files & Status
+                </label>
+              </div>
+            </div>
+
+            <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:4px">
+              <button type="button" class="btn small" onclick="toggleMcpCreateForm(false)">Hủy</button>
+              <button type="submit" class="btn small primary" style="background:#059669;border-color:#10b981">
+                💾 Xác Nhận Tạo Agent & Token
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- 1.4 Khung Hiển Thị Kết Quả Sau Khi Tạo Token (Gen-hub Snippet Card) -->
+        <div id="mcpCreatedResultCard" style="display:none;background:#030712;border:1px solid #10b981;border-radius:8px;padding:14px;box-shadow:0 8px 30px rgba(16,185,129,0.25)">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-            <span style="font-size:11px;font-weight:700;color:#10b981">⚡ Stdio CLI Executable Bridge</span>
-            <span class="badge" style="background:#065f46;color:#fff;font-size:8.5px">Zero Latency</span>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="font-size:16px">🎉</span>
+              <strong style="font-size:13px;color:#34d399" id="mcpCreatedTitle">Đã Tạo Token Thành Công!</strong>
+            </div>
+            <button class="iconBtn" onclick="document.getElementById('mcpCreatedResultCard').style.display='none'" style="font-size:14px;width:22px;height:22px">×</button>
           </div>
-          <div style="font-family:var(--mono);font-size:11.5px;background:#020617;padding:6px 10px;border-radius:5px;border:1px solid #334155;color:#f8fafc;display:flex;align-items:center;justify-content:space-between">
-            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:280px" title="/workspace/.local/bin/gen-workplace-mcp">~/.local/bin/gen-workplace-mcp</span>
-            <button class="btn small" style="font-size:9px;padding:2px 6px;color:#10b981" onclick="copyText('/workspace/.local/bin/gen-workplace-mcp')">📋 Copy</button>
+          <p style="font-size:11px;color:#94a3b8;line-height:1.4;margin:0 0 8px 0">
+            Sao chép cả khối này — đủ endpoint + key + ví dụ để đưa cho app hoặc agent khác dùng ngay. Xem lại được bất cứ lúc nào qua bảng bên dưới.
+          </p>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <textarea id="mcpCreatedSnippetArea" readonly rows="5" class="input mono" style="font-size:11px;background:#010409;color:#a7f3d0;padding:8px 10px;border:1px solid #1e293b;border-radius:5px;white-space:pre"></textarea>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button type="button" class="btn small primary" onclick="copyCreatedMcpSnippet()" style="font-size:10px">
+                📋 Sao Chép Cả Khối cURL
+              </button>
+              <button type="button" class="btn small" onclick="copyCreatedMcpUrl()" style="font-size:10px;color:#38bdf8">
+                📋 Sao Chép Link URL
+              </button>
+              <button type="button" class="btn small" onclick="copyCreatedMcpTokenOnly()" style="font-size:10px;color:#fbbf24">
+                📋 Sao Chép Riêng Token
+              </button>
+            </div>
           </div>
-          <div style="font-size:10px;color:#94a3b8;margin-top:4px">Dành cho Antigravity CLI, Claude Desktop, Cursor, subagents.</div>
+        </div>
+
+        <!-- 1.5 Bảng Quản Lý Agent & Quyền Đã Cấp (Agents & Grants Table) -->
+        <div style="background:#090d16;border:1px solid #1a2538;border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div style="display:flex;align-items:center;gap:6px">
+              <strong style="font-size:12px;color:#f8fafc">Danh Sách Agent & Quyền Đã Cấp (Agents & Grants)</strong>
+              <span class="badge" style="background:#1e293b;color:#38bdf8;font-size:9px" id="mcpTokensCountBadge">1 Tokens</span>
+            </div>
+            <button class="btn small" onclick="loadMcpTokensAndAuth()" style="font-size:9.5px;padding:2px 7px;color:#94a3b8">
+              🔄 Tải Lại
+            </button>
+          </div>
+
+          <div style="overflow-x:auto;max-height:220px">
+            <table style="width:100%;border-collapse:collapse;font-size:11px;text-align:left">
+              <thead>
+                <tr style="border-bottom:1px solid #1e293b;color:#94a3b8;font-size:10px">
+                  <th style="padding:6px 8px">AGENT & ID</th>
+                  <th style="padding:6px 8px">KHÓA TOKEN</th>
+                  <th style="padding:6px 8px">QUYỀN HẠN</th>
+                  <th style="padding:6px 8px">HẠN DÙNG</th>
+                  <th style="padding:6px 8px">LẦN GỌI GẦN NHẤT</th>
+                  <th style="padding:6px 8px">LƯỢT GỌI</th>
+                  <th style="padding:6px 8px">TRẠNG THÁI</th>
+                  <th style="padding:6px 8px;text-align:right">THAO TÁC</th>
+                </tr>
+              </thead>
+              <tbody id="mcpTokensTableBody">
+                <!-- Dynamically populated tokens rows -->
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
-      <!-- 2. One-Click Copy MCP Configurations -->
-      <div style="background:#0d131f;border:1px solid #1e2d42;border-radius:8px;padding:12px">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-          <span style="font-size:11.5px;font-weight:700;color:#f8fafc">📋 Cấu Hình Tích Hợp 1-Click (Copy & Paste)</span>
-          <div style="display:flex;gap:6px">
-            <button class="btn small" onclick="switchMcpConfigTab('antigravity')" id="btnMcpTab-antigravity" style="font-size:9.5px;padding:2px 8px;background:#1e293b;color:#38bdf8">Antigravity / agy</button>
-            <button class="btn small" onclick="switchMcpConfigTab('claude')" id="btnMcpTab-claude" style="font-size:9.5px;padding:2px 8px;background:transparent;color:#94a3b8">Claude Desktop</button>
-            <button class="btn small" onclick="switchMcpConfigTab('cursor')" id="btnMcpTab-cursor" style="font-size:9.5px;padding:2px 8px;background:transparent;color:#94a3b8">Cursor / VS Code</button>
-          </div>
-        </div>
-        <div style="position:relative">
-          <pre id="mcpConfigSnippet" style="background:#040711;border:1px solid #1e293b;border-radius:6px;padding:10px 12px;font-family:var(--mono);font-size:11px;color:#e2e8f0;margin:0;max-height:110px;overflow-y:auto"></pre>
-          <button class="btn small primary" style="position:absolute;top:6px;right:8px;font-size:9.5px;padding:3px 8px" onclick="copyCurrentMcpSnippet()">📋 Copy JSON</button>
-        </div>
-      </div>
-
-      <!-- 3. Active 27 Tools Inspector & Quick Test -->
-      <div style="display:flex;flex-direction:column;gap:8px">
+      <!-- ================= TAB 2: 27 MCP TOOLS & TEST CONSOLE ================= -->
+      <div id="mcpPane-tools" style="display:none;flex-direction:column;gap:12px">
         <div style="display:flex;align-items:center;justify-content:space-between">
           <div style="display:flex;align-items:center;gap:6px">
             <strong style="font-size:12px;color:#f8fafc">🛠️ Danh Mục 27 Công Cụ Nghiệp Vụ (MCP Tools)</strong>
@@ -6762,24 +6952,46 @@ body.resizing-active, body.resizing-active * {
           <input type="text" id="mcpToolSearchInput" placeholder="🔍 Lọc tool theo tên hoặc chức năng..." oninput="filterMcpTools(this.value)" style="font-size:11px;padding:3px 8px;border-radius:5px;width:240px;background:#090d15;border:1px solid #1e293b;color:#f8fafc">
         </div>
 
-        <div id="mcpToolsListContainer" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;max-height:260px;overflow-y:auto;padding-right:4px">
+        <div id="mcpToolsListContainer" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;max-height:280px;overflow-y:auto;padding-right:4px">
           <!-- Dynamically populated tool cards with live Test button -->
+        </div>
+
+        <!-- Interactive Tool Test Console -->
+        <div id="mcpLiveTestSection" style="display:none;background:#040711;border:1px solid #1e293b;border-radius:8px;padding:12px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+            <strong style="font-size:11.5px;color:#38bdf8" id="mcpTestToolTitle">⚡ Test Tool Trực Tiếp</strong>
+            <button class="iconBtn" onclick="document.getElementById('mcpLiveTestSection').style.display='none'" style="width:20px;height:20px;font-size:12px">×</button>
+          </div>
+          <pre id="mcpLiveTestOutput" style="background:#02050b;border:1px solid #1a2233;border-radius:5px;padding:8px 10px;font-family:var(--mono);font-size:10.5px;color:#a7f3d0;max-height:160px;overflow-y:auto;margin:0"></pre>
         </div>
       </div>
 
-      <!-- 4. Interactive Tool Test Console -->
-      <div id="mcpLiveTestSection" style="display:none;background:#040711;border:1px solid #1e293b;border-radius:8px;padding:12px">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-          <strong style="font-size:11.5px;color:#38bdf8" id="mcpTestToolTitle">⚡ Test Tool Trực Tiếp</strong>
-          <button class="iconBtn" onclick="document.getElementById('mcpLiveTestSection').style.display='none'" style="width:20px;height:20px;font-size:12px">×</button>
+      <!-- ================= TAB 3: CLIENT CONFIGURATIONS ================= -->
+      <div id="mcpPane-configs" style="display:none;flex-direction:column;gap:12px">
+        <div style="background:#0d131f;border:1px solid #1e2d42;border-radius:8px;padding:14px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <span style="font-size:12px;font-weight:700;color:#f8fafc">📋 Cấu Hình Tích Hợp 1-Click (Tự Động Điền Token Đang Chọn)</span>
+            <div style="display:flex;gap:6px">
+              <button class="btn small" onclick="switchMcpConfigTab('antigravity')" id="btnMcpTab-antigravity" style="font-size:9.5px;padding:2px 8px;background:#1e293b;color:#38bdf8">Antigravity / agy</button>
+              <button class="btn small" onclick="switchMcpConfigTab('claude')" id="btnMcpTab-claude" style="font-size:9.5px;padding:2px 8px;background:transparent;color:#94a3b8">Claude Desktop</button>
+              <button class="btn small" onclick="switchMcpConfigTab('cursor')" id="btnMcpTab-cursor" style="font-size:9.5px;padding:2px 8px;background:transparent;color:#94a3b8">Cursor / VS Code</button>
+            </div>
+          </div>
+          <div style="position:relative">
+            <pre id="mcpConfigSnippet" style="background:#040711;border:1px solid #1e293b;border-radius:6px;padding:10px 12px;font-family:var(--mono);font-size:11px;color:#e2e8f0;margin:0;max-height:150px;overflow-y:auto"></pre>
+            <button class="btn small primary" style="position:absolute;top:6px;right:8px;font-size:9.5px;padding:3px 8px" onclick="copyCurrentMcpSnippet()">📋 Copy JSON</button>
+          </div>
+          <div style="font-size:10px;color:#94a3b8;margin-top:6px" id="mcpConfigSnippetPathHelp">
+            Tệp đích: <code style="color:#38bdf8">~/.gemini/config/mcp_config.json</code>
+          </div>
         </div>
-        <pre id="mcpLiveTestOutput" style="background:#02050b;border:1px solid #1a2233;border-radius:5px;padding:8px 10px;font-family:var(--mono);font-size:10.5px;color:#a7f3d0;max-height:160px;overflow-y:auto;margin:0"></pre>
       </div>
     </div>
 
+    <!-- Modal Foot -->
     <div class="modalFoot" style="padding:10px 20px;border-top:1px solid #1a2333;display:flex;align-items:center;justify-content:space-between">
       <div style="font-size:11px;color:#94a3b8">
-        Đã tự động liên kết với <code style="color:#38bdf8">~/.gemini/config/mcp_config.json</code>
+        Hệ thống tự động liên kết với <code style="color:#38bdf8">~/.gemini/config/mcp_config.json</code>
       </div>
       <button class="btn" onclick="closeMcpModal()">Đóng</button>
     </div>
@@ -14491,32 +14703,84 @@ setInterval(async () => {
 // ==========================================
 // MCP SERVER CONTROL PLANE JAVASCRIPT
 // ==========================================
+let mcpMainActiveTab = 'links';
 let mcpActiveTab = 'antigravity';
 let mcpCachedTools = [];
+let mcpTokensList = [];
+let mcpAuthStatus = { require_auth: false, active_tokens: 0, total_tokens: 0 };
+let mcpSelectedToken = null;
+let mcpLastCreatedTokenData = null;
 
-const mcpConfigs = {
-  antigravity: `{
+function switchMcpMainTab(tab) {
+  mcpMainActiveTab = tab;
+  ['links', 'tools', 'configs'].forEach(t => {
+    const btn = document.getElementById(`btnMcpMainTab-${t}`);
+    const pane = document.getElementById(`mcpPane-${t}`);
+    if (btn) {
+      if (t === tab) {
+        btn.style.background = '#1e293b';
+        btn.style.color = '#38bdf8';
+        btn.style.fontWeight = '600';
+      } else {
+        btn.style.background = 'transparent';
+        btn.style.color = '#94a3b8';
+        btn.style.fontWeight = 'normal';
+      }
+    }
+    if (pane) {
+      pane.style.display = (t === tab) ? 'flex' : 'none';
+    }
+  });
+
+  if (tab === 'configs') {
+    switchMcpConfigTab(mcpActiveTab);
+  }
+}
+
+function updateMcpConfigSnippets() {
+  const tokVal = (mcpSelectedToken && mcpSelectedToken.token_raw) ? mcpSelectedToken.token_raw : 'gw_live_your_token_here';
+  const urlWithTok = `http://localhost:8888/mcp?token=${tokVal}`;
+
+  const mcpConfigs = {
+    antigravity: `{
   "mcpServers": {
     "gen-workplace": {
       "command": "/workspace/.local/bin/gen-workplace-mcp"
     }
   }
 }`,
-  claude: `{
+    claude: `{
   "mcpServers": {
     "gen-workplace": {
       "command": "/workspace/.local/bin/gen-workplace-mcp"
     }
   }
 }`,
-  cursor: `{
+    cursor: `{
   "mcpServers": {
     "gen-workplace": {
-      "url": "http://localhost:8888/mcp"
+      "url": "${urlWithTok}"
     }
   }
 }`
-};
+  };
+
+  const snippetEl = document.getElementById('mcpConfigSnippet');
+  if (snippetEl) {
+    snippetEl.textContent = mcpConfigs[mcpActiveTab] || '';
+  }
+
+  const helpEl = document.getElementById('mcpConfigSnippetPathHelp');
+  if (helpEl) {
+    if (mcpActiveTab === 'antigravity') {
+      helpEl.innerHTML = 'Tệp đích: <code style="color:#38bdf8">~/.gemini/config/mcp_config.json</code> (Đã đăng ký sẵn)';
+    } else if (mcpActiveTab === 'claude') {
+      helpEl.innerHTML = 'Tệp đích: <code style="color:#38bdf8">~/.claude.json</code> hoặc <code style="color:#38bdf8">~/Library/Application Support/Claude/claude_desktop_config.json</code>';
+    } else {
+      helpEl.innerHTML = 'Tệp đích: <code style="color:#38bdf8">.cursor/mcp.json</code> trong thư mục dự án Cursor';
+    }
+  }
+}
 
 function switchMcpConfigTab(tab) {
   mcpActiveTab = tab;
@@ -14532,25 +14796,294 @@ function switchMcpConfigTab(tab) {
       }
     }
   });
-  const snippetEl = document.getElementById('mcpConfigSnippet');
-  if (snippetEl) {
-    snippetEl.textContent = mcpConfigs[tab] || '';
-  }
+  updateMcpConfigSnippets();
 }
 
 function copyCurrentMcpSnippet() {
-  const code = mcpConfigs[mcpActiveTab];
-  copyText(code);
-  showToast(`✅ Đã copy JSON cấu hình MCP cho ${mcpActiveTab.toUpperCase()}!`);
+  const snippetEl = document.getElementById('mcpConfigSnippet');
+  if (snippetEl) {
+    copyText(snippetEl.textContent);
+    showToast(`✅ Đã copy JSON cấu hình MCP cho ${mcpActiveTab.toUpperCase()}!`);
+  }
+}
+
+async function loadMcpTokensAndAuth() {
+  try {
+    const res = await fetch('/api/mcp/tokens');
+    if (res.ok) {
+      const data = await res.json();
+      mcpTokensList = data.tokens || [];
+      mcpAuthStatus = data.auth_status || { require_auth: false };
+      renderMcpTokensUI();
+    }
+  } catch (err) {
+    console.error('Lỗi tải token MCP:', err);
+  }
+}
+
+function renderMcpTokensUI() {
+  // 1. Cập nhật Badge Strict Auth
+  const badgeEl = document.getElementById('mcpStrictAuthBadge');
+  const btnToggle = document.getElementById('btnToggleMcpAuth');
+  if (badgeEl) {
+    if (mcpAuthStatus.require_auth) {
+      badgeEl.textContent = '🔒 Bắt buộc xác thực (Strict Auth: ON)';
+      badgeEl.style.background = '#7f1d1d';
+      badgeEl.style.color = '#fca5a5';
+      if (btnToggle) btnToggle.textContent = '🔓 Tắt Strict Auth';
+    } else {
+      badgeEl.textContent = '🟡 Xác thực tùy chọn (Strict Auth: OFF)';
+      badgeEl.style.background = '#14532d';
+      badgeEl.style.color = '#86efac';
+      if (btnToggle) btnToggle.textContent = '🔒 Bật Strict Auth';
+    }
+  }
+
+  // 2. Điền danh sách chọn token
+  const selectEl = document.getElementById('mcpTokenSelect');
+  if (selectEl) {
+    const activeTokens = mcpTokensList.filter(t => t.status === 'active');
+    if (activeTokens.length > 0) {
+      selectEl.innerHTML = activeTokens.map((t, idx) => 
+        `<option value="${t.id}" ${idx === 0 ? 'selected' : ''}>${t.name} (${t.token_masked})</option>`
+      ).join('');
+      mcpSelectedToken = activeTokens[0];
+    } else {
+      selectEl.innerHTML = '<option value="">(Chưa có token nào)</option>';
+      mcpSelectedToken = null;
+    }
+    updateMcpLinkFields();
+  }
+
+  // 3. Render bảng Agents & Grants
+  const tableBody = document.getElementById('mcpTokensTableBody');
+  const countBadge = document.getElementById('mcpTokensCountBadge');
+  if (countBadge) {
+    countBadge.textContent = `${mcpTokensList.length} Token${mcpTokensList.length > 1 ? 's' : ''}`;
+  }
+
+  if (tableBody) {
+    if (mcpTokensList.length === 0) {
+      tableBody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:16px">Chưa có Token xác thực nào. Hãy tạo token đầu tiên bên trên.</td></tr>';
+      return;
+    }
+
+    tableBody.innerHTML = mcpTokensList.map(t => {
+      const isAct = (t.status === 'active');
+      const statusBadge = isAct 
+        ? '<span class="badge" style="background:#064e3b;color:#34d399;font-size:8.5px">Active</span>'
+        : '<span class="badge" style="background:#374151;color:#9ca3af;font-size:8.5px">Revoked</span>';
+
+      const permBadge = (t.permissions.includes('all') || t.permissions.includes('*'))
+        ? '<span class="badge" style="background:#0369a1;color:#bae6fd;font-size:8.5px">Toàn quyền (27)</span>'
+        : `<span class="badge" style="background:#1e293b;color:#38bdf8;font-size:8.5px">${t.permissions.join(', ')}</span>`;
+
+      const revokeBtn = isAct
+        ? `<button class="btn small" style="color:#ef4444;border-color:#7f1d1d;font-size:9px;padding:1px 6px" onclick="revokeMcpToken('${t.id}', '${t.name}')">Thu hồi</button>`
+        : '<span style="color:#6b7280;font-size:9px">Đã thu hồi</span>';
+
+      return `
+        <tr style="border-bottom:1px solid #141c2b">
+          <td style="padding:6px 8px">
+            <strong style="color:#f8fafc">${t.name}</strong>
+            <div style="font-size:9px;color:#64748b;font-family:var(--mono)">${t.id} · ${t.client}</div>
+          </td>
+          <td style="padding:6px 8px">
+            <div style="display:flex;align-items:center;gap:4px">
+              <code style="color:#fbbf24;font-size:10px">${t.token_masked}</code>
+              <button class="btn small" style="font-size:8.5px;padding:1px 5px;color:#fbbf24" onclick="copyText('${t.token_raw}')" title="Sao chép toàn bộ Token">📋</button>
+            </div>
+          </td>
+          <td style="padding:6px 8px">${permBadge}</td>
+          <td style="padding:6px 8px;color:#cbd5e1;font-size:10px">${t.expires_at}</td>
+          <td style="padding:6px 8px;color:#94a3b8;font-size:10px">${t.last_used_at}</td>
+          <td style="padding:6px 8px;color:#cbd5e1;font-size:10.5px">${t.calls_count}</td>
+          <td style="padding:6px 8px">${statusBadge}</td>
+          <td style="padding:6px 8px;text-align:right">${revokeBtn}</td>
+        </tr>
+      `;
+    }).join('');
+  }
+}
+
+function onMcpTokenSelectChange() {
+  const selectEl = document.getElementById('mcpTokenSelect');
+  if (!selectEl) return;
+  const tid = selectEl.value;
+  mcpSelectedToken = mcpTokensList.find(t => t.id === tid) || null;
+  updateMcpLinkFields();
+}
+
+function updateMcpLinkFields() {
+  const rawToken = (mcpSelectedToken && mcpSelectedToken.token_raw) ? mcpSelectedToken.token_raw : '';
+  const authUrlField = document.getElementById('mcpFieldAuthUrl');
+  const sseUrlField = document.getElementById('mcpFieldSseUrl');
+  const bearerField = document.getElementById('mcpFieldBearerToken');
+
+  const baseOrigin = 'http://localhost:8888';
+  if (authUrlField) {
+    authUrlField.value = rawToken ? `${baseOrigin}/mcp?token=${rawToken}` : `${baseOrigin}/mcp`;
+  }
+  if (sseUrlField) {
+    sseUrlField.value = rawToken ? `${baseOrigin}/sse?token=${rawToken}` : `${baseOrigin}/sse`;
+  }
+  if (bearerField) {
+    bearerField.value = rawToken;
+  }
+  updateMcpConfigSnippets();
+}
+
+function copyMcpField(inputId, label) {
+  const el = document.getElementById(inputId);
+  if (!el || !el.value) return;
+  copyText(el.value);
+  showToast(`✅ Đã copy ${label}!`);
+}
+
+async function toggleMcpStrictAuth() {
+  const nextVal = !mcpAuthStatus.require_auth;
+  try {
+    const res = await fetch('/api/mcp/auth/toggle', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ require_auth: nextVal })
+    });
+    if (res.ok) {
+      mcpAuthStatus = await res.json();
+      renderMcpTokensUI();
+      showToast(nextVal ? '🔒 Đã BẬT chế độ bắt buộc xác thực token MCP' : '🔓 Đã chuyển sang chế độ xác thực tùy chọn');
+    }
+  } catch (err) {
+    showToast('❌ Lỗi khi thay đổi chế độ xác thực: ' + err.message);
+  }
+}
+
+function toggleMcpCreateForm(show) {
+  const card = document.getElementById('mcpCreateTokenFormCard');
+  if (!card) return;
+  const isShown = (show !== undefined) ? show : (card.style.display !== 'none');
+  card.style.display = isShown ? 'none' : 'block';
+  if (!isShown) {
+    setTimeout(() => {
+      const nameInput = document.getElementById('mcpNewAgentName');
+      if (nameInput) nameInput.focus();
+    }, 100);
+  }
+}
+
+function toggleAllPermChecks(checked) {
+  const checks = document.querySelectorAll('.mcpPermCheck');
+  checks.forEach(c => { c.checked = checked; });
+}
+
+async function submitCreateMcpToken(e) {
+  if (e) e.preventDefault();
+  const nameEl = document.getElementById('mcpNewAgentName');
+  const expEl = document.getElementById('mcpNewAgentExpires');
+  const allCheck = document.getElementById('mcpCheckAllPerms');
+
+  const name = nameEl ? nameEl.value.trim() : '';
+  if (!name) {
+    showToast('⚠️ Vui lòng nhập tên gợi nhớ cho Agent');
+    return;
+  }
+  const expiresDays = expEl ? parseInt(expEl.value) : 90;
+
+  let perms = [];
+  if (allCheck && allCheck.checked) {
+    perms = ['all'];
+  } else {
+    document.querySelectorAll('.mcpPermCheck:checked').forEach(c => {
+      perms.push(c.value);
+    });
+    if (perms.length === 0) perms = ['all'];
+  }
+
+  try {
+    const res = await fetch('/api/mcp/tokens/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: name,
+        permissions: perms,
+        expires_days: expiresDays,
+        client: 'Manual Connect'
+      })
+    });
+
+    const data = await res.json();
+    if (res.ok && data.ok) {
+      mcpLastCreatedTokenData = data;
+      toggleMcpCreateForm(false);
+      if (nameEl) nameEl.value = '';
+
+      // Hiển thị Card kết quả chuẩn Gen-hub
+      const resCard = document.getElementById('mcpCreatedResultCard');
+      const snippetArea = document.getElementById('mcpCreatedSnippetArea');
+      const titleEl = document.getElementById('mcpCreatedTitle');
+      if (resCard && snippetArea) {
+        resCard.style.display = 'block';
+        if (titleEl) titleEl.textContent = `🎉 Đã Tạo Token Cho "${data.name}"!`;
+        snippetArea.value = data.curl_snippet;
+      }
+
+      await loadMcpTokensAndAuth();
+      showToast(`✅ Đã tạo thành công Token MCP cho ${data.name}!`);
+    } else {
+      showToast(`❌ Lỗi tạo token: ${data.error || 'Thao tác không thành công'}`);
+    }
+  } catch (err) {
+    showToast(`❌ Lỗi kết nối máy chủ: ${err.message}`);
+  }
+}
+
+function copyCreatedMcpSnippet() {
+  if (!mcpLastCreatedTokenData) return;
+  copyText(mcpLastCreatedTokenData.curl_snippet);
+  showToast('✅ Đã copy toàn bộ khối lệnh cURL mẫu!');
+}
+
+function copyCreatedMcpUrl() {
+  if (!mcpLastCreatedTokenData) return;
+  copyText(mcpLastCreatedTokenData.auth_url);
+  showToast('✅ Đã copy URL MCP Authenticated!');
+}
+
+function copyCreatedMcpTokenOnly() {
+  if (!mcpLastCreatedTokenData) return;
+  copyText(mcpLastCreatedTokenData.token);
+  showToast('✅ Đã copy khóa Bearer Token!');
+}
+
+async function revokeMcpToken(id, name) {
+  if (!confirm(`Bạn có chắc muốn thu hồi quyền truy cập của Agent "${name}"? Token này sẽ bị vô hiệu hóa ngay lập tức.`)) {
+    return;
+  }
+  try {
+    const res = await fetch('/api/mcp/tokens/revoke', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: id })
+    });
+    if (res.ok) {
+      showToast(`✅ Đã thu hồi quyền của Agent ${name}`);
+      await loadMcpTokensAndAuth();
+    }
+  } catch (err) {
+    showToast(`❌ Lỗi thu hồi: ${err.message}`);
+  }
 }
 
 async function openMcpModal() {
   const modal = document.getElementById('mcpModal');
   if (!modal) return;
   modal.classList.add('active');
-  switchMcpConfigTab(mcpActiveTab);
+  switchMcpMainTab('links');
 
-  // Tải danh sách tools mới nhất từ backend
+  // Nạp danh sách tokens và trạng thái auth
+  await loadMcpTokensAndAuth();
+
+  // Nạp danh sách tools mới nhất từ backend
   try {
     const res = await fetch('/mcp/tools');
     if (res.ok) {
@@ -14645,9 +15178,13 @@ async function testMcpTool(toolName) {
         arguments: defaultArgs
       }
     };
+    const tok = (mcpSelectedToken && mcpSelectedToken.token_raw) ? mcpSelectedToken.token_raw : '';
+    const headers = { 'Content-Type': 'application/json' };
+    if (tok) headers['Authorization'] = `Bearer ${tok}`;
+
     const res = await fetch('/mcp', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: headers,
       body: JSON.stringify(payload)
     });
     const data = await res.json();

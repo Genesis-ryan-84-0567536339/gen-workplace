@@ -13,8 +13,10 @@ import base64
 import time
 import uuid
 import subprocess
+import hashlib
+import secrets
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 default_data = "/app/data" if (os.path.exists("/app") or os.environ.get("DOCKER_CONTAINER")) else str(BASE_DIR / "data")
@@ -472,6 +474,46 @@ def init_db():
         );
         """)
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_gen_sess_todos_conv ON gen_session_todos(conversation_id, status);")
+
+        # 21. MCP Agent Tokens & Permissions (Chuẩn bảo mật Gen-hub OAuth / Bearer)
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS mcp_agent_tokens (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            token TEXT UNIQUE NOT NULL,
+            token_hash TEXT UNIQUE NOT NULL,
+            client TEXT DEFAULT 'Manual Token',
+            role TEXT DEFAULT 'agent', -- 'agent', 'admin', 'readonly'
+            permissions_json TEXT DEFAULT '["all"]',
+            status TEXT DEFAULT 'active', -- 'active', 'revoked', 'expired'
+            expires_at TEXT,
+            last_used_at TEXT,
+            last_ip TEXT DEFAULT '',
+            calls_count INTEGER DEFAULT 0,
+            owner_id TEXT DEFAULT 'owner-ryan',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """)
+
+        # 22. MCP System Auth Settings
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS mcp_auth_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """)
+        cursor.execute("INSERT OR IGNORE INTO mcp_auth_settings (key, value) VALUES ('require_auth', '0')")
+
+        # Seed master sovereign token for Ryan if no tokens exist
+        cursor.execute("SELECT count(*) FROM mcp_agent_tokens")
+        if cursor.fetchone()[0] == 0:
+            seed_tok = f"gw_live_{secrets.token_hex(20)}"
+            seed_hash = hashlib.sha256(seed_tok.encode('utf-8')).hexdigest()
+            cursor.execute("""
+            INSERT INTO mcp_agent_tokens (id, name, token, token_hash, client, role, permissions_json, status, expires_at, owner_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, ("mcp-tok-master", "Owner Ryan Sovereign Master Token", seed_tok, seed_hash, "Master Control", "admin", json.dumps(["all"]), "active", None, "owner-ryan"))
 
         conn.commit()
 
@@ -4541,6 +4583,213 @@ def parse_and_apply_agent_kanban_updates(conv_id, agent_text):
         updates_made.append(f"Task {tid} -> Hoàn thành (Done)")
 
     return updates_made
+
+def get_mcp_auth_status():
+    """Lấy trạng thái cấu hình xác thực MCP."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT value FROM mcp_auth_settings WHERE key = 'require_auth'")
+        row = cursor.fetchone()
+        req_auth = (row["value"] == "1") if row else False
+        cursor.execute("SELECT count(*) FROM mcp_agent_tokens WHERE status = 'active'")
+        active_count = cursor.fetchone()[0]
+        cursor.execute("SELECT count(*) FROM mcp_agent_tokens")
+        total_count = cursor.fetchone()[0]
+        return {
+            "require_auth": req_auth,
+            "active_tokens": active_count,
+            "total_tokens": total_count,
+            "origin": "http://localhost:8888",
+            "endpoint": "http://localhost:8888/mcp"
+        }
+
+def set_mcp_strict_auth(enabled: bool):
+    """Bật / tắt chế độ bắt buộc xác thực MCP."""
+    val = "1" if enabled else "0"
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("INSERT OR REPLACE INTO mcp_auth_settings (key, value, updated_at) VALUES ('require_auth', ?, CURRENT_TIMESTAMP)", (val,))
+        conn.commit()
+    return get_mcp_auth_status()
+
+def get_mcp_agent_tokens(owner_id="owner-ryan"):
+    """Lấy danh sách các Agent Token đã cấp."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+        SELECT id, name, token, client, role, permissions_json, status, expires_at, last_used_at, calls_count, created_at
+        FROM mcp_agent_tokens
+        ORDER BY created_at DESC
+        """)
+        rows = cursor.fetchall()
+        tokens = []
+        for r in rows:
+            raw_tok = r["token"]
+            masked = f"{raw_tok[:10]}...{raw_tok[-6:]}" if len(raw_tok) > 16 else raw_tok
+            try:
+                perms = json.loads(r["permissions_json"])
+            except Exception:
+                perms = ["all"]
+            tokens.append({
+                "id": r["id"],
+                "name": r["name"],
+                "token_masked": masked,
+                "token_raw": raw_tok,
+                "client": r["client"],
+                "role": r["role"],
+                "permissions": perms,
+                "status": r["status"],
+                "expires_at": r["expires_at"] or "Vĩnh viễn",
+                "last_used_at": r["last_used_at"] or "Chưa sử dụng",
+                "calls_count": r["calls_count"] or 0,
+                "created_at": str(r["created_at"])[:16]
+            })
+        return {
+            "tokens": tokens,
+            "auth_status": get_mcp_auth_status()
+        }
+
+def create_mcp_agent_token(name, permissions=None, expires_days=90, client="Manual Token", role="agent", owner_id="owner-ryan"):
+    """Tạo mới một Agent Token xác thực MCP chuẩn như Gen-hub."""
+    if not name or not str(name).strip():
+        return {"error": "Tên Agent không được để trống"}
+
+    token_id = f"mcp-tok-{secrets.token_hex(4)}"
+    token_val = f"gw_live_{secrets.token_hex(20)}"
+    token_hash = hashlib.sha256(token_val.encode('utf-8')).hexdigest()
+
+    perms = permissions if isinstance(permissions, list) and permissions else ["all"]
+    perms_json = json.dumps(perms, ensure_ascii=False)
+
+    expires_at = None
+    if expires_days and int(expires_days) > 0:
+        exp_dt = datetime.now() + timedelta(days=int(expires_days))
+        expires_at = exp_dt.strftime("%Y-%m-%d %H:%M:%S")
+
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+        INSERT INTO mcp_agent_tokens (id, name, token, token_hash, client, role, permissions_json, status, expires_at, owner_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)
+        """, (token_id, name.strip(), token_val, token_hash, client, role, perms_json, expires_at, owner_id))
+        conn.commit()
+
+    endpoint = "http://localhost:8888/mcp"
+    auth_url = f"{endpoint}?token={token_val}"
+    curl_snippet = (
+        f'curl -X POST {endpoint} \\\n'
+        f'  -H "Authorization: Bearer {token_val}" \\\n'
+        f'  -H "Content-Type: application/json" \\\n'
+        f'  -d \'{{"jsonrpc":"2.0","id":1,"method":"tools/list"}}\''
+    )
+
+    return {
+        "ok": True,
+        "id": token_id,
+        "name": name.strip(),
+        "token": token_val,
+        "token_masked": f"{token_val[:10]}...{token_val[-6:]}",
+        "endpoint": endpoint,
+        "auth_url": auth_url,
+        "curl_snippet": curl_snippet,
+        "permissions": perms,
+        "expires_at": expires_at or "Vĩnh viễn",
+        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    }
+
+def revoke_mcp_agent_token(token_id):
+    """Thu hồi quyền / vô hiệu hóa Agent Token."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE mcp_agent_tokens SET status = 'revoked' WHERE id = ?", (token_id,))
+        conn.commit()
+    return {"ok": True, "status": "revoked", "id": token_id}
+
+def verify_mcp_request_auth(headers=None, query=None, tool_name=None):
+    """
+    Xác thực yêu cầu tới MCP Server chuẩn như Gen-hub.
+    Trả về (is_authorized, agent_info, error_message).
+    Hỗ trợ Bearer Header và query param ?token=... hoặc ?key=...
+    """
+    headers = headers or {}
+    query = query or {}
+    
+    auth_header = headers.get("Authorization", "") or headers.get("authorization", "")
+    token_str = ""
+    if auth_header.lower().startswith("bearer "):
+        token_str = auth_header[7:].strip()
+    elif "token" in query:
+        token_str = query["token"][0] if isinstance(query["token"], list) else str(query["token"])
+    elif "key" in query:
+        token_str = query["key"][0] if isinstance(query["key"], list) else str(query["key"])
+
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT value FROM mcp_auth_settings WHERE key = 'require_auth'")
+        row = cursor.fetchone()
+        require_auth = (row["value"] == "1") if row else False
+
+        if not token_str:
+            if not require_auth:
+                return (True, {"id": "anon", "name": "Local Loopback / Direct CLI", "role": "local", "permissions": ["all"]}, None)
+            return (False, None, "Agent chưa xác thực hoặc quyền đã bị thu hồi")
+
+        token_hash = hashlib.sha256(token_str.encode('utf-8')).hexdigest()
+        cursor.execute("""
+        SELECT id, name, role, permissions_json, status, expires_at, calls_count
+        FROM mcp_agent_tokens
+        WHERE token = ? OR token_hash = ?
+        """, (token_str, token_hash))
+        agent_row = cursor.fetchone()
+
+        if not agent_row:
+            return (False, None, "Agent chưa xác thực hoặc quyền đã bị thu hồi")
+
+        if agent_row["status"] != "active":
+            return (False, None, "Agent chưa xác thực hoặc quyền đã bị thu hồi")
+
+        if agent_row["expires_at"]:
+            try:
+                exp_dt = datetime.strptime(agent_row["expires_at"], "%Y-%m-%d %H:%M:%S")
+                if exp_dt < datetime.now():
+                    cursor.execute("UPDATE mcp_agent_tokens SET status = 'expired' WHERE id = ?", (agent_row["id"],))
+                    conn.commit()
+                    return (False, None, "Agent chưa xác thực hoặc quyền đã bị thu hồi")
+            except Exception:
+                pass
+
+        try:
+            perms = json.loads(agent_row["permissions_json"])
+        except Exception:
+            perms = ["all"]
+
+        if tool_name and "all" not in perms and "*" not in perms and tool_name not in perms:
+            domain_allowed = False
+            domain_map = {
+                "quota": ["get_live_quota", "list_google_accounts", "switch_google_account", "get_oauth_login_url"],
+                "swarm": ["list_swarm_workers", "send_worker_directive", "manage_worker_lifecycle", "get_worker_terminal_output", "post_warroom_message", "get_warroom_messages"],
+                "kanban": ["list_kanban_tasks", "create_kanban_task", "claim_task", "complete_task", "update_task_checklist"],
+                "chat": ["gen_chat", "list_conversations", "create_conversation", "get_conversation_messages", "compact_conversation"],
+                "files": ["list_notes", "save_note", "delete_note", "read_workspace_file", "create_workspace_file", "list_workspace_files", "get_system_status"]
+            }
+            for p in perms:
+                if p in domain_map and tool_name in domain_map[p]:
+                    domain_allowed = True
+                    break
+            if not domain_allowed:
+                return (False, None, f"Agent không có quyền thực thi công cụ '{tool_name}'")
+
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute("UPDATE mcp_agent_tokens SET last_used_at = ?, calls_count = calls_count + 1 WHERE id = ?", (now_str, agent_row["id"]))
+        conn.commit()
+
+        agent_data = {
+            "id": agent_row["id"],
+            "name": agent_row["name"],
+            "role": agent_row["role"],
+            "permissions": perms
+        }
+        return (True, agent_data, None)
 
 # Khởi tạo tự động khi import
 init_db()

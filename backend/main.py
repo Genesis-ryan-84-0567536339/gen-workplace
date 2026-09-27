@@ -55,8 +55,13 @@ class SwarmHandler(SimpleHTTPRequestHandler):
         path = parsed.path
         query = urllib.parse.parse_qs(parsed.query)
 
-        # 0. API Model Context Protocol (MCP) SSE & Inspector
+        # 0. API Model Context Protocol (MCP) SSE, Token Management & Inspector
         if path in ("/mcp", "/sse"):
+            is_auth, agent_info, err_msg = db.verify_mcp_request_auth(self.headers, query)
+            if not is_auth:
+                self._send_json(401, {"error": err_msg or "Agent chưa xác thực hoặc quyền đã bị thu hồi"})
+                return
+
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream")
             self.send_header("Cache-Control", "no-cache")
@@ -64,22 +69,35 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
             try:
-                self.wfile.write(b"event: endpoint\r\ndata: /mcp\r\n\r\n")
+                token_param = query.get("token", [""])[0] or query.get("key", [""])[0]
+                ep_data = f"/mcp?token={token_param}" if token_param else "/mcp"
+                self.wfile.write(f"event: endpoint\r\ndata: {ep_data}\r\n\r\n".encode("utf-8"))
                 self.wfile.flush()
             except Exception:
                 pass
             return
 
         if path in ("/mcp/tools", "/api/mcp/tools", "/api/mcp/status"):
+            auth_st = db.get_mcp_auth_status()
             self._send_json(200, {
                 "status": "online",
                 "serverInfo": mcp_core.MCP_SERVER_INFO,
                 "protocolVersion": mcp_core.MCP_PROTOCOL_VERSION,
                 "tools_count": len(mcp_core.TOOLS),
+                "auth": auth_st,
                 "tools": mcp_core.TOOLS,
                 "resources": mcp_core.RESOURCES,
                 "prompts": mcp_core.PROMPTS
             })
+            return
+
+        if path == "/api/mcp/tokens":
+            tokens_data = db.get_mcp_agent_tokens()
+            self._send_json(200, tokens_data)
+            return
+
+        if path == "/api/mcp/auth/status":
+            self._send_json(200, db.get_mcp_auth_status())
             return
 
         # 1. API Status
@@ -339,6 +357,24 @@ class SwarmHandler(SimpleHTTPRequestHandler):
 
         # 0. API Model Context Protocol (MCP) JSON-RPC 2.0 Handler
         if path in ("/mcp", "/api/mcp"):
+            parsed_post = urllib.parse.urlparse(self.path)
+            post_query = urllib.parse.parse_qs(parsed_post.query)
+            tool_name = None
+            if isinstance(data, dict) and data.get("method") == "tools/call":
+                tool_name = (data.get("params") or {}).get("name")
+
+            is_auth, agent_info, err_msg = db.verify_mcp_request_auth(self.headers, post_query, tool_name=tool_name)
+            if not is_auth:
+                self._send_json(401, {
+                    "jsonrpc": "2.0",
+                    "id": data.get("id") if isinstance(data, dict) else None,
+                    "error": {
+                        "code": -32000,
+                        "message": err_msg or "Agent chưa xác thực hoặc quyền đã bị thu hồi"
+                    }
+                })
+                return
+
             resp = mcp_core.handle_jsonrpc(data)
             if resp is None:
                 self.send_response(204)
@@ -346,6 +382,33 @@ class SwarmHandler(SimpleHTTPRequestHandler):
                 self.end_headers()
                 return
             self._send_json(200, resp)
+            return
+
+        # 0.1 API Tạo Token Xác Thực MCP Mới
+        if path == "/api/mcp/tokens/create":
+            name = data.get("name", "").strip()
+            perms = data.get("permissions", ["all"])
+            expires_days = data.get("expires_days", 90)
+            client = data.get("client", "Manual Token")
+            res = db.create_mcp_agent_token(name, perms, expires_days, client)
+            self._send_json(200 if "error" not in res else 400, res)
+            return
+
+        # 0.2 API Thu Hồi Token Xác Thực MCP
+        if path == "/api/mcp/tokens/revoke":
+            token_id = data.get("id") or data.get("token_id")
+            if token_id:
+                res = db.revoke_mcp_agent_token(token_id)
+                self._send_json(200, res)
+            else:
+                self._send_json(400, {"error": "Missing token id"})
+            return
+
+        # 0.3 API Bật / Tắt Chế Độ Bắt Buộc Xác Thực MCP (Strict Auth)
+        if path == "/api/mcp/auth/toggle":
+            enabled = bool(data.get("require_auth", False))
+            res = db.set_mcp_strict_auth(enabled)
+            self._send_json(200, res)
             return
 
         # 1. Thêm tin nhắn chat vào SQLite
