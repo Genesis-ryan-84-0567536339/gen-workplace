@@ -14,3 +14,6 @@ Thumbs.db
 roles/
 *.sqlite
 *.db
+.env
+.env.*
+!.env.example

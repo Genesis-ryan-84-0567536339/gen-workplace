@@ -19,6 +19,20 @@ from pathlib import Path
 from datetime import datetime, timedelta
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Tự động nạp cấu hình từ .env nếu tồn tại
+_env_file = BASE_DIR / ".env"
+if _env_file.exists():
+    try:
+        with open(_env_file, "r", encoding="utf-8") as _f:
+            for _line in _f:
+                _line = _line.strip()
+                if _line and not _line.startswith("#") and "=" in _line:
+                    _k, _v = _line.split("=", 1)
+                    os.environ.setdefault(_k.strip(), _v.strip().strip('"').strip("'"))
+    except Exception:
+        pass
+
 default_data = "/app/data" if (os.path.exists("/app") or os.environ.get("DOCKER_CONTAINER")) else str(BASE_DIR / "data")
 DATA_DIR = Path(os.environ.get("DATA_DIR", default_data))
 DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -1120,8 +1134,8 @@ _LIVE_QUOTA_CACHE = {}
 _LIVE_QUOTA_CACHE_TIME = {}
 QUOTA_CACHE_TTL = 30.0  # 30 giây cache cho auto-polling để tránh spam Cloud Code API
 
-GOOGLE_OAUTH_CLIENT_ID = ""
-GOOGLE_OAUTH_CLIENT_SECRET = ""
+GOOGLE_OAUTH_CLIENT_ID = os.environ.get("GOOGLE_OAUTH_CLIENT_ID", "")
+GOOGLE_OAUTH_CLIENT_SECRET = os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET", "")
 
 def refresh_google_oauth_token(profile_id="owner_default"):
     """
@@ -2216,7 +2230,8 @@ def start_oauth_login(profile_id, custom_path=""):
     os.makedirs(cli_dir, exist_ok=True)
 
     # Google OAuth 2.0 Auth URL chuẩn cho Antigravity CLI / Cloud Code
-    oauth_url = "https://accounts.google.com/o/oauth2/v2/auth?response_type=code&client_id=&redirect_uri=http%3A%2F%2Flocalhost%3A8085%2Foauth2callback&scope=openid%20email%20profile%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcloud-platform&access_type=offline&prompt=consent"
+    cid = os.environ.get("GOOGLE_OAUTH_CLIENT_ID", "")
+    oauth_url = f"https://accounts.google.com/o/oauth2/v2/auth?response_type=code&client_id={cid}&redirect_uri=http%3A%2F%2Flocalhost%3A8085%2Foauth2callback&scope=openid%20email%20profile%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcloud-platform&access_type=offline&prompt=consent"
 
     session_name = "gw-oauth-login"
     tmux_created = False
