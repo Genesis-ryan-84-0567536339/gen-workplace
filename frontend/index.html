@@ -5296,14 +5296,8 @@ body.resizing-active, body.resizing-active * {
                 <div class="wrToolbarLeft">
                   <span style="font-size:11px;color:var(--muted)">Gửi với tư cách:</span>
                   <select class="wrSelect" id="wrSenderSelect">
-                    <option value="Ryan (Owner)" selected>Ryan (Owner / Tác Giả)</option>
-                    <option value="Genesis Orchestrator">Genesis Orchestrator (Core Gen)</option>
-                    <option value="Lead Architect">Lead Architect (Trưởng Nhóm)</option>
-                    <option value="Backend Specialist">Backend Specialist</option>
-                    <option value="Frontend Specialist">Frontend Specialist</option>
-                    <option value="DevOps & Packaging">DevOps Engineer</option>
-                    <option value="QA Tester">QA Tester</option>
-                    <option value="Security Auditor">Security Auditor</option>
+                    <option value="Ryan (Owner)" selected>Ryan (Owner)</option>
+                    <option value="Claude (điều phối)">Claude (điều phối)</option>
                   </select>
 
                   <span style="font-size:11px;color:var(--muted);margin-left:8px">Loại lệnh / Phân loại:</span>
@@ -5324,11 +5318,8 @@ body.resizing-active, body.resizing-active * {
               </div>
 
               <div class="wrInputBox">
-                <textarea id="wrMessageInput" class="wrTextarea" placeholder="Nhập mệnh lệnh hoặc thảo luận bằng tiếng Việt... (Nhấn Enter để gửi, Shift+Enter xuống dòng. Gõ @Backend, @Frontend, @DevOps, @QA để chuyên gia phản hồi tức thì)" onkeydown="handleWarRoomKeydown(event)"></textarea>
-                <button class="wrSendBtn" id="wrSendBtn" onclick="sendWarRoomMessage()">
-                  <span></span>
-                  <span>Phát Lệnh</span>
-                </button>
+                <textarea id="wrMessageInput" class="wrTextarea" placeholder="Gõ @backend, @frontend, @devops, @qa, @security hoặc @lead rồi nêu việc cần làm. Enter để gửi, Shift+Enter xuống dòng." onkeydown="handleWarRoomKeydown(event)"></textarea>
+                <button class="wrSendBtn" id="wrSendBtn" onclick="sendWarRoomMessage()">Gửi</button>
               </div>
             </div>
           </div>
@@ -14574,16 +14565,16 @@ async function sendWarRoomMessage() {
     if (res.ok) {
       input.value = '';
       await loadWarRoomMessages(true);
-      showToast('Đã phát lệnh thành công!');
+      showToast('Đã gửi. Nếu có @vai, agy sẽ chạy và trả kết quả về kênh này.');
     } else {
-      showToast('Không thể gửi lệnh!');
+      showToast('Không gửi được tin.');
     }
   } catch (err) {
-    showToast('Lỗi mạng khi phát lệnh!');
+    showToast('Lỗi mạng khi gửi tin.');
   } finally {
     if (btn) {
       btn.disabled = false;
-      btn.innerHTML = '<span></span><span>Phát Lệnh</span>';
+      btn.textContent = 'Gửi';
     }
     input.focus();
   }
