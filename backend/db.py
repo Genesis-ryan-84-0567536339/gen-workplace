@@ -15,6 +15,9 @@ import uuid
 import subprocess
 import hashlib
 import secrets
+import shutil
+import threading
+from contextlib import contextmanager
 from pathlib import Path
 from datetime import datetime, timedelta
 
@@ -45,14 +48,22 @@ def normalize_project_id(pid):
         return "PRJ-GEN-WORKPLACE"
     return str(pid).strip()
 
+@contextmanager
 def get_connection():
-    """Tạo kết nối SQLite tối ưu với WAL mode và Foreign Keys."""
+    """Tạo kết nối SQLite tối ưu với WAL mode, Foreign Keys và bảo đảm đóng kết nối giải phóng File Descriptors."""
     conn = sqlite3.connect(str(DB_PATH), timeout=15.0)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode = WAL;")
     conn.execute("PRAGMA synchronous = NORMAL;")
     conn.execute("PRAGMA foreign_keys = ON;")
-    return conn
+    try:
+        with conn:
+            yield conn
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 def init_db():
     """Khởi tạo schema toàn diện cho Multi-Agent Swarm."""
@@ -530,7 +541,55 @@ def init_db():
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, ("mcp-tok-master", "Owner Ryan Sovereign Master Token", seed_tok, seed_hash, "Master Control", "admin", json.dumps(["all"]), "active", None, "owner-ryan"))
 
+        # Kết quả gọi agy thật (thành công / 429) để hiển thị quota từ dữ liệu thật (#6)
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS quota_probe (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            profile_id TEXT NOT NULL,
+            model TEXT DEFAULT '',
+            status TEXT NOT NULL,
+            reset_at TEXT DEFAULT '',
+            checked_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            raw TEXT DEFAULT ''
+        );
+        """)
+
+        # Nhật ký điều phối tin @vai trong chatroom sang agy thật (#3)
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS dispatch_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id TEXT NOT NULL,
+            command TEXT DEFAULT '',
+            exit_code INTEGER,
+            report_path TEXT DEFAULT '',
+            started_at TEXT DEFAULT '',
+            finished_at TEXT DEFAULT ''
+        );
+        """)
+
         conn.commit()
+
+    migrate_unverified_done_tasks()
+
+def migrate_unverified_done_tasks():
+    """Di trú nhỏ: task 'done' (todos & gen_session_todos) có evidence không kiểm được → 'review' (#4)."""
+    changed = 0
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            for table in ("todos", "gen_session_todos"):
+                cursor.execute(f"SELECT id, evidence_ref FROM {table} WHERE status = 'done'")
+                for r in cursor.fetchall():
+                    ok, _, _ = verify_evidence_ref(r["evidence_ref"])
+                    if not ok:
+                        cursor.execute(f"UPDATE {table} SET status = 'review' WHERE id = ?", (r["id"],))
+                        changed += cursor.rowcount
+            conn.commit()
+    except Exception as e:
+        print(f"[migrate] Lỗi khi rà soát bằng chứng task done: {e}")
+    if changed:
+        print(f"[migrate] Đặt lại {changed} task 'done' thiếu bằng chứng kiểm được về 'review'")
+    return changed
 
 def seed_ssot_events():
     with get_connection() as conn:
@@ -600,23 +659,31 @@ def seed_real_project():
             cursor.execute("INSERT INTO roadmaps (id, project_id, title, description, todos_count, status, order_idx) VALUES (?, 'PRJ-GEN-WORKPLACE', ?, ?, ?, ?, ?)", r)
 
         # 3. Todos thật
+        # Cột cuối là bằng chứng thật (file trong repo); chỉ ghi 'done' khi verify_evidence_ref() kiểm được,
+        # còn lại về 'queued' với evidence_ref rỗng (#4).
         todos = [
-            ('TODO-01', 'RM-01', 'Khởi tạo Git repo và lưu cấu trúc dự án', 'Lead Architect', 'done'),
-            ('TODO-02', 'RM-01', 'Lưu đặc tả gốc vào docs/SSOT_ORIGINAL_SPEC.md', 'Lead Architect', 'done'),
-            ('TODO-03', 'RM-01', 'Chuyển đổi giao diện sang phong cách Gen-workplace v1.1', 'Frontend Specialist', 'done'),
-            ('TODO-04', 'RM-02', 'Viết Dockerfile container hóa Python backend + WebApp', 'DevOps Engineer', 'done'),
-            ('TODO-05', 'RM-02', 'Cấu hình docker-compose live mount với cờ SELinux :z', 'DevOps Engineer', 'done'),
-            ('TODO-06', 'RM-03', 'Xây dựng installer_tui.py với thanh loading % đồ họa', 'Backend Specialist', 'done'),
-            ('TODO-07', 'RM-03', 'Kịch bản install.sh tự động kiểm tra Git & Docker daemon', 'DevOps Engineer', 'done'),
-            ('TODO-08', 'RM-03', 'Tạo shortcut Desktop Gen-workplace.desktop tự động', 'DevOps Engineer', 'done'),
-            ('TODO-09', 'RM-04', 'Khởi tạo SQLite WAL DB & FTS5 virtual table', 'Backend Specialist', 'done'),
-            ('TODO-10', 'RM-04', 'Kết nối API /api/state và /api/catalog với SQLite', 'Backend Specialist', 'live'),
-            ('TODO-11', 'RM-04', 'Tích hợp Process Runner gọi agy CLI thời gian thực', 'Lead Architect', 'queued'),
-            ('TODO-12', 'RM-05', 'Kiểm thử cross-platform trên macOS và Windows WSL2', 'QA Tester', 'queued'),
-            ('TODO-13', 'RM-05', 'Publish repository lên GitHub và gắn release v1.0', 'Lead Architect', 'queued')
+            ('TODO-01', 'RM-01', 'Khởi tạo Git repo và lưu cấu trúc dự án', 'Lead Architect', 'done', 'README.md'),
+            ('TODO-02', 'RM-01', 'Lưu đặc tả gốc vào docs/SSOT_ORIGINAL_SPEC.md', 'Lead Architect', 'done', 'docs/SSOT_ORIGINAL_SPEC.md'),
+            ('TODO-03', 'RM-01', 'Chuyển đổi giao diện sang phong cách Gen-workplace v1.1', 'Frontend Specialist', 'done', 'frontend/index.html'),
+            ('TODO-04', 'RM-02', 'Viết Dockerfile container hóa Python backend + WebApp', 'DevOps Engineer', 'done', 'Dockerfile'),
+            ('TODO-05', 'RM-02', 'Cấu hình docker-compose live mount với cờ SELinux :z', 'DevOps Engineer', 'done', 'docker-compose.yml'),
+            ('TODO-06', 'RM-03', 'Xây dựng installer_tui.py với thanh loading % đồ họa', 'Backend Specialist', 'done', 'installer_tui.py'),
+            ('TODO-07', 'RM-03', 'Kịch bản install.sh tự động kiểm tra Git & Docker daemon', 'DevOps Engineer', 'done', 'install.sh'),
+            ('TODO-08', 'RM-03', 'Tạo shortcut Desktop Gen-workplace.desktop tự động', 'DevOps Engineer', 'done', ''),
+            ('TODO-09', 'RM-04', 'Khởi tạo SQLite WAL DB & FTS5 virtual table', 'Backend Specialist', 'done', 'backend/db.py'),
+            ('TODO-10', 'RM-04', 'Kết nối API /api/state và /api/catalog với SQLite', 'Backend Specialist', 'live', ''),
+            ('TODO-11', 'RM-04', 'Tích hợp Process Runner gọi agy CLI thời gian thực', 'Lead Architect', 'queued', ''),
+            ('TODO-12', 'RM-05', 'Kiểm thử cross-platform trên macOS và Windows WSL2', 'QA Tester', 'queued', ''),
+            ('TODO-13', 'RM-05', 'Publish repository lên GitHub và gắn release v1.0', 'Lead Architect', 'queued', '')
         ]
-        for t in todos:
-            cursor.execute("INSERT INTO todos (id, roadmap_id, project_id, title, assigned_role, status) VALUES (?, ?, 'PRJ-GEN-WORKPLACE', ?, ?, ?)", t)
+        for tid, rm, title, role, status, evidence in todos:
+            verified_by = ''
+            if status == 'done':
+                ok, verified_by, _ = verify_evidence_ref(evidence)
+                if not ok:
+                    status, evidence, verified_by = 'queued', '', ''
+            cursor.execute("INSERT INTO todos (id, roadmap_id, project_id, title, assigned_role, status, evidence_ref, verified_by) VALUES (?, ?, 'PRJ-GEN-WORKPLACE', ?, ?, ?, ?, ?)",
+                           (tid, rm, title, role, status, evidence, verified_by))
 
         # 4. Roles thật
         roles = [
@@ -1093,9 +1160,24 @@ def get_oauth_profiles():
                     data = json.load(f)
                     has_refresh = bool(data.get("token", {}).get("refresh_token") or data.get("refresh_token"))
                     payload = parse_id_token(data.get("id_token", ""))
-                    email = payload.get("email")
-                    user_name = payload.get("name")
-                    exp = payload.get("exp", 0)
+                    email = payload.get("email") if isinstance(payload, dict) else None
+                    user_name = payload.get("name") if isinstance(payload, dict) else None
+                    exp = payload.get("exp", 0) if isinstance(payload, dict) else 0
+
+                    if not email and isinstance(data, dict):
+                        acc_tok = (data.get("token") or {}).get("access_token") if isinstance(data.get("token"), dict) else data.get("access_token")
+                        if acc_tok:
+                            try:
+                                import urllib.request
+                                req = urllib.request.Request("https://www.googleapis.com/oauth2/v3/userinfo",
+                                                             headers={"Authorization": f"Bearer {acc_tok}"})
+                                with urllib.request.urlopen(req, timeout=2.0) as u_resp:
+                                    u_data = json.loads(u_resp.read().decode("utf-8"))
+                                    email = u_data.get("email")
+                                    user_name = u_data.get("name")
+                            except Exception:
+                                pass
+
                     is_auth = bool(email or data.get("token"))
             except Exception:
                 pass
@@ -1125,6 +1207,15 @@ def get_oauth_profiles():
         })
 
     return results
+
+def compute_account_label(account_type, oauth_map=None):
+    """Nhãn tài khoản TÍNH từ email thật của profile OAuth: 'profileN (email)' hoặc 'profileN (chưa đăng nhập)'; owner_default dùng tiền tố 'Mặc định'."""
+    if oauth_map is None:
+        oauth_map = {p["id"]: p for p in get_oauth_profiles()}
+    account_type = account_type or "owner_default"
+    email = (oauth_map.get(account_type) or {}).get("email")
+    prefix = "Mặc định" if account_type == "owner_default" else account_type
+    return f"{prefix} ({email})" if email else f"{prefix} (chưa đăng nhập)"
 
 # =========================================================================
 # MODEL QUOTA TELEMETRY ENGINE (GEMINI & ANTHROPIC FAMILIES)
@@ -1461,97 +1552,184 @@ def fetch_live_google_quota(profile_id="owner_default", force=False):
         print(f"[Live Quota] Error processing quota models: {e}")
         return _LIVE_QUOTA_CACHE.get(profile_id)
 
+QUOTA_PROBE_MAX_AGE_SEC = 6 * 3600
+
+def _agy_bin():
+    """Đường dẫn CLI agy; ghi đè bằng GW_AGY_BIN (script giả) để test không cần agy thật."""
+    return os.environ.get("GW_AGY_BIN") or "agy"
+
+def _profile_dir(profile_id):
+    """Thư mục hồ sơ agy: ~/.gemini cho owner_default, ~/.agy-profiles/<id> cho profile khác."""
+    if not profile_id or profile_id == "owner_default":
+        return os.path.join(HOME_DIR, ".gemini")
+    return os.path.join(HOME_DIR, ".agy-profiles", profile_id)
+
+def _agy_env(p_dir):
+    """Biến môi trường chạy agy với hồ sơ p_dir (ANTIGRAVITY_APP_DATA_DIR cho profile phụ)."""
+    env = {**os.environ, "HOME": HOME_DIR, "PATH": f"/usr/local/bin:/usr/bin:/bin:{HOME_DIR}/.local/bin:" + os.environ.get("PATH", "")}
+    if p_dir != os.path.join(HOME_DIR, ".gemini") and os.path.exists(os.path.join(p_dir, "antigravity-cli")):
+        env["ANTIGRAVITY_APP_DATA_DIR"] = os.path.join(p_dir, "antigravity-cli")
+    return env
+
+def classify_agy_result(returncode, output):
+    """Phân loại kết quả 1 lần gọi agy: ('ok', ''), ('rate_limited', reset) khi 429/RESOURCE_EXHAUSTED, ('error', '') còn lại."""
+    out = output or ""
+    if returncode == 0:
+        return "ok", ""
+    if re.search(r"RESOURCE_EXHAUSTED|Individual quota reached|\b429\b|quota (exceeded|reached|exhausted)", out, re.IGNORECASE):
+        m = re.search(r"Resets? (?:in|at) ([^\n\"]{1,40})", out)
+        return "rate_limited", (m.group(1).strip() if m else "")
+    return "error", ""
+
+def record_quota_probe(profile_id, model, status, reset_at="", raw=""):
+    """Ghi 1 dòng kết quả gọi agy thật (ok / rate_limited / error / timeout) vào bảng quota_probe (#6)."""
+    try:
+        with get_connection() as conn:
+            conn.execute("INSERT INTO quota_probe (profile_id, model, status, reset_at, raw) VALUES (?, ?, ?, ?, ?)",
+                         (profile_id or "owner_default", model or "", status, reset_at or "", (raw or "")[-2000:]))
+            conn.commit()
+    except Exception as e:
+        print(f"[quota_probe] Không ghi được: {e}")
+
+def record_quota_probe_from_result(profile_id, model, res):
+    """Ghi quota_probe từ CompletedProcess của agy (dùng chung cho runner chat, probe và dispatch)."""
+    output = ((res.stdout or "") + "\n" + (res.stderr or "")).strip()
+    status, reset_at = classify_agy_result(res.returncode, output)
+    record_quota_probe(profile_id, model, status, reset_at, output)
+    return status, reset_at
+
+def get_latest_quota_probe(profile_id, family="gemini", max_age_sec=QUOTA_PROBE_MAX_AGE_SEC):
+    """Dòng quota_probe mới nhất (< max_age_sec giây) của profile; family 'claude' lấy model claude/sonnet/opus, 'gemini' lấy còn lại."""
+    try:
+        with get_connection() as conn:
+            rows = conn.execute("""
+            SELECT id, profile_id, model, status, reset_at, checked_at, raw FROM quota_probe
+            WHERE profile_id = ? AND (strftime('%s', 'now') - strftime('%s', checked_at)) < ?
+            ORDER BY id DESC LIMIT 30
+            """, (profile_id or "owner_default", int(max_age_sec))).fetchall()
+    except Exception:
+        return None
+    for r in rows:
+        m = (r["model"] or "").lower()
+        is_claude = any(k in m for k in ("claude", "sonnet", "opus"))
+        if (family == "claude") != is_claude:
+            continue
+        return dict(r)
+    return None
+
+def _quota_from_probe(probe, live, base):
+    """Ghép quota hiển thị: ưu tiên dòng probe rate_limited < 6h, rồi số liệu live Cloud Code, rồi probe ok, cuối cùng 'unknown' không có %."""
+    q = dict(live) if live else dict(base)
+    q.setdefault("percent", None)
+    q.setdefault("reset_time", "")
+    if probe and probe["status"] == "rate_limited":
+        reset = probe.get("reset_at") or ""
+        q.update({
+            "status": "rate_limited",
+            "status_label": f"429 · hồi {reset or 'chưa rõ'}",
+            "percent": 0,
+            "reset_time": reset or q.get("reset_time") or "",
+            "color": "#ef4444",
+            "detail": f"Lệnh agy lúc {probe['checked_at']} bị 429 (RESOURCE_EXHAUSTED). " + (probe.get("raw") or "")[-200:],
+            "source": "agy_probe",
+            "probe_checked_at": probe["checked_at"],
+        })
+        return q
+    if live:
+        q["source"] = "cloudcode_api_live"
+        if probe:
+            q["probe_checked_at"] = probe["checked_at"]
+            q["probe_status"] = probe["status"]
+        return q
+    if probe and probe["status"] == "ok":
+        q.update({
+            "status": "ready",
+            "status_label": f"Gọi thật OK lúc {probe['checked_at']}",
+            "percent": None,
+            "color": "#38bdf8",
+            "detail": f"Lệnh agy ({probe.get('model') or 'mặc định'}) chạy thành công lúc {probe['checked_at']}; chưa có số % từ Cloud Code API.",
+            "source": "agy_probe",
+            "probe_checked_at": probe["checked_at"],
+        })
+        return q
+    if probe:
+        q.update({
+            "status": "unknown",
+            "status_label": f"Lỗi gọi agy ({probe['status']}) lúc {probe['checked_at']}",
+            "percent": None,
+            "color": "#f59e0b",
+            "detail": (probe.get("raw") or "")[-300:] or "Không có output.",
+            "source": "agy_probe",
+            "probe_checked_at": probe["checked_at"],
+        })
+        return q
+    q.update({
+        "status": "unknown",
+        "status_label": "Chưa có dữ liệu gọi thật",
+        "percent": None,
+        "color": "#6b7280",
+        "detail": "Chưa có lần gọi agy nào trong 6 giờ qua. Bấm kiểm tra quota (POST /api/quota/probe) để chạy lệnh agy tối thiểu.",
+        "source": "none",
+    })
+    return q
+
 def get_quota_telemetry(profile_id, email=""):
     """
-    Theo dõi và tính toán Quota thực tế còn lại cho 2 nhóm Model:
-    1. Nhóm Google Gemini (Gemini 3.8 Flash, Gemini 3.1 Pro)
-    2. Nhóm Anthropic Claude (Claude Sonnet 4.6 Thinking, Claude Opus 4.6 Thinking)
+    Quota hiển thị cho 2 nhóm model (Gemini / Claude) từ dữ liệu THẬT (#6):
+    ưu tiên dòng quota_probe < 6h (rate_limited → 429 + giờ hồi), rồi Cloud Code API live,
+    không có gì → status 'unknown', không có %. Giữ nguyên các key status/status_label/percent/reset_time/detail.
     """
-    # 1. Ưu tiên truy vấn trực tiếp thời gian thực từ Google Cloud Code API của agy CLI
     live = fetch_live_google_quota(profile_id)
-    if live:
-        return live
-
-    # 2. Fallback sang thanh tra nhật ký cục bộ nếu mất mạng hoặc token hết hạn
-    target_dir = os.path.join(HOME_DIR, ".gemini") if profile_id == "owner_default" else os.path.join(HOME_DIR, ".agy-profiles", profile_id)
-    log_dir = os.path.join(target_dir, "antigravity-cli", "log")
-    
-    gemini_rate_limited = False
-    gemini_reset_str = ""
-    gemini_reason = ""
-
-    if os.path.exists(log_dir):
-        try:
-            log_files = sorted(
-                [os.path.join(log_dir, f) for f in os.listdir(log_dir) if f.startswith("cli-")],
-                key=lambda x: os.path.getmtime(x),
-                reverse=True
-            )
-            if log_files:
-                with open(log_files[0], "r", errors="ignore") as lf:
-                    lines = lf.readlines()[-300:]
-                    err_idx = -1
-                    success_after_err = False
-                    for i, l in enumerate(lines):
-                        if "mcp_auth.go" in l or "dynamic client registration" in l:
-                            continue
-                        
-                        if re.search(r'\b(RESOURCE_EXHAUSTED|Individual quota reached)\b', l, re.IGNORECASE):
-                            err_idx = i
-                            gemini_reason = l.strip()[-140:]
-                            m = re.search(r'Resets in (?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?', l)
-                            if m:
-                                gemini_reset_str = m.group(0)
-                        elif err_idx != -1 and ("streamGenerateContent" in l or "loadCodeAssist" in l or "fetchAvailableModels" in l):
-                            if "URL: https://" in l or "ResponseID:" in l:
-                                success_after_err = True
-
-                    if err_idx != -1 and not success_after_err:
-                        gemini_rate_limited = True
-        except Exception:
-            pass
-
-    gemini_percent = 0 if gemini_rate_limited else 71
-    gemini_status = "rate_limited" if gemini_rate_limited else "ready"
-    gemini_status_label = f"429 Rate Limit ({gemini_reset_str or 'Đang chờ hồi'})" if gemini_rate_limited else f"Khả dụng {gemini_percent}% (Sẵn sàng)"
-    gemini_color = "#ef4444" if gemini_rate_limited else "#38bdf8"
-    gemini_detail = gemini_reason if gemini_rate_limited else f"Tokens/Min: 4.0M | Request/Min: 60 | Quota: {gemini_percent}%"
-
-    gemini_quota = {
+    live_g, live_c = live if live else (None, None)
+    base_g = {
         "family": "Google Gemini",
         "model": "Gemini 3.8 Flash (High)",
         "alt_model": "Gemini 3.1 Pro (High)",
-        "status": gemini_status,
-        "status_label": gemini_status_label,
-        "percent": gemini_percent,
-        "used_requests": 1500 if gemini_rate_limited else 12,
-        "limit_requests": 1500,
-        "rpm": 60,
-        "tpm": 4000000,
-        "reset_time": "00:00 UTC (hằng ngày)",
-        "tier": "Cloud Code / AI Studio Enterprise",
-        "color": gemini_color,
-        "detail": gemini_detail
+        "tier": "Cloud Code / AI Studio",
+        "reset_time": "",
     }
-
-    anthropic_quota = {
+    base_c = {
         "family": "Anthropic Claude",
         "model": "Claude Sonnet 4.6 (Thinking)",
         "alt_model": "Claude Opus 4.6 (Thinking)",
-        "status": "rate_limited",
-        "status_label": "0% (429 Quota Exceeded · Hồi sau rolling window)",
-        "percent": 0,
-        "used_tokens": 200000,
-        "limit_tokens": 200000,
-        "rpm": 50,
-        "tpm": 200000,
-        "reset_time": "Rolling 5h",
-        "tier": "Sonnet 4.6 Tier 4 Entitlement",
-        "color": "#ef4444",
-        "detail": "Hạn ngạch cá nhân đã cạn (0%) · Đang chờ hồi"
+        "tier": "Sonnet 4.6 Entitlement",
+        "reset_time": "",
     }
-
+    gemini_quota = _quota_from_probe(get_latest_quota_probe(profile_id, "gemini"), live_g, base_g)
+    anthropic_quota = _quota_from_probe(get_latest_quota_probe(profile_id, "claude"), live_c, base_c)
     return gemini_quota, anthropic_quota
+
+def probe_quota(profile_id="owner_default", timeout=60):
+    """Chạy lệnh agy tối thiểu (--gemini_dir=<dir> --mode plan -p 'ping') với hồ sơ profile_id, ghi quota_probe và trả quota mới (#6)."""
+    p_dir = _profile_dir(profile_id)
+    cmd = [_agy_bin(), f"--gemini_dir={p_dir}", "--mode", "plan", "-p", "ping"]
+    started = time.time()
+    try:
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, cwd=str(BASE_DIR), env=_agy_env(p_dir))
+        output = ((res.stdout or "") + "\n" + (res.stderr or "")).strip()
+        status, reset_at = record_quota_probe_from_result(profile_id, "default", res)
+        code = res.returncode
+    except subprocess.TimeoutExpired:
+        status, reset_at, code = "timeout", "", -1
+        output = f"agy không phản hồi sau {timeout}s"
+        record_quota_probe(profile_id, "default", status, "", output)
+    except Exception as e:
+        status, reset_at, code = "error", "", -1
+        output = f"Không chạy được agy ({_agy_bin()}): {e}"
+        record_quota_probe(profile_id, "default", status, "", output)
+    g_q, a_q = get_quota_telemetry(profile_id)
+    return {
+        "ok": status == "ok",
+        "profile_id": profile_id,
+        "status": status,
+        "reset_at": reset_at,
+        "exit_code": code,
+        "elapsed_sec": round(time.time() - started, 1),
+        "command": " ".join(cmd),
+        "output": output[-1500:],
+        "gemini": g_q,
+        "claude": a_q,
+    }
 
 # =========================================================================
 # REAL TMUX SWARM ENGINE (6 INTERACTIVE PROCESSES & SHARED CONTEXT)
@@ -1739,8 +1917,8 @@ def ensure_real_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
             conv_id = s["conversation_id"] if "conversation_id" in s.keys() and s["conversation_id"] else f"conv-{sid}"
 
             p_info = oauth_map.get(acc_type, {})
-            email = p_info.get("email") or ("owner@genesis.local" if acc_type in ("owner_default", "profile1") else "Chưa đăng nhập")
-            is_auth = p_info.get("is_auth", bool(email and email != "Chưa đăng nhập"))
+            email = p_info.get("email") or "Chưa đăng nhập"
+            is_auth = bool(p_info.get("is_auth"))
             if not profile_dir and p_info.get("path"):
                 profile_dir = p_info["path"]
 
@@ -1827,7 +2005,7 @@ def seed_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
         for cfg in SWARM_DEFAULT_CONFIG:
             sid = cfg["id"]
             p_info = oauth_map.get(cfg["account_type"], {})
-            acc_label = p_info.get("label") or cfg["account_type"]
+            acc_label = compute_account_label(cfg["account_type"], oauth_map)
             profile_dir = p_info.get("path") or ""
 
             allowed_p = json.dumps(cfg.get("allowed_paths", []))
@@ -1876,8 +2054,8 @@ def get_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
         for r in rows:
             acc_type = r["account_type"]
             p_info = oauth_map.get(acc_type, {})
-            email = p_info.get("email") or ("owner@genesis.local" if acc_type in ("owner_default", "profile1") else None)
-            is_auth = p_info.get("is_auth", bool(email))
+            email = p_info.get("email") or None
+            is_auth = bool(p_info.get("is_auth"))
             
             # Luôn tính toán Quota thực tế thời gian thực
             quota_g, quota_a = get_quota_telemetry(acc_type, email or "")
@@ -1929,7 +2107,7 @@ def get_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
                 "role_name": r["role_name"],
                 "cli_tool": r["cli_tool"],
                 "account_type": acc_type,
-                "account_label": r["account_label"],
+                "account_label": compute_account_label(acc_type, oauth_map),
                 "profile_dir": r["profile_dir"],
                 "status": r["status"],
                 "pid": r["pid"],
@@ -1954,8 +2132,10 @@ def get_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
 
         return results
 
-def update_tmux_account(session_id, account_type, account_label, profile_dir=""):
-    """Đổi tài khoản OAuth cho phiên Tmux và cập nhật môi trường runtime ngay trong tmux."""
+def update_tmux_account(session_id, account_type, account_label="", profile_dir=""):
+    """Đổi tài khoản OAuth cho phiên Tmux và cập nhật môi trường runtime ngay trong tmux. Nhãn để trống sẽ được tính từ email thật; trả về nhãn đã dùng."""
+    if not account_label:
+        account_label = compute_account_label(account_type)
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
@@ -1967,11 +2147,14 @@ def update_tmux_account(session_id, account_type, account_label, profile_dir="")
 
     # Cập nhật biến môi trường trực tiếp vào phiên tmux đang chạy
     try:
-        p_dir = profile_dir or os.path.join(HOME_DIR, ".gemini")
+        p_dir = profile_dir or (os.path.join(HOME_DIR, ".gemini") if account_type == "owner_default" else os.path.join(HOME_DIR, ".agy-profiles", account_type))
+        if p_dir.startswith("~"):
+            p_dir = os.path.expanduser(p_dir)
         cmd = f"export GEMINI_DIR='{p_dir}'; alias agy=\"agy --gemini_dir='{p_dir}' --dangerously-skip-permissions\"; echo '[AUTH] Đã kích hoạt tài khoản: {account_label}'"
         subprocess.run(["tmux", "send-keys", "-t", session_id, cmd, "Enter"], capture_output=True, timeout=2.0)
     except Exception:
         pass
+    return account_label
 
 def log_directive_audit(session_id, channel, command, allowed, reason=""):
     """Ghi nhật ký mọi lệnh/phím gửi vào tmux worker (cả cho phép lẫn từ chối) — phục vụ audit allowlist."""
@@ -2166,7 +2349,7 @@ def wake_tmux_session(session_id):
         prev_output = s["terminal_output"] or ""
 
         p_info = oauth_map.get(acc_type, {})
-        email = p_info.get("email") or "owner@genesis.local"
+        email = p_info.get("email") or "Chưa đăng nhập"
         p_dir_clean = profile_dir or p_info.get("path") or os.path.join(HOME_DIR, ".gemini")
         role_spec_file = generate_role_spec_file(session_id, role_name, conv_id=conv_id)
 
@@ -2265,9 +2448,57 @@ def start_oauth_login(profile_id, custom_path=""):
     cli_dir = os.path.join(target_dir, "antigravity-cli")
     os.makedirs(cli_dir, exist_ok=True)
 
+    # Pre-seed jetski_state và settings.json để agy CLI bỏ qua màn hình onboarding TUI
+    owner_cli = os.path.join(HOME_DIR, ".gemini", "antigravity-cli")
+    target_jetski = os.path.join(cli_dir, "jetski_state.pbtxt")
+    if not os.path.exists(target_jetski) and os.path.exists(os.path.join(owner_cli, "jetski_state.pbtxt")):
+        try:
+            shutil.copy(os.path.join(owner_cli, "jetski_state.pbtxt"), target_jetski)
+        except Exception:
+            pass
+
+    target_settings = os.path.join(cli_dir, "settings.json")
+    if not os.path.exists(target_settings):
+        try:
+            with open(target_settings, "w", encoding="utf-8") as f:
+                json.dump({"theme": "terminal"}, f, indent=2)
+        except Exception:
+            pass
+
+    # Pre-seed config/mcp_config.json và schemas cho agy CLI
+    config_dir = os.path.join(target_dir, "config")
+    os.makedirs(config_dir, exist_ok=True)
+    mcp_cfg = os.path.join(config_dir, "mcp_config.json")
+    if not os.path.exists(mcp_cfg):
+        try:
+            with open(mcp_cfg, "w", encoding="utf-8") as f:
+                json.dump({
+                    "mcpServers": {
+                        "google-drive": {
+                            "command": os.path.join(HOME_DIR, ".local", "bin", "genos-gdrive-mcp")
+                        },
+                        "gen-workplace": {
+                            "command": os.path.join(HOME_DIR, ".local", "bin", "gen-workplace-mcp")
+                        }
+                    }
+                }, f, indent=2)
+        except Exception:
+            pass
+
+    target_mcp_schemas = os.path.join(cli_dir, "mcp", "gen-workplace")
+    owner_mcp_schemas = os.path.join(HOME_DIR, ".gemini", "antigravity-cli", "mcp", "gen-workplace")
+    if not os.path.exists(target_mcp_schemas) and os.path.exists(owner_mcp_schemas):
+        try:
+            shutil.copytree(owner_mcp_schemas, target_mcp_schemas)
+        except Exception:
+            pass
+
     # Google OAuth 2.0 Auth URL chuẩn cho Antigravity CLI / Cloud Code
-    cid = os.environ.get("GOOGLE_OAUTH_CLIENT_ID", "")
-    oauth_url = f"https://accounts.google.com/o/oauth2/v2/auth?response_type=code&client_id={cid}&redirect_uri=http%3A%2F%2Flocalhost%3A8085%2Foauth2callback&scope=openid%20email%20profile%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcloud-platform&access_type=offline&prompt=consent"
+    cid = os.environ.get("GOOGLE_OAUTH_CLIENT_ID") or GOOGLE_OAUTH_CLIENT_ID
+    if not cid:
+        return {"ok": False, "error": "Chưa cấu hình GOOGLE_OAUTH_CLIENT_ID trong .env", "profile_id": profile_id, "oauth_url": ""}
+    # prompt=select_account consent giúp người dùng luôn có thể đổi sang tài khoản Google khác
+    oauth_url = f"https://accounts.google.com/o/oauth2/v2/auth?response_type=code&client_id={cid}&redirect_uri=http%3A%2F%2Flocalhost%3A8085%2Foauth2callback&scope=openid%20email%20profile%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcloud-platform&access_type=offline&prompt=select_account%20consent&state={profile_id}"
 
     session_name = "gw-oauth-login"
     tmux_created = False
@@ -2307,17 +2538,34 @@ def check_oauth_status(profile_id):
     try:
         with open(token_file, "r") as f:
             data = json.load(f)
-            payload = parse_id_token(data.get("id_token", ""))
-            email = payload.get("email")
-            name = payload.get("name")
-            exp = payload.get("exp", 0)
+            payload = parse_id_token(data.get("id_token", "")) if isinstance(data, dict) else {}
+            email = payload.get("email") if isinstance(payload, dict) else None
+            name = payload.get("name") if isinstance(payload, dict) else None
+            exp = payload.get("exp", 0) if isinstance(payload, dict) else 0
+
+            # Fallback lấy email từ Google UserInfo API nếu id_token không có
+            if not email and isinstance(data, dict):
+                acc_tok = (data.get("token") or {}).get("access_token") if isinstance(data.get("token"), dict) else data.get("access_token")
+                if acc_tok:
+                    try:
+                        import urllib.request
+                        req = urllib.request.Request("https://www.googleapis.com/oauth2/v3/userinfo",
+                                                     headers={"Authorization": f"Bearer {acc_tok}"})
+                        with urllib.request.urlopen(req, timeout=3.0) as u_resp:
+                            u_data = json.loads(u_resp.read().decode("utf-8"))
+                            email = u_data.get("email")
+                            name = u_data.get("name")
+                    except Exception:
+                        pass
+
+            is_auth = bool(email or (isinstance(data, dict) and data.get("token")))
             return {
                 "profile_id": profile_id,
-                "is_auth": True,
+                "is_auth": is_auth,
                 "email": email,
                 "name": name,
                 "exp": exp,
-                "message": f"Đã xác thực thành công tài khoản Google: {email}"
+                "message": f"Đã xác thực thành công tài khoản Google: {email}" if email else "Token hợp lệ"
             }
     except Exception as e:
         return {
@@ -2326,6 +2574,143 @@ def check_oauth_status(profile_id):
             "error": str(e),
             "message": "Lỗi khi đọc token xác thực."
         }
+
+def exchange_google_code_for_token(code, profile_id="profile1"):
+    """
+    Trao đổi authorization code với Google OAuth Token Endpoint (https://oauth2.googleapis.com/token)
+    để lấy access_token, refresh_token, id_token và tự động lưu vào profile.
+    """
+    import urllib.request
+    import urllib.parse
+    from datetime import datetime, timezone, timedelta
+
+    cid = os.environ.get("GOOGLE_OAUTH_CLIENT_ID") or GOOGLE_OAUTH_CLIENT_ID
+    csec = os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET") or GOOGLE_OAUTH_CLIENT_SECRET
+    if not cid:
+        return False, "Chưa cấu hình GOOGLE_OAUTH_CLIENT_ID trong .env", None
+    if not csec:
+        return False, "Chưa cấu hình GOOGLE_OAUTH_CLIENT_SECRET", None
+    redirect_uri = "http://localhost:8085/oauth2callback"
+
+    post_data = urllib.parse.urlencode({
+        "code": code,
+        "client_id": cid,
+        "client_secret": csec,
+        "redirect_uri": redirect_uri,
+        "grant_type": "authorization_code"
+    }).encode("utf-8")
+
+    req = urllib.request.Request(
+        "https://oauth2.googleapis.com/token",
+        data=post_data,
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        method="POST"
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=10.0) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        err_msg = e.read().decode("utf-8")
+        return False, f"Google OAuth HTTP {e.code}: {err_msg}", None
+    except Exception as e:
+        return False, f"Lỗi kết nối tới Google OAuth: {str(e)}", None
+
+    access_token = data.get("access_token")
+    refresh_token = data.get("refresh_token")
+    expires_in = data.get("expires_in", 3600)
+    id_token = data.get("id_token", "")
+
+    expiry_dt = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
+    expiry_str = expiry_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    token_payload = {
+        "token": {
+            "access_token": access_token,
+            "token_type": "Bearer",
+            "refresh_token": refresh_token or access_token,
+            "expiry": expiry_str
+        },
+        "auth_method": "consumer",
+        "id_token": id_token
+    }
+
+    # Lưu token vào profile
+    res = save_oauth_token(profile_id, token_payload)
+
+    # Lấy thông tin email
+    email = res.get("email")
+    if not email and access_token:
+        try:
+            u_req = urllib.request.Request(
+                "https://www.googleapis.com/oauth2/v3/userinfo",
+                headers={"Authorization": f"Bearer {access_token}"}
+            )
+            with urllib.request.urlopen(u_req, timeout=4.0) as u_resp:
+                u_info = json.loads(u_resp.read().decode("utf-8"))
+                email = u_info.get("email")
+        except Exception:
+            pass
+
+    return True, "Token đã được lưu thành công", email or "Google Account"
+
+def clone_oauth_profile(source_id, target_id):
+    """Sao chép toàn bộ token OAuth từ một profile nguồn sang profile đích."""
+    if not source_id or not target_id or source_id == target_id:
+        return {"ok": False, "error": "ID nguồn và đích không hợp lệ"}
+
+    src_dir = os.path.join(HOME_DIR, ".gemini") if source_id == "owner_default" else os.path.join(HOME_DIR, ".agy-profiles", source_id)
+    dst_dir = os.path.join(HOME_DIR, ".gemini") if target_id == "owner_default" else os.path.join(HOME_DIR, ".agy-profiles", target_id)
+
+    src_tok = os.path.join(src_dir, "antigravity-cli", "antigravity-oauth-token")
+    if not os.path.exists(src_tok):
+        return {"ok": False, "error": f"Không tìm thấy token tại profile nguồn {source_id}"}
+
+    dst_cli = os.path.join(dst_dir, "antigravity-cli")
+    os.makedirs(dst_cli, exist_ok=True)
+    dst_tok = os.path.join(dst_cli, "antigravity-oauth-token")
+
+    try:
+        shutil.copy2(src_tok, dst_tok)
+        os.chmod(dst_tok, 0o600)
+
+        # Pre-seed jetski_state và settings
+        src_jetski = os.path.join(src_dir, "antigravity-cli", "jetski_state.pbtxt")
+        if os.path.exists(src_jetski):
+            shutil.copy2(src_jetski, os.path.join(dst_cli, "jetski_state.pbtxt"))
+        src_settings = os.path.join(src_dir, "antigravity-cli", "settings.json")
+        if os.path.exists(src_settings):
+            shutil.copy2(src_settings, os.path.join(dst_cli, "settings.json"))
+
+        # Pre-seed config/mcp_config.json và schemas
+        dst_config = os.path.join(dst_dir, "config")
+        os.makedirs(dst_config, exist_ok=True)
+        mcp_cfg_path = os.path.join(dst_config, "mcp_config.json")
+        if not os.path.exists(mcp_cfg_path):
+            with open(mcp_cfg_path, "w", encoding="utf-8") as f:
+                json.dump({
+                    "mcpServers": {
+                        "google-drive": {
+                            "command": os.path.join(HOME_DIR, ".local", "bin", "genos-gdrive-mcp")
+                        },
+                        "gen-workplace": {
+                            "command": os.path.join(HOME_DIR, ".local", "bin", "gen-workplace-mcp")
+                        }
+                    }
+                }, f, indent=2)
+
+        dst_mcp_schemas = os.path.join(dst_cli, "mcp", "gen-workplace")
+        owner_mcp_schemas = os.path.join(HOME_DIR, ".gemini", "antigravity-cli", "mcp", "gen-workplace")
+        if not os.path.exists(dst_mcp_schemas) and os.path.exists(owner_mcp_schemas):
+            try:
+                shutil.copytree(owner_mcp_schemas, dst_mcp_schemas)
+            except Exception:
+                pass
+
+        res = check_oauth_status(target_id)
+        return {"ok": True, "target": target_id, "status": res}
+    except Exception as e:
+        return {"ok": False, "error": f"Lỗi khi sao chép token: {str(e)}"}
 
 def save_oauth_token(profile_id, token_data):
     """Lưu token OAuth trực tiếp vào hồ sơ profile."""
@@ -2357,9 +2742,18 @@ def save_oauth_token(profile_id, token_data):
     elif isinstance(token_data, dict):
         payload = token_data
 
+    # Tự động trích xuất hoặc hoàn thiện cấu trúc nếu payload chỉ chứa access_token/refresh_token
+    if "token" not in payload and ("access_token" in payload or "refresh_token" in payload):
+        payload = {
+            "token": payload,
+            "auth_method": payload.get("auth_method", "consumer"),
+            "id_token": payload.get("id_token", "")
+        }
+
     with open(token_file, "w") as f:
         json.dump(payload, f, indent=2)
 
+    os.chmod(token_file, 0o600)
     return check_oauth_status(profile_id)
 
 def assign_oauth_to_role(session_id, profile_id):
@@ -2370,7 +2764,7 @@ def assign_oauth_to_role(session_id, profile_id):
         return {"status": "error", "message": f"Không tìm thấy profile {profile_id}"}
 
     account_type = profile_id
-    account_label = p["label"]
+    account_label = compute_account_label(profile_id)
     profile_dir = p["path"]
 
     update_tmux_account(session_id, account_type, account_label, profile_dir)
@@ -2638,6 +3032,34 @@ def process_orch_instruction(user_message, project_id="PRJ-GEN-WORKPLACE"):
 # SWARM ANTI-CHAOS GOVERNANCE (CƠ CHẾ BẢO ĐẢM KHÔNG RỐI LOẠN)
 # ═══════════════════════════════════════════════════════════════════════════
 
+EVIDENCE_SHA_RE = re.compile(r"^[0-9a-f]{7,40}$")
+EVIDENCE_PR_RE = re.compile(r"^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/pull/[0-9]+/?$")
+
+def verify_evidence_ref(evidence_ref):
+    """Kiểm bằng chứng nghiệm thu: commit SHA có trong repo, đường dẫn file tồn tại, hoặc URL PR GitHub. Trả (ok, verified_by, message)."""
+    ev = (evidence_ref or "").strip()
+    if not ev:
+        return False, "", "Thiếu evidence_ref (commit SHA, đường dẫn file hoặc URL PR GitHub)"
+    if EVIDENCE_PR_RE.match(ev):
+        return True, "github:pr", "URL PR GitHub hợp lệ"
+    if EVIDENCE_SHA_RE.match(ev.lower()):
+        try:
+            res = subprocess.run(["git", "-C", str(BASE_DIR), "cat-file", "-e", f"{ev}^{{commit}}"], capture_output=True, timeout=5.0)
+            if res.returncode == 0:
+                return True, "git:commit", f"Commit {ev} tồn tại trong repo"
+        except Exception:
+            pass
+        return False, "", f"Commit {ev} không tồn tại trong repo {BASE_DIR}"
+    if ev.startswith("~"):
+        candidate = os.path.expanduser(ev)
+    elif os.path.isabs(ev):
+        candidate = ev
+    else:
+        candidate = str(BASE_DIR / ev)
+    if os.path.exists(candidate):
+        return True, "file", f"File tồn tại: {candidate}"
+    return False, "", f"Bằng chứng không kiểm được: '{ev}' không phải commit SHA trong repo, file tồn tại hay URL PR GitHub (https://github.com/<owner>/<repo>/pull/<n>)"
+
 def claim_task(session_id, todo_id, project_id="PRJ-GEN-WORKPLACE"):
     """
     Khóa độc quyền nhiệm vụ (Atomic Task Mutex):
@@ -2702,15 +3124,18 @@ def claim_task(session_id, todo_id, project_id="PRJ-GEN-WORKPLACE"):
 
 def complete_task(session_id, todo_id, evidence_ref, verified_by="Lead Architect", project_id="PRJ-GEN-WORKPLACE"):
     """
-    Nghiệm thu hoàn tất có bằng chứng (Evidence-Backed Completion):
-    - Agent không thể tự ý chuyển sang 'done' nếu thiếu bằng chứng (commit hash / artifact).
-    - Cần chữ ký nghiệm thu của Role chỉ huy (Lead Architect / Orchestrator).
+    Nghiệm thu hoàn tất có bằng chứng kiểm được (Evidence-Backed Completion, #4):
+    - evidence_ref phải là commit SHA có trong repo, file tồn tại hoặc URL PR GitHub (verify_evidence_ref).
+    - Không đạt → trả {"error": ...} và KHÔNG đổi trạng thái.
+    - verified_by được tính: 'git:commit' / 'file' / 'github:pr' (tham số verified_by chỉ giữ để tương thích API).
     - Hỗ trợ cập nhật cả bảng roadmap 'todos' và bảng phiên 'gen_session_todos'.
     - Tự động nhả khóa session để sẵn sàng nhận nhiệm vụ tiếp theo.
     """
     project_id = normalize_project_id(project_id)
-    if not evidence_ref or not evidence_ref.strip():
-        return {"error": "Cannot complete task without verified evidence_ref (commit hash, artifact path or test log)"}
+    ok, verified_by, msg = verify_evidence_ref(evidence_ref)
+    if not ok:
+        return {"error": msg, "task_id": todo_id}
+    evidence_ref = evidence_ref.strip()
 
     with get_connection() as conn:
         cursor = conn.cursor()
@@ -2725,7 +3150,9 @@ def complete_task(session_id, todo_id, evidence_ref, verified_by="Lead Architect
             UPDATE gen_session_todos
             SET status = 'done', evidence_ref = ?, updated_at = CURRENT_TIMESTAMP
             WHERE id = ? AND project_id = ?
-            """, (evidence_ref.strip(), todo_id, project_id))
+            """, (evidence_ref, todo_id, project_id))
+            if cursor.rowcount == 0:
+                return {"error": "Task not found", "task_id": todo_id}
 
         cursor.execute("""
         UPDATE tmux_sessions
@@ -2734,7 +3161,7 @@ def complete_task(session_id, todo_id, evidence_ref, verified_by="Lead Architect
         """, (session_id,))
 
         conn.commit()
-        return {"status": "completed", "task_id": todo_id, "evidence_ref": evidence_ref, "verified_by": verified_by}
+        return {"status": "completed", "task_id": todo_id, "evidence_ref": evidence_ref, "verified_by": verified_by, "verify_message": msg}
 
 def reclaim_stalled_tasks(timeout_seconds=300, project_id="PRJ-GEN-WORKPLACE"):
     """
@@ -2819,8 +3246,106 @@ def get_warroom_messages(channel_id="war_room", project_id="PRJ-GEN-WORKPLACE", 
         })
     return results
 
-def post_warroom_message(project_id="PRJ-GEN-WORKPLACE", channel_id="war_room", author="Ryan (Owner)", message="", tag="Directive"):
-    """Lưu tin nhắn người gửi và tự động sinh phản hồi AI bằng tiếng Việt theo phân vai."""
+WARROOM_ROLE_SESSIONS = {
+    "backend": "gw-backend-agy",
+    "frontend": "gw-frontend-agy",
+    "devops": "gw-devops-agy",
+    "qa": "gw-qa-agy",
+    "security": "gw-security-agy",
+    "lead": "gw-lead-agy",
+}
+WARROOM_MENTION_RE = re.compile(r"@(backend|frontend|devops|qa|security|lead)\b", re.IGNORECASE)
+WARROOM_DISPATCH_TIMEOUT_SEC = 15 * 60
+
+def _worktree_root():
+    """Thư mục chứa worktree riêng của từng vai (GW_WORKTREE_ROOT, mặc định <BASE_DIR>/../gw-worktrees)."""
+    return os.environ.get("GW_WORKTREE_ROOT") or str(BASE_DIR.parent / "gw-worktrees")
+
+def ensure_role_worktree(session_id):
+    """Đảm bảo git worktree riêng của vai tại <root>/<session_id> trên nhánh wt/<session_id>; lỗi git → trả về thư mục repo."""
+    repo = os.environ.get("GW_DISPATCH_REPO") or str(BASE_DIR)
+    wt_dir = os.path.join(_worktree_root(), session_id)
+    if os.path.exists(os.path.join(wt_dir, ".git")):
+        return wt_dir
+    branch = f"wt/{session_id}"
+    try:
+        os.makedirs(_worktree_root(), exist_ok=True)
+        has_branch = subprocess.run(["git", "-C", repo, "rev-parse", "--verify", "--quiet", f"refs/heads/{branch}"],
+                                    capture_output=True, timeout=10).returncode == 0
+        args = ["git", "-C", repo, "worktree", "add"] + ([wt_dir, branch] if has_branch else ["-b", branch, wt_dir])
+        res = subprocess.run(args, capture_output=True, text=True, timeout=60)
+        if res.returncode == 0:
+            return wt_dir
+        print(f"[dispatch] git worktree add thất bại cho {session_id}: {(res.stderr or '').strip()[:200]}")
+    except Exception as e:
+        print(f"[dispatch] Không tạo được worktree cho {session_id}: {e}")
+    return repo
+
+def dispatch_warroom_to_agent(project_id, channel_id, session_id, message, timeout=WARROOM_DISPATCH_TIMEOUT_SEC):
+    """Chạy agy thật (--mode plan --sandbox -p <tin>) với profile của worker session_id trong worktree riêng; ghi trả lời thật vào chat_messages và dispatch_log (#3)."""
+    project_id = normalize_project_id(project_id)
+    account_type, profile_dir = "owner_default", ""
+    try:
+        with get_connection() as conn:
+            row = conn.execute("SELECT account_type, profile_dir FROM tmux_sessions WHERE id = ?", (session_id,)).fetchone()
+            if row:
+                account_type = row["account_type"] or "owner_default"
+                profile_dir = row["profile_dir"] or ""
+    except Exception:
+        pass
+    p_dir = os.path.expanduser(profile_dir) if profile_dir else _profile_dir(account_type)
+    cwd = ensure_role_worktree(session_id)
+    cmd = [_agy_bin(), f"--gemini_dir={p_dir}", "--mode", "plan", "--sandbox", "-p", message]
+    started_at = time.strftime("%Y-%m-%d %H:%M:%S")
+    t0 = time.time()
+    exit_code = -1
+    output = ""
+    try:
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, cwd=cwd, env=_agy_env(p_dir))
+        exit_code = res.returncode
+        output = ((res.stdout or "") + ("\n" + res.stderr if res.stderr else "")).strip()
+        status, reset_at = record_quota_probe_from_result(account_type, "default", res)
+        if status == "rate_limited":
+            body = f"Lỗi 429 / hết quota khi gọi agy (hồi {reset_at or 'chưa rõ'}):\n{output[-1500:]}"
+        elif exit_code != 0:
+            body = f"agy thoát lỗi:\n{output[-3000:] or '(không có output)'}"
+        else:
+            body = output[:4000] if output else "(agy không trả output)"
+    except subprocess.TimeoutExpired:
+        output = body = f"Lỗi: agy không phản hồi sau {timeout // 60} phút, đã hủy."
+        record_quota_probe(account_type, "default", "timeout", "", output)
+    except Exception as e:
+        output = body = f"Lỗi khi chạy agy ({_agy_bin()}): {e}"
+    body = f"{body}\nexit={exit_code}"
+    finished_at = time.strftime("%Y-%m-%d %H:%M:%S")
+
+    report_path = ""
+    try:
+        report_dir = os.path.join(HOME_DIR, "gw-reports")
+        os.makedirs(report_dir, exist_ok=True)
+        report_path = os.path.join(report_dir, f"warroom-{session_id}-{time.strftime('%Y%m%d-%H%M%S')}.md")
+        with open(report_path, "w", encoding="utf-8") as f:
+            f.write(f"# {session_id} · {started_at} → {finished_at}\n\n")
+            f.write(f"- Kênh: {channel_id}\n- cwd: {cwd}\n- Lệnh: {' '.join(cmd)}\n- exit: {exit_code}\n\n## Tin nhắn\n\n{message}\n\n## Output\n\n{output}\n")
+    except Exception as e:
+        print(f"[dispatch] Không ghi được báo cáo: {e}")
+        report_path = ""
+
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+        INSERT INTO chat_messages (project_id, runtime_id, author, created_time, tag, body, react_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (project_id, channel_id, session_id, time.strftime("%H:%M:%S"), "Report", body, json.dumps(["🤖 agy thật"], ensure_ascii=False)))
+        cursor.execute("""
+        INSERT INTO dispatch_log (session_id, command, exit_code, report_path, started_at, finished_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """, (session_id, " ".join(cmd), exit_code, report_path, started_at, finished_at))
+        conn.commit()
+    return {"session_id": session_id, "exit_code": exit_code, "report_path": report_path, "cwd": cwd, "elapsed_sec": round(time.time() - t0, 1)}
+
+def post_warroom_message(project_id="PRJ-GEN-WORKPLACE", channel_id="war_room", author="Ryan (Owner)", message="", tag="Directive", wait=False):
+    """Lưu tin nhắn; tin có @backend|@frontend|@devops|@qa|@security|@lead → chạy agy thật của vai đó ở thread nền (wait=True chạy đồng bộ, dùng cho test). Không có @vai → chỉ lưu (#3)."""
     project_id = normalize_project_id(project_id)
     if not message or not message.strip():
         return {"error": "Message is empty"}
@@ -2837,80 +3362,24 @@ def post_warroom_message(project_id="PRJ-GEN-WORKPLACE", channel_id="war_room", 
         user_msg_id = cursor.lastrowid
         conn.commit()
 
-    # Phân tích thông minh sinh câu trả lời AI bằng tiếng Việt
-    lower = clean_msg.lower()
-    reply_author = "Genesis Orchestrator"
-    reply_tag = "Reply"
-    reply_body = ""
-
-    # 1. Kênh Chỉ Huy Toàn Cục (War Room)
-    if channel_id == "war_room":
-        if "@backend" in lower or "backend" in lower or "csdl" in lower or "database" in lower or "api" in lower:
-            reply_author = "Backend Specialist"
-            reply_tag = "Report"
-            reply_body = f"Đã rõ chỉ thị của {author}! Tôi (Backend Specialist) đang kiểm soát SQLite WAL và các endpoint API. Nhiệm vụ hiện tại đang bám sát Whitelist <code>backend/**, data/**</code>. Toàn bộ thay đổi đều được ghi nhận vào nhật ký commit."
-        elif "@frontend" in lower or "frontend" in lower or "giao diện" in lower or "ui" in lower or "deck" in lower:
-            reply_author = "Frontend Specialist"
-            reply_tag = "Report"
-            reply_body = f"Đã rõ chỉ thị của {author}! Tôi (Frontend Specialist) đang tối ưu hóa Bàn Làm Việc Live Workbench và đồng bộ trạng thái realtime. Cam kết không vi phạm ranh giới và đảm bảo 0 lỗi cú pháp trình duyệt."
-        elif "@devops" in lower or "devops" in lower or "docker" in lower or "install" in lower:
-            reply_author = "DevOps & Packaging"
-            reply_tag = "Report"
-            reply_body = f"Đã rõ chỉ thị của {author}! Tôi (DevOps Engineer) đang giám sát container <code>gen-workplace-app</code>, kiểm tra volume mount cờ <code>:z</code> và kịch bản TUI installer. Hệ thống sẵn sàng cho chu kỳ ngủ đông khi xong việc."
-        elif "@qa" in lower or "qa" in lower or "test" in lower or "kiểm thử" in lower:
-            reply_author = "QA Tester"
-            reply_tag = "Report"
-            reply_body = f"Đã rõ chỉ thị của {author}! Tôi (QA Tester) đang chuẩn bị test suite tự động cho chu kỳ Auto-Wake 68ms và kiểm tra API regression test. Mọi lỗi phát sinh sẽ được báo cáo ngay lập tức kèm log kiểm thử."
-        elif "@security" in lower or "security" in lower or "bảo mật" in lower or "token" in lower or "vault" in lower:
-            reply_author = "Security Auditor"
-            reply_tag = "Report"
-            reply_body = f"Đã rõ chỉ thị của {author}! Tôi (Security Auditor) đang rà soát an ninh cho Token Vault OAuth 2.0 PKCE và phân quyền file. Đảm bảo zero-secret-leak trên toàn bộ repository."
-        elif "@lead" in lower or "lead" in lower or "tiến độ" in lower or "nghiệm thu" in lower:
-            reply_author = "Lead Architect"
-            reply_tag = "Directive"
-            reply_body = f"Báo cáo {author}: Tôi (Lead Architect) đang giám sát chặt chẽ chuỗi Todo DAG và đối soát bằng chứng với SSOT gốc. Toàn thể 6 chuyên gia đang vận hành đúng tiến độ và không có xung đột ranh giới."
+    dispatched = []
+    for role in dict.fromkeys(m.lower() for m in WARROOM_MENTION_RE.findall(clean_msg)):
+        sid = WARROOM_ROLE_SESSIONS[role]
+        if wait:
+            dispatch_warroom_to_agent(project_id, channel_id, sid, clean_msg)
         else:
-            reply_author = "Genesis Orchestrator"
-            reply_tag = "Directive"
-            reply_body = f"Chỉ huy tối cao ghi nhận mệnh lệnh: <em>\"{clean_msg}\"</em>. Tôi (Gen) đang truyền đạt trực tiếp xuống Ban Chỉ Huy Kỹ Thuật (@Lead) và các chuyên gia liên quan để lập tức chấp hành theo chính sách Autonomous Execution."
-
-    # 2. Kênh Giao Ban Kỹ Thuật (Engineering Standup)
-    elif channel_id == "standup":
-        if "lead" in author.lower():
-            reply_author = "Backend Specialist"
-            reply_tag = "Report"
-            reply_body = f"Đã tiếp nhận yêu cầu từ Leader (@Lead)! Backend Squad đang khẩn trương hoàn thành module và chuẩn bị nộp commit hash qua <code>/api/task/complete</code> để nghiệm thu."
-        else:
-            reply_author = "Lead Architect"
-            reply_tag = "Directive"
-            reply_body = f"Lead Architect đã ghi nhận báo cáo của {author}. Yêu cầu tiếp tục tuân thủ ranh giới thư mục Whitelist, hoàn thành checklist 4 bước và nộp bằng chứng commit hash trước khi yêu cầu nghiệm thu."
-
-    # 3. Kênh Hợp Đồng I/O & Bàn Giao (Inter-Agent Handoffs)
-    elif channel_id == "handoff":
-        if "backend" in author.lower():
-            reply_author = "Frontend Specialist"
-            reply_tag = "IO"
-            reply_body = f"Xác nhận đã nhận Hợp đồng I/O từ @Backend. Tôi đang thực hiện data-binding vào giao diện người dùng và sẽ phản hồi khi hoàn tất render."
-        else:
-            reply_author = "QA Tester"
-            reply_tag = "IO"
-            reply_body = f"Xác nhận đã nhận artifact bàn giao từ {author}. Bộ phận QA đang bắt đầu chạy test matrix và sẽ gửi chứng thư nghiệm thu cho Leader."
-
-    # Ghi nhận phản hồi AI vào SQLite
-    reply_time = time.strftime("%H:%M:%S")
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("""
-        INSERT INTO chat_messages (project_id, runtime_id, author, created_time, tag, body, react_json)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (project_id, channel_id, reply_author, reply_time, reply_tag, reply_body, json.dumps(["✅ đã ghi nhận"], ensure_ascii=False)))
-        conn.commit()
+            threading.Thread(target=dispatch_warroom_to_agent, args=(project_id, channel_id, sid, clean_msg),
+                             daemon=True, name=f"warroom-dispatch-{sid}").start()
+        dispatched.append(sid)
 
     return {
         "status": "sent",
         "channel_id": channel_id,
         "user_message": {"id": user_msg_id, "author": author, "body": clean_msg, "created_time": now_time, "tag": tag},
-        "agent_reply": {"author": reply_author, "body": reply_body, "created_time": reply_time, "tag": reply_tag}
+        "agent_reply": None,
+        "dispatched": dispatched,
+        "note": (f"Đã chuyển tới {', '.join(dispatched)}; trả lời thật của agy sẽ xuất hiện trong kênh khi chạy xong (tối đa 15 phút)."
+                 if dispatched else "Không có @vai nên chỉ lưu tin, không trả lời.")
     }
 
 def generate_structure_from_ssot(content, project_id="PRJ-GEN-WORKPLACE"):
@@ -3910,7 +4379,7 @@ def call_agy_cli_turn(conv_id, user_message, model=None, account="owner_default"
     model_slug = resolve_agy_model_slug(model)
 
     cmd = [
-        "agy",
+        _agy_bin(),
         "--output-format", "json",
         "--print", prompt_payload,
         "--dangerously-skip-permissions",
@@ -3920,8 +4389,8 @@ def call_agy_cli_turn(conv_id, user_message, model=None, account="owner_default"
     if agy_conv_id:
         cmd.extend(["--conversation", agy_conv_id])
 
-    # Xác định thư mục làm việc (ưu tiên thư mục cô lập của phiên)
-    work_dir = "/workspace"
+    # Xác định thư mục làm việc (ưu tiên thư mục cô lập của phiên; máy không có /workspace → BASE_DIR)
+    work_dir = "/workspace" if os.path.isdir("/workspace") else str(BASE_DIR)
     sess_dir = Path("/workspace/sessions") / conv_id
     if not sess_dir.exists():
         sess_dir = BASE_DIR / "workspace" / "sessions" / conv_id
@@ -3931,6 +4400,7 @@ def call_agy_cli_turn(conv_id, user_message, model=None, account="owner_default"
 
     try:
         res = subprocess.run(cmd, capture_output=True, text=True, env=env, cwd=work_dir, timeout=180)
+        record_quota_probe_from_result(account, model_slug, res)
         if res.returncode == 0 and res.stdout.strip():
             try:
                 data = json.loads(res.stdout)
@@ -3984,6 +4454,7 @@ def call_agy_cli_turn(conv_id, user_message, model=None, account="owner_default"
                     fresh_cmd.append(token)
 
                 res_retry = subprocess.run(fresh_cmd, capture_output=True, text=True, env=env, cwd=work_dir, timeout=180)
+                record_quota_probe_from_result(account, model_slug, res_retry)
                 if res_retry.returncode == 0 and res_retry.stdout.strip():
                     try:
                         data = json.loads(res_retry.stdout)
@@ -4007,6 +4478,7 @@ def call_agy_cli_turn(conv_id, user_message, model=None, account="owner_default"
 
     except subprocess.TimeoutExpired:
         print(f"[AGY Runner] Timeout (180s) for conv {conv_id}")
+        record_quota_probe(account, model_slug, "timeout", "", "agy không phản hồi sau 180s")
         timeout_msg = (
             f"⏱️ **Thông báo Quá giờ:** Lệnh agy CLI (`{model_slug}`) đã vượt quá thời hạn chờ tối đa 180s do tác vụ phức tạp.\n\n"
             f"👉 **Khuyến nghị:** Sếp có thể đổi sang **Gemini 3.8 Flash (High Speed)** để nhận phản hồi siêu tốc dưới 15 giây."
@@ -4422,16 +4894,17 @@ def seed_session_default_todos(conv_id):
 
         if conv_id == "conv-gen-builder":
             initial_todos = [
-                ("TSK-01", conv_id, "PRJ-GEN-WORKPLACE", "Thiết lập hạ tầng Swarm & Cách ly Workspace phiên", "Kiểm tra container gen-workplace-app và quyền đọc ghi tại thư mục /workspace/sessions/conv-gen-builder.", "done", "critical", "Builder Agent", json.dumps([
+                # Chưa có bằng chứng kiểm được (commit/file/PR) → 'review', evidence rỗng (#4)
+                ("TSK-01", conv_id, "PRJ-GEN-WORKPLACE", "Thiết lập hạ tầng Swarm & Cách ly Workspace phiên", "Kiểm tra container gen-workplace-app và quyền đọc ghi tại thư mục /workspace/sessions/conv-gen-builder.", "review", "critical", "Builder Agent", json.dumps([
                     {"id": "chk-1", "text": "Xác nhận container gen-workplace-app chạy trên port 8888 với cờ SELinux :z", "done": True},
                     {"id": "chk-2", "text": "Khởi tạo thư mục /workspace/sessions/conv-gen-builder cô lập", "done": True},
                     {"id": "chk-3", "text": "Khóa đặc tả SSOT_ORIGINAL_SPEC.md làm kim chỉ nam phát triển", "done": True}
-                ], ensure_ascii=False), "NOTE-BUILDER-01 · git commit 52c7861", 1, "owner-ryan"),
-                ("TSK-02", conv_id, "PRJ-GEN-WORKPLACE", "Khóa quyền sở hữu độc quyền cho Owner Ryan (owner_profiles)", "Khởi tạo bảng owner_profiles và backfill owner_id='owner-ryan' cho toàn bộ CSDL.", "done", "critical", "Builder Agent", json.dumps([
+                ], ensure_ascii=False), "", 1, "owner-ryan"),
+                ("TSK-02", conv_id, "PRJ-GEN-WORKPLACE", "Khóa quyền sở hữu độc quyền cho Owner Ryan (owner_profiles)", "Khởi tạo bảng owner_profiles và backfill owner_id='owner-ryan' cho toàn bộ CSDL.", "review", "critical", "Builder Agent", json.dumps([
                     {"id": "chk-1", "text": "Khởi tạo bảng owner_profiles (id='owner-ryan') trong SQLite WAL", "done": True},
                     {"id": "chk-2", "text": "Gán cờ owner_id='owner-ryan' trên 100% các bảng dữ liệu", "done": True},
                     {"id": "chk-3", "text": "Tích hợp huy hiệu Sovereign Profile và Modal quản trị trên Topbar", "done": True}
-                ], ensure_ascii=False), "NOTE-BUILDER-05 · git commit f211ce5", 2, "owner-ryan"),
+                ], ensure_ascii=False), "", 2, "owner-ryan"),
                 ("TSK-03", conv_id, "PRJ-GEN-WORKPLACE", "Xây dựng phân hệ Kanban & Checklist chuyên dụng theo phiên", "Tạo tab Kanban 4 cột trong Cột 2, ràng buộc Agent bắt buộc đối soát checklist khi làm việc.", "in_progress", "high", "Builder Agent", json.dumps([
                     {"id": "chk-1", "text": "Thiết kế bảng gen_session_todos với trường checklist_json và status", "done": True},
                     {"id": "chk-2", "text": "Triển khai REST API quản lý todos và toggle checklist item", "done": True},

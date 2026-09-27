@@ -70,3 +70,50 @@ google-chrome --headless=new --virtual-time-budget=3000 --dump-dom http://localh
    - Format: `<type>(<scope>): <mô tả ngắn bằng tiếng Anh>`
    - Ví dụ: `fix(chat): eliminate robotic canned replies with live executive persona`
    - Nhánh phát triển hiện hành: `feat/mission-control-ui`.
+
+---
+
+## 3. VẬN HÀNH BACKEND SAU CÁC SỬA ĐỔI (OAuth · #3 · #4 · #5 · #6)
+
+### 3.1. Biến môi trường mới
+| Biến | Mặc định | Ý nghĩa |
+|---|---|---|
+| `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` | (rỗng) | Bắt buộc để đăng nhập Google. Không còn client ID hard-code; thiếu → API trả lỗi "Chưa cấu hình GOOGLE_OAUTH_CLIENT_ID trong .env". |
+| `GW_AGY_BIN` | `agy` | Đường dẫn CLI agy. Test trỏ tới script giả để chạy không cần agy thật. |
+| `GW_RECLAIM_INTERVAL_SEC` | `300` | Chu kỳ thread nền `[reclaim]` thu hồi task `in_progress` treo (`GW_RECLAIM_TIMEOUT_SEC` = ngưỡng treo, mặc định bằng chu kỳ). |
+| `GW_WORKTREE_ROOT` | `<repo>/../gw-worktrees` | Nơi tạo worktree riêng `wt/<session_id>` cho từng vai khi chatroom gọi agy. |
+| `GW_DISPATCH_REPO` | thư mục repo | Repo nguồn để `git worktree add` (test dùng repo git tạm). |
+
+### 3.2. OAuth callback
+- Server callback cổng 8085 chỉ bind `127.0.0.1`; route dự phòng `/oauth2callback` trên cổng chính dùng chung `handle_oauth_callback()`.
+- Tham số `state` (= profile đích) phải khớp `^(owner_default|profile[0-9]{1,2})$`, sai → HTTP 400, không gọi Google.
+- `mcp_config.json` seed cho profile mới trỏ `~/.local/bin/genos-gdrive-mcp` và `~/.local/bin/gen-workplace-mcp` (theo `$HOME`).
+
+### 3.3. Nhãn tài khoản (#5)
+`account_label` trong `GET /api/tmux/sessions` là giá trị TÍNH: `profileN (email)` hoặc `profileN (chưa đăng nhập)`; `owner_default` → `Mặc định (...)`. Không còn email giả `owner@genesis.local`. MCP `switch_google_account` chỉ nhận `account_id`.
+
+### 3.4. Bằng chứng nghiệm thu (#4)
+`POST /api/task/complete` và MCP `complete_task` chỉ nhận `evidence_ref` kiểm được:
+- commit SHA 7–40 hex có trong repo → `verified_by = git:commit`;
+- file tồn tại (tuyệt đối, tương đối repo, hoặc `~/gw-reports/...`) → `file`;
+- `https://github.com/<owner>/<repo>/pull/<n>` → `github:pr`.
+Không đạt → `{"error": ...}` và trạng thái giữ nguyên. Lúc `init_db`, task `done` có evidence không kiểm được được đặt lại về `review`.
+
+### 3.5. Quota từ kết quả gọi thật (#6)
+- Mỗi lần runner agy chạy (chat, probe, dispatch) ghi 1 dòng `quota_probe(profile_id, model, status, reset_at, checked_at, raw)`.
+- `get_quota_telemetry` ưu tiên dòng < 6 giờ: `rate_limited` → `status_label = "429 · hồi <reset>"`; chưa có dòng nào → `status = unknown`, `percent = null`.
+- Cập nhật thủ công: `POST /api/quota/probe {"profile_id": "owner_default"}` hoặc MCP `probe_quota` (chạy `agy --gemini_dir=<dir> --mode plan -p 'ping'`, timeout 60s).
+
+### 3.6. Chatroom gọi agy thật (#3)
+Tin trong War Room có `@backend|@frontend|@devops|@qa|@security|@lead` → thread nền chạy
+`agy --gemini_dir=<profile của worker> --mode plan --sandbox -p "<tin>"` (timeout 15 phút) trong worktree riêng của vai; trả lời thật
+(tác giả = `gw-<vai>-agy`, body = output cắt 4000 ký tự + `exit=<code>`) được ghi vào `chat_messages`, kèm `dispatch_log` và báo cáo `~/gw-reports/warroom-<sid>-<ts>.md`. Tin không có `@vai` chỉ được lưu.
+
+### 3.7. Kiểm thử không cần server / agy / tmux
+```bash
+python3 -m py_compile backend/*.py
+python3 scripts/test_directive_guard.py
+python3 scripts/test_task_evidence.py      # #4
+python3 scripts/test_quota_probe.py        # #6
+python3 scripts/test_warroom_dispatch.py   # #3
+```

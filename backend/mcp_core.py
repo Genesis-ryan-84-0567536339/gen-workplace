@@ -55,6 +55,20 @@ TOOLS = [
         }
     },
     {
+        "name": "probe_quota",
+        "description": "Chạy 1 lệnh agy tối thiểu (--mode plan -p 'ping') với profile chỉ định để cập nhật quota từ kết quả gọi THẬT (ok / 429 rate_limited + giờ hồi). Kết quả được ghi vào bảng quota_probe và dùng cho get_live_quota.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "profile_id": {
+                    "type": "string",
+                    "description": "ID tài khoản / profile OAuth (mặc định 'owner_default').",
+                    "default": "owner_default"
+                }
+            }
+        }
+    },
+    {
         "name": "list_google_accounts",
         "description": "Liệt kê toàn bộ các tài khoản Google / OAuth profiles có trong hệ thống và trạng thái đăng nhập/hiệu lực của token.",
         "inputSchema": {
@@ -75,12 +89,7 @@ TOOLS = [
                 },
                 "account_id": {
                     "type": "string",
-                    "description": "ID profile tài khoản (vd: 'owner_default', 'profile1')."
-                },
-                "account_label": {
-                    "type": "string",
-                    "description": "Tên hiển thị nhãn tài khoản (vd: 'Ryan (Default)', 'Workspace Backup').",
-                    "default": ""
+                    "description": "ID profile tài khoản (vd: 'owner_default', 'profile1'). Nhãn hiển thị được tính tự động từ email thật của profile."
                 }
             },
             "required": ["account_id"]
@@ -183,7 +192,7 @@ TOOLS = [
     },
     {
         "name": "post_warroom_message",
-        "description": "Đăng tin nhắn hoặc chỉ thị vào phòng họp chung War Room Swarm All-Hands để toàn bộ các agent phối hợp.",
+        "description": "Đăng tin nhắn / chỉ thị vào phòng họp chung War Room. Tin có @backend, @frontend, @devops, @qa, @security hoặc @lead sẽ được chuyển cho agy thật của vai đó chạy nền (--mode plan --sandbox) và trả lời thật xuất hiện trong kênh; không có @vai thì chỉ lưu.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -308,7 +317,7 @@ TOOLS = [
     },
     {
         "name": "complete_task",
-        "description": "Nghiệm thu hoàn tất nhiệm vụ với bằng chứng bắt buộc (evidence_ref như file log, commit hash, file path).",
+        "description": "Nghiệm thu hoàn tất nhiệm vụ với bằng chứng KIỂM ĐƯỢC: commit SHA có trong repo, đường dẫn file tồn tại, hoặc URL PR GitHub. Bằng chứng không kiểm được → lỗi, trạng thái không đổi.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -322,12 +331,12 @@ TOOLS = [
                 },
                 "evidence_ref": {
                     "type": "string",
-                    "description": "Bằng chứng nghiệm thu (đường dẫn file kết quả, commit hash, hoặc log tóm tắt)."
+                    "description": "Commit SHA (7-40 hex, có trong repo), đường dẫn file tồn tại (tuyệt đối / tương đối repo / ~/gw-reports/...), hoặc https://github.com/<owner>/<repo>/pull/<n>."
                 },
                 "verified_by": {
                     "type": "string",
-                    "description": "Người hoặc vai trò thẩm định nghiệm thu.",
-                    "default": "Lead Architect"
+                    "description": "Không còn dùng: hệ thống tự đặt 'git:commit' / 'file' / 'github:pr' theo loại bằng chứng.",
+                    "default": ""
                 }
             },
             "required": ["session_id", "task_id", "evidence_ref"]
@@ -678,11 +687,17 @@ def execute_tool(name: str, args: dict) -> dict:
                 g_q, a_q = db.get_quota_telemetry(profile_id)
                 data = {
                     "ok": True,
-                    "source": "log_telemetry_fallback",
+                    "source": "agy_probe_or_unknown",
                     "gemini": g_q,
                     "claude": a_q
                 }
             return {"content": [{"type": "text", "text": json.dumps(data, ensure_ascii=False, indent=2)}], "isError": False}
+
+        # 1b. probe_quota
+        if name == "probe_quota":
+            profile_id = args.get("profile_id", "owner_default")
+            res = db.probe_quota(profile_id)
+            return {"content": [{"type": "text", "text": json.dumps(res, ensure_ascii=False, indent=2)}], "isError": False}
 
         # 2. list_google_accounts
         if name == "list_google_accounts":
@@ -693,8 +708,7 @@ def execute_tool(name: str, args: dict) -> dict:
         if name == "switch_google_account":
             account_id = args.get("account_id")
             session_id = args.get("session_id", "gw-lead-agy")
-            account_label = args.get("account_label") or ("Mặc định (Owner Gmail)" if account_id == "owner_default" else f"Tài khoản {account_id}")
-            db.update_tmux_account(session_id, account_id, account_label)
+            account_label = db.update_tmux_account(session_id, account_id)
             db.append_tmux_output(session_id, f"auth switch --account='{account_label}'", f"Đã chuyển cấu hình phiên sang: {account_label}")
             return {"content": [{"type": "text", "text": json.dumps({"status": "account_updated", "session_id": session_id, "account_label": account_label}, ensure_ascii=False, indent=2)}], "isError": False}
 
@@ -816,8 +830,7 @@ def execute_tool(name: str, args: dict) -> dict:
             session_id = args.get("session_id")
             task_id = args.get("task_id")
             evidence = args.get("evidence_ref")
-            verified_by = args.get("verified_by", "Lead Architect")
-            res = db.complete_task(session_id, task_id, evidence, verified_by, "PRJ-GEN-WORKPLACE")
+            res = db.complete_task(session_id, task_id, evidence, "", "PRJ-GEN-WORKPLACE")
             return {"content": [{"type": "text", "text": json.dumps(res, ensure_ascii=False, indent=2)}], "isError": "error" in res}
 
         # 15. update_task_checklist
