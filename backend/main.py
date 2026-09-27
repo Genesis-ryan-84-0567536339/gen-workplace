@@ -796,7 +796,7 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             self._send_json(200, res)
             return
 
-        # 17. Gửi tin nhắn vào War Room / Phòng Giao Ban Swarm (tự động phản hồi AI theo vai trò)
+        # 17. Gửi tin nhắn vào War Room / Phòng Giao Ban Swarm (@vai → agy thật chạy nền, xem db.post_warroom_message)
         if path == "/api/warroom/send":
             channel_id = data.get("channel_id", "war_room")
             prj_id = data.get("project_id", "PRJ-GEN-WORKPLACE")

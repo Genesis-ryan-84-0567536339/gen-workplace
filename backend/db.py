@@ -16,6 +16,7 @@ import subprocess
 import hashlib
 import secrets
 import shutil
+import threading
 from contextlib import contextmanager
 from pathlib import Path
 from datetime import datetime, timedelta
@@ -3245,8 +3246,106 @@ def get_warroom_messages(channel_id="war_room", project_id="PRJ-GEN-WORKPLACE", 
         })
     return results
 
-def post_warroom_message(project_id="PRJ-GEN-WORKPLACE", channel_id="war_room", author="Ryan (Owner)", message="", tag="Directive"):
-    """Lưu tin nhắn người gửi và tự động sinh phản hồi AI bằng tiếng Việt theo phân vai."""
+WARROOM_ROLE_SESSIONS = {
+    "backend": "gw-backend-agy",
+    "frontend": "gw-frontend-agy",
+    "devops": "gw-devops-agy",
+    "qa": "gw-qa-agy",
+    "security": "gw-security-agy",
+    "lead": "gw-lead-agy",
+}
+WARROOM_MENTION_RE = re.compile(r"@(backend|frontend|devops|qa|security|lead)\b", re.IGNORECASE)
+WARROOM_DISPATCH_TIMEOUT_SEC = 15 * 60
+
+def _worktree_root():
+    """Thư mục chứa worktree riêng của từng vai (GW_WORKTREE_ROOT, mặc định <BASE_DIR>/../gw-worktrees)."""
+    return os.environ.get("GW_WORKTREE_ROOT") or str(BASE_DIR.parent / "gw-worktrees")
+
+def ensure_role_worktree(session_id):
+    """Đảm bảo git worktree riêng của vai tại <root>/<session_id> trên nhánh wt/<session_id>; lỗi git → trả về thư mục repo."""
+    repo = os.environ.get("GW_DISPATCH_REPO") or str(BASE_DIR)
+    wt_dir = os.path.join(_worktree_root(), session_id)
+    if os.path.exists(os.path.join(wt_dir, ".git")):
+        return wt_dir
+    branch = f"wt/{session_id}"
+    try:
+        os.makedirs(_worktree_root(), exist_ok=True)
+        has_branch = subprocess.run(["git", "-C", repo, "rev-parse", "--verify", "--quiet", f"refs/heads/{branch}"],
+                                    capture_output=True, timeout=10).returncode == 0
+        args = ["git", "-C", repo, "worktree", "add"] + ([wt_dir, branch] if has_branch else ["-b", branch, wt_dir])
+        res = subprocess.run(args, capture_output=True, text=True, timeout=60)
+        if res.returncode == 0:
+            return wt_dir
+        print(f"[dispatch] git worktree add thất bại cho {session_id}: {(res.stderr or '').strip()[:200]}")
+    except Exception as e:
+        print(f"[dispatch] Không tạo được worktree cho {session_id}: {e}")
+    return repo
+
+def dispatch_warroom_to_agent(project_id, channel_id, session_id, message, timeout=WARROOM_DISPATCH_TIMEOUT_SEC):
+    """Chạy agy thật (--mode plan --sandbox -p <tin>) với profile của worker session_id trong worktree riêng; ghi trả lời thật vào chat_messages và dispatch_log (#3)."""
+    project_id = normalize_project_id(project_id)
+    account_type, profile_dir = "owner_default", ""
+    try:
+        with get_connection() as conn:
+            row = conn.execute("SELECT account_type, profile_dir FROM tmux_sessions WHERE id = ?", (session_id,)).fetchone()
+            if row:
+                account_type = row["account_type"] or "owner_default"
+                profile_dir = row["profile_dir"] or ""
+    except Exception:
+        pass
+    p_dir = os.path.expanduser(profile_dir) if profile_dir else _profile_dir(account_type)
+    cwd = ensure_role_worktree(session_id)
+    cmd = [_agy_bin(), f"--gemini_dir={p_dir}", "--mode", "plan", "--sandbox", "-p", message]
+    started_at = time.strftime("%Y-%m-%d %H:%M:%S")
+    t0 = time.time()
+    exit_code = -1
+    output = ""
+    try:
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, cwd=cwd, env=_agy_env(p_dir))
+        exit_code = res.returncode
+        output = ((res.stdout or "") + ("\n" + res.stderr if res.stderr else "")).strip()
+        status, reset_at = record_quota_probe_from_result(account_type, "default", res)
+        if status == "rate_limited":
+            body = f"Lỗi 429 / hết quota khi gọi agy (hồi {reset_at or 'chưa rõ'}):\n{output[-1500:]}"
+        elif exit_code != 0:
+            body = f"agy thoát lỗi:\n{output[-3000:] or '(không có output)'}"
+        else:
+            body = output[:4000] if output else "(agy không trả output)"
+    except subprocess.TimeoutExpired:
+        output = body = f"Lỗi: agy không phản hồi sau {timeout // 60} phút, đã hủy."
+        record_quota_probe(account_type, "default", "timeout", "", output)
+    except Exception as e:
+        output = body = f"Lỗi khi chạy agy ({_agy_bin()}): {e}"
+    body = f"{body}\nexit={exit_code}"
+    finished_at = time.strftime("%Y-%m-%d %H:%M:%S")
+
+    report_path = ""
+    try:
+        report_dir = os.path.join(HOME_DIR, "gw-reports")
+        os.makedirs(report_dir, exist_ok=True)
+        report_path = os.path.join(report_dir, f"warroom-{session_id}-{time.strftime('%Y%m%d-%H%M%S')}.md")
+        with open(report_path, "w", encoding="utf-8") as f:
+            f.write(f"# {session_id} · {started_at} → {finished_at}\n\n")
+            f.write(f"- Kênh: {channel_id}\n- cwd: {cwd}\n- Lệnh: {' '.join(cmd)}\n- exit: {exit_code}\n\n## Tin nhắn\n\n{message}\n\n## Output\n\n{output}\n")
+    except Exception as e:
+        print(f"[dispatch] Không ghi được báo cáo: {e}")
+        report_path = ""
+
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+        INSERT INTO chat_messages (project_id, runtime_id, author, created_time, tag, body, react_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (project_id, channel_id, session_id, time.strftime("%H:%M:%S"), "Report", body, json.dumps(["🤖 agy thật"], ensure_ascii=False)))
+        cursor.execute("""
+        INSERT INTO dispatch_log (session_id, command, exit_code, report_path, started_at, finished_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """, (session_id, " ".join(cmd), exit_code, report_path, started_at, finished_at))
+        conn.commit()
+    return {"session_id": session_id, "exit_code": exit_code, "report_path": report_path, "cwd": cwd, "elapsed_sec": round(time.time() - t0, 1)}
+
+def post_warroom_message(project_id="PRJ-GEN-WORKPLACE", channel_id="war_room", author="Ryan (Owner)", message="", tag="Directive", wait=False):
+    """Lưu tin nhắn; tin có @backend|@frontend|@devops|@qa|@security|@lead → chạy agy thật của vai đó ở thread nền (wait=True chạy đồng bộ, dùng cho test). Không có @vai → chỉ lưu (#3)."""
     project_id = normalize_project_id(project_id)
     if not message or not message.strip():
         return {"error": "Message is empty"}
@@ -3263,80 +3362,24 @@ def post_warroom_message(project_id="PRJ-GEN-WORKPLACE", channel_id="war_room", 
         user_msg_id = cursor.lastrowid
         conn.commit()
 
-    # Phân tích thông minh sinh câu trả lời AI bằng tiếng Việt
-    lower = clean_msg.lower()
-    reply_author = "Genesis Orchestrator"
-    reply_tag = "Reply"
-    reply_body = ""
-
-    # 1. Kênh Chỉ Huy Toàn Cục (War Room)
-    if channel_id == "war_room":
-        if "@backend" in lower or "backend" in lower or "csdl" in lower or "database" in lower or "api" in lower:
-            reply_author = "Backend Specialist"
-            reply_tag = "Report"
-            reply_body = f"Đã rõ chỉ thị của {author}! Tôi (Backend Specialist) đang kiểm soát SQLite WAL và các endpoint API. Nhiệm vụ hiện tại đang bám sát Whitelist <code>backend/**, data/**</code>. Toàn bộ thay đổi đều được ghi nhận vào nhật ký commit."
-        elif "@frontend" in lower or "frontend" in lower or "giao diện" in lower or "ui" in lower or "deck" in lower:
-            reply_author = "Frontend Specialist"
-            reply_tag = "Report"
-            reply_body = f"Đã rõ chỉ thị của {author}! Tôi (Frontend Specialist) đang tối ưu hóa Bàn Làm Việc Live Workbench và đồng bộ trạng thái realtime. Cam kết không vi phạm ranh giới và đảm bảo 0 lỗi cú pháp trình duyệt."
-        elif "@devops" in lower or "devops" in lower or "docker" in lower or "install" in lower:
-            reply_author = "DevOps & Packaging"
-            reply_tag = "Report"
-            reply_body = f"Đã rõ chỉ thị của {author}! Tôi (DevOps Engineer) đang giám sát container <code>gen-workplace-app</code>, kiểm tra volume mount cờ <code>:z</code> và kịch bản TUI installer. Hệ thống sẵn sàng cho chu kỳ ngủ đông khi xong việc."
-        elif "@qa" in lower or "qa" in lower or "test" in lower or "kiểm thử" in lower:
-            reply_author = "QA Tester"
-            reply_tag = "Report"
-            reply_body = f"Đã rõ chỉ thị của {author}! Tôi (QA Tester) đang chuẩn bị test suite tự động cho chu kỳ Auto-Wake 68ms và kiểm tra API regression test. Mọi lỗi phát sinh sẽ được báo cáo ngay lập tức kèm log kiểm thử."
-        elif "@security" in lower or "security" in lower or "bảo mật" in lower or "token" in lower or "vault" in lower:
-            reply_author = "Security Auditor"
-            reply_tag = "Report"
-            reply_body = f"Đã rõ chỉ thị của {author}! Tôi (Security Auditor) đang rà soát an ninh cho Token Vault OAuth 2.0 PKCE và phân quyền file. Đảm bảo zero-secret-leak trên toàn bộ repository."
-        elif "@lead" in lower or "lead" in lower or "tiến độ" in lower or "nghiệm thu" in lower:
-            reply_author = "Lead Architect"
-            reply_tag = "Directive"
-            reply_body = f"Báo cáo {author}: Tôi (Lead Architect) đang giám sát chặt chẽ chuỗi Todo DAG và đối soát bằng chứng với SSOT gốc. Toàn thể 6 chuyên gia đang vận hành đúng tiến độ và không có xung đột ranh giới."
+    dispatched = []
+    for role in dict.fromkeys(m.lower() for m in WARROOM_MENTION_RE.findall(clean_msg)):
+        sid = WARROOM_ROLE_SESSIONS[role]
+        if wait:
+            dispatch_warroom_to_agent(project_id, channel_id, sid, clean_msg)
         else:
-            reply_author = "Genesis Orchestrator"
-            reply_tag = "Directive"
-            reply_body = f"Chỉ huy tối cao ghi nhận mệnh lệnh: <em>\"{clean_msg}\"</em>. Tôi (Gen) đang truyền đạt trực tiếp xuống Ban Chỉ Huy Kỹ Thuật (@Lead) và các chuyên gia liên quan để lập tức chấp hành theo chính sách Autonomous Execution."
-
-    # 2. Kênh Giao Ban Kỹ Thuật (Engineering Standup)
-    elif channel_id == "standup":
-        if "lead" in author.lower():
-            reply_author = "Backend Specialist"
-            reply_tag = "Report"
-            reply_body = f"Đã tiếp nhận yêu cầu từ Leader (@Lead)! Backend Squad đang khẩn trương hoàn thành module và chuẩn bị nộp commit hash qua <code>/api/task/complete</code> để nghiệm thu."
-        else:
-            reply_author = "Lead Architect"
-            reply_tag = "Directive"
-            reply_body = f"Lead Architect đã ghi nhận báo cáo của {author}. Yêu cầu tiếp tục tuân thủ ranh giới thư mục Whitelist, hoàn thành checklist 4 bước và nộp bằng chứng commit hash trước khi yêu cầu nghiệm thu."
-
-    # 3. Kênh Hợp Đồng I/O & Bàn Giao (Inter-Agent Handoffs)
-    elif channel_id == "handoff":
-        if "backend" in author.lower():
-            reply_author = "Frontend Specialist"
-            reply_tag = "IO"
-            reply_body = f"Xác nhận đã nhận Hợp đồng I/O từ @Backend. Tôi đang thực hiện data-binding vào giao diện người dùng và sẽ phản hồi khi hoàn tất render."
-        else:
-            reply_author = "QA Tester"
-            reply_tag = "IO"
-            reply_body = f"Xác nhận đã nhận artifact bàn giao từ {author}. Bộ phận QA đang bắt đầu chạy test matrix và sẽ gửi chứng thư nghiệm thu cho Leader."
-
-    # Ghi nhận phản hồi AI vào SQLite
-    reply_time = time.strftime("%H:%M:%S")
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("""
-        INSERT INTO chat_messages (project_id, runtime_id, author, created_time, tag, body, react_json)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (project_id, channel_id, reply_author, reply_time, reply_tag, reply_body, json.dumps(["✅ đã ghi nhận"], ensure_ascii=False)))
-        conn.commit()
+            threading.Thread(target=dispatch_warroom_to_agent, args=(project_id, channel_id, sid, clean_msg),
+                             daemon=True, name=f"warroom-dispatch-{sid}").start()
+        dispatched.append(sid)
 
     return {
         "status": "sent",
         "channel_id": channel_id,
         "user_message": {"id": user_msg_id, "author": author, "body": clean_msg, "created_time": now_time, "tag": tag},
-        "agent_reply": {"author": reply_author, "body": reply_body, "created_time": reply_time, "tag": reply_tag}
+        "agent_reply": None,
+        "dispatched": dispatched,
+        "note": (f"Đã chuyển tới {', '.join(dispatched)}; trả lời thật của agy sẽ xuất hiện trong kênh khi chạy xong (tối đa 15 phút)."
+                 if dispatched else "Không có @vai nên chỉ lưu tin, không trả lời.")
     }
 
 def generate_structure_from_ssot(content, project_id="PRJ-GEN-WORKPLACE"):

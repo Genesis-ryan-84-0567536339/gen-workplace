@@ -192,7 +192,7 @@ TOOLS = [
     },
     {
         "name": "post_warroom_message",
-        "description": "Đăng tin nhắn hoặc chỉ thị vào phòng họp chung War Room Swarm All-Hands để toàn bộ các agent phối hợp.",
+        "description": "Đăng tin nhắn / chỉ thị vào phòng họp chung War Room. Tin có @backend, @frontend, @devops, @qa, @security hoặc @lead sẽ được chuyển cho agy thật của vai đó chạy nền (--mode plan --sandbox) và trả lời thật xuất hiện trong kênh; không có @vai thì chỉ lưu.",
         "inputSchema": {
             "type": "object",
             "properties": {
