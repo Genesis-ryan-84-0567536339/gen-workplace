@@ -303,7 +303,7 @@ TOOLS = [
     },
     {
         "name": "complete_task",
-        "description": "Nghiệm thu hoàn tất nhiệm vụ với bằng chứng bắt buộc (evidence_ref như file log, commit hash, file path).",
+        "description": "Nghiệm thu hoàn tất nhiệm vụ với bằng chứng KIỂM ĐƯỢC: commit SHA có trong repo, đường dẫn file tồn tại, hoặc URL PR GitHub. Bằng chứng không kiểm được → lỗi, trạng thái không đổi.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -317,12 +317,12 @@ TOOLS = [
                 },
                 "evidence_ref": {
                     "type": "string",
-                    "description": "Bằng chứng nghiệm thu (đường dẫn file kết quả, commit hash, hoặc log tóm tắt)."
+                    "description": "Commit SHA (7-40 hex, có trong repo), đường dẫn file tồn tại (tuyệt đối / tương đối repo / ~/gw-reports/...), hoặc https://github.com/<owner>/<repo>/pull/<n>."
                 },
                 "verified_by": {
                     "type": "string",
-                    "description": "Người hoặc vai trò thẩm định nghiệm thu.",
-                    "default": "Lead Architect"
+                    "description": "Không còn dùng: hệ thống tự đặt 'git:commit' / 'file' / 'github:pr' theo loại bằng chứng.",
+                    "default": ""
                 }
             },
             "required": ["session_id", "task_id", "evidence_ref"]
@@ -810,8 +810,7 @@ def execute_tool(name: str, args: dict) -> dict:
             session_id = args.get("session_id")
             task_id = args.get("task_id")
             evidence = args.get("evidence_ref")
-            verified_by = args.get("verified_by", "Lead Architect")
-            res = db.complete_task(session_id, task_id, evidence, verified_by, "PRJ-GEN-WORKPLACE")
+            res = db.complete_task(session_id, task_id, evidence, "", "PRJ-GEN-WORKPLACE")
             return {"content": [{"type": "text", "text": json.dumps(res, ensure_ascii=False, indent=2)}], "isError": "error" in res}
 
         # 15. update_task_checklist

@@ -540,7 +540,55 @@ def init_db():
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, ("mcp-tok-master", "Owner Ryan Sovereign Master Token", seed_tok, seed_hash, "Master Control", "admin", json.dumps(["all"]), "active", None, "owner-ryan"))
 
+        # Kết quả gọi agy thật (thành công / 429) để hiển thị quota từ dữ liệu thật (#6)
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS quota_probe (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            profile_id TEXT NOT NULL,
+            model TEXT DEFAULT '',
+            status TEXT NOT NULL,
+            reset_at TEXT DEFAULT '',
+            checked_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            raw TEXT DEFAULT ''
+        );
+        """)
+
+        # Nhật ký điều phối tin @vai trong chatroom sang agy thật (#3)
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS dispatch_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id TEXT NOT NULL,
+            command TEXT DEFAULT '',
+            exit_code INTEGER,
+            report_path TEXT DEFAULT '',
+            started_at TEXT DEFAULT '',
+            finished_at TEXT DEFAULT ''
+        );
+        """)
+
         conn.commit()
+
+    migrate_unverified_done_tasks()
+
+def migrate_unverified_done_tasks():
+    """Di trú nhỏ: task 'done' (todos & gen_session_todos) có evidence không kiểm được → 'review' (#4)."""
+    changed = 0
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            for table in ("todos", "gen_session_todos"):
+                cursor.execute(f"SELECT id, evidence_ref FROM {table} WHERE status = 'done'")
+                for r in cursor.fetchall():
+                    ok, _, _ = verify_evidence_ref(r["evidence_ref"])
+                    if not ok:
+                        cursor.execute(f"UPDATE {table} SET status = 'review' WHERE id = ?", (r["id"],))
+                        changed += cursor.rowcount
+            conn.commit()
+    except Exception as e:
+        print(f"[migrate] Lỗi khi rà soát bằng chứng task done: {e}")
+    if changed:
+        print(f"[migrate] Đặt lại {changed} task 'done' thiếu bằng chứng kiểm được về 'review'")
+    return changed
 
 def seed_ssot_events():
     with get_connection() as conn:
@@ -610,23 +658,31 @@ def seed_real_project():
             cursor.execute("INSERT INTO roadmaps (id, project_id, title, description, todos_count, status, order_idx) VALUES (?, 'PRJ-GEN-WORKPLACE', ?, ?, ?, ?, ?)", r)
 
         # 3. Todos thật
+        # Cột cuối là bằng chứng thật (file trong repo); chỉ ghi 'done' khi verify_evidence_ref() kiểm được,
+        # còn lại về 'queued' với evidence_ref rỗng (#4).
         todos = [
-            ('TODO-01', 'RM-01', 'Khởi tạo Git repo và lưu cấu trúc dự án', 'Lead Architect', 'done'),
-            ('TODO-02', 'RM-01', 'Lưu đặc tả gốc vào docs/SSOT_ORIGINAL_SPEC.md', 'Lead Architect', 'done'),
-            ('TODO-03', 'RM-01', 'Chuyển đổi giao diện sang phong cách Gen-workplace v1.1', 'Frontend Specialist', 'done'),
-            ('TODO-04', 'RM-02', 'Viết Dockerfile container hóa Python backend + WebApp', 'DevOps Engineer', 'done'),
-            ('TODO-05', 'RM-02', 'Cấu hình docker-compose live mount với cờ SELinux :z', 'DevOps Engineer', 'done'),
-            ('TODO-06', 'RM-03', 'Xây dựng installer_tui.py với thanh loading % đồ họa', 'Backend Specialist', 'done'),
-            ('TODO-07', 'RM-03', 'Kịch bản install.sh tự động kiểm tra Git & Docker daemon', 'DevOps Engineer', 'done'),
-            ('TODO-08', 'RM-03', 'Tạo shortcut Desktop Gen-workplace.desktop tự động', 'DevOps Engineer', 'done'),
-            ('TODO-09', 'RM-04', 'Khởi tạo SQLite WAL DB & FTS5 virtual table', 'Backend Specialist', 'done'),
-            ('TODO-10', 'RM-04', 'Kết nối API /api/state và /api/catalog với SQLite', 'Backend Specialist', 'live'),
-            ('TODO-11', 'RM-04', 'Tích hợp Process Runner gọi agy CLI thời gian thực', 'Lead Architect', 'queued'),
-            ('TODO-12', 'RM-05', 'Kiểm thử cross-platform trên macOS và Windows WSL2', 'QA Tester', 'queued'),
-            ('TODO-13', 'RM-05', 'Publish repository lên GitHub và gắn release v1.0', 'Lead Architect', 'queued')
+            ('TODO-01', 'RM-01', 'Khởi tạo Git repo và lưu cấu trúc dự án', 'Lead Architect', 'done', 'README.md'),
+            ('TODO-02', 'RM-01', 'Lưu đặc tả gốc vào docs/SSOT_ORIGINAL_SPEC.md', 'Lead Architect', 'done', 'docs/SSOT_ORIGINAL_SPEC.md'),
+            ('TODO-03', 'RM-01', 'Chuyển đổi giao diện sang phong cách Gen-workplace v1.1', 'Frontend Specialist', 'done', 'frontend/index.html'),
+            ('TODO-04', 'RM-02', 'Viết Dockerfile container hóa Python backend + WebApp', 'DevOps Engineer', 'done', 'Dockerfile'),
+            ('TODO-05', 'RM-02', 'Cấu hình docker-compose live mount với cờ SELinux :z', 'DevOps Engineer', 'done', 'docker-compose.yml'),
+            ('TODO-06', 'RM-03', 'Xây dựng installer_tui.py với thanh loading % đồ họa', 'Backend Specialist', 'done', 'installer_tui.py'),
+            ('TODO-07', 'RM-03', 'Kịch bản install.sh tự động kiểm tra Git & Docker daemon', 'DevOps Engineer', 'done', 'install.sh'),
+            ('TODO-08', 'RM-03', 'Tạo shortcut Desktop Gen-workplace.desktop tự động', 'DevOps Engineer', 'done', ''),
+            ('TODO-09', 'RM-04', 'Khởi tạo SQLite WAL DB & FTS5 virtual table', 'Backend Specialist', 'done', 'backend/db.py'),
+            ('TODO-10', 'RM-04', 'Kết nối API /api/state và /api/catalog với SQLite', 'Backend Specialist', 'live', ''),
+            ('TODO-11', 'RM-04', 'Tích hợp Process Runner gọi agy CLI thời gian thực', 'Lead Architect', 'queued', ''),
+            ('TODO-12', 'RM-05', 'Kiểm thử cross-platform trên macOS và Windows WSL2', 'QA Tester', 'queued', ''),
+            ('TODO-13', 'RM-05', 'Publish repository lên GitHub và gắn release v1.0', 'Lead Architect', 'queued', '')
         ]
-        for t in todos:
-            cursor.execute("INSERT INTO todos (id, roadmap_id, project_id, title, assigned_role, status) VALUES (?, ?, 'PRJ-GEN-WORKPLACE', ?, ?, ?)", t)
+        for tid, rm, title, role, status, evidence in todos:
+            verified_by = ''
+            if status == 'done':
+                ok, verified_by, _ = verify_evidence_ref(evidence)
+                if not ok:
+                    status, evidence, verified_by = 'queued', '', ''
+            cursor.execute("INSERT INTO todos (id, roadmap_id, project_id, title, assigned_role, status, evidence_ref, verified_by) VALUES (?, ?, 'PRJ-GEN-WORKPLACE', ?, ?, ?, ?, ?)",
+                           (tid, rm, title, role, status, evidence, verified_by))
 
         # 4. Roles thật
         roles = [
@@ -2888,6 +2944,34 @@ def process_orch_instruction(user_message, project_id="PRJ-GEN-WORKPLACE"):
 # SWARM ANTI-CHAOS GOVERNANCE (CƠ CHẾ BẢO ĐẢM KHÔNG RỐI LOẠN)
 # ═══════════════════════════════════════════════════════════════════════════
 
+EVIDENCE_SHA_RE = re.compile(r"^[0-9a-f]{7,40}$")
+EVIDENCE_PR_RE = re.compile(r"^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/pull/[0-9]+/?$")
+
+def verify_evidence_ref(evidence_ref):
+    """Kiểm bằng chứng nghiệm thu: commit SHA có trong repo, đường dẫn file tồn tại, hoặc URL PR GitHub. Trả (ok, verified_by, message)."""
+    ev = (evidence_ref or "").strip()
+    if not ev:
+        return False, "", "Thiếu evidence_ref (commit SHA, đường dẫn file hoặc URL PR GitHub)"
+    if EVIDENCE_PR_RE.match(ev):
+        return True, "github:pr", "URL PR GitHub hợp lệ"
+    if EVIDENCE_SHA_RE.match(ev.lower()):
+        try:
+            res = subprocess.run(["git", "-C", str(BASE_DIR), "cat-file", "-e", f"{ev}^{{commit}}"], capture_output=True, timeout=5.0)
+            if res.returncode == 0:
+                return True, "git:commit", f"Commit {ev} tồn tại trong repo"
+        except Exception:
+            pass
+        return False, "", f"Commit {ev} không tồn tại trong repo {BASE_DIR}"
+    if ev.startswith("~"):
+        candidate = os.path.expanduser(ev)
+    elif os.path.isabs(ev):
+        candidate = ev
+    else:
+        candidate = str(BASE_DIR / ev)
+    if os.path.exists(candidate):
+        return True, "file", f"File tồn tại: {candidate}"
+    return False, "", f"Bằng chứng không kiểm được: '{ev}' không phải commit SHA trong repo, file tồn tại hay URL PR GitHub (https://github.com/<owner>/<repo>/pull/<n>)"
+
 def claim_task(session_id, todo_id, project_id="PRJ-GEN-WORKPLACE"):
     """
     Khóa độc quyền nhiệm vụ (Atomic Task Mutex):
@@ -2952,15 +3036,18 @@ def claim_task(session_id, todo_id, project_id="PRJ-GEN-WORKPLACE"):
 
 def complete_task(session_id, todo_id, evidence_ref, verified_by="Lead Architect", project_id="PRJ-GEN-WORKPLACE"):
     """
-    Nghiệm thu hoàn tất có bằng chứng (Evidence-Backed Completion):
-    - Agent không thể tự ý chuyển sang 'done' nếu thiếu bằng chứng (commit hash / artifact).
-    - Cần chữ ký nghiệm thu của Role chỉ huy (Lead Architect / Orchestrator).
+    Nghiệm thu hoàn tất có bằng chứng kiểm được (Evidence-Backed Completion, #4):
+    - evidence_ref phải là commit SHA có trong repo, file tồn tại hoặc URL PR GitHub (verify_evidence_ref).
+    - Không đạt → trả {"error": ...} và KHÔNG đổi trạng thái.
+    - verified_by được tính: 'git:commit' / 'file' / 'github:pr' (tham số verified_by chỉ giữ để tương thích API).
     - Hỗ trợ cập nhật cả bảng roadmap 'todos' và bảng phiên 'gen_session_todos'.
     - Tự động nhả khóa session để sẵn sàng nhận nhiệm vụ tiếp theo.
     """
     project_id = normalize_project_id(project_id)
-    if not evidence_ref or not evidence_ref.strip():
-        return {"error": "Cannot complete task without verified evidence_ref (commit hash, artifact path or test log)"}
+    ok, verified_by, msg = verify_evidence_ref(evidence_ref)
+    if not ok:
+        return {"error": msg, "task_id": todo_id}
+    evidence_ref = evidence_ref.strip()
 
     with get_connection() as conn:
         cursor = conn.cursor()
@@ -2975,7 +3062,9 @@ def complete_task(session_id, todo_id, evidence_ref, verified_by="Lead Architect
             UPDATE gen_session_todos
             SET status = 'done', evidence_ref = ?, updated_at = CURRENT_TIMESTAMP
             WHERE id = ? AND project_id = ?
-            """, (evidence_ref.strip(), todo_id, project_id))
+            """, (evidence_ref, todo_id, project_id))
+            if cursor.rowcount == 0:
+                return {"error": "Task not found", "task_id": todo_id}
 
         cursor.execute("""
         UPDATE tmux_sessions
@@ -2984,7 +3073,7 @@ def complete_task(session_id, todo_id, evidence_ref, verified_by="Lead Architect
         """, (session_id,))
 
         conn.commit()
-        return {"status": "completed", "task_id": todo_id, "evidence_ref": evidence_ref, "verified_by": verified_by}
+        return {"status": "completed", "task_id": todo_id, "evidence_ref": evidence_ref, "verified_by": verified_by, "verify_message": msg}
 
 def reclaim_stalled_tasks(timeout_seconds=300, project_id="PRJ-GEN-WORKPLACE"):
     """
@@ -4672,16 +4761,17 @@ def seed_session_default_todos(conv_id):
 
         if conv_id == "conv-gen-builder":
             initial_todos = [
-                ("TSK-01", conv_id, "PRJ-GEN-WORKPLACE", "Thiết lập hạ tầng Swarm & Cách ly Workspace phiên", "Kiểm tra container gen-workplace-app và quyền đọc ghi tại thư mục /workspace/sessions/conv-gen-builder.", "done", "critical", "Builder Agent", json.dumps([
+                # Chưa có bằng chứng kiểm được (commit/file/PR) → 'review', evidence rỗng (#4)
+                ("TSK-01", conv_id, "PRJ-GEN-WORKPLACE", "Thiết lập hạ tầng Swarm & Cách ly Workspace phiên", "Kiểm tra container gen-workplace-app và quyền đọc ghi tại thư mục /workspace/sessions/conv-gen-builder.", "review", "critical", "Builder Agent", json.dumps([
                     {"id": "chk-1", "text": "Xác nhận container gen-workplace-app chạy trên port 8888 với cờ SELinux :z", "done": True},
                     {"id": "chk-2", "text": "Khởi tạo thư mục /workspace/sessions/conv-gen-builder cô lập", "done": True},
                     {"id": "chk-3", "text": "Khóa đặc tả SSOT_ORIGINAL_SPEC.md làm kim chỉ nam phát triển", "done": True}
-                ], ensure_ascii=False), "NOTE-BUILDER-01 · git commit 52c7861", 1, "owner-ryan"),
-                ("TSK-02", conv_id, "PRJ-GEN-WORKPLACE", "Khóa quyền sở hữu độc quyền cho Owner Ryan (owner_profiles)", "Khởi tạo bảng owner_profiles và backfill owner_id='owner-ryan' cho toàn bộ CSDL.", "done", "critical", "Builder Agent", json.dumps([
+                ], ensure_ascii=False), "", 1, "owner-ryan"),
+                ("TSK-02", conv_id, "PRJ-GEN-WORKPLACE", "Khóa quyền sở hữu độc quyền cho Owner Ryan (owner_profiles)", "Khởi tạo bảng owner_profiles và backfill owner_id='owner-ryan' cho toàn bộ CSDL.", "review", "critical", "Builder Agent", json.dumps([
                     {"id": "chk-1", "text": "Khởi tạo bảng owner_profiles (id='owner-ryan') trong SQLite WAL", "done": True},
                     {"id": "chk-2", "text": "Gán cờ owner_id='owner-ryan' trên 100% các bảng dữ liệu", "done": True},
                     {"id": "chk-3", "text": "Tích hợp huy hiệu Sovereign Profile và Modal quản trị trên Topbar", "done": True}
-                ], ensure_ascii=False), "NOTE-BUILDER-05 · git commit f211ce5", 2, "owner-ryan"),
+                ], ensure_ascii=False), "", 2, "owner-ryan"),
                 ("TSK-03", conv_id, "PRJ-GEN-WORKPLACE", "Xây dựng phân hệ Kanban & Checklist chuyên dụng theo phiên", "Tạo tab Kanban 4 cột trong Cột 2, ràng buộc Agent bắt buộc đối soát checklist khi làm việc.", "in_progress", "high", "Builder Agent", json.dumps([
                     {"id": "chk-1", "text": "Thiết kế bảng gen_session_todos với trường checklist_json và status", "done": True},
                     {"id": "chk-2", "text": "Triển khai REST API quản lý todos và toggle checklist item", "done": True},

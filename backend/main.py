@@ -1087,6 +1087,31 @@ def start_oauth_callback_server(port=8085):
         print(f"  [Warning] Không thể mở cổng OAuth Callback {port}: {e}")
         return None
 
+def start_reclaim_worker():
+    """Thread daemon gọi db.reclaim_stalled_tasks() mỗi GW_RECLAIM_INTERVAL_SEC giây (mặc định 300) để thu hồi task treo (#4)."""
+    try:
+        interval = max(5, int(os.environ.get("GW_RECLAIM_INTERVAL_SEC", "300")))
+    except ValueError:
+        interval = 300
+    try:
+        timeout = int(os.environ.get("GW_RECLAIM_TIMEOUT_SEC", str(interval)))
+    except ValueError:
+        timeout = interval
+
+    def _loop():
+        while True:
+            time.sleep(interval)
+            try:
+                res = db.reclaim_stalled_tasks(timeout)
+                print(f"[reclaim] thu hồi {res.get('reclaimed_count', 0)} task")
+            except Exception as e:
+                print(f"[reclaim] lỗi: {e}")
+
+    t = threading.Thread(target=_loop, daemon=True, name="TaskReclaimWorker")
+    t.start()
+    print(f"  Reclaim task treo: mỗi {interval}s (timeout {timeout}s)")
+    return t
+
 def main():
     print(f"==================================================")
     print(f"  GENESIS SWARM WORKPLACE - CONTROL PLANE DAEMON  ")
@@ -1095,6 +1120,7 @@ def main():
     print(f"  Data: {DATA_DIR}")
     print(f"  Database: SQLite 3 WAL + FTS5 Ready")
     start_oauth_callback_server(8085)
+    start_reclaim_worker()
     print(f"==================================================")
     server = ThreadedHTTPServer(("0.0.0.0", PORT), SwarmHandler)
     try:
