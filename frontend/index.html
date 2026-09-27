@@ -8113,6 +8113,14 @@ async function refreshTmuxSessions(showNotify = false) {
   renderTmuxSessions();
 }
 
+// Quota: backend có thể trả status 'unknown' / percent null (chưa kiểm tra thật) -> hiện '?' thay vì số giả
+function qPct(q, field) {
+  if (!q || q.status === 'unknown') return null;
+  const v = (field && q[field] !== undefined && q[field] !== null) ? q[field] : q.percent;
+  return (v === null || v === undefined || v === '') ? null : Number(v);
+}
+function qTxt(v) { return (v === null || v === undefined || Number.isNaN(v)) ? '?' : `${v}%`; }
+
 const ROLE_AVATARS = {
   'gw-lead-agy': 'LD',
   'gw-backend-agy': 'BE',
@@ -8289,8 +8297,8 @@ function renderExpertSquadGrid() {
           <div style="min-width:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text);background:rgba(255,255,255,0.03);padding:2px 6px;border-radius:4px;border:1px solid rgba(255,255,255,0.06)" title="${escapeHtml(s.current_task_id ? `${s.current_task_id}: ${s.task_title || ''} (${s.evidence_ref || 'Verified'})` : 'Sẵn sàng')}">
             ${taskHtml}
           </div>
-          <div style="font-family:var(--mono);color:var(--muted);font-size:9.5px;flex-shrink:0;background:rgba(0,0,0,0.3);padding:2px 5px;border-radius:4px" title="Quota: Gemini 5h: ${qG.percent_5h ?? qG.percent ?? 100}% | Tuần: ${qG.percent_weekly ?? 100}% · Claude Tuần: ${qA.percent_weekly ?? qA.percent ?? 0}%">
-            ${qG.percent_5h ?? qG.percent ?? 100}% ${qA.percent_weekly ?? qA.percent ?? 0}%
+          <div style="font-family:var(--mono);color:var(--muted);font-size:9.5px;flex-shrink:0;background:rgba(0,0,0,0.3);padding:2px 5px;border-radius:4px" title="Quota: Gemini 5h: ${qTxt(qPct(qG,'percent_5h'))} | Tuần: ${qTxt(qPct(qG,'percent_weekly'))} · Claude Tuần: ${qTxt(qPct(qA,'percent_weekly'))}">
+            ${qTxt(qPct(qG,'percent_5h'))} ${qTxt(qPct(qA,'percent_weekly'))}
           </div>
         </div>
       </div>
@@ -8322,15 +8330,15 @@ function updateCommandDeck() {
   if ($('deckAgentSid')) $('deckAgentSid').textContent = current.id;
   if ($('deckAgentConv')) $('deckAgentConv').textContent = current.conversation_id || ('conv-' + current.id);
   if ($('deckAgentEmail')) $('deckAgentEmail').textContent = email;
-  const g5h = (qG && qG.percent_5h !== undefined) ? qG.percent_5h : (qG?.percent ?? 85);
-  const gWk = (qG && qG.percent_weekly !== undefined) ? qG.percent_weekly : 100;
-  const cWk = (qA && qA.percent_weekly !== undefined) ? qA.percent_weekly : (qA?.percent ?? 0);
-  const deckPillStr = `5h: ${g5h}% | Tuần: ${gWk}% · Tuần: ${cWk}%`;
-  if ($('deckQuotaGeminiVal')) $('deckQuotaGeminiVal').textContent = `${g5h}% (Tuần ${gWk}%)`;
-  if ($('deckQuotaClaudeVal')) $('deckQuotaClaudeVal').textContent = `${cWk}%`;
+  const g5h = qTxt(qPct(qG, 'percent_5h'));
+  const gWk = qTxt(qPct(qG, 'percent_weekly'));
+  const cWk = qTxt(qPct(qA, 'percent_weekly'));
+  const deckPillStr = `Gemini 5h ${g5h} · tuần ${gWk} | Claude tuần ${cWk}`;
+  if ($('deckQuotaGeminiVal')) $('deckQuotaGeminiVal').textContent = `${g5h} (tuần ${gWk})`;
+  if ($('deckQuotaClaudeVal')) $('deckQuotaClaudeVal').textContent = cWk;
   if ($('deckQuotaPill')) $('deckQuotaPill').textContent = deckPillStr;
   if ($('orchDeckQuotaPill')) $('orchDeckQuotaPill').textContent = deckPillStr;
-  if ($('orchOwnerQuotaSmall')) $('orchOwnerQuotaSmall').textContent = `Owner · 5h:${g5h}% Tuần:${gWk}% · Tuần:${cWk}%`;
+  if ($('orchOwnerQuotaSmall')) $('orchOwnerQuotaSmall').textContent = `Owner · ${deckPillStr}`;
 
   // Governance Sub-bar Elements
   const taskEl = $('deckAgentActiveTask');
@@ -9625,8 +9633,8 @@ function renderOrchSwarmCards() {
 
     const statusLabel = isHib ? 'Ngủ đông' : (isPaused ? 'Tạm dừng' : '● Đang chạy');
     const statusClass = isHib ? 'sleep' : (isPaused ? 'paused' : 'live');
-    const qG = s.quota_gemini?.percent ?? 100;
-    const qA = s.quota_anthropic?.percent ?? 100;
+    const qG = qTxt(qPct(s.quota_gemini, 'percent_5h'));
+    const qA = qTxt(qPct(s.quota_anthropic, 'percent_weekly'));
 
     const hasTask = Boolean(s.current_task_id && s.current_task_id.trim());
     const allowed = (s.allowed_paths && s.allowed_paths.length) ? s.allowed_paths.join(', ') : 'Toàn quyền';
@@ -9647,7 +9655,7 @@ function renderOrchSwarmCards() {
 
         <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:10px;font-family:var(--mono);background:rgba(0,0,0,0.25);padding:3px 8px;border-radius:5px">
           <span>PID: <strong style="color:var(--text)">${escapeHtml(s.pid > 0 ? s.pid : '0 (Off)')}</strong></span>
-          <span style="color:var(--accent)">${qG}% · ${qA}%</span>
+          <span style="color:var(--accent)">${qG} · ${qA}</span>
         </div>
 
         <div style="font-size:11px;display:flex;flex-direction:column;gap:3px;background:rgba(255,255,255,0.02);padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.05)">
@@ -11390,18 +11398,18 @@ async function initGenWorkplace() {
 // 1. Quota Telemetry Sync (2-Tier Architecture: Cửa sổ 5h & Hạn mức tuần)
 function syncGenQuotaTelemetry() {
   const s0 = (state.tmuxSessions && state.tmuxSessions[0]) || {};
-  const qG = s0.quota_gemini || { percent_5h: 85, percent_weekly: 37, percent: 85, status: 'ready', color: 'var(--accent)' };
-  const qC = s0.quota_anthropic || { percent_5h: 100, percent_weekly: 0, percent: 0, disabled_5h: true, status: 'rate_limited', color: 'var(--red)' };
+  const qG = s0.quota_gemini || { status: 'unknown', status_label: 'chưa kiểm tra' };
+  const qC = s0.quota_anthropic || { status: 'unknown', status_label: 'chưa kiểm tra' };
 
-  // Google Gemini Tiers
-  const g5h = qG.percent_5h !== undefined ? qG.percent_5h : (qG.percent ?? 85);
-  const gWk = qG.percent_weekly !== undefined ? qG.percent_weekly : 100;
+  // Google Gemini Tiers (null = chưa rõ)
+  const g5h = qPct(qG, 'percent_5h');
+  const gWk = qPct(qG, 'percent_weekly');
   const g5hReset = qG.reset_5h || qG.reset_time || '';
   const gWkReset = qG.reset_weekly || '';
 
   // Claude & GPT Tiers
-  const cWk = qC.percent_weekly !== undefined ? qC.percent_weekly : (qC.percent ?? 0);
-  const c5h = qC.percent_5h !== undefined ? qC.percent_5h : 0;
+  const cWk = qPct(qC, 'percent_weekly');
+  const c5h = qPct(qC, 'percent_5h');
   const c5hDisabled = Boolean(qC.disabled_5h || cWk === 0);
   const cWkReset = qC.reset_weekly || qC.reset_time || '';
   const c5hReset = qC.reset_5h || '';
@@ -11423,11 +11431,11 @@ function syncGenQuotaTelemetry() {
   const elGSummary = $('genGeminiSummaryBadge');
 
   if (elG5hText) {
-    elG5hText.textContent = `${g5h}%`;
+    elG5hText.textContent = `${qTxt(g5h)}`;
     elG5hText.style.color = g5h > 20 ? 'var(--accent)' : (g5h > 0 ? 'var(--yellow)' : 'var(--red)');
   }
   if (elG5hFill) {
-    elG5hFill.style.width = `${g5h}%`;
+    elG5hFill.style.width = `${g5h ?? 0}%`;
     elG5hFill.style.background = g5h > 20 ? 'var(--accent)' : (g5h > 0 ? 'var(--yellow)' : 'var(--red)');
   }
   if (elG5hReset) {
@@ -11435,11 +11443,11 @@ function syncGenQuotaTelemetry() {
     elG5hReset.title = g5hReset ? `Hồi lúc: ${g5hReset}` : 'Cửa sổ trượt 5h';
   }
   if (elGWkText) {
-    elGWkText.textContent = `${gWk}%`;
+    elGWkText.textContent = `${qTxt(gWk)}`;
     elGWkText.style.color = gWk > 20 ? 'var(--accent)' : (gWk > 0 ? 'var(--yellow)' : 'var(--red)');
   }
   if (elGWkFill) {
-    elGWkFill.style.width = `${gWk}%`;
+    elGWkFill.style.width = `${gWk ?? 0}%`;
     elGWkFill.style.background = gWk > 20 ? 'var(--accent)' : (gWk > 0 ? 'var(--yellow)' : 'var(--red)');
   }
   if (elGWkReset) {
@@ -11447,7 +11455,7 @@ function syncGenQuotaTelemetry() {
     elGWkReset.title = gWkReset ? `Hồi lúc: ${gWkReset}` : 'Hạn ngạch tuần';
   }
   if (elGSummary) {
-    elGSummary.textContent = `5h: ${g5h}% · Tuần: ${gWk}%`;
+    elGSummary.textContent = `5h: ${qTxt(g5h)} · Tuần: ${qTxt(gWk)}`;
     elGSummary.style.color = (g5h > 0 && gWk > 0) ? 'var(--accent)' : 'var(--red)';
   }
 
@@ -11461,11 +11469,11 @@ function syncGenQuotaTelemetry() {
   const elCSummary = $('genClaudeSummaryBadge');
 
   if (elCWkText) {
-    elCWkText.textContent = cWk > 0 ? `${cWk}%` : '0% (Cạn)';
+    elCWkText.textContent = cWk === null ? '?' : (cWk > 0 ? qTxt(cWk) : '0% (cạn)');
     elCWkText.style.color = cWk > 20 ? 'var(--yellow)' : (cWk > 0 ? 'var(--yellow)' : 'var(--red)');
   }
   if (elCWkFill) {
-    elCWkFill.style.width = `${cWk}%`;
+    elCWkFill.style.width = `${cWk ?? 0}%`;
     elCWkFill.style.background = cWk > 20 ? 'var(--yellow)' : (cWk > 0 ? 'var(--yellow)' : 'var(--red)');
   }
   if (elCWkReset) {
@@ -11479,12 +11487,12 @@ function syncGenQuotaTelemetry() {
       elC5hText.textContent = 'Khóa';
       elC5hText.style.color = 'var(--muted)';
     } else {
-      elC5hText.textContent = `${c5h}%`;
+      elC5hText.textContent = `${qTxt(c5h)}`;
       elC5hText.style.color = c5h > 20 ? 'var(--accent)' : 'var(--red)';
     }
   }
   if (elC5hFill) {
-    elC5hFill.style.width = c5hDisabled ? '0%' : `${c5h}%`;
+    elC5hFill.style.width = c5hDisabled ? '0%' : `${qTxt(c5h)}`;
     elC5hFill.style.background = c5hDisabled ? 'var(--muted2)' : 'var(--accent)';
   }
   if (elC5hReset) {
@@ -11501,28 +11509,31 @@ function syncGenQuotaTelemetry() {
       elCSummary.textContent = `Tuần: 0% (${compactReset(cWkReset) || 'Khóa'})`;
       elCSummary.style.color = 'var(--red)';
     } else {
-      elCSummary.textContent = `5h: ${c5h}% · Tuần: ${cWk}%`;
+      elCSummary.textContent = `5h: ${qTxt(c5h)} · Tuần: ${qTxt(cWk)}`;
       elCSummary.style.color = 'var(--yellow)';
     }
   }
+
+  if (qG.status === 'unknown' && elGSummary) { elGSummary.textContent = qG.status_label || 'chưa kiểm tra'; elGSummary.style.color = 'var(--muted2)'; }
+  if (qC.status === 'unknown' && elCSummary) { elCSummary.textContent = qC.status_label || 'chưa kiểm tra'; elCSummary.style.color = 'var(--muted2)'; }
 
   // Legacy elements backward compatibility
   const gFill = $('genGeminiQuotaFill');
   const gText = $('genGeminiQuotaText');
   const cFill = $('genClaudeQuotaFill');
   const cText = $('genClaudeQuotaText');
-  if (gFill) { gFill.style.width = `${g5h}%`; }
-  if (gText) { gText.textContent = qG.status_label || `5h: ${g5h}% · Tuần: ${gWk}%`; }
-  if (cFill) { cFill.style.width = `${cWk}%`; }
-  if (cText) { cText.textContent = qC.status_label || `Tuần: ${cWk}% · 5h: ${c5h}%`; }
+  if (gFill) { gFill.style.width = `${g5h ?? 0}%`; }
+  if (gText) { gText.textContent = qG.status_label || `5h: ${qTxt(g5h)} · Tuần: ${qTxt(gWk)}`; }
+  if (cFill) { cFill.style.width = `${cWk ?? 0}%`; }
+  if (cText) { cText.textContent = qC.status_label || `Tuần: ${qTxt(cWk)} · 5h: ${qTxt(c5h)}`; }
 
   // 3. Đồng bộ các thanh hiển thị quota toàn bộ giao diện
-  const pillStr = `5h: ${g5h}% | Tuần: ${gWk}% · Tuần: ${cWk}%`;
+  const pillStr = `5h: ${qTxt(g5h)} | Tuần: ${qTxt(gWk)} · Tuần: ${qTxt(cWk)}`;
   if ($('deckQuotaPill')) $('deckQuotaPill').textContent = pillStr;
   if ($('orchDeckQuotaPill')) $('orchDeckQuotaPill').textContent = pillStr;
-  if ($('deckQuotaGeminiVal')) $('deckQuotaGeminiVal').textContent = `${g5h}% (Tuần ${gWk}%)`;
-  if ($('deckQuotaClaudeVal')) $('deckQuotaClaudeVal').textContent = `${cWk}%`;
-  if ($('orchOwnerQuotaSmall')) $('orchOwnerQuotaSmall').textContent = `Owner · 5h:${g5h}% Tuần:${gWk}% · Tuần:${cWk}%`;
+  if ($('deckQuotaGeminiVal')) $('deckQuotaGeminiVal').textContent = `${qTxt(g5h)} (Tuần ${qTxt(gWk)})`;
+  if ($('deckQuotaClaudeVal')) $('deckQuotaClaudeVal').textContent = `${qTxt(cWk)}`;
+  if ($('orchOwnerQuotaSmall')) $('orchOwnerQuotaSmall').textContent = `Owner · 5h:${qTxt(g5h)} Tuần:${qTxt(gWk)} · Tuần:${qTxt(cWk)}`;
 }
 
 // 1.1. Live Quota Checker on-demand (Nút bấm kiểm tra Quota Live)
