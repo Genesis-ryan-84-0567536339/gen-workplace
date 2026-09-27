@@ -2591,6 +2591,7 @@ def claim_task(session_id, todo_id, project_id="PRJ-GEN-WORKPLACE"):
     Khóa độc quyền nhiệm vụ (Atomic Task Mutex):
     - Ngăn chặn 2 agent tranh chấp cùng 1 task (loại bỏ 100% race condition).
     - Kiểm tra ràng buộc tiền đề (depends_on): chỉ cho nhận khi task phụ thuộc đã hoàn tất.
+    - Hỗ trợ cả bảng roadmap 'todos' và bảng phiên 'gen_session_todos'.
     - Cập nhật thời điểm khóa (locked_at) và gán task cho session.
     """
     project_id = normalize_project_id(project_id)
@@ -2599,7 +2600,26 @@ def claim_task(session_id, todo_id, project_id="PRJ-GEN-WORKPLACE"):
         cursor.execute("SELECT id, status, assigned_session_id, depends_on FROM todos WHERE id = ? AND project_id = ?", (todo_id, project_id))
         todo = cursor.fetchone()
         if not todo:
-            return {"error": "Task not found"}
+            # Fallback sang bảng gen_session_todos nếu là task Kanban theo phiên
+            cursor.execute("SELECT id, status, assigned_agent FROM gen_session_todos WHERE id = ? AND project_id = ?", (todo_id, project_id))
+            gen_todo = cursor.fetchone()
+            if not gen_todo:
+                return {"error": "Task not found"}
+
+            cursor.execute("""
+            UPDATE gen_session_todos 
+            SET status = 'in_progress', assigned_agent = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ? AND project_id = ?
+            """, (session_id, todo_id, project_id))
+
+            cursor.execute("""
+            UPDATE tmux_sessions 
+            SET current_task_id = ?, last_heartbeat = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """, (todo_id, session_id))
+
+            conn.commit()
+            return {"status": "claimed", "task_id": todo_id, "session_id": session_id}
 
         # 1. Kiểm tra tranh chấp
         if todo["status"] == "in_progress" and todo["assigned_session_id"] and todo["assigned_session_id"] != session_id:
@@ -2633,6 +2653,7 @@ def complete_task(session_id, todo_id, evidence_ref, verified_by="Lead Architect
     Nghiệm thu hoàn tất có bằng chứng (Evidence-Backed Completion):
     - Agent không thể tự ý chuyển sang 'done' nếu thiếu bằng chứng (commit hash / artifact).
     - Cần chữ ký nghiệm thu của Role chỉ huy (Lead Architect / Orchestrator).
+    - Hỗ trợ cập nhật cả bảng roadmap 'todos' và bảng phiên 'gen_session_todos'.
     - Tự động nhả khóa session để sẵn sàng nhận nhiệm vụ tiếp theo.
     """
     project_id = normalize_project_id(project_id)
@@ -2646,6 +2667,13 @@ def complete_task(session_id, todo_id, evidence_ref, verified_by="Lead Architect
         SET status = 'done', evidence_ref = ?, verified_by = ?, assigned_session_id = ''
         WHERE id = ? AND project_id = ?
         """, (evidence_ref.strip(), verified_by, todo_id, project_id))
+
+        if cursor.rowcount == 0:
+            cursor.execute("""
+            UPDATE gen_session_todos
+            SET status = 'done', evidence_ref = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ? AND project_id = ?
+            """, (evidence_ref.strip(), todo_id, project_id))
 
         cursor.execute("""
         UPDATE tmux_sessions
@@ -4463,11 +4491,19 @@ def save_gen_session_todo(conv_id, todo_id=None, title="Nhiệm vụ mới", des
 def toggle_gen_session_todo_checklist_item(conv_id, todo_id, item_id, done_status=None):
     with get_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT checklist_json, status FROM gen_session_todos WHERE id = ? AND conversation_id = ?", (todo_id, conv_id))
+        if conv_id:
+            cursor.execute("SELECT conversation_id, checklist_json, status FROM gen_session_todos WHERE id = ? AND conversation_id = ?", (todo_id, conv_id))
+        else:
+            cursor.execute("SELECT conversation_id, checklist_json, status FROM gen_session_todos WHERE id = ?", (todo_id,))
         row = cursor.fetchone()
         if not row:
-            return {"error": "Todo not found"}
+            # Fallback tìm kiếm theo ID nếu conv_id không khớp
+            cursor.execute("SELECT conversation_id, checklist_json, status FROM gen_session_todos WHERE id = ?", (todo_id,))
+            row = cursor.fetchone()
+            if not row:
+                return {"error": "Todo not found"}
         
+        target_conv_id = row["conversation_id"]
         try:
             chk = json.loads(row["checklist_json"] or "[]")
         except Exception:
@@ -4486,7 +4522,15 @@ def toggle_gen_session_todo_checklist_item(conv_id, todo_id, item_id, done_statu
                 all_done = False
 
         if not found:
-            return {"error": "Checklist item not found"}
+            # Hỗ trợ alias dạng chk-01, chk-1, 0, 1
+            if item_id in ("chk-01", "chk-1", "0", 0) and len(chk) > 0:
+                chk[0]["done"] = bool(done_status) if done_status is not None else not chk[0].get("done", False)
+                found = True
+            elif item_id in ("chk-02", "chk-2", "1", 1) and len(chk) > 1:
+                chk[1]["done"] = bool(done_status) if done_status is not None else not chk[1].get("done", False)
+                found = True
+            else:
+                return {"error": f"Checklist item '{item_id}' not found"}
 
         new_status = row["status"]
         if all_done and len(chk) > 0 and new_status in ("todo", "in_progress"):
@@ -4496,7 +4540,7 @@ def toggle_gen_session_todo_checklist_item(conv_id, todo_id, item_id, done_statu
         UPDATE gen_session_todos 
         SET checklist_json = ?, status = ?, updated_at = CURRENT_TIMESTAMP 
         WHERE id = ? AND conversation_id = ?
-        """, (json.dumps(chk, ensure_ascii=False), new_status, todo_id, conv_id))
+        """, (json.dumps(chk, ensure_ascii=False), new_status, todo_id, target_conv_id))
         conn.commit()
     return {"status": "updated", "id": todo_id, "item_id": item_id, "all_done": all_done, "new_status": new_status}
 
