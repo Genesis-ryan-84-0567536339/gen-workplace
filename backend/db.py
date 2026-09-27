@@ -1973,6 +1973,42 @@ def update_tmux_account(session_id, account_type, account_label, profile_dir="")
     except Exception:
         pass
 
+def log_directive_audit(session_id, channel, command, allowed, reason=""):
+    """Ghi nhật ký mọi lệnh/phím gửi vào tmux worker (cả cho phép lẫn từ chối) — phục vụ audit allowlist."""
+    try:
+        with get_connection() as conn:
+            conn.execute("""
+            CREATE TABLE IF NOT EXISTS directive_audit (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                session_id TEXT,
+                channel TEXT,
+                command TEXT,
+                allowed INTEGER,
+                reason TEXT
+            )
+            """)
+            conn.execute("""
+            INSERT INTO directive_audit (session_id, channel, command, allowed, reason)
+            VALUES (?, ?, ?, ?, ?)
+            """, (session_id or "", channel or "", (command or "")[:2000], 1 if allowed else 0, reason or ""))
+            conn.commit()
+    except Exception as e:
+        print(f"[directive_audit] Không ghi được nhật ký: {e}")
+
+
+def get_directive_audit(limit=100, only_rejected=False):
+    """Đọc nhật ký lệnh gửi vào tmux, mới nhất trước."""
+    limit = max(1, min(int(limit or 100), 1000))
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='directive_audit'")
+        if not cursor.fetchone():
+            return []
+        where = "WHERE allowed = 0" if only_rejected else ""
+        cursor.execute(f"SELECT * FROM directive_audit {where} ORDER BY id DESC LIMIT ?", (limit,))
+        return [dict(r) for r in cursor.fetchall()]
+
 def append_tmux_output(session_id, command, output=""):
     """Ghi nhận output tương tác của phiên tmux vào SQLite Core DB."""
     with get_connection() as conn:

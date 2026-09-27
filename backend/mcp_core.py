@@ -17,8 +17,10 @@ sys.path.insert(0, str(BASE_DIR))
 
 try:
     from backend import db
+    from backend import directive_guard
 except ImportError:
     import db
+    import directive_guard
 
 MCP_SERVER_INFO = {
     "name": "gen-workplace",
@@ -716,6 +718,11 @@ def execute_tool(name: str, args: dict) -> dict:
             key = (args.get("key") or "").strip()
             if not session_id or not (command or key):
                 return {"content": [{"type": "text", "text": "Thiếu session_id hoặc (command/key)"}], "isError": True}
+
+            allowed, reason = directive_guard.guard(session_id, command, key)
+            db.log_directive_audit(session_id, "mcp:send_worker_directive", key or command, allowed, reason)
+            if not allowed:
+                return {"content": [{"type": "text", "text": json.dumps({"status": "rejected", "session_id": session_id, "reason": reason}, ensure_ascii=False, indent=2)}], "isError": True}
 
             payload = key if key else command
             tmux_success = False

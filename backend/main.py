@@ -25,10 +25,11 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 # Tự động nạp SQLite DB Module & MCP Core
 sys.path.insert(0, str(BASE_DIR))
 try:
-    from backend import db, mcp_core
+    from backend import db, mcp_core, directive_guard
 except ImportError:
     import db
     import mcp_core
+    import directive_guard
 
 class SwarmHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
@@ -98,6 +99,16 @@ class SwarmHandler(SimpleHTTPRequestHandler):
 
         if path == "/api/mcp/auth/status":
             self._send_json(200, db.get_mcp_auth_status())
+            return
+
+        # 0.9. Nhật ký allowlist lệnh gửi vào tmux (audit)
+        if path == "/api/directive/audit":
+            limit = query.get("limit", ["100"])[0]
+            only_rejected = query.get("rejected", ["0"])[0] in ("1", "true")
+            try:
+                self._send_json(200, {"items": db.get_directive_audit(limit, only_rejected), "allow_all": directive_guard.allow_all_enabled()})
+            except Exception as e:
+                self._send_json(500, {"error": str(e)})
             return
 
         # 1. API Status
@@ -514,6 +525,12 @@ class SwarmHandler(SimpleHTTPRequestHandler):
                     elif s_row and s_row["status"] == "paused":
                         db.resume_tmux_session(session_id)
                         time.sleep(0.1)
+
+                allowed, reason = directive_guard.guard(session_id, command, key)
+                db.log_directive_audit(session_id, "http:/api/tmux/send", key or command, allowed, reason)
+                if not allowed:
+                    self._send_json(403, {"status": "rejected", "session_id": session_id, "reason": reason})
+                    return
 
                 tmux_success = False
                 payload = key if key else command

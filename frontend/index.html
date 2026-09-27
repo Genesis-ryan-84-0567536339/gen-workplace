@@ -8682,6 +8682,11 @@ async function sendWbTmuxCmd() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ session_id: sid, command: cmd })
     });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      showToast('Từ chối: ' + (err.reason || err.error || res.status));
+      return;
+    }
     if (res.ok) {
       showToast(`Đã gửi lệnh tới ${sid}`);
       setTimeout(async () => {
@@ -9976,6 +9981,12 @@ async function sendTmuxCmd() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ session_id: sid, command: cmd })
     });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      showToast('Từ chối: ' + (err.reason || err.error || res.status));
+      await refreshTmuxSessions();
+      return;
+    }
     if (res.ok) {
       showToast('Đã gửi lệnh vào ' + sid);
       await refreshTmuxSessions();
@@ -9998,6 +10009,12 @@ async function sendGridCmd(sid) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ session_id: sid, command: cmd })
     });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      showToast('Từ chối: ' + (err.reason || err.error || res.status));
+      await refreshTmuxSessions();
+      return;
+    }
     if (res.ok) {
       showToast('Đã gửi lệnh vào ' + sid);
       await refreshTmuxSessions();
