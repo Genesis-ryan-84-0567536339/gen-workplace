@@ -56,7 +56,8 @@ def get_connection():
     conn.execute("PRAGMA synchronous = NORMAL;")
     conn.execute("PRAGMA foreign_keys = ON;")
     try:
-        yield conn
+        with conn:
+            yield conn
     finally:
         try:
             conn.close()
@@ -1158,8 +1159,7 @@ _LIVE_QUOTA_CACHE = {}
 _LIVE_QUOTA_CACHE_TIME = {}
 QUOTA_CACHE_TTL = 30.0  # 30 giây cache cho auto-polling để tránh spam Cloud Code API
 
-DEFAULT_GOOGLE_OAUTH_CLIENT_ID = "1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com"
-GOOGLE_OAUTH_CLIENT_ID = os.environ.get("GOOGLE_OAUTH_CLIENT_ID") or DEFAULT_GOOGLE_OAUTH_CLIENT_ID
+GOOGLE_OAUTH_CLIENT_ID = os.environ.get("GOOGLE_OAUTH_CLIENT_ID", "")
 GOOGLE_OAUTH_CLIENT_SECRET = os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET", "")
 
 def refresh_google_oauth_token(profile_id="owner_default"):
@@ -2319,10 +2319,10 @@ def start_oauth_login(profile_id, custom_path=""):
                 json.dump({
                     "mcpServers": {
                         "google-drive": {
-                            "command": "/home/ryan/.local/bin/genos-gdrive-mcp"
+                            "command": os.path.join(HOME_DIR, ".local", "bin", "genos-gdrive-mcp")
                         },
                         "gen-workplace": {
-                            "command": "/home/ryan/.local/bin/gen-workplace-mcp"
+                            "command": os.path.join(HOME_DIR, ".local", "bin", "gen-workplace-mcp")
                         }
                     }
                 }, f, indent=2)
@@ -2338,7 +2338,9 @@ def start_oauth_login(profile_id, custom_path=""):
             pass
 
     # Google OAuth 2.0 Auth URL chuẩn cho Antigravity CLI / Cloud Code
-    cid = os.environ.get("GOOGLE_OAUTH_CLIENT_ID") or GOOGLE_OAUTH_CLIENT_ID or DEFAULT_GOOGLE_OAUTH_CLIENT_ID
+    cid = os.environ.get("GOOGLE_OAUTH_CLIENT_ID") or GOOGLE_OAUTH_CLIENT_ID
+    if not cid:
+        return {"ok": False, "error": "Chưa cấu hình GOOGLE_OAUTH_CLIENT_ID trong .env", "profile_id": profile_id, "oauth_url": ""}
     # prompt=select_account consent giúp người dùng luôn có thể đổi sang tài khoản Google khác
     oauth_url = f"https://accounts.google.com/o/oauth2/v2/auth?response_type=code&client_id={cid}&redirect_uri=http%3A%2F%2Flocalhost%3A8085%2Foauth2callback&scope=openid%20email%20profile%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcloud-platform&access_type=offline&prompt=select_account%20consent&state={profile_id}"
 
@@ -2346,7 +2348,7 @@ def start_oauth_login(profile_id, custom_path=""):
     tmux_created = False
     try:
         subprocess.run(["tmux", "kill-session", "-t", session_name], capture_output=True)
-        cmd = f"agy --gemini_dir={target_dir} --dangerously-skip-permissions || bash"
+        cmd = f"agy --gemini_dir={target_dir} || bash"
         res = subprocess.run(["tmux", "new-session", "-d", "-s", session_name, "-c", str(BASE_DIR), cmd], capture_output=True, timeout=2.0)
         tmux_created = (res.returncode == 0)
     except Exception:
@@ -2426,8 +2428,12 @@ def exchange_google_code_for_token(code, profile_id="profile1"):
     import urllib.parse
     from datetime import datetime, timezone, timedelta
 
-    cid = os.environ.get("GOOGLE_OAUTH_CLIENT_ID") or GOOGLE_OAUTH_CLIENT_ID or DEFAULT_GOOGLE_OAUTH_CLIENT_ID
+    cid = os.environ.get("GOOGLE_OAUTH_CLIENT_ID") or GOOGLE_OAUTH_CLIENT_ID
     csec = os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET") or GOOGLE_OAUTH_CLIENT_SECRET
+    if not cid:
+        return False, "Chưa cấu hình GOOGLE_OAUTH_CLIENT_ID trong .env", None
+    if not csec:
+        return False, "Chưa cấu hình GOOGLE_OAUTH_CLIENT_SECRET", None
     redirect_uri = "http://localhost:8085/oauth2callback"
 
     post_data = urllib.parse.urlencode({
@@ -2529,10 +2535,10 @@ def clone_oauth_profile(source_id, target_id):
                 json.dump({
                     "mcpServers": {
                         "google-drive": {
-                            "command": "/home/ryan/.local/bin/genos-gdrive-mcp"
+                            "command": os.path.join(HOME_DIR, ".local", "bin", "genos-gdrive-mcp")
                         },
                         "gen-workplace": {
-                            "command": "/home/ryan/.local/bin/gen-workplace-mcp"
+                            "command": os.path.join(HOME_DIR, ".local", "bin", "gen-workplace-mcp")
                         }
                     }
                 }, f, indent=2)

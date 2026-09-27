@@ -11,6 +11,7 @@ import json
 import time
 import subprocess
 import urllib.parse
+import re
 from pathlib import Path
 from http.server import SimpleHTTPRequestHandler, HTTPServer
 from socketserver import ThreadingMixIn
@@ -69,6 +70,36 @@ def render_oauth_callback_html(status_code, title, desc, profile_id, email=None)
 </body>
 </html>"""
 
+OAUTH_STATE_RE = re.compile(r"^(owner_default|profile[0-9]{1,2})$")
+
+def handle_oauth_callback(handler, query):
+    """Xử lý chung callback Google OAuth (cổng 8085 và route dự phòng /oauth2callback): kiểm state, đổi code lấy token, trả HTML."""
+    code = query.get("code", [None])[0]
+    error = query.get("error", [None])[0]
+    state = query.get("state", [""])[0] or ""
+
+    if not OAUTH_STATE_RE.match(state):
+        html = render_oauth_callback_html(400, "Tham số state không hợp lệ", "Hồ sơ đích (state) phải là owner_default hoặc profileN.", "?")
+        status = 400
+    elif error:
+        html = render_oauth_callback_html(400, "Xác thực bị từ chối", f"Google thông báo lỗi: {error}", state)
+        status = 400
+    elif not code:
+        html = render_oauth_callback_html(400, "Thiếu Authorization Code", "Không nhận được mã ủy quyền từ Google OAuth.", state)
+        status = 400
+    else:
+        ok, msg, email = db.exchange_google_code_for_token(code, state)
+        if ok:
+            html = render_oauth_callback_html(200, "Xác thực Google thành công!", f"Hồ sơ <b>{state}</b> đã được kết nối với tài khoản:", state, email=email)
+            status = 200
+        else:
+            html = render_oauth_callback_html(500, "Lỗi trao đổi token Google", f"Không thể lưu token: {msg}", state)
+            status = 500
+    handler.send_response(status)
+    handler.send_header("Content-Type", "text/html; charset=utf-8")
+    handler.end_headers()
+    handler.wfile.write(html.encode("utf-8"))
+
 class OAuthCallbackHandler(SimpleHTTPRequestHandler):
     def log_message(self, format, *args):
         pass
@@ -77,27 +108,7 @@ class OAuthCallbackHandler(SimpleHTTPRequestHandler):
         parsed = urllib.parse.urlparse(self.path)
         if parsed.path == "/oauth2callback":
             query = urllib.parse.parse_qs(parsed.query)
-            code = query.get("code", [None])[0]
-            error = query.get("error", [None])[0]
-            state = query.get("state", ["profile1"])[0]
-
-            if error:
-                html = render_oauth_callback_html(400, "Xác thực bị từ chối", f"Google thông báo lỗi: {error}", state)
-                self.send_response(400)
-            elif not code:
-                html = render_oauth_callback_html(400, "Thiếu Authorization Code", "Không nhận được mã ủy quyền từ Google OAuth.", state)
-                self.send_response(400)
-            else:
-                ok, msg, email = db.exchange_google_code_for_token(code, state)
-                if ok:
-                    html = render_oauth_callback_html(200, "Xác thực Google thành công!", f"Hồ sơ <b>{state}</b> đã được kết nối với tài khoản:", state, email=email)
-                    self.send_response(200)
-                else:
-                    html = render_oauth_callback_html(500, "Lỗi trao đổi token Google", f"Không thể lưu token: {msg}", state)
-                    self.send_response(500)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.end_headers()
-            self.wfile.write(html.encode("utf-8"))
+            handle_oauth_callback(self, query)
             return
 
         self.send_response(404)
@@ -185,27 +196,7 @@ class SwarmHandler(SimpleHTTPRequestHandler):
 
         # OAuth Callback (Dự phòng cho cổng 8888 nếu redirect trỏ về cổng chính)
         if path == "/oauth2callback":
-            code = query.get("code", [None])[0]
-            error = query.get("error", [None])[0]
-            state = query.get("state", ["profile1"])[0]
-
-            if error:
-                html = render_oauth_callback_html(400, "Xác thực bị từ chối", f"Google thông báo lỗi: {error}", state)
-                self.send_response(400)
-            elif not code:
-                html = render_oauth_callback_html(400, "Thiếu Authorization Code", "Không nhận được mã ủy quyền từ Google OAuth.", state)
-                self.send_response(400)
-            else:
-                ok, msg, email = db.exchange_google_code_for_token(code, state)
-                if ok:
-                    html = render_oauth_callback_html(200, "Xác thực Google thành công!", f"Hồ sơ <b>{state}</b> đã được kết nối với tài khoản:", state, email=email)
-                    self.send_response(200)
-                else:
-                    html = render_oauth_callback_html(500, "Lỗi trao đổi token Google", f"Không thể lưu token: {msg}", state)
-                    self.send_response(500)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.end_headers()
-            self.wfile.write(html.encode("utf-8"))
+            handle_oauth_callback(self, query)
             return
 
         # 1. API Status
@@ -1087,10 +1078,10 @@ class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
 def start_oauth_callback_server(port=8085):
     """Khởi chạy server lắng nghe callback Google OAuth tại localhost:8085 trong background daemon thread."""
     try:
-        cb_server = ThreadedHTTPServer(("0.0.0.0", port), OAuthCallbackHandler)
+        cb_server = ThreadedHTTPServer(("127.0.0.1", port), OAuthCallbackHandler)
         t = threading.Thread(target=cb_server.serve_forever, daemon=True, name="OAuthCallbackServer-8085")
         t.start()
-        print(f"  Google OAuth Callback: http://0.0.0.0:{port}/oauth2callback (Active)")
+        print(f"  Google OAuth Callback: http://127.0.0.1:{port}/oauth2callback (Active)")
         return cb_server
     except Exception as e:
         print(f"  [Warning] Không thể mở cổng OAuth Callback {port}: {e}")
