@@ -15,6 +15,8 @@ import uuid
 import subprocess
 import hashlib
 import secrets
+import shutil
+from contextlib import contextmanager
 from pathlib import Path
 from datetime import datetime, timedelta
 
@@ -45,14 +47,21 @@ def normalize_project_id(pid):
         return "PRJ-GEN-WORKPLACE"
     return str(pid).strip()
 
+@contextmanager
 def get_connection():
-    """Tạo kết nối SQLite tối ưu với WAL mode và Foreign Keys."""
+    """Tạo kết nối SQLite tối ưu với WAL mode, Foreign Keys và bảo đảm đóng kết nối giải phóng File Descriptors."""
     conn = sqlite3.connect(str(DB_PATH), timeout=15.0)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode = WAL;")
     conn.execute("PRAGMA synchronous = NORMAL;")
     conn.execute("PRAGMA foreign_keys = ON;")
-    return conn
+    try:
+        yield conn
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 def init_db():
     """Khởi tạo schema toàn diện cho Multi-Agent Swarm."""
@@ -1093,9 +1102,24 @@ def get_oauth_profiles():
                     data = json.load(f)
                     has_refresh = bool(data.get("token", {}).get("refresh_token") or data.get("refresh_token"))
                     payload = parse_id_token(data.get("id_token", ""))
-                    email = payload.get("email")
-                    user_name = payload.get("name")
-                    exp = payload.get("exp", 0)
+                    email = payload.get("email") if isinstance(payload, dict) else None
+                    user_name = payload.get("name") if isinstance(payload, dict) else None
+                    exp = payload.get("exp", 0) if isinstance(payload, dict) else 0
+
+                    if not email and isinstance(data, dict):
+                        acc_tok = (data.get("token") or {}).get("access_token") if isinstance(data.get("token"), dict) else data.get("access_token")
+                        if acc_tok:
+                            try:
+                                import urllib.request
+                                req = urllib.request.Request("https://www.googleapis.com/oauth2/v3/userinfo",
+                                                             headers={"Authorization": f"Bearer {acc_tok}"})
+                                with urllib.request.urlopen(req, timeout=2.0) as u_resp:
+                                    u_data = json.loads(u_resp.read().decode("utf-8"))
+                                    email = u_data.get("email")
+                                    user_name = u_data.get("name")
+                            except Exception:
+                                pass
+
                     is_auth = bool(email or data.get("token"))
             except Exception:
                 pass
@@ -1134,7 +1158,8 @@ _LIVE_QUOTA_CACHE = {}
 _LIVE_QUOTA_CACHE_TIME = {}
 QUOTA_CACHE_TTL = 30.0  # 30 giây cache cho auto-polling để tránh spam Cloud Code API
 
-GOOGLE_OAUTH_CLIENT_ID = os.environ.get("GOOGLE_OAUTH_CLIENT_ID", "")
+DEFAULT_GOOGLE_OAUTH_CLIENT_ID = "1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com"
+GOOGLE_OAUTH_CLIENT_ID = os.environ.get("GOOGLE_OAUTH_CLIENT_ID") or DEFAULT_GOOGLE_OAUTH_CLIENT_ID
 GOOGLE_OAUTH_CLIENT_SECRET = os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET", "")
 
 def refresh_google_oauth_token(profile_id="owner_default"):
@@ -1967,7 +1992,9 @@ def update_tmux_account(session_id, account_type, account_label, profile_dir="")
 
     # Cập nhật biến môi trường trực tiếp vào phiên tmux đang chạy
     try:
-        p_dir = profile_dir or os.path.join(HOME_DIR, ".gemini")
+        p_dir = profile_dir or (os.path.join(HOME_DIR, ".gemini") if account_type == "owner_default" else os.path.join(HOME_DIR, ".agy-profiles", account_type))
+        if p_dir.startswith("~"):
+            p_dir = os.path.expanduser(p_dir)
         cmd = f"export GEMINI_DIR='{p_dir}'; alias agy=\"agy --gemini_dir='{p_dir}' --dangerously-skip-permissions\"; echo '[AUTH] Đã kích hoạt tài khoản: {account_label}'"
         subprocess.run(["tmux", "send-keys", "-t", session_id, cmd, "Enter"], capture_output=True, timeout=2.0)
     except Exception:
@@ -2265,15 +2292,61 @@ def start_oauth_login(profile_id, custom_path=""):
     cli_dir = os.path.join(target_dir, "antigravity-cli")
     os.makedirs(cli_dir, exist_ok=True)
 
+    # Pre-seed jetski_state và settings.json để agy CLI bỏ qua màn hình onboarding TUI
+    owner_cli = os.path.join(HOME_DIR, ".gemini", "antigravity-cli")
+    target_jetski = os.path.join(cli_dir, "jetski_state.pbtxt")
+    if not os.path.exists(target_jetski) and os.path.exists(os.path.join(owner_cli, "jetski_state.pbtxt")):
+        try:
+            shutil.copy(os.path.join(owner_cli, "jetski_state.pbtxt"), target_jetski)
+        except Exception:
+            pass
+
+    target_settings = os.path.join(cli_dir, "settings.json")
+    if not os.path.exists(target_settings):
+        try:
+            with open(target_settings, "w", encoding="utf-8") as f:
+                json.dump({"theme": "terminal"}, f, indent=2)
+        except Exception:
+            pass
+
+    # Pre-seed config/mcp_config.json và schemas cho agy CLI
+    config_dir = os.path.join(target_dir, "config")
+    os.makedirs(config_dir, exist_ok=True)
+    mcp_cfg = os.path.join(config_dir, "mcp_config.json")
+    if not os.path.exists(mcp_cfg):
+        try:
+            with open(mcp_cfg, "w", encoding="utf-8") as f:
+                json.dump({
+                    "mcpServers": {
+                        "google-drive": {
+                            "command": "/home/ryan/.local/bin/genos-gdrive-mcp"
+                        },
+                        "gen-workplace": {
+                            "command": "/home/ryan/.local/bin/gen-workplace-mcp"
+                        }
+                    }
+                }, f, indent=2)
+        except Exception:
+            pass
+
+    target_mcp_schemas = os.path.join(cli_dir, "mcp", "gen-workplace")
+    owner_mcp_schemas = os.path.join(HOME_DIR, ".gemini", "antigravity-cli", "mcp", "gen-workplace")
+    if not os.path.exists(target_mcp_schemas) and os.path.exists(owner_mcp_schemas):
+        try:
+            shutil.copytree(owner_mcp_schemas, target_mcp_schemas)
+        except Exception:
+            pass
+
     # Google OAuth 2.0 Auth URL chuẩn cho Antigravity CLI / Cloud Code
-    cid = os.environ.get("GOOGLE_OAUTH_CLIENT_ID", "")
-    oauth_url = f"https://accounts.google.com/o/oauth2/v2/auth?response_type=code&client_id={cid}&redirect_uri=http%3A%2F%2Flocalhost%3A8085%2Foauth2callback&scope=openid%20email%20profile%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcloud-platform&access_type=offline&prompt=consent"
+    cid = os.environ.get("GOOGLE_OAUTH_CLIENT_ID") or GOOGLE_OAUTH_CLIENT_ID or DEFAULT_GOOGLE_OAUTH_CLIENT_ID
+    # prompt=select_account consent giúp người dùng luôn có thể đổi sang tài khoản Google khác
+    oauth_url = f"https://accounts.google.com/o/oauth2/v2/auth?response_type=code&client_id={cid}&redirect_uri=http%3A%2F%2Flocalhost%3A8085%2Foauth2callback&scope=openid%20email%20profile%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcloud-platform&access_type=offline&prompt=select_account%20consent&state={profile_id}"
 
     session_name = "gw-oauth-login"
     tmux_created = False
     try:
         subprocess.run(["tmux", "kill-session", "-t", session_name], capture_output=True)
-        cmd = f"agy --gemini_dir={target_dir} || bash"
+        cmd = f"agy --gemini_dir={target_dir} --dangerously-skip-permissions || bash"
         res = subprocess.run(["tmux", "new-session", "-d", "-s", session_name, "-c", str(BASE_DIR), cmd], capture_output=True, timeout=2.0)
         tmux_created = (res.returncode == 0)
     except Exception:
@@ -2307,17 +2380,34 @@ def check_oauth_status(profile_id):
     try:
         with open(token_file, "r") as f:
             data = json.load(f)
-            payload = parse_id_token(data.get("id_token", ""))
-            email = payload.get("email")
-            name = payload.get("name")
-            exp = payload.get("exp", 0)
+            payload = parse_id_token(data.get("id_token", "")) if isinstance(data, dict) else {}
+            email = payload.get("email") if isinstance(payload, dict) else None
+            name = payload.get("name") if isinstance(payload, dict) else None
+            exp = payload.get("exp", 0) if isinstance(payload, dict) else 0
+
+            # Fallback lấy email từ Google UserInfo API nếu id_token không có
+            if not email and isinstance(data, dict):
+                acc_tok = (data.get("token") or {}).get("access_token") if isinstance(data.get("token"), dict) else data.get("access_token")
+                if acc_tok:
+                    try:
+                        import urllib.request
+                        req = urllib.request.Request("https://www.googleapis.com/oauth2/v3/userinfo",
+                                                     headers={"Authorization": f"Bearer {acc_tok}"})
+                        with urllib.request.urlopen(req, timeout=3.0) as u_resp:
+                            u_data = json.loads(u_resp.read().decode("utf-8"))
+                            email = u_data.get("email")
+                            name = u_data.get("name")
+                    except Exception:
+                        pass
+
+            is_auth = bool(email or (isinstance(data, dict) and data.get("token")))
             return {
                 "profile_id": profile_id,
-                "is_auth": True,
+                "is_auth": is_auth,
                 "email": email,
                 "name": name,
                 "exp": exp,
-                "message": f"Đã xác thực thành công tài khoản Google: {email}"
+                "message": f"Đã xác thực thành công tài khoản Google: {email}" if email else "Token hợp lệ"
             }
     except Exception as e:
         return {
@@ -2326,6 +2416,139 @@ def check_oauth_status(profile_id):
             "error": str(e),
             "message": "Lỗi khi đọc token xác thực."
         }
+
+def exchange_google_code_for_token(code, profile_id="profile1"):
+    """
+    Trao đổi authorization code với Google OAuth Token Endpoint (https://oauth2.googleapis.com/token)
+    để lấy access_token, refresh_token, id_token và tự động lưu vào profile.
+    """
+    import urllib.request
+    import urllib.parse
+    from datetime import datetime, timezone, timedelta
+
+    cid = os.environ.get("GOOGLE_OAUTH_CLIENT_ID") or GOOGLE_OAUTH_CLIENT_ID or DEFAULT_GOOGLE_OAUTH_CLIENT_ID
+    csec = os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET") or GOOGLE_OAUTH_CLIENT_SECRET
+    redirect_uri = "http://localhost:8085/oauth2callback"
+
+    post_data = urllib.parse.urlencode({
+        "code": code,
+        "client_id": cid,
+        "client_secret": csec,
+        "redirect_uri": redirect_uri,
+        "grant_type": "authorization_code"
+    }).encode("utf-8")
+
+    req = urllib.request.Request(
+        "https://oauth2.googleapis.com/token",
+        data=post_data,
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        method="POST"
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=10.0) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        err_msg = e.read().decode("utf-8")
+        return False, f"Google OAuth HTTP {e.code}: {err_msg}", None
+    except Exception as e:
+        return False, f"Lỗi kết nối tới Google OAuth: {str(e)}", None
+
+    access_token = data.get("access_token")
+    refresh_token = data.get("refresh_token")
+    expires_in = data.get("expires_in", 3600)
+    id_token = data.get("id_token", "")
+
+    expiry_dt = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
+    expiry_str = expiry_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    token_payload = {
+        "token": {
+            "access_token": access_token,
+            "token_type": "Bearer",
+            "refresh_token": refresh_token or access_token,
+            "expiry": expiry_str
+        },
+        "auth_method": "consumer",
+        "id_token": id_token
+    }
+
+    # Lưu token vào profile
+    res = save_oauth_token(profile_id, token_payload)
+
+    # Lấy thông tin email
+    email = res.get("email")
+    if not email and access_token:
+        try:
+            u_req = urllib.request.Request(
+                "https://www.googleapis.com/oauth2/v3/userinfo",
+                headers={"Authorization": f"Bearer {access_token}"}
+            )
+            with urllib.request.urlopen(u_req, timeout=4.0) as u_resp:
+                u_info = json.loads(u_resp.read().decode("utf-8"))
+                email = u_info.get("email")
+        except Exception:
+            pass
+
+    return True, "Token đã được lưu thành công", email or "Google Account"
+
+def clone_oauth_profile(source_id, target_id):
+    """Sao chép toàn bộ token OAuth từ một profile nguồn sang profile đích."""
+    if not source_id or not target_id or source_id == target_id:
+        return {"ok": False, "error": "ID nguồn và đích không hợp lệ"}
+
+    src_dir = os.path.join(HOME_DIR, ".gemini") if source_id == "owner_default" else os.path.join(HOME_DIR, ".agy-profiles", source_id)
+    dst_dir = os.path.join(HOME_DIR, ".gemini") if target_id == "owner_default" else os.path.join(HOME_DIR, ".agy-profiles", target_id)
+
+    src_tok = os.path.join(src_dir, "antigravity-cli", "antigravity-oauth-token")
+    if not os.path.exists(src_tok):
+        return {"ok": False, "error": f"Không tìm thấy token tại profile nguồn {source_id}"}
+
+    dst_cli = os.path.join(dst_dir, "antigravity-cli")
+    os.makedirs(dst_cli, exist_ok=True)
+    dst_tok = os.path.join(dst_cli, "antigravity-oauth-token")
+
+    try:
+        shutil.copy2(src_tok, dst_tok)
+        os.chmod(dst_tok, 0o600)
+
+        # Pre-seed jetski_state và settings
+        src_jetski = os.path.join(src_dir, "antigravity-cli", "jetski_state.pbtxt")
+        if os.path.exists(src_jetski):
+            shutil.copy2(src_jetski, os.path.join(dst_cli, "jetski_state.pbtxt"))
+        src_settings = os.path.join(src_dir, "antigravity-cli", "settings.json")
+        if os.path.exists(src_settings):
+            shutil.copy2(src_settings, os.path.join(dst_cli, "settings.json"))
+
+        # Pre-seed config/mcp_config.json và schemas
+        dst_config = os.path.join(dst_dir, "config")
+        os.makedirs(dst_config, exist_ok=True)
+        mcp_cfg_path = os.path.join(dst_config, "mcp_config.json")
+        if not os.path.exists(mcp_cfg_path):
+            with open(mcp_cfg_path, "w", encoding="utf-8") as f:
+                json.dump({
+                    "mcpServers": {
+                        "google-drive": {
+                            "command": "/home/ryan/.local/bin/genos-gdrive-mcp"
+                        },
+                        "gen-workplace": {
+                            "command": "/home/ryan/.local/bin/gen-workplace-mcp"
+                        }
+                    }
+                }, f, indent=2)
+
+        dst_mcp_schemas = os.path.join(dst_cli, "mcp", "gen-workplace")
+        owner_mcp_schemas = os.path.join(HOME_DIR, ".gemini", "antigravity-cli", "mcp", "gen-workplace")
+        if not os.path.exists(dst_mcp_schemas) and os.path.exists(owner_mcp_schemas):
+            try:
+                shutil.copytree(owner_mcp_schemas, dst_mcp_schemas)
+            except Exception:
+                pass
+
+        res = check_oauth_status(target_id)
+        return {"ok": True, "target": target_id, "status": res}
+    except Exception as e:
+        return {"ok": False, "error": f"Lỗi khi sao chép token: {str(e)}"}
 
 def save_oauth_token(profile_id, token_data):
     """Lưu token OAuth trực tiếp vào hồ sơ profile."""
@@ -2357,9 +2580,18 @@ def save_oauth_token(profile_id, token_data):
     elif isinstance(token_data, dict):
         payload = token_data
 
+    # Tự động trích xuất hoặc hoàn thiện cấu trúc nếu payload chỉ chứa access_token/refresh_token
+    if "token" not in payload and ("access_token" in payload or "refresh_token" in payload):
+        payload = {
+            "token": payload,
+            "auth_method": payload.get("auth_method", "consumer"),
+            "id_token": payload.get("id_token", "")
+        }
+
     with open(token_file, "w") as f:
         json.dump(payload, f, indent=2)
 
+    os.chmod(token_file, 0o600)
     return check_oauth_status(profile_id)
 
 def assign_oauth_to_role(session_id, profile_id):

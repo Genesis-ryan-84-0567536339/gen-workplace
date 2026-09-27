@@ -14,6 +14,7 @@ import urllib.parse
 from pathlib import Path
 from http.server import SimpleHTTPRequestHandler, HTTPServer
 from socketserver import ThreadingMixIn
+import threading
 
 PORT = int(os.environ.get("PORT", 8888))
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -30,6 +31,77 @@ except ImportError:
     import db
     import mcp_core
     import directive_guard
+
+def render_oauth_callback_html(status_code, title, desc, profile_id, email=None):
+    is_success = (status_code == 200)
+    color = "#3ad18b" if is_success else "#f85149"
+    icon = "🎉" if is_success else "⚠️"
+    email_html = f'<div style="font-family:monospace;font-size:15px;background:#0d1117;padding:10px 14px;border-radius:6px;border:1px solid #30363d;margin:16px 0;color:#58a6ff;">{email}</div>' if email else ""
+
+    return f"""<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <title>{title} - Genesis Workplace</title>
+  <style>
+    body {{ background: #0b0f19; color: #e6edf3; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }}
+    .card {{ background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 32px; max-width: 480px; text-align: center; box-shadow: 0 12px 32px rgba(0,0,0,0.6); }}
+    .icon {{ font-size: 48px; margin-bottom: 12px; }}
+    h2 {{ color: {color}; margin-top: 0; font-size: 22px; }}
+    p {{ color: #8b949e; font-size: 14px; line-height: 1.6; margin: 12px 0; }}
+    .btn {{ display: inline-block; background: #238636; color: #fff; padding: 10px 24px; border-radius: 6px; text-decoration: none; font-weight: 600; margin-top: 18px; border: none; cursor: pointer; font-size: 14px; }}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">{icon}</div>
+    <h2>{title}</h2>
+    <p>{desc}</p>
+    {email_html}
+    <p style="font-size:12px;color:#6e7681">Mission Control OS đã tự động lưu trữ và đồng bộ token vào hồ sơ {profile_id}. Bạn có thể đóng tab này.</p>
+    <button class="btn" onclick="window.close()">Đóng Cửa Sổ Này</button>
+  </div>
+  <script>
+    if ({str(is_success).lower()}) {{
+      setTimeout(() => {{ try {{ window.close(); }} catch(e) {{}} }}, 3500);
+    }}
+  </script>
+</body>
+</html>"""
+
+class OAuthCallbackHandler(SimpleHTTPRequestHandler):
+    def log_message(self, format, *args):
+        pass
+
+    def do_GET(self):
+        parsed = urllib.parse.urlparse(self.path)
+        if parsed.path == "/oauth2callback":
+            query = urllib.parse.parse_qs(parsed.query)
+            code = query.get("code", [None])[0]
+            error = query.get("error", [None])[0]
+            state = query.get("state", ["profile1"])[0]
+
+            if error:
+                html = render_oauth_callback_html(400, "Xác thực bị từ chối", f"Google thông báo lỗi: {error}", state)
+                self.send_response(400)
+            elif not code:
+                html = render_oauth_callback_html(400, "Thiếu Authorization Code", "Không nhận được mã ủy quyền từ Google OAuth.", state)
+                self.send_response(400)
+            else:
+                ok, msg, email = db.exchange_google_code_for_token(code, state)
+                if ok:
+                    html = render_oauth_callback_html(200, "Xác thực Google thành công!", f"Hồ sơ <b>{state}</b> đã được kết nối với tài khoản:", state, email=email)
+                    self.send_response(200)
+                else:
+                    html = render_oauth_callback_html(500, "Lỗi trao đổi token Google", f"Không thể lưu token: {msg}", state)
+                    self.send_response(500)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(html.encode("utf-8"))
+            return
+
+        self.send_response(404)
+        self.end_headers()
 
 class SwarmHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
@@ -109,6 +181,31 @@ class SwarmHandler(SimpleHTTPRequestHandler):
                 self._send_json(200, {"items": db.get_directive_audit(limit, only_rejected), "allow_all": directive_guard.allow_all_enabled()})
             except Exception as e:
                 self._send_json(500, {"error": str(e)})
+            return
+
+        # OAuth Callback (Dự phòng cho cổng 8888 nếu redirect trỏ về cổng chính)
+        if path == "/oauth2callback":
+            code = query.get("code", [None])[0]
+            error = query.get("error", [None])[0]
+            state = query.get("state", ["profile1"])[0]
+
+            if error:
+                html = render_oauth_callback_html(400, "Xác thực bị từ chối", f"Google thông báo lỗi: {error}", state)
+                self.send_response(400)
+            elif not code:
+                html = render_oauth_callback_html(400, "Thiếu Authorization Code", "Không nhận được mã ủy quyền từ Google OAuth.", state)
+                self.send_response(400)
+            else:
+                ok, msg, email = db.exchange_google_code_for_token(code, state)
+                if ok:
+                    html = render_oauth_callback_html(200, "Xác thực Google thành công!", f"Hồ sơ <b>{state}</b> đã được kết nối với tài khoản:", state, email=email)
+                    self.send_response(200)
+                else:
+                    html = render_oauth_callback_html(500, "Lỗi trao đổi token Google", f"Không thể lưu token: {msg}", state)
+                    self.send_response(500)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(html.encode("utf-8"))
             return
 
         # 1. API Status
@@ -608,6 +705,17 @@ class SwarmHandler(SimpleHTTPRequestHandler):
                 self._send_json(400, {"error": "Missing profile_id or token_data"})
             return
 
+        # 9.1. Kế thừa / Sao chép token OAuth từ Profile nguồn sang Profile đích
+        if path == "/api/oauth/clone":
+            src = data.get("source_id") or data.get("source_profile")
+            dst = data.get("target_id") or data.get("profile_id")
+            if src and dst:
+                res = db.clone_oauth_profile(src, dst)
+                self._send_json(200 if res.get("ok") else 400, res)
+            else:
+                self._send_json(400, {"error": "Missing source_id or target_id"})
+            return
+
         # 10. Gán Profile OAuth cho Swarm Role
         if path == "/api/oauth/assign":
             session_id = data.get("session_id")
@@ -976,6 +1084,18 @@ class SwarmHandler(SimpleHTTPRequestHandler):
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
     daemon_threads = True
 
+def start_oauth_callback_server(port=8085):
+    """Khởi chạy server lắng nghe callback Google OAuth tại localhost:8085 trong background daemon thread."""
+    try:
+        cb_server = ThreadedHTTPServer(("0.0.0.0", port), OAuthCallbackHandler)
+        t = threading.Thread(target=cb_server.serve_forever, daemon=True, name="OAuthCallbackServer-8085")
+        t.start()
+        print(f"  Google OAuth Callback: http://0.0.0.0:{port}/oauth2callback (Active)")
+        return cb_server
+    except Exception as e:
+        print(f"  [Warning] Không thể mở cổng OAuth Callback {port}: {e}")
+        return None
+
 def main():
     print(f"==================================================")
     print(f"  GENESIS SWARM WORKPLACE - CONTROL PLANE DAEMON  ")
@@ -983,6 +1103,7 @@ def main():
     print(f"  Frontend: {FRONTEND_DIR}")
     print(f"  Data: {DATA_DIR}")
     print(f"  Database: SQLite 3 WAL + FTS5 Ready")
+    start_oauth_callback_server(8085)
     print(f"==================================================")
     server = ThreadedHTTPServer(("0.0.0.0", PORT), SwarmHandler)
     try:
