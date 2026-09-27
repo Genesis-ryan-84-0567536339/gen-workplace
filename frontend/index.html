@@ -3530,6 +3530,67 @@ body.resizing-active, body.resizing-active * {
   flex-shrink: 0;
 }
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.genAccountToolbar {
+  background: #090e17;
+  border: 1px solid #1a2536;
+  border-radius: 6px;
+  padding: 5px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.genAccountToolbarLeft {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+.genAccountKeyIcon {
+  font-size: 13px;
+  flex-shrink: 0;
+}
+.genAccountSelectWrapper {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  gap: 1px;
+}
+.genAccountSelectLabel {
+  font-size: 8px;
+  color: #64748b;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+.genAccountSelectTop {
+  background: #04070c;
+  border: 1px solid #202e42;
+  border-radius: 4px;
+  color: #f1f5f9;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  width: 100%;
+  text-overflow: ellipsis;
+  outline: none;
+  cursor: pointer;
+}
+.genAccountSelectTop:focus {
+  border-color: #38bdf8;
+}
+.genAccountToolbarRight {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+.genAccountBtn {
+  font-size: 9px !important;
+  padding: 3px 7px !important;
+  white-space: nowrap;
+}
 .genTelemetryQuotaBox {
   background: #080c12;
   border: 1px solid #17212f;
@@ -4812,6 +4873,31 @@ body.resizing-active, body.resizing-active * {
                   <span class="badge" style="background:#0f172a;color:#a855f7;border:1px solid rgba(168,85,247,0.35);font-size:9.5px;font-family:var(--mono)" id="genSessionTokenCountBadge" title="Tổng tokens đã dùng trong phiên này">🪙 0 tokens</span>
                   <button class="btn small" style="font-size:9px;padding:2px 6px" onclick="renameCurrentGenSession()" title="Đổi tên tiêu đề phiên này">✏️ Đổi tên</button>
                   <button class="btn small" id="btnCollapseGenCol3" style="font-size:11px;padding:2px 6px;border-radius:4px;color:#94a3b8" onclick="toggleGenCol3()" title="Thu gọn Cột Chatroom Gen Core">▶</button>
+                </div>
+              </div>
+
+              <!-- Thanh Điều Khiển Tài Khoản Google (Phía trên Quota: Đổi tài khoản & Login mới) -->
+              <div class="genAccountToolbar">
+                <div class="genAccountToolbarLeft">
+                  <span class="genAccountKeyIcon">🔑</span>
+                  <div class="genAccountSelectWrapper">
+                    <span class="genAccountSelectLabel">TÀI KHOẢN GOOGLE:</span>
+                    <select class="genAccountSelectTop" id="genTopAccountSelect" onchange="handleGenAccountChange(this.value)" title="Chọn tài khoản Google hoạt động cho agy CLI">
+                      <option value="owner_default">👑 Owner Ryan (owner@genesis.local)</option>
+                      <option value="profile1">Profile #1 (owner@genesis.local)</option>
+                      <option value="profile2">⚡ Profile #2 (claude.bot@genesis.local) [Có Claude Quota]</option>
+                      <option value="profile3">Profile #3 (admin@genesis.local)</option>
+                      <option value="profile4">Profile #4 (admin@genesis.local)</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="genAccountToolbarRight">
+                  <button class="btn small genAccountBtn" id="btnGenSwitchAccount" onclick="openGenAccountSwitcherModal()" title="Mở danh sách cấu hình & đổi tài khoản Google cho phiên">
+                    <span>🔄 Đổi tài khoản</span>
+                  </button>
+                  <button class="btn small primary genAccountBtn" id="btnGenLoginNew" onclick="openNewGoogleLoginModal()" title="Đăng nhập tài khoản Google mới (Browser / Terminal / Token)">
+                    <span>➕ Login mới</span>
+                  </button>
                 </div>
               </div>
 
@@ -9770,6 +9856,9 @@ async function submitAccountChange() {
     if (res.ok) {
       showToast('Đã cập nhật tài khoản cho ' + sid);
       closeAccountModal();
+      if (['owner_default', 'profile1', 'profile2', 'profile3', 'profile4', 'profile5'].includes(type)) {
+        handleGenAccountChange(type);
+      }
       await refreshTmuxSessions();
     } else {
       showToast('Lỗi khi cập nhật tài khoản');
@@ -9781,6 +9870,50 @@ async function submitAccountChange() {
 
 function openNewTmuxModal() {
   showToast('Khởi tạo thêm Role: hãy dùng nút Khởi tạo Role trong khu Implementation');
+}
+
+// Mở modal cấu hình / đổi tài khoản Google cho phiên chat Gen Core & Swarm
+function openGenAccountSwitcherModal() {
+  const sid = state.selectedTmuxSessionId || state.tmuxSessions?.[0]?.id || 'gw-lead-agy';
+  openAccountModal(sid);
+  const title = $('accountModalTitle');
+  if (title) title.textContent = '🔄 Đổi Tài Khoản / Profile Google Cho agy CLI & Swarm';
+}
+
+// Mở modal đăng nhập tài khoản Google OAuth mới
+function openNewGoogleLoginModal() {
+  const unauth = state.oauthProfiles?.find(p => !p.is_auth);
+  const targetId = unauth ? unauth.id : 'profile5';
+  openOauthModal(targetId);
+  switchOauthTab('browser');
+  showToast('🔐 Đang mở cổng đăng nhập Google OAuth mới...');
+}
+
+// Đồng bộ danh sách tài khoản Google cho dropdowns trên và dưới Quota
+function syncGenAccountSelects() {
+  const topSel = $('genTopAccountSelect');
+  const botSel = $('genAccountSelect');
+  const profiles = state.oauthProfiles || [];
+  
+  if (profiles.length > 0) {
+    const curVal = genState.currentAccount || 'owner_default';
+    const html = profiles.map(p => {
+      const email = p.email || (p.is_auth ? 'Đã xác thực' : 'Chưa login');
+      const isOwner = p.id === 'owner_default' || p.is_owner;
+      const icon = isOwner ? '👑' : (p.id === 'profile2' ? '⚡' : '🔑');
+      const label = isOwner ? `👑 Owner Ryan (${email})` : `${icon} ${p.id.toUpperCase()} (${email})`;
+      return `<option value="${escapeHtml(p.id)}">${escapeHtml(label)}</option>`;
+    }).join('');
+    
+    if (topSel) {
+      topSel.innerHTML = html;
+      topSel.value = curVal;
+    }
+    if (botSel) {
+      botSel.innerHTML = html;
+      botSel.value = curVal;
+    }
+  }
 }
 
 // =========================================================================
@@ -9811,6 +9944,8 @@ function renderOauthProfiles() {
   if ($('oaStatActive')) $('oaStatActive').textContent = activeCount;
   if ($('oaStatPending')) $('oaStatPending').textContent = pendingCount;
   if ($('oauthBadgeCount')) $('oauthBadgeCount').textContent = activeCount + ' Đã Login';
+
+  syncGenAccountSelects();
 
   const rows = $('oauthProfileRows');
   if (rows) {
@@ -11120,7 +11255,7 @@ async function checkLiveQuotaNow() {
   if (label) label.textContent = 'Đang kiểm tra...';
 
   try {
-    const acc = $('genAccountSelect')?.value || 'owner_default';
+    const acc = $('genTopAccountSelect')?.value || $('genAccountSelect')?.value || 'owner_default';
     const res = await fetch(`/api/quota/live?profile=${encodeURIComponent(acc)}&force=1`);
     if (res.ok) {
       const data = await res.json();
@@ -11242,6 +11377,7 @@ async function selectGenConversation(convId) {
       }
     }
     if ($('genAccountSelect')) $('genAccountSelect').value = genState.currentAccount;
+    if ($('genTopAccountSelect')) $('genTopAccountSelect').value = genState.currentAccount;
     if ($('genInputModelBadge')) $('genInputModelBadge').textContent = genState.currentModel.split(' ')[0] + ' ' + (genState.currentModel.split(' ')[1] || '');
 
     // Phục hồi trọn bộ Session Workspace Context cho Cột 2 (Mặc định Kanban & Todos)
@@ -11753,6 +11889,8 @@ async function triggerManualCompact() {
 
 async function handleGenAccountChange(newAccount) {
   genState.currentAccount = newAccount;
+  if ($('genTopAccountSelect')) $('genTopAccountSelect').value = newAccount;
+  if ($('genAccountSelect')) $('genAccountSelect').value = newAccount;
   const cur = genState.conversations.find(x => x.id === genState.currentConvId);
   if (cur) {
     cur.account_profile = newAccount;
@@ -11766,8 +11904,8 @@ async function handleGenAccountChange(newAccount) {
         account: newAccount
       })
     });
-    showToast(`✅ Đã lưu tài khoản agy CLI [${newAccount}] cho phiên này!`);
-    checkLiveQuotaNow();
+    showToast(`✅ Đã chuyển tài khoản Google sang [${newAccount}]!`);
+    await checkLiveQuotaNow();
   } catch (e) {
     showToast('Đã đổi tài khoản: ' + newAccount);
   }
