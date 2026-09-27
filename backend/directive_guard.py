@@ -12,7 +12,7 @@ Cho phép:
   - Lệnh bắt đầu bằng `agy ...` hoặc `agy-run ...` (tuỳ chọn `clear;` / `clear &&` đứng trước),
     có thể nối thêm đúng mẫu giao việc chuẩn:
         ... 2>&1 | tee ~/gw-reports/<file>.md; echo "=== XONG exit=${PIPESTATUS[0]} ==="
-  - Alias tra cứu: gw-role, gw-status.
+  - Alias tra cứu: gw-role, gw-status; gw-update [nhánh] (cập nhật app từ GitHub, scripts/gw-update.sh).
   - Riêng phiên gw-oauth-login: chuỗi văn bản thuần (không ký tự điều khiển shell) để
     trả lời màn hình đăng nhập của agy.
 
@@ -25,6 +25,7 @@ import shlex
 
 ALLOWED_KEYS = {"C-c", "Enter", "q", "Escape"}
 ALLOWED_ALIASES = {"gw-role", "gw-status"}
+_GW_UPDATE_RE = re.compile(r"^gw-update(?: [A-Za-z0-9._/\-]{1,80})?$")
 SEPARATORS = {";", "|", "&&", "||", "&"}
 OAUTH_LOGIN_SESSION = "gw-oauth-login"
 _PLAIN_TEXT_RE = re.compile(r"^[A-Za-z0-9 _./:?=&%@~+\-]+$")
@@ -89,7 +90,7 @@ def check_directive(session_id, command="", key=""):
     if "\n" in command or "\r" in command:
         return False, "Lệnh nhiều dòng bị từ chối"
 
-    if command in ALLOWED_ALIASES:
+    if command in ALLOWED_ALIASES or _GW_UPDATE_RE.match(command):
         return True, ""
 
     try:
