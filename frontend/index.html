@@ -3530,39 +3530,14 @@ body.resizing-active, body.resizing-active * {
   flex-shrink: 0;
 }
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-.genAccountToolbar {
+.genTelemetryQuotaBox {
   background: #090e17;
   border: 1px solid #1a2536;
   border-radius: 6px;
   padding: 5px 8px;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-.genAccountToolbarLeft {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex: 1;
-  min-width: 0;
-}
-.genAccountKeyIcon {
-  font-size: 13px;
-  flex-shrink: 0;
-}
-.genAccountSelectWrapper {
-  display: flex;
   flex-direction: column;
-  flex: 1;
-  min-width: 0;
-  gap: 1px;
-}
-.genAccountSelectLabel {
-  font-size: 8px;
-  color: #64748b;
-  font-weight: 700;
-  letter-spacing: 0.5px;
+  gap: 3px;
 }
 .genAccountSelectTop {
   background: #04070c;
@@ -3572,79 +3547,52 @@ body.resizing-active, body.resizing-active * {
   font-size: 10px;
   font-weight: 600;
   padding: 2px 6px;
-  width: 100%;
   text-overflow: ellipsis;
   outline: none;
   cursor: pointer;
+  transition: border-color 0.2s;
 }
 .genAccountSelectTop:focus {
   border-color: #38bdf8;
 }
-.genAccountToolbarRight {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  flex-shrink: 0;
-}
-.genAccountBtn {
-  font-size: 9px !important;
-  padding: 3px 7px !important;
-  white-space: nowrap;
-}
-.genTelemetryQuotaBox {
-  background: #080c12;
-  border: 1px solid #17212f;
-  border-radius: 6px;
-  padding: 6px 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.genQuotaGroup {
+.genQuotaGroupMini {
   background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 5px;
-  padding: 5px 7px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+  padding: 4px 6px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-}
-.genQuotaGroupHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 10px;
-  font-weight: 700;
+  gap: 2px;
 }
 .genQuotaTierRow {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 4px;
   font-size: 9px;
+  line-height: 1.2;
 }
 .genQuotaTierLabel {
   color: #94a3b8;
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
+  font-size: 8.5px;
+  white-space: nowrap;
 }
 .genQuotaTierVal {
   font-family: var(--mono);
   font-size: 9px;
-  font-weight: 600;
+  font-weight: 700;
 }
 .genQuotaBarRow {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 9.5px;
+  font-size: 9px;
 }
 .genQuotaProgress {
-  height: 3.5px;
+  height: 3px;
   border-radius: 2px;
-  background: #1e293b;
+  background: #17202e;
   overflow: hidden;
-  margin-top: 2px;
+  margin-top: 1px;
 }
 .genQuotaProgressFill {
   height: 100%;
@@ -4876,42 +4824,36 @@ body.resizing-active, body.resizing-active * {
                 </div>
               </div>
 
-              <!-- Thanh Điều Khiển Tài Khoản Google (Phía trên Quota: Đổi tài khoản & Login mới) -->
-              <div class="genAccountToolbar">
-                <div class="genAccountToolbarLeft">
-                  <span class="genAccountKeyIcon">🔑</span>
-                  <div class="genAccountSelectWrapper">
-                    <span class="genAccountSelectLabel">TÀI KHOẢN GOOGLE:</span>
-                    <select class="genAccountSelectTop" id="genTopAccountSelect" onchange="handleGenAccountChange(this.value)" title="Chọn tài khoản Google hoạt động cho agy CLI">
+              <!-- Unified Compact Quota & Google Account Console -->
+              <div class="genTelemetryQuotaBox" id="genTelemetryQuotaBox">
+                <!-- Hàng 1: Dropdown Tài Khoản Google & Các Nút Thao Tác (Chiếm duy nhất 1 hàng siêu gọn ~24px) -->
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:6px">
+                  <div style="display:flex;align-items:center;gap:5px;flex:1;min-width:0">
+                    <span style="font-size:11px;flex-shrink:0" title="Tài khoản Google đang chọn">🔑</span>
+                    <select class="genAccountSelectTop" id="genTopAccountSelect" onchange="handleGenAccountChange(this.value)" title="Chọn tài khoản Google hoạt động cho agy CLI" style="height:22px;padding:1px 5px;font-size:9.5px;font-weight:600;background:#05080f;border:1px solid #1e293b;border-radius:4px;color:#f1f5f9;flex:1;min-width:0;text-overflow:ellipsis">
                       <option value="owner_default">👑 Owner Ryan (owner@genesis.local)</option>
                       <option value="profile1">Profile #1 (owner@genesis.local)</option>
                       <option value="profile2">⚡ Profile #2 (claude.bot@genesis.local) [Có Claude Quota]</option>
                       <option value="profile3">Profile #3 (admin@genesis.local)</option>
                       <option value="profile4">Profile #4 (admin@genesis.local)</option>
                     </select>
+                    <span id="genQuotaLiveSourceBadge" class="badge" style="font-size:8px;padding:1px 4px;background:#064e3b;color:#34d399;border:1px solid rgba(52,211,153,0.3);white-space:nowrap;flex-shrink:0">● Live</span>
                   </div>
-                </div>
-                <div class="genAccountToolbarRight">
-                  <button class="btn small genAccountBtn" id="btnGenSwitchAccount" onclick="openGenAccountSwitcherModal()" title="Mở danh sách cấu hình & đổi tài khoản Google cho phiên">
-                    <span>🔄 Đổi tài khoản</span>
-                  </button>
-                  <button class="btn small primary genAccountBtn" id="btnGenLoginNew" onclick="openNewGoogleLoginModal()" title="Đăng nhập tài khoản Google mới (Browser / Terminal / Token)">
-                    <span>➕ Login mới</span>
-                  </button>
-                </div>
-              </div>
-
-              <!-- Telemetry Quota Monitor (2-Tier: Cửa sổ 5h & Hạn mức tuần) -->
-              <div class="genTelemetryQuotaBox">
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px">
-                  <div style="display:flex;align-items:center;gap:6px">
-                    <span style="font-size:9.5px;font-weight:700;color:#94a3b8;letter-spacing:0.5px">HẠN NGẠCH AGY CLI (CLOUD CODE LIVE)</span>
-                    <span id="genQuotaLiveSourceBadge" class="badge" style="font-size:8.5px;padding:1px 5px;background:#064e3b;color:#34d399;border:1px solid rgba(52,211,153,0.3)">● Live API</span>
+                  <div style="display:flex;align-items:center;gap:3px;flex-shrink:0">
+                    <button class="btn small" id="btnGenSwitchAccount" onclick="openGenAccountSwitcherModal()" style="font-size:8.5px;padding:2px 5px;background:#16202e;border:1px solid #243447;color:#94a3b8" title="Đổi / gán tài khoản Profile cho phiên & Swarm">
+                      🔄 Đổi
+                    </button>
+                    <button class="btn small primary" id="btnGenLoginNew" onclick="openNewGoogleLoginModal()" style="font-size:8.5px;padding:2px 6px" title="Đăng nhập tài khoản Google mới (Browser / Terminal / Token)">
+                      ➕ Login
+                    </button>
+                    <button class="btn small" id="btnCheckLiveQuota" onclick="checkLiveQuotaNow()" style="font-size:8.5px;padding:2px 5px;background:#1e293b;border:1px solid #334155;color:#f8fafc" title="Bấm để kiểm tra Quota thời gian thực">
+                      <span id="btnCheckQuotaSpinner" style="display:none;animation:spin 1s linear infinite">🔄</span>
+                      <span id="btnCheckQuotaLabel">⚡ Check</span>
+                    </button>
+                    <button class="btn small" id="btnToggleQuotaDetails" onclick="toggleQuotaDetails()" style="font-size:9px;padding:2px 6px;background:#0f172a;border:1px solid #334155;color:#38bdf8" title="Bấm để mở rộng / thu gọn chi tiết thanh tiến độ Quota">
+                      <span id="btnToggleQuotaIcon">▲</span>
+                    </button>
                   </div>
-                  <button class="btn small" id="btnCheckLiveQuota" onclick="checkLiveQuotaNow()" style="font-size:9.5px;padding:2px 7px;background:#1e293b;border:1px solid #334155;color:#f8fafc;cursor:pointer;display:inline-flex;align-items:center;gap:4px" title="Bấm để truy vấn thời gian thực quota Cloud Code từ OAuth token của agy cli">
-                    <span id="btnCheckQuotaSpinner" style="display:none;animation:spin 1s linear infinite">🔄</span>
-                    <span id="btnCheckQuotaLabel">⚡ Kiểm tra Quota Live</span>
-                  </button>
                 </div>
 
                 <!-- Hidden elements for legacy script compatibility -->
@@ -4920,96 +4862,77 @@ body.resizing-active, body.resizing-active * {
                 <div id="genGeminiQuotaFill" style="display:none"></div>
                 <div id="genClaudeQuotaFill" style="display:none"></div>
 
-                <!-- Block 1: Google Gemini (Flash / Pro) -->
-                <div class="genQuotaGroup">
-                  <div class="genQuotaGroupHeader">
-                    <span style="color:#38bdf8;display:flex;align-items:center;gap:4px">
-                      <span>💎</span> <strong>Google Gemini (Flash / Pro)</strong>
-                    </span>
-                    <span id="genGeminiSummaryBadge" class="badge" style="font-size:8.5px;padding:1px 5px;background:rgba(56,189,248,0.12);color:#38bdf8;border:1px solid rgba(56,189,248,0.25)">5h: 85% · Tuần: 37%</span>
+                <!-- Hàng 2: Summary Row (Hiển thị tóm tắt siêu gọn - luôn thấy được khi thu gọn hoặc mở rộng) -->
+                <div id="genQuotaSummaryRow" style="display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:9.5px;font-family:var(--mono);padding:2px 0">
+                  <div style="display:flex;align-items:center;gap:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1" title="Google Gemini (Flash/Pro)">
+                    <span style="color:#38bdf8;font-weight:700">💎 Gemini:</span>
+                    <span id="genGeminiSummaryBadge" style="color:#38bdf8">5h: 83% · Tuần: 36%</span>
                   </div>
-                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-                    <div>
-                      <div class="genQuotaTierRow">
-                        <span class="genQuotaTierLabel">⏳ Cửa sổ 5h:</span>
-                        <span class="genQuotaTierVal" id="genGemini5hText" style="color:#38bdf8">85%</span>
-                      </div>
-                      <div class="genQuotaProgress">
-                        <div class="genQuotaProgressFill" id="genGemini5hFill" style="width:85%;background:#38bdf8"></div>
-                      </div>
-                      <div id="genGemini5hReset" style="font-size:8px;color:#64748b;font-family:var(--mono);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="">Hồi lúc 11:42 (còn ~4h47m)</div>
-                    </div>
-                    <div>
-                      <div class="genQuotaTierRow">
-                        <span class="genQuotaTierLabel">📅 Hạn mức tuần:</span>
-                        <span class="genQuotaTierVal" id="genGeminiWeeklyText" style="color:#38bdf8">37%</span>
-                      </div>
-                      <div class="genQuotaProgress">
-                        <div class="genQuotaProgressFill" id="genGeminiWeeklyFill" style="width:37%;background:#0284c7"></div>
-                      </div>
-                      <div id="genGeminiWeeklyReset" style="font-size:8px;color:#64748b;font-family:var(--mono);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="">Hồi 23:05 01/10 (còn ~4d 16h)</div>
-                    </div>
+                  <div style="display:flex;align-items:center;gap:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;justify-content:flex-end" title="Anthropic Claude & GPT-OSS">
+                    <span style="color:#f59e0b;font-weight:700">⚡ Claude:</span>
+                    <span id="genClaudeSummaryBadge" style="color:#ef4444">Tuần: 0% (Hồi 10:38)</span>
                   </div>
                 </div>
 
-                <!-- Block 2: Anthropic Claude & GPT-OSS -->
-                <div class="genQuotaGroup">
-                  <div class="genQuotaGroupHeader">
-                    <span style="color:#f59e0b;display:flex;align-items:center;gap:4px">
-                      <span>⚡</span> <strong>Anthropic Claude &amp; GPT-OSS</strong>
-                    </span>
-                    <span id="genClaudeSummaryBadge" class="badge" style="font-size:8.5px;padding:1px 5px;background:rgba(239,68,68,0.12);color:#ef4444;border:1px solid rgba(239,68,68,0.25)">Tuần: 0% · Đang chờ hồi</span>
-                  </div>
-                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-                    <div>
-                      <div class="genQuotaTierRow">
-                        <span class="genQuotaTierLabel">📅 Hạn mức tuần:</span>
-                        <span class="genQuotaTierVal" id="genClaudeWeeklyText" style="color:#ef4444">0% (Cạn)</span>
-                      </div>
-                      <div class="genQuotaProgress">
-                        <div class="genQuotaProgressFill" id="genClaudeWeeklyFill" style="width:0%;background:#ef4444"></div>
-                      </div>
-                      <div id="genClaudeWeeklyReset" style="font-size:8px;color:#f87171;font-family:var(--mono);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="">Hồi lúc 10:38 (còn ~3h44m)</div>
+                <!-- Hàng 3: Chi Tiết Đầy Đủ 2 Cột (2-Tier Bars & Countdowns - có thể bấm ▲/▼ để đóng mở) -->
+                <div id="genQuotaDetailsBody" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;border-top:1px dashed rgba(255,255,255,0.07);padding-top:4px;margin-top:2px">
+                  <!-- Cột Gemini -->
+                  <div class="genQuotaGroupMini">
+                    <div class="genQuotaTierRow">
+                      <span class="genQuotaTierLabel">⏳ 5h:</span>
+                      <span class="genQuotaTierVal" id="genGemini5hText" style="color:#38bdf8">83%</span>
+                      <span id="genGemini5hReset" style="font-size:8px;color:#64748b;font-family:var(--mono);margin-left:auto" title="">còn ~4h45m</span>
                     </div>
-                    <div>
-                      <div class="genQuotaTierRow">
-                        <span class="genQuotaTierLabel">⏳ Cửa sổ 5h:</span>
-                        <span class="genQuotaTierVal" id="genClaude5hText" style="color:#94a3b8">Đang khóa</span>
-                      </div>
-                      <div class="genQuotaProgress">
-                        <div class="genQuotaProgressFill" id="genClaude5hFill" style="width:0%;background:#64748b"></div>
-                      </div>
-                      <div id="genClaude5hReset" style="font-size:8px;color:#64748b;font-family:var(--mono);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="">Tự mở khi hạn tuần hồi</div>
+                    <div class="genQuotaProgress">
+                      <div class="genQuotaProgressFill" id="genGemini5hFill" style="width:83%;background:#38bdf8"></div>
+                    </div>
+                    <div class="genQuotaTierRow" style="margin-top:3px">
+                      <span class="genQuotaTierLabel">📅 Tuần:</span>
+                      <span class="genQuotaTierVal" id="genGeminiWeeklyText" style="color:#38bdf8">36%</span>
+                      <span id="genGeminiWeeklyReset" style="font-size:8px;color:#64748b;font-family:var(--mono);margin-left:auto" title="">còn ~4d 16h</span>
+                    </div>
+                    <div class="genQuotaProgress">
+                      <div class="genQuotaProgressFill" id="genGeminiWeeklyFill" style="width:36%;background:#0284c7"></div>
+                    </div>
+                  </div>
+
+                  <!-- Cột Claude -->
+                  <div class="genQuotaGroupMini">
+                    <div class="genQuotaTierRow">
+                      <span class="genQuotaTierLabel">📅 Tuần:</span>
+                      <span class="genQuotaTierVal" id="genClaudeWeeklyText" style="color:#ef4444">0% (Cạn)</span>
+                      <span id="genClaudeWeeklyReset" style="font-size:8px;color:#f87171;font-family:var(--mono);margin-left:auto" title="">còn ~3h40m</span>
+                    </div>
+                    <div class="genQuotaProgress">
+                      <div class="genQuotaProgressFill" id="genClaudeWeeklyFill" style="width:0%;background:#ef4444"></div>
+                    </div>
+                    <div class="genQuotaTierRow" style="margin-top:3px">
+                      <span class="genQuotaTierLabel">⏳ 5h:</span>
+                      <span class="genQuotaTierVal" id="genClaude5hText" style="color:#94a3b8">Khóa</span>
+                      <span id="genClaude5hReset" style="font-size:8px;color:#64748b;font-family:var(--mono);margin-left:auto" title="">chờ tuần hồi</span>
+                    </div>
+                    <div class="genQuotaProgress">
+                      <div class="genQuotaProgressFill" id="genClaude5hFill" style="width:0%;background:#475569"></div>
                     </div>
                   </div>
                 </div>
               </div>
 
-              <!-- Model Selector & Account Profile Row -->
-              <div class="genChatControlsRow">
-                <div>
-                  <label style="font-size:9px;color:#64748b;display:block;margin-bottom:2px">ĐỔI MODEL (TỰ COMPACT):</label>
-                  <select class="genChatSelect" id="genModelSelect" onchange="handleGenModelChange(this.value)">
-                    <option value="Gemini 3.8 Flash (High)">⚡ Gemini 3.8 Flash (Tốc độ cao & Thông minh - Khuyến nghị)</option>
-                    <option value="Gemini 3.8 Flash (Medium)">⚡ Gemini 3.8 Flash (Medium Effort)</option>
-                    <option value="Gemini 3.8 Flash (Low)">⚡ Gemini 3.8 Flash (Low Effort - Cực nhanh)</option>
-                    <option value="Gemini 3.7 Flash (High)">🧠 Gemini 3.7 Flash (High Reasoning)</option>
-                    <option value="Gemini 3.1 Pro (High)">👑 Gemini 3.1 Pro (Deep Thinking & Kiến trúc sâu)</option>
-                    <option value="Claude Sonnet 4.6 (Thinking)">🔮 Claude Sonnet 4.6 (Extended Thinking)</option>
-                    <option value="Claude Opus 4.6 (Thinking)">🏛️ Claude Opus 4.6 (Deep Reasoning)</option>
-                    <option value="GPT-OSS 120B (Medium)">🌐 GPT-OSS 120B (Open Weights)</option>
-                  </select>
-                </div>
-                <div>
-                  <label style="font-size:9px;color:#64748b;display:block;margin-bottom:2px">TÀI KHOẢN AGY CLI:</label>
-                  <select class="genChatSelect" id="genAccountSelect" onchange="handleGenAccountChange(this.value)">
-                    <option value="owner_default">👑 Ryan (Owner) - Mặc định (owner@genesis.local)</option>
-                    <option value="profile1">Profile #1 (owner@genesis.local)</option>
-                    <option value="profile2">Profile #2 (claude.bot@genesis.local)</option>
-                    <option value="profile3">Profile #3 (admin@genesis.local)</option>
-                    <option value="profile4">Profile #4 (admin@genesis.local)</option>
-                  </select>
-                </div>
+              <!-- Thanh Chọn Model (Gọn gàng 1 dòng, loại bỏ trùng lặp dropdown tài khoản) -->
+              <div style="display:flex;align-items:center;gap:6px;margin:2px 0">
+                <span style="font-size:8.5px;color:#64748b;font-weight:700;white-space:nowrap;letter-spacing:0.5px">MODEL:</span>
+                <select class="genChatSelect" id="genModelSelect" onchange="handleGenModelChange(this.value)" style="flex:1;height:23px;font-size:10px;padding:1px 6px">
+                  <option value="Gemini 3.8 Flash (High)">⚡ Gemini 3.8 Flash (Tốc độ cao & Thông minh - Khuyến nghị)</option>
+                  <option value="Gemini 3.8 Flash (Medium)">⚡ Gemini 3.8 Flash (Medium Effort)</option>
+                  <option value="Gemini 3.8 Flash (Low)">⚡ Gemini 3.8 Flash (Low Effort - Cực nhanh)</option>
+                  <option value="Gemini 3.7 Flash (High)">🧠 Gemini 3.7 Flash (High Reasoning)</option>
+                  <option value="Gemini 3.1 Pro (High)">👑 Gemini 3.1 Pro (Deep Thinking & Kiến trúc sâu)</option>
+                  <option value="Claude Sonnet 4.6 (Thinking)">🔮 Claude Sonnet 4.6 (Extended Thinking)</option>
+                  <option value="Claude Opus 4.6 (Thinking)">🏛️ Claude Opus 4.6 (Deep Reasoning)</option>
+                  <option value="GPT-OSS 120B (Medium)">🌐 GPT-OSS 120B (Open Weights)</option>
+                </select>
+                <!-- Hidden legacy select for script compatibility -->
+                <select id="genAccountSelect" style="display:none"></select>
               </div>
             </div>
 
@@ -9916,6 +9839,34 @@ function syncGenAccountSelects() {
   }
 }
 
+// Bật / tắt hiển thị chi tiết thanh tiến độ Quota (Accordion)
+function toggleQuotaDetails() {
+  const body = $('genQuotaDetailsBody');
+  const icon = $('btnToggleQuotaIcon');
+  if (!body) return;
+  const isHidden = body.style.display === 'none';
+  if (isHidden) {
+    body.style.display = 'grid';
+    if (icon) icon.textContent = '▲';
+    localStorage.setItem('genQuotaDetailsVisible', '1');
+  } else {
+    body.style.display = 'none';
+    if (icon) icon.textContent = '▼';
+    localStorage.setItem('genQuotaDetailsVisible', '0');
+  }
+}
+
+function initQuotaDetailsState() {
+  const visible = localStorage.getItem('genQuotaDetailsVisible');
+  // Nếu Sếp đã chọn thu gọn trước đó thì duy trì trạng thái thu gọn
+  if (visible === '0') {
+    const body = $('genQuotaDetailsBody');
+    const icon = $('btnToggleQuotaIcon');
+    if (body) body.style.display = 'none';
+    if (icon) icon.textContent = '▼';
+  }
+}
+
 // =========================================================================
 // OAUTH & GOOGLE ACCOUNT CONTROLLER
 // =========================================================================
@@ -11106,6 +11057,7 @@ async function initGenWorkplace() {
     await loadGenSessionTodos(genState.currentConvId);
   }
   syncGenQuotaTelemetry();
+  initQuotaDetailsState();
 }
 
 // 1. Quota Telemetry Sync (2-Tier Architecture: Cửa sổ 5h & Hạn mức tuần)
@@ -11127,6 +11079,13 @@ function syncGenQuotaTelemetry() {
   const cWkReset = qC.reset_weekly || qC.reset_time || '';
   const c5hReset = qC.reset_5h || '';
 
+  // Helper rút gọn hiển thị countdown trên giao diện nhỏ
+  const compactReset = (str) => {
+    if (!str) return '';
+    const m = str.match(/\((còn [^)]+)\)/);
+    return m ? m[1] : (str.includes('ngày') ? str.split('ngày')[0].trim() : str);
+  };
+
   // 1. Cập nhật nhóm Google Gemini
   const elG5hText = $('genGemini5hText');
   const elG5hFill = $('genGemini5hFill');
@@ -11145,8 +11104,8 @@ function syncGenQuotaTelemetry() {
     elG5hFill.style.background = g5h > 20 ? '#38bdf8' : (g5h > 0 ? '#f59e0b' : '#ef4444');
   }
   if (elG5hReset) {
-    elG5hReset.textContent = g5hReset ? `Hồi: ${g5hReset}` : 'Cửa sổ trượt 5h';
-    elG5hReset.title = g5hReset;
+    elG5hReset.textContent = g5hReset ? compactReset(g5hReset) : '5h';
+    elG5hReset.title = g5hReset ? `Hồi lúc: ${g5hReset}` : 'Cửa sổ trượt 5h';
   }
   if (elGWkText) {
     elGWkText.textContent = `${gWk}%`;
@@ -11157,8 +11116,8 @@ function syncGenQuotaTelemetry() {
     elGWkFill.style.background = gWk > 20 ? '#0284c7' : (gWk > 0 ? '#f59e0b' : '#ef4444');
   }
   if (elGWkReset) {
-    elGWkReset.textContent = gWkReset ? `Hồi: ${gWkReset}` : 'Hạn ngạch tuần';
-    elGWkReset.title = gWkReset;
+    elGWkReset.textContent = gWkReset ? compactReset(gWkReset) : 'Tuần';
+    elGWkReset.title = gWkReset ? `Hồi lúc: ${gWkReset}` : 'Hạn ngạch tuần';
   }
   if (elGSummary) {
     elGSummary.textContent = `5h: ${g5h}% · Tuần: ${gWk}%`;
@@ -11183,14 +11142,14 @@ function syncGenQuotaTelemetry() {
     elCWkFill.style.background = cWk > 20 ? '#f59e0b' : (cWk > 0 ? '#facc15' : '#ef4444');
   }
   if (elCWkReset) {
-    elCWkReset.textContent = cWkReset ? `Hồi: ${cWkReset}` : 'Hạn ngạch tuần';
-    elCWkReset.title = cWkReset;
+    elCWkReset.textContent = cWkReset ? compactReset(cWkReset) : 'Tuần';
+    elCWkReset.title = cWkReset ? `Hồi lúc: ${cWkReset}` : 'Hạn ngạch tuần';
     elCWkReset.style.color = cWk === 0 ? '#f87171' : '#64748b';
   }
 
   if (elC5hText) {
     if (c5hDisabled) {
-      elC5hText.textContent = 'Đang khóa';
+      elC5hText.textContent = 'Khóa';
       elC5hText.style.color = '#94a3b8';
     } else {
       elC5hText.textContent = `${c5h}%`;
@@ -11203,24 +11162,20 @@ function syncGenQuotaTelemetry() {
   }
   if (elC5hReset) {
     if (c5hDisabled) {
-      elC5hReset.textContent = 'Tự mở khi hạn tuần hồi';
+      elC5hReset.textContent = 'Chờ tuần hồi';
       elC5hReset.title = qC.desc_5h || 'Đang khóa (sẽ tự động mở khi hạn mức tuần hồi)';
     } else {
-      elC5hReset.textContent = c5hReset ? `Hồi: ${c5hReset}` : 'Cửa sổ trượt 5h';
-      elC5hReset.title = c5hReset;
+      elC5hReset.textContent = c5hReset ? compactReset(c5hReset) : '5h';
+      elC5hReset.title = c5hReset ? `Hồi lúc: ${c5hReset}` : 'Cửa sổ trượt 5h';
     }
   }
   if (elCSummary) {
     if (cWk === 0) {
-      elCSummary.textContent = 'Tuần: 0% · Chờ hồi';
-      elCSummary.style.background = 'rgba(239,68,68,0.12)';
+      elCSummary.textContent = `Tuần: 0% (${compactReset(cWkReset) || 'Khóa'})`;
       elCSummary.style.color = '#ef4444';
-      elCSummary.style.borderColor = 'rgba(239,68,68,0.3)';
     } else {
       elCSummary.textContent = `5h: ${c5h}% · Tuần: ${cWk}%`;
-      elCSummary.style.background = 'rgba(245,158,11,0.12)';
       elCSummary.style.color = '#f59e0b';
-      elCSummary.style.borderColor = 'rgba(245,158,11,0.3)';
     }
   }
 
