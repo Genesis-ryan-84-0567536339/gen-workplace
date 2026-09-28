@@ -5601,18 +5601,17 @@ body.resizing-active, body.resizing-active * {
                     <div style="display:flex;align-items:center;gap:6px">
                       <span style="font-size:14px"></span>
                       <strong style="color:var(--text);font-size:12px" id="thinkingTitle">Chuỗi Suy Luận Nhận Thức</strong>
-                      <span class="chip live" id="thinkingStatusChip" style="font-size:9px;padding:1px 6px">● Logic Đã Hội Tụ</span>
+                      <span class="chip wait" id="thinkingStatusChip">chưa có dữ liệu</span>
                     </div>
                     <span style="color:var(--line2)">|</span>
                     <span style="color:var(--muted)">Model: <strong style="color:var(--accent)" id="thinkingModelName">Gemini 3.8 Flash</strong></span>
                     <span style="color:var(--line2)">·</span>
-                    <span style="color:var(--muted)">Latency: <code style="color:var(--green);font-family:var(--mono)" id="thinkingLatency">184ms</code></span>
+                    <span style="color:var(--muted)">Latency: <code style="color:var(--green);font-family:var(--mono)" id="thinkingLatency">—</code></span>
                     <span style="color:var(--line2)">·</span>
-                    <span style="color:var(--muted)">Tokens: <code style="color:var(--yellow);font-family:var(--mono)" id="thinkingTokens">1,428</code></span>
+                    <span style="color:var(--muted)">Tokens: <code style="color:var(--yellow);font-family:var(--mono)" id="thinkingTokens">—</code></span>
                   </div>
                   <div style="display:flex;align-items:center;gap:6px">
                     <button class="btn small" onclick="copyThinkingTrace()" title="Sao chép toàn bộ chuỗi suy luận">Sao chép</button>
-                    <button class="btn small primary" onclick="simulateLiveThinking()" id="btnSimulateThinking" title="Kích hoạt mô phỏng dòng suy nghĩ thời gian thực">Tái suy luận (Stream)</button>
                   </div>
                 </div>
 
@@ -6316,7 +6315,7 @@ body.resizing-active, body.resizing-active * {
             <span class="chip done" style="font-size:9px;background:rgba(245,158,11,0.2);color:var(--yellow);border:1px solid rgba(245,158,11,0.5)">SYSTEM OWNER</span>
             <span class="chip active" style="font-size:9px">SOVEREIGN</span>
           </div>
-          <div style="font-size:11px;color:var(--accent);font-family:var(--mono);margin-top:3px" id="ownerModalEmail">owner@genesis.local</div>
+          <div style="font-size:11px;color:var(--accent);font-family:var(--mono);margin-top:3px" id="ownerModalEmail">chưa đặt</div>
           <div style="font-size:11px;color:var(--muted);margin-top:5px;line-height:1.4" id="ownerModalBio">
             Single Source of Truth tối cao và chủ sở hữu độc quyền toàn bộ dữ liệu hệ thống Gen Workplace & Genesis Swarm.
           </div>
@@ -8499,8 +8498,7 @@ function renderThinkingCards() {
   const listEl = $('pipelineCircuitBar') || $('thinkingStepsList');
   if (listEl && steps.length === 0) {
     listEl.innerHTML = '<div class="emptyState" style="grid-column:1/-1">Chưa có luồng suy nghĩ thật. Mục này sẽ hiện khi agy xuất log tư duy qua API /api/thinking/trace.</div>';
-    const canvas = $('circuitDeepCanvasBody') || $('thinkingDetailBody');
-    if (canvas) canvas.innerHTML = '';
+    document.querySelectorAll('.circuitDeepCanvas').forEach(el => { el.style.display = 'none'; });
     return;
   }
   if (listEl) {
@@ -8617,7 +8615,7 @@ function simulateLiveThinking() {
         btn.textContent = 'Tái suy luận (Stream)';
       }
       if (chip) {
-        chip.textContent = '● Logic Đã Hội Tụ';
+        chip.textContent = 'chưa có dữ liệu';
         chip.style.color = '';
       }
       showToast('Đã hoàn tất duyệt chuỗi suy luận 5 giai đoạn!');
