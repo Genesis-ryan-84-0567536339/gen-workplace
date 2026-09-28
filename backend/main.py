@@ -417,7 +417,7 @@ class SwarmHandler(SimpleHTTPRequestHandler):
 
         # 19. API Gen Workplace Messages
         if path == "/api/gen/messages":
-            conv_id = query.get("conv_id", ["conv-gen-core-01"])[0]
+            conv_id = query.get("conv_id", [""])[0] or db.default_conv_id()
             msgs = db.get_gen_messages(conv_id)
             self._send_json(200, {"messages": msgs})
             return
@@ -439,14 +439,14 @@ class SwarmHandler(SimpleHTTPRequestHandler):
 
         # 22. API Gen Session Workspace Files (Quản lý File & Folder theo từng phiên)
         if path == "/api/gen/session/files":
-            conv_id = query.get("conv_id", ["conv-gen-core-01"])[0]
+            conv_id = query.get("conv_id", [""])[0] or db.default_conv_id()
             sess_files = db.get_gen_session_files(conv_id)
             self._send_json(200, sess_files)
             return
 
         # 23. API Gen Session Todos & Interactive Checklists (Kanban DAG chuyên dụng theo phiên)
         if path == "/api/gen/session/todos":
-            conv_id = query.get("conv_id", [query.get("conversation_id", ["conv-gen-core-01"])[0]])[0]
+            conv_id = query.get("conv_id", [query.get("conversation_id", [""])[0]])[0] or db.default_conv_id()
             todos = db.get_gen_session_todos(conv_id)
             self._send_json(200, {"todos": todos, "count": len(todos), "conversation_id": conv_id})
             return
@@ -902,7 +902,7 @@ class SwarmHandler(SimpleHTTPRequestHandler):
 
         # 23. API Gen Workplace Chat
         if path == "/api/gen/chat":
-            conv_id = data.get("conv_id", "conv-gen-core-01")
+            conv_id = data.get("conv_id") or db.default_conv_id()
             author = data.get("author", "Ryan (Owner)")
             message = data.get("message", "").strip()
             model = data.get("model", "Gemini 3.1 Pro (High)")
@@ -927,7 +927,7 @@ class SwarmHandler(SimpleHTTPRequestHandler):
 
         # 24. API Gen Workplace Progressive Compaction
         if path == "/api/gen/compact":
-            conv_id = data.get("conv_id", "conv-gen-core-01")
+            conv_id = data.get("conv_id") or db.default_conv_id()
             model_from = data.get("model_from", "")
             model_to = data.get("model_to", "")
             manual = bool(data.get("manual", False))

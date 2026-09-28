@@ -334,7 +334,7 @@ def init_db():
             active_tab TEXT DEFAULT 'files_repo',
             active_file TEXT DEFAULT 'backend/main.py',
             open_tabs_json TEXT DEFAULT '["backend/main.py"]',
-            active_evidence_id TEXT DEFAULT 'NOTE-01',
+            active_evidence_id TEXT DEFAULT '',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
@@ -345,7 +345,7 @@ def init_db():
             ("active_tab", "TEXT DEFAULT 'files_repo'"),
             ("active_file", "TEXT DEFAULT 'backend/main.py'"),
             ("open_tabs_json", "TEXT DEFAULT '[\"backend/main.py\"]'"),
-            ("active_evidence_id", "TEXT DEFAULT 'NOTE-01'"),
+            ("active_evidence_id", "TEXT DEFAULT ''"),
             ("agy_conv_id", "TEXT DEFAULT ''"),
             ("total_tokens", "INTEGER DEFAULT 0")
         ]:
@@ -3894,6 +3894,14 @@ def update_owner_profile(owner_id="owner-ryan", display_name=None, email=None, b
             conn.commit()
     return {"status": "ok", "message": "Đã cập nhật hồ sơ Owner Ryan thành công"}
 
+def default_conv_id(project_id="PRJ-GEN-WORKPLACE"):
+    """ID phiên chat gần nhất (dùng khi caller không truyền conv_id); rỗng nếu chưa có phiên nào."""
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT id FROM gen_conversations WHERE project_id = ? ORDER BY updated_at DESC, id DESC LIMIT 1",
+            (normalize_project_id(project_id),)).fetchone()
+        return row["id"] if row else ""
+
 def get_gen_conversations(project_id="PRJ-GEN-WORKPLACE", owner_id="owner-ryan"):
     with get_connection() as conn:
         cursor = conn.cursor()
@@ -3923,7 +3931,7 @@ def create_gen_conversation(project_id="PRJ-GEN-WORKPLACE", title="Cuộc trò c
         cursor = conn.cursor()
         cursor.execute("""
         INSERT INTO gen_conversations (id, project_id, title, model, account_profile, is_pinned, active_tab, active_file, open_tabs_json, active_evidence_id, owner_id)
-        VALUES (?, ?, ?, ?, ?, 0, 'files_repo', 'backend/main.py', '["backend/main.py"]', 'NOTE-01', ?)
+        VALUES (?, ?, ?, ?, ?, 0, 'files_repo', 'backend/main.py', '["backend/main.py"]', '', ?)
         """, (conv_id, project_id, title, model, account, owner_id))
         conn.commit()
     return {"id": conv_id, "title": title, "model": model, "account": account, "active_tab": "files_repo", "active_file": "backend/main.py", "open_tabs": ["backend/main.py"], "active_evidence_id": "NOTE-01", "owner_id": owner_id}
@@ -4289,7 +4297,7 @@ def compact_gen_conversation(conv_id, model_from="", model_to="", manual=False):
         
         topics_str = " · ".join(user_topics[:3]) if user_topics else "Thảo luận điều phối và kiến trúc hệ thống"
         decisions_str = " | ".join(assistant_decisions[:3]) if assistant_decisions else "Đã thống nhất cơ chế bảo toàn SSOT và ranh giới whitelist"
-        notes_str = ", ".join(notes_list) if notes_list else "#NOTE-01, #NOTE-02"
+        notes_str = ", ".join(notes_list) if notes_list else "(chưa có ghi chú)"
 
         summary = (
             f"📦 **Progressive Context Compact ({cpt_id})** · Chuyển tiếp ngữ cảnh từ `{model_from or 'Trước'}` sang `{model_to or 'Hiện tại'}`:\n"
@@ -4519,6 +4527,9 @@ def attach_repo_file_to_session(conv_id, repo_path):
     return {"status": "attached", "path": clean_p}
 
 def get_file_content_safely(file_path):
+    if not file_path or not str(file_path).strip():
+        return {"error": "Thiếu file_path (đường dẫn file trong repo hoặc session:<conv_id>/<đường dẫn>)"}
+    file_path = str(file_path).strip()
     # Hỗ trợ đọc file thuộc Session Workspace (prefix session:<conv_id>/<rel_path>)
     if file_path.startswith("session:"):
         parts = file_path[len("session:"):].split("/", 1)

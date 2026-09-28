@@ -248,8 +248,7 @@ TOOLS = [
             "properties": {
                 "conv_id": {
                     "type": "string",
-                    "description": "ID cuộc trò chuyện / phiên làm việc (mặc định 'conv-gen-core-01').",
-                    "default": "conv-gen-core-01"
+                    "description": "ID cuộc trò chuyện / phiên làm việc (bỏ trống = phiên gần nhất)."
                 }
             }
         }
@@ -262,8 +261,7 @@ TOOLS = [
             "properties": {
                 "conv_id": {
                     "type": "string",
-                    "description": "ID phiên làm việc (mặc định 'conv-gen-core-01').",
-                    "default": "conv-gen-core-01"
+                    "description": "ID phiên làm việc (bỏ trống = phiên gần nhất)."
                 },
                 "title": {
                     "type": "string",
@@ -354,8 +352,7 @@ TOOLS = [
             "properties": {
                 "conv_id": {
                     "type": "string",
-                    "description": "ID phiên làm việc (mặc định 'conv-gen-core-01').",
-                    "default": "conv-gen-core-01"
+                    "description": "ID phiên làm việc (bỏ trống = phiên gần nhất)."
                 },
                 "task_id": {
                     "type": "string",
@@ -387,8 +384,7 @@ TOOLS = [
                 },
                 "conv_id": {
                     "type": "string",
-                    "description": "ID phiên làm việc (mặc định 'conv-gen-core-01').",
-                    "default": "conv-gen-core-01"
+                    "description": "ID phiên làm việc (bỏ trống = phiên gần nhất)."
                 },
                 "model": {
                     "type": "string",
@@ -566,8 +562,7 @@ TOOLS = [
             "properties": {
                 "conv_id": {
                     "type": "string",
-                    "description": "ID phiên làm việc (mặc định 'conv-gen-core-01').",
-                    "default": "conv-gen-core-01"
+                    "description": "ID phiên làm việc (bỏ trống = phiên gần nhất)."
                 },
                 "path": {
                     "type": "string",
@@ -767,7 +762,9 @@ def execute_tool(name: str, args: dict) -> dict:
 
         # 8. get_worker_terminal_output
         if name == "get_worker_terminal_output":
-            session_id = args.get("session_id")
+            session_id = (args.get("session_id") or "").strip()
+            if not session_id:
+                return {"content": [{"type": "text", "text": json.dumps({"error": "Thiếu session_id (vd gw-qa-agy)"}, ensure_ascii=False)}], "isError": True}
             lines = int(args.get("lines", 60))
             try:
                 res = subprocess.run(["tmux", "capture-pane", "-t", session_id, "-p", "-S", f"-{lines}"],
@@ -802,13 +799,17 @@ def execute_tool(name: str, args: dict) -> dict:
 
         # 11. list_kanban_tasks
         if name == "list_kanban_tasks":
-            conv_id = args.get("conv_id", "conv-gen-core-01")
+            conv_id = args.get("conv_id") or db.default_conv_id()
+            if not conv_id:
+                return {"content": [{"type": "text", "text": json.dumps({"error": "Chưa có phiên chat nào; truyền conv_id hoặc tạo phiên bằng create_conversation"}, ensure_ascii=False)}], "isError": True}
             todos = db.get_gen_session_todos(conv_id)
             return {"content": [{"type": "text", "text": json.dumps({"conversation_id": conv_id, "count": len(todos), "tasks": todos}, ensure_ascii=False, indent=2)}], "isError": False}
 
         # 12. create_kanban_task
         if name == "create_kanban_task":
-            conv_id = args.get("conv_id", "conv-gen-core-01")
+            conv_id = args.get("conv_id") or db.default_conv_id()
+            if not conv_id:
+                return {"content": [{"type": "text", "text": json.dumps({"error": "Chưa có phiên chat nào; truyền conv_id hoặc tạo phiên bằng create_conversation"}, ensure_ascii=False)}], "isError": True}
             title = args.get("title", "")
             desc = args.get("description", "")
             priority = args.get("priority", "high")
@@ -840,7 +841,9 @@ def execute_tool(name: str, args: dict) -> dict:
 
         # 15. update_task_checklist
         if name == "update_task_checklist":
-            conv_id = args.get("conv_id", "conv-gen-core-01")
+            conv_id = args.get("conv_id") or db.default_conv_id()
+            if not conv_id:
+                return {"content": [{"type": "text", "text": json.dumps({"error": "Chưa có phiên chat nào; truyền conv_id hoặc tạo phiên bằng create_conversation"}, ensure_ascii=False)}], "isError": True}
             task_id = args.get("task_id")
             item_id = args.get("item_id")
             done = bool(args.get("done"))
@@ -850,7 +853,9 @@ def execute_tool(name: str, args: dict) -> dict:
         # 16. gen_chat
         if name == "gen_chat":
             msg = args.get("message", "")
-            conv_id = args.get("conv_id", "conv-gen-core-01")
+            conv_id = args.get("conv_id") or db.default_conv_id()
+            if not conv_id:
+                return {"content": [{"type": "text", "text": json.dumps({"error": "Chưa có phiên chat nào; truyền conv_id hoặc tạo phiên bằng create_conversation"}, ensure_ascii=False)}], "isError": True}
             model = args.get("model", "Gemini 3.1 Pro (High)")
             author = args.get("author", "AI Agent")
             account = args.get("account", "owner_default")
@@ -915,8 +920,12 @@ def execute_tool(name: str, args: dict) -> dict:
 
         # 25. create_workspace_file
         if name == "create_workspace_file":
-            conv_id = args.get("conv_id", "conv-gen-core-01")
-            rel_path = args.get("path", "")
+            conv_id = args.get("conv_id") or db.default_conv_id()
+            if not conv_id:
+                return {"content": [{"type": "text", "text": json.dumps({"error": "Chưa có phiên chat nào; truyền conv_id hoặc tạo phiên bằng create_conversation"}, ensure_ascii=False)}], "isError": True}
+            rel_path = (args.get("path") or "").strip()
+            if not rel_path:
+                return {"content": [{"type": "text", "text": json.dumps({"error": "Thiếu path (đường dẫn tương đối trong phiên, vd docs/ghi-chu.md)"}, ensure_ascii=False)}], "isError": True}
             is_dir = bool(args.get("is_dir", False))
             content = args.get("content", "")
             res = db.create_gen_session_file(conv_id, rel_path, is_dir, content)
@@ -1034,7 +1043,7 @@ def handle_jsonrpc_request(req: dict) -> dict:
             sessions = db.get_tmux_sessions("PRJ-GEN-WORKPLACE")
             content_text = json.dumps(sessions, ensure_ascii=False)
         elif uri == "gen-workplace://kanban/tasks":
-            todos = db.get_gen_session_todos("conv-gen-core-01")
+            todos = db.get_gen_session_todos(db.default_conv_id())
             content_text = json.dumps(todos, ensure_ascii=False)
         else:
             return {
