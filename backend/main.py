@@ -874,7 +874,9 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             self._send_json(200, res)
             return
 
-        # 22. Trao đổi chỉ thị với Runtime Chuyên gia (Ghi DB + Chuyển Tmux)
+        # 22. Trao đổi chỉ thị với Runtime Chuyên gia: CHỈ lưu tin vào chat_messages theo runtime_id.
+        #     Không gửi gì vào tmux ở đây (trước đây echo tin qua send-keys không qua directive_guard → chạy được
+        #     $(...)/backtick trong shell worker). Muốn gõ vào tmux phải dùng /api/tmux/send (có allowlist + audit).
         if path == "/api/runtime/chat":
             message = data.get("message", "").strip()
             session_id = data.get("session_id", "gw-lead-agy")
@@ -889,12 +891,6 @@ class SwarmHandler(SimpleHTTPRequestHandler):
                     VALUES (?, ?, ?, ?, 'Directive', ?, '["✅ đã nhận"]')
                     """, (project_id, session_id, author, now_time, message))
                     conn.commit()
-                # Gửi lệnh vào tmux tương tác nếu phiên đang mở
-                try:
-                    escaped_msg = message.replace('"', '\\"')
-                    subprocess.run(["tmux", "send-keys", "-t", session_id, f'echo -e "\\033[1;36m[Ryan DIRECTIVE]\\033[0m: {escaped_msg}"', "C-m"], timeout=1.5)
-                except Exception:
-                    pass
                 self._send_json(200, {"status": "sent", "session_id": session_id, "time": now_time})
             else:
                 self._send_json(400, {"error": "Missing message"})
