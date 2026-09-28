@@ -28,11 +28,14 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 # Tự động nạp SQLite DB Module & MCP Core
 sys.path.insert(0, str(BASE_DIR))
 try:
-    from backend import db, mcp_core, directive_guard
+    from backend import db, mcp_core, directive_guard, auto_update
 except ImportError:
     import db
     import mcp_core
     import directive_guard
+    import auto_update
+
+RUNNING_COMMIT = auto_update.current_commit(BASE_DIR)  # commit của code đang chạy (đổi sau khi tự cập nhật execv)
 
 def render_oauth_callback_html(status_code, title, desc, profile_id, email=None):
     is_success = (status_code == 200)
@@ -241,9 +244,15 @@ class SwarmHandler(SimpleHTTPRequestHandler):
                 "runtimes_count": len(state.get("runtimes", [])),
                 "ssot_synced": True,
                 "db_engine": "SQLite 3 WAL + FTS5",
-                "active_project": state.get("project", {}).get("name", "gen-workplace")
+                "active_project": state.get("project", {}).get("name", "gen-workplace"),
+                "commit": RUNNING_COMMIT,
+                "auto_update": auto_update.enabled()
             }
             self._send_json(200, status)
+            return
+
+        if path == "/api/auto-update":
+            self._send_json(200, auto_update.status(BASE_DIR, DATA_DIR))
             return
 
         # 2. API Full State (Từ SQLite Core DB)
@@ -1178,6 +1187,7 @@ def main():
     print(f"  Database: SQLite 3 WAL + FTS5 Ready")
     start_oauth_callback_server(8085)
     start_reclaim_worker()
+    auto_update.start_worker(BASE_DIR, DATA_DIR)
     print(f"==================================================")
     server = ThreadedHTTPServer(("0.0.0.0", PORT), SwarmHandler)
     try:

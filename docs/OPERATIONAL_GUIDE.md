@@ -18,9 +18,15 @@ systemctl --user daemon-reload && systemctl --user enable --now gen-workplace
 systemctl --user restart gen-workplace          # khởi động lại sau khi cập nhật backend
 journalctl --user -u gen-workplace -f -n 50     # log runtime của Control Plane
 
-# Cập nhật app về đúng commit trên GitHub rồi khởi động lại (scripts/gw-update.sh)
-gw-update            # origin/main
-gw-update <nhánh>    # nhánh PR đang xem thử
+# TỰ CẬP NHẬT (#13, backend/auto_update.py): app tự kiểm origin/main mỗi 120s; có commit mới
+# thì chạy thử trên cổng phụ với bản sao DB, OK mới tự restart (os.execv), hỏng thì giữ bản cũ.
+# Chỉ chạy khi máy đang ở nhánh main. Xem trạng thái: curl localhost:8888/api/auto-update
+# Biến: GW_AUTO_UPDATE=0 (tắt) · GW_AUTO_UPDATE_SEC=120 · GW_AUTO_UPDATE_BRANCH=main
+# Nhật ký: data/auto_update.log
+
+# Cập nhật tay (thường không cần nữa) (scripts/gw-update.sh)
+gw-update            # origin/main — cũng là lệnh đưa máy về main để tự cập nhật chạy lại
+gw-update <nhánh>    # nhánh PR đang xem thử (tự cập nhật tạm dừng tới khi gw-update về main)
 
 # Vào phiên tmux của một vai (attach_cmd trong GET /api/tmux/sessions)
 tmux attach -t gw-backend-agy
