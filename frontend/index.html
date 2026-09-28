@@ -4993,7 +4993,7 @@ body.resizing-active, body.resizing-active * {
               </div>
 
               <div class="orchListGroupTitle">Dự Án Điều Phối</div>
-              <div class="orchListItem" onclick="go('dashboard')">
+              <div class="orchListItem" onclick="go('implementation')">
                 <span class="orchItemIcon"></span>
                 <div class="orchItemInfo">
                   <strong>gen-workplace (Active)</strong>
@@ -5492,7 +5492,6 @@ body.resizing-active, body.resizing-active * {
                       <span style="font-size:10px;font-weight:700;color:var(--muted2);text-transform:uppercase;letter-spacing:0.5px">Thao tác nhanh:</span>
                       <button class="btn small" style="font-size:10px;padding:2px 8px;font-family:var(--mono)" onclick="sendWbTmuxPredefinedCmd('gw-status')" title="Kiểm tra context vai trò">gw-status</button>
                       <button class="btn small" style="font-size:10px;padding:2px 8px;font-family:var(--mono)" onclick="sendWbTmuxPredefinedCmd('gw-role')" title="Đọc toàn bộ Role Spec">gw-role</button>
-                      <button class="btn small" style="font-size:10px;padding:2px 8px;font-family:var(--mono)" onclick="sendWbTmuxPredefinedCmd('cat docs/SSOT_ORIGINAL_SPEC.md | head -n 30')" title="Tra cứu SSOT Spec">SSOT Spec</button>
                       <button class="btn small" style="font-size:10px;padding:2px 8px;font-family:var(--mono);color:var(--accent);border-color:rgba(56,189,248,0.3)" onclick="sendWbTmuxRoleTask()" title="Chạy nhiệm vụ chuyên môn của role này">▶ Chạy Task này</button>
                     </div>
                     <div>
@@ -7361,7 +7360,7 @@ function openRoleSource(role = 'Role') {
   $('sourceInput').focus();
   $('sourceInput').selectionStart = 0;
   $('sourceInput').selectionEnd = $('sourceInput').value.length;
-  showToast(role + ' instruction được đồng bộ từ Input tổng');
+  showToast('Sửa chỉ thị của ' + role + ' ngay trong Input tổng rồi bấm "Lưu nguồn"');
 }
 
 async function toggleTodoStatus(todoId, currentStatus) {
@@ -7550,7 +7549,7 @@ function renderDashboardProjects() {
     </div>
     <div class="resource">
       <div><b>Nơi làm việc / SSOT</b><small>${state.ssot.length} dữ kiện đã xác thực</small></div>
-      <button class="btn" onclick="go('memory')">Mở</button>
+      <button class="btn" onclick="go('data'); switchData('catalog')">Mở</button>
     </div>
   `;
 }
@@ -9287,8 +9286,18 @@ async function triggerSwarmLifecycle(action) {
   }
 }
 
+function copyText(text) {
+  const t = String(text ?? '');
+  if (!t) { showToast('Không có gì để sao chép'); return; }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(t).then(() => showToast('Đã sao chép')).catch(() => showToast('Trình duyệt không cho phép sao chép'));
+  } else {
+    showToast('Trình duyệt không hỗ trợ sao chép');
+  }
+}
+
 function copyTmuxAttachCmd() {
-  const cmd = $('tmuxAttachCmdDisplay')?.textContent || `docker exec -it gen-workplace-app tmux a -t ${state.selectedTmuxSessionId}`;
+  const cmd = $('tmuxAttachCmdDisplay')?.textContent || `tmux attach -t ${state.selectedTmuxSessionId}`;
   if (navigator.clipboard) {
     navigator.clipboard.writeText(cmd);
   }
@@ -9296,7 +9305,7 @@ function copyTmuxAttachCmd() {
 }
 
 function copyGridAttach(sid) {
-  const cmd = `docker exec -it gen-workplace-app tmux a -t ${sid}`;
+  const cmd = `tmux attach -t ${sid}`;
   if (navigator.clipboard) {
     navigator.clipboard.writeText(cmd);
   }
@@ -10639,7 +10648,7 @@ let genState = {
   gitStatus: null,
   fileSearchQuery: '',
   notes: [],
-  activeEvidenceId: 'NOTE-01',
+  activeEvidenceId: '',
   messages: [],
   searchQuery: '',
   showCompactedDetails: false,
@@ -11099,7 +11108,7 @@ async function selectGenConversation(convId) {
     const savedTab = c.active_tab || 'kanban_todo';
     const savedFile = c.active_file || 'backend/main.py';
     genState.openTabs = Array.isArray(c.open_tabs) && c.open_tabs.length > 0 ? c.open_tabs : ['backend/main.py'];
-    genState.activeEvidenceId = c.active_evidence_id || 'NOTE-01';
+    genState.activeEvidenceId = c.active_evidence_id || '';
 
     // Chuyển Cột 2 sang đúng tab và file của phiên này (không sync ngược lại):
     switchGenVsTab(savedTab, false);
@@ -11522,7 +11531,8 @@ function clearGenInput() {
 function insertNoteRefToInput() {
   const input = $('genChatInput');
   if (!input) return;
-  const currentId = genState.activeEvidenceId || 'NOTE-01';
+  const currentId = genState.activeEvidenceId;
+  if (!currentId) { showToast('Chưa chọn ghi chú nào để tham chiếu'); return; }
   input.value = (input.value ? input.value + ' ' : '') + `#${currentId}`;
   input.focus();
 }
@@ -12310,7 +12320,7 @@ function switchGenVsTab(tabName, shouldSync = true) {
       bTarget.textContent = genState.activeFilePath || 'backend/main.py';
     } else if (tabName === 'evidence') {
       if (bSection) bSection.textContent = 'evidence';
-      bTarget.textContent = `#${genState.activeEvidenceId || 'NOTE-01'}`;
+      bTarget.textContent = genState.activeEvidenceId ? `#${genState.activeEvidenceId}` : '—';
     } else if (tabName === 'scratchpad') {
       if (bSection) bSection.textContent = 'notes';
       bTarget.textContent = 'Sổ tay Scratchpad';
@@ -13114,14 +13124,14 @@ function reloadGenActiveTab() {
     loadGenNotes();
     showToast('Đã làm mới sổ tay!');
   } else if (genState.currentVsTab === 'evidence') {
-    openEvidenceDetail(genState.activeEvidenceId || 'NOTE-01');
-    showToast('Đã làm mới hồ sơ bằng chứng!');
+    if (genState.activeEvidenceId) { openEvidenceDetail(genState.activeEvidenceId); showToast('Đã làm mới hồ sơ bằng chứng!'); } else { showToast('Chưa chọn ghi chú nào'); }
   }
 }
 
 // 6. Evidence Trace Viewer (Cột 2 Tab 2)
 async function openEvidenceDetail(rawId) {
-  const id = (rawId || 'NOTE-01').replace(/^#/, '').trim();
+  const id = String(rawId || '').replace(/^#/, '').trim();
+  if (!id) { showToast('Chưa chọn ghi chú/bằng chứng nào'); return; }
   genState.activeEvidenceId = id;
   switchGenVsTab('evidence');
 
@@ -13165,7 +13175,7 @@ async function openEvidenceDetail(rawId) {
 }
 
 function citeActiveEvidenceToChat() {
-  const id = genState.activeEvidenceId || 'NOTE-01';
+  const id = genState.activeEvidenceId || '';
   const inp = $('genChatInput');
   if (inp) {
     inp.value = (inp.value ? inp.value + ' ' : '') + `Theo chứng cứ #${id}: `;
@@ -13755,9 +13765,8 @@ function refreshAll() {
 document.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
     e.preventDefault();
-    go('memory');
-    document.querySelector('.indexToolbar .searchBox')?.focus();
-    showToast('Catalog tra cứu nhanh ID: Event / Vault / MCP / File');
+    go('data'); switchData('catalog');
+    document.querySelector('#data-catalog input')?.focus();
   }
   if (e.key === 'Escape') closeModal();
 });
