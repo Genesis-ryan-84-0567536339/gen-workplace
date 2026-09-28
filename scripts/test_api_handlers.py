@@ -105,6 +105,45 @@ check("tin lưu nguyên văn vào chat_messages với runtime_id", row and row["
 st, js, _ = call("POST", "/api/runtime/chat", {"message": "   "})
 check("thiếu message → 400", st == 400 and js and "error" in js, f"{st} {js}")
 
+print("[2] POST /api/todo/update: id không tồn tại → 404")
+with db.get_connection() as conn:
+    conn.execute("INSERT INTO roadmaps (id, project_id, title, description, todos_count, status, order_idx) VALUES ('RM-API', 'PRJ-GEN-WORKPLACE', 'Roadmap test', '', 1, 'queued', 1)")
+    conn.execute("INSERT INTO todos (id, roadmap_id, project_id, title, assigned_role, status) VALUES ('TODO-API-1', 'RM-API', 'PRJ-GEN-WORKPLACE', 'Task thật', 'QA Tester', 'queued')")
+    conn.commit()
+check("db.update_todo_status id lạ → False", db.update_todo_status("TODO-KHONG-CO", "done") is False)
+check("db.update_todo_status id thật → True", db.update_todo_status("TODO-API-1", "in_progress") is True)
+st, js, _ = call("POST", "/api/todo/update", {"id": "TODO-KHONG-CO", "status": "done"})
+check("404 Task not found", st == 404 and js == {"error": "Task not found", "id": "TODO-KHONG-CO"}, f"{st} {js}")
+st, js, _ = call("POST", "/api/todo/update", {"id": "TODO-API-1", "status": "review"})
+check("id thật → 200 success=True", st == 200 and js and js.get("success") is True and js.get("new_status") == "review", f"{st} {js}")
+st, js, _ = call("POST", "/api/todo/update", {"id": "TODO-API-1"})
+check("thiếu status → 400", st == 400 and js and "error" in js, f"{st} {js}")
+
+print("[3] POST /api/gen/session/todos/save: conv_id không tồn tại → 400 JSON")
+st, js, raw = call("POST", "/api/gen/session/todos/save", {"conv_id": "conv-khong-co", "title": "Task", "viec_ref": "VIEC-1"})
+check("400 + thông báo phiên không tồn tại", st == 400 and js == {"error": "Phiên chat không tồn tại: conv-khong-co"}, f"{st} {raw!r}")
+conv = db.create_gen_conversation(title="Phiên test API")
+st, js, _ = call("POST", "/api/gen/session/todos/save", {"conv_id": conv["id"], "title": "Task thật", "viec_ref": "VIEC-1"})
+check("phiên thật → 200 saved", st == 200 and js and js.get("status") == "saved" and js.get("created") is True, f"{st} {js}")
+check("db.gen_conversation_exists", db.gen_conversation_exists(conv["id"]) and not db.gen_conversation_exists("conv-khong-co") and not db.gen_conversation_exists(""))
+
+print("[4] exception chưa bắt trong do_POST / do_GET → 500 JSON, server vẫn sống")
+
+
+def _boom(*a, **kw):
+    raise RuntimeError("nổ thử")
+
+
+_orig_create_project, _orig_vault = db.create_new_project, db.get_vault_list
+db.create_new_project, db.get_vault_list = _boom, _boom
+st, js, raw = call("POST", "/api/project/create", {"name": "x"})
+check("POST → 500 {'error': 'RuntimeError'}", st == 500 and js and js.get("error") == "RuntimeError", f"{st} {raw!r}")
+st, js, raw = call("GET", "/api/vault/list")
+check("GET → 500 {'error': 'RuntimeError'}", st == 500 and js and js.get("error") == "RuntimeError", f"{st} {raw!r}")
+db.create_new_project, db.get_vault_list = _orig_create_project, _orig_vault
+st, js, _ = call("GET", "/api/vault/list")
+check("sau lỗi server vẫn phục vụ bình thường", st == 200 and js and "vault" in js, f"{st} {js}")
+
 shutil.rmtree(TMP, ignore_errors=True)
 server.shutdown()
 print(f"\n{PASSED}/{PASSED + FAILED} test pass")

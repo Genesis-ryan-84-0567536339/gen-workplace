@@ -12,6 +12,7 @@ import time
 import subprocess
 import urllib.parse
 import re
+import traceback
 from pathlib import Path
 from http.server import SimpleHTTPRequestHandler, HTTPServer
 from socketserver import ThreadingMixIn
@@ -134,7 +135,26 @@ class SwarmHandler(SimpleHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.end_headers()
 
+    def _guarded(self, handler):
+        """Chạy handler; exception chưa bắt → log traceback ra stderr và trả 500 JSON {"error": "<tên lỗi>"} thay vì ngắt kết nối."""
+        try:
+            handler()
+        except (BrokenPipeError, ConnectionResetError):
+            pass  # client đã đóng kết nối, không còn gì để trả
+        except Exception as e:
+            traceback.print_exc(file=sys.stderr)
+            try:
+                self._send_json(500, {"error": type(e).__name__, "detail": str(e)})
+            except Exception:
+                pass
+
     def do_GET(self):
+        self._guarded(self._handle_get)
+
+    def do_POST(self):
+        self._guarded(self._handle_post)
+
+    def _handle_get(self):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
         query = urllib.parse.parse_qs(parsed.query)
@@ -453,7 +473,7 @@ class SwarmHandler(SimpleHTTPRequestHandler):
 
         return super().do_GET()
 
-    def do_POST(self):
+    def _handle_post(self):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
         content_length = int(self.headers.get("Content-Length", 0))
@@ -548,6 +568,9 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             project_id = data.get("project_id", "PRJ-GEN-WORKPLACE")
             if todo_id and new_status:
                 success = db.update_todo_status(todo_id, new_status, project_id)
+                if not success:
+                    self._send_json(404, {"error": "Task not found", "id": todo_id})
+                    return
                 self._send_json(200, {"status": "updated", "id": todo_id, "new_status": new_status, "success": success})
             else:
                 self._send_json(400, {"error": "Missing id or status"})
@@ -1053,6 +1076,10 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             except (TypeError, ValueError):
                 order_idx = 0
             if conv_id and title:
+                # Phiên không tồn tại → 400 (trước đây sqlite3.IntegrityError FOREIGN KEY không bắt → ngắt kết nối)
+                if not db.gen_conversation_exists(conv_id):
+                    self._send_json(400, {"error": f"Phiên chat không tồn tại: {conv_id}"})
+                    return
                 # Tạo mới (không có id / id chưa tồn tại) bắt buộc viec_ref khớp ^VIEC-[0-9]+$ → thiếu/sai trả 400
                 res = db.save_gen_session_todo(conv_id, todo_id, title, description, status, priority, assigned_agent, checklist,
                                                evidence_ref, order_idx=order_idx, owner_id=owner_id, viec_ref=viec_ref)

@@ -3689,7 +3689,8 @@ def update_todo_status(todo_id, new_status, project_id="PRJ-GEN-WORKPLACE"):
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("UPDATE todos SET status = ? WHERE id = ? AND project_id = ?", (new_status, todo_id, project_id))
-        
+        updated = cursor.rowcount > 0  # id không tồn tại → False (trước đây luôn True)
+
         cursor.execute("SELECT roadmap_id FROM todos WHERE id = ? AND project_id = ?", (todo_id, project_id))
         r_row = cursor.fetchone()
         if r_row:
@@ -3702,7 +3703,7 @@ def update_todo_status(todo_id, new_status, project_id="PRJ-GEN-WORKPLACE"):
             cursor.execute("UPDATE roadmaps SET status = ?, todos_count = ? WHERE id = ?", (rm_status, total, rm_id))
 
         conn.commit()
-        return True
+        return updated
 
 def create_new_project(name, repo_path, plan_text=""):
     name = (name or "").strip()
@@ -3924,6 +3925,13 @@ def get_gen_conversations(project_id="PRJ-GEN-WORKPLACE", owner_id="owner-ryan")
                 d["open_tabs"] = ["backend/main.py"]
             result.append(d)
         return result
+
+def gen_conversation_exists(conv_id):
+    """True nếu phiên chat conv_id có trong gen_conversations (kiểm trước khi INSERT bảng con có FOREIGN KEY)."""
+    if not conv_id:
+        return False
+    with get_connection() as conn:
+        return conn.execute("SELECT 1 FROM gen_conversations WHERE id = ?", (conv_id,)).fetchone() is not None
 
 def create_gen_conversation(project_id="PRJ-GEN-WORKPLACE", title="Cuộc trò chuyện mới", model="Gemini 3.1 Pro (High)", account="owner_default", owner_id="owner-ryan"):
     conv_id = f"conv-{uuid.uuid4().hex[:8]}"
