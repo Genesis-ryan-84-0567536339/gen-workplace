@@ -5655,7 +5655,7 @@ body.resizing-active, body.resizing-active * {
           <div class="actions">
             <span class="chip done" id="sourceState">Nguồn đồng bộ SSOT</span>
             <button class="btn" onclick="saveSource()">Lưu nguồn</button>
-            <button class="btn primary" onclick="generateFromSource()">AI sinh cấu trúc</button>
+            <button class="btn primary" onclick="generateFromSource()">Lưu đặc tả cho các vai</button>
           </div>
         </div>
 
@@ -7076,12 +7076,12 @@ async function generateFromSource() {
       $('sourceState').className = 'chip live';
       $('roadmapSourceState').textContent = '5 Phase gen-workplace (Đã khóa)';
       renderAll();
-      showToast('AI đã phân rã Roadmap → Todo DAG → Khóa Role Instructions → Cập nhật SQLite!');
+      showToast(data.note || 'Đã lưu đặc tả làm nguồn cho các vai');
     } else {
-      showToast('Lỗi khi AI phân rã cấu trúc');
+      { const err = await res.json().catch(() => ({})); showToast('Không lưu được đặc tả: ' + (err.error || res.status)); }
     }
   } catch (e) {
-    showToast('Lỗi kết nối AI phân rã: ' + e.message);
+    showToast('Lỗi kết nối: ' + e.message);
   }
 }
 
@@ -7964,10 +7964,10 @@ function updateCommandDeck() {
     }
   }
   if ($('wbInputFrom')) {
-    $('wbInputFrom').textContent = roleInfo.inputFrom;
+    $('wbInputFrom').textContent = roleInfo.inputFrom || '—';
   }
   if ($('wbOutputTo')) {
-    $('wbOutputTo').textContent = roleInfo.outputTo;
+    $('wbOutputTo').textContent = roleInfo.outputTo || '—';
   }
   if ($('wbAllowedBox')) {
     const al = current.allowed_paths?.join(', ') || 'Toàn quyền trong workspace';
@@ -7999,8 +7999,8 @@ function updateCommandDeck() {
   // Update SOP Panel Elements
   if ($('sopRoleTitle')) $('sopRoleTitle').textContent = `${current.role_name} (${current.id}) · Quy Chuẩn Vận Hành SOP`;
   if ($('sopRoleMission')) $('sopRoleMission').textContent = roleInfo.mission;
-  if ($('sopInputFrom')) $('sopInputFrom').textContent = roleInfo.inputFrom;
-  if ($('sopOutputTo')) $('sopOutputTo').textContent = roleInfo.outputTo;
+  if ($('sopInputFrom')) $('sopInputFrom').textContent = roleInfo.inputFrom || '—';
+  if ($('sopOutputTo')) $('sopOutputTo').textContent = roleInfo.outputTo || '—';
   if ($('sopAllowedPaths')) $('sopAllowedPaths').textContent = current.allowed_paths?.join(', ') || '* (Toàn quyền trong workspace)';
   if ($('sopBlockedPaths')) $('sopBlockedPaths').textContent = current.blocked_paths?.join(', ') || 'Không có hạn chế';
   if ($('sopStatusChip')) {
@@ -8273,7 +8273,7 @@ function updateRibbonSummary() {
   const roleInfo = rolesSopData[current?.id] || ROLE_DETAILS[current?.id] || ROLE_DETAILS['gw-lead-agy'];
   const summaryEl = $('wbRibbonSummaryText');
   if (summaryEl) {
-    summaryEl.innerHTML = `<strong>${escapeHtml(current?.current_task_id || 'Task')}</strong>: ${escapeHtml(roleInfo.mission.substring(0, 60))}... | <span style="color:var(--accent)">${escapeHtml(roleInfo.inputFrom)}</span> | <span style="color:var(--green)">${current?.allowed_paths?.join(', ') || '*'}</span>`;
+    summaryEl.innerHTML = `<strong>${escapeHtml(current?.current_task_id || 'Task')}</strong>: ${escapeHtml((roleInfo.mission || '').substring(0, 60))}... | <span style="color:var(--accent)">${escapeHtml(roleInfo.inputFrom)}</span> | <span style="color:var(--green)">${current?.allowed_paths?.join(', ') || '*'}</span>`;
   }
 }
 
