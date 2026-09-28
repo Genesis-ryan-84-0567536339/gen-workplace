@@ -528,6 +528,12 @@ def init_db():
             reason TEXT DEFAULT ''
         );
         """)
+        # Loại dòng audit + người đang giữ task khi bị đóng thay bằng force (Issue #18)
+        for col, col_type in [("action", "TEXT DEFAULT 'override_evidence'"), ("held_by", "TEXT DEFAULT ''")]:
+            try:
+                cursor.execute(f"ALTER TABLE task_evidence_audit ADD COLUMN {col} {col_type};")
+            except Exception:
+                pass
 
         # 21. MCP Agent Tokens & Permissions (Chuẩn bảo mật Gen-hub OAuth / Bearer)
         cursor.execute("""
@@ -3224,14 +3230,19 @@ def claim_task(session_id, todo_id, project_id="PRJ-GEN-WORKPLACE", lock_timeout
         return _claim_refused(table, todo_id, project_id, session_id)
     return {"status": "claimed", "task_id": todo_id, "session_id": session_id}
 
-def _log_evidence_override(conn, table, todo_id, project_id, session_id, old_ev, old_by, new_ev, new_by, reason):
+def _log_evidence_override(conn, table, todo_id, project_id, session_id, old_ev, old_by, new_ev, new_by, reason,
+                           action="override_evidence", held_by=""):
     conn.execute("""
     INSERT INTO task_evidence_audit (task_id, table_name, project_id, session_id, old_evidence_ref, old_verified_by,
-                                     new_evidence_ref, new_verified_by, reason)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (todo_id, table, project_id, session_id or "", old_ev or "", old_by or "", new_ev, new_by, reason or ""))
-    print(f"[evidence] force ghi đè bằng chứng task {todo_id} ({table}) bởi {session_id}: '{old_ev}' → '{new_ev}'"
-          + (f" — lý do: {reason}" if reason else ""))
+                                     new_evidence_ref, new_verified_by, reason, action, held_by)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (todo_id, table, project_id, session_id or "", old_ev or "", old_by or "", new_ev, new_by, reason or "", action, held_by or ""))
+    if action == "force_close":
+        print(f"[evidence] force đóng task {todo_id} ({table}) đang do {held_by} giữ, người đóng {session_id}: '{new_ev}'"
+              + (f" — lý do: {reason}" if reason else ""))
+    else:
+        print(f"[evidence] force ghi đè bằng chứng task {todo_id} ({table}) bởi {session_id}: '{old_ev}' → '{new_ev}'"
+              + (f" — lý do: {reason}" if reason else ""))
 
 def get_task_evidence_audit(task_id="", limit=50):
     """Nhật ký ghi đè bằng chứng (complete_task force=True), mới nhất trước."""
@@ -3242,12 +3253,20 @@ def get_task_evidence_audit(task_id="", limit=50):
             rows = conn.execute("SELECT * FROM task_evidence_audit ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
     return [dict(r) for r in rows]
 
+# Người đang giữ task (claim_task): todos → assigned_session_id, Kanban phiên → claimed_by (assigned_agent chỉ là nhãn giao việc)
+_TASK_HOLDER_COL = {"todos": "assigned_session_id", "gen_session_todos": "claimed_by"}
+
 def complete_task(session_id, todo_id, evidence_ref, verified_by="Lead Architect", project_id="PRJ-GEN-WORKPLACE", force=False, reason=""):
     """
-    Nghiệm thu hoàn tất có bằng chứng kiểm được (Evidence-Backed Completion, #4, #16):
+    HÀM CHUNG duy nhất chuyển task sang 'done' (Evidence-Backed Completion, #4, #16, #18). Mọi đường đổi trạng thái
+    (API /api/task/complete, /api/todo/update, /api/gen/session/todos/status|save, MCP complete_task, kéo thả Kanban,
+    chỉ thị [KANBAN_UPDATE]/[TASK_DONE] của chat Gen) đều gọi qua đây:
     - evidence_ref phải qua verify_evidence_ref (commit SHA / file không rỗng trong ~/gw-reports·repo·worktree /
       dispatch:<id> done khớp task / warroom:<id> trả lời của agent / URL PR GitHub có thật).
     - Không đạt → trả {"error": ...} và KHÔNG đổi trạng thái.
+    - Chỉ người đang giữ task (claimed_by / assigned_session_id) được đóng; task chưa ai claim thì ai cũng đóng được.
+      Người khác → {"error", "code": "not_holder", "held_by"}; muốn đóng thay phải force=True và lần đóng đó được ghi
+      vào task_evidence_audit (action='force_close', held_by).
     - Task đã done → {"error", "code": "already_done"} và KHÔNG ghi đè; chỉ ghi đè khi force=True,
       mỗi lần ghi đè được lưu vào task_evidence_audit (bằng chứng cũ → mới, ai, lý do) và in log.
     - verified_by được tính: 'git:commit' / 'file' / 'github:pr' / 'dispatch' / 'warroom' (tham số verified_by chỉ giữ để tương thích API).
@@ -3255,11 +3274,13 @@ def complete_task(session_id, todo_id, evidence_ref, verified_by="Lead Architect
     """
     project_id = normalize_project_id(project_id)
     todo_id = (todo_id or "").strip()
+    session_id = (session_id or "").strip()
+    evidence_ref = evidence_ref if isinstance(evidence_ref, str) else ("" if evidence_ref is None else str(evidence_ref))
     with get_connection() as conn:
         table, row = None, None
         for tbl, by_col in (("todos", "verified_by"), ("gen_session_todos", "'' AS verified_by")):
-            row = conn.execute(f"SELECT status, evidence_ref, {by_col} FROM {tbl} WHERE id = ? AND project_id = ?",
-                               (todo_id, project_id)).fetchone()
+            row = conn.execute(f"SELECT status, evidence_ref, {by_col}, COALESCE({_TASK_HOLDER_COL[tbl]}, '') AS holder "
+                               f"FROM {tbl} WHERE id = ? AND project_id = ?", (todo_id, project_id)).fetchone()
             if row:
                 table = tbl
                 break
@@ -3270,40 +3291,60 @@ def complete_task(session_id, todo_id, evidence_ref, verified_by="Lead Architect
         return {"error": f"Task {todo_id} đã done với bằng chứng '{row['evidence_ref'] or ''}' — không ghi đè. "
                          "Cần sửa bằng chứng thì gọi lại với force=true (sẽ được ghi log).",
                 "code": "already_done", "task_id": todo_id, "evidence_ref": row["evidence_ref"] or "", "verified_by": row["verified_by"] or ""}
+    holder = (row["holder"] or "").strip()
+    if not was_done and holder and holder != session_id and not force:
+        return {"error": f"Task {todo_id} đang do {holder} giữ — chỉ người giữ task mới được đóng. "
+                         "Muốn đóng thay thì gọi lại với force=true (sẽ được ghi nhật ký task_evidence_audit).",
+                "code": "not_holder", "task_id": todo_id, "held_by": holder, "session_id": session_id}
 
     ok, verified_by, msg = verify_evidence_ref(evidence_ref, task_id=todo_id, project_id=project_id)
     if not ok:
-        return {"error": msg, "task_id": todo_id}
+        return {"error": msg, "code": "invalid_evidence", "task_id": todo_id}
     evidence_ref = evidence_ref.strip()
+    holder_col = _TASK_HOLDER_COL[table]
 
     with get_connection() as conn:
         conn.isolation_level = None
         conn.execute("BEGIN IMMEDIATE")
         try:
-            done_guard = "" if force else " AND status != 'done'"
             by_col = "verified_by" if table == "todos" else "'' AS verified_by"
-            old = conn.execute(f"SELECT status, evidence_ref, {by_col} FROM {table} WHERE id = ? AND project_id = ?",
-                               (todo_id, project_id)).fetchone()
+            old = conn.execute(f"SELECT status, evidence_ref, {by_col}, COALESCE({holder_col}, '') AS holder FROM {table} "
+                               "WHERE id = ? AND project_id = ?", (todo_id, project_id)).fetchone()
+            guard, guard_params = "", []
+            if not force:
+                # Nguyên tử: chưa done và (chưa ai giữ hoặc chính người gọi đang giữ) ngay tại lúc ghi
+                guard = f" AND status != 'done' AND COALESCE({holder_col}, '') IN ('', ?)"
+                guard_params = [session_id]
             if table == "todos":
                 cur = conn.execute(f"""
                 UPDATE todos
                 SET status = 'done', evidence_ref = ?, verified_by = ?, assigned_session_id = ''
-                WHERE id = ? AND project_id = ?{done_guard}
-                """, (evidence_ref, verified_by, todo_id, project_id))
+                WHERE id = ? AND project_id = ?{guard}
+                """, [evidence_ref, verified_by, todo_id, project_id] + guard_params)
             else:
                 cur = conn.execute(f"""
                 UPDATE gen_session_todos
                 SET status = 'done', evidence_ref = ?, claimed_by = '', locked_at = '', updated_at = CURRENT_TIMESTAMP
-                WHERE id = ? AND project_id = ?{done_guard}
-                """, (evidence_ref, todo_id, project_id))
+                WHERE id = ? AND project_id = ?{guard}
+                """, [evidence_ref, todo_id, project_id] + guard_params)
             if cur.rowcount == 0:
                 conn.execute("ROLLBACK")
-                return {"error": f"Task {todo_id} vừa được nghiệm thu bởi lượt gọi khác — không ghi đè", "code": "already_done", "task_id": todo_id}
+                if old and old["status"] == "done":
+                    return {"error": f"Task {todo_id} vừa được nghiệm thu bởi lượt gọi khác — không ghi đè", "code": "already_done", "task_id": todo_id}
+                return {"error": f"Task {todo_id} vừa được {old['holder'] if old else '?'} claim trong lúc đóng — chỉ người giữ task mới được đóng",
+                        "code": "not_holder", "task_id": todo_id, "held_by": old["holder"] if old else ""}
             overridden = bool(old and old["status"] == "done")
+            old_holder = (old["holder"] or "").strip() if old else ""
+            force_closed = bool(old and not overridden and old_holder and old_holder != session_id)
             if overridden:
                 _log_evidence_override(conn, table, todo_id, project_id, session_id, old["evidence_ref"], old["verified_by"],
                                        evidence_ref, verified_by, reason)
+            elif force_closed:
+                _log_evidence_override(conn, table, todo_id, project_id, session_id, old["evidence_ref"], old["verified_by"],
+                                       evidence_ref, verified_by, reason, action="force_close", held_by=old_holder)
             conn.execute("UPDATE tmux_sessions SET current_task_id = '', last_heartbeat = CURRENT_TIMESTAMP WHERE id = ?", (session_id,))
+            if force_closed:
+                conn.execute("UPDATE tmux_sessions SET current_task_id = '' WHERE id = ? AND current_task_id = ?", (old_holder, todo_id))
             conn.execute("COMMIT")
         except Exception:
             conn.execute("ROLLBACK")
@@ -3316,7 +3357,66 @@ def complete_task(session_id, todo_id, evidence_ref, verified_by="Lead Architect
            "verify_message": msg, "webhook_sent": webhook_sent}
     if overridden:
         res["overridden"] = {"old_evidence_ref": old["evidence_ref"] or "", "old_verified_by": old["verified_by"] or "", "reason": reason or ""}
+    if force_closed:
+        res["force_closed"] = {"held_by": old_holder, "reason": reason or ""}
     return res
+
+TASK_STATUS_ERROR_HTTP = {"not_found": 404, "already_done": 409, "not_holder": 409, "wrong_conversation": 404}
+
+def task_error_http_status(res):
+    """Mã HTTP cho kết quả lỗi của complete_task / set_task_status: 404 không có task, 409 đã done / người khác giữ, 400 còn lại."""
+    if not isinstance(res, dict) or "error" not in res:
+        return 200
+    if res.get("error") == "Task not found":
+        return 404
+    return TASK_STATUS_ERROR_HTTP.get(res.get("code"), 400)
+
+def set_task_status(todo_id, new_status, project_id="PRJ-GEN-WORKPLACE", conv_id=None, session_id="", evidence_ref="",
+                    force=False, reason=""):
+    """
+    Đổi trạng thái 1 task (todos roadmap hoặc Kanban phiên nếu truyền conv_id). Mọi đường đổi trạng thái đều đi qua đây:
+    - new_status == 'done' → complete_task (kiểm evidence + chỉ người giữ task, force thì ghi audit). Không có evidence
+      hợp lệ → {"error", "code"} và trạng thái KHÔNG đổi.
+    - Trạng thái khác → cập nhật thẳng (Kanban phiên: ngoài todo/in_progress/review/done → 'todo').
+    Trả dict: {"status": "updated"|"completed", ...} hoặc {"error", "code"?, ...}.
+    """
+    project_id = normalize_project_id(project_id)
+    todo_id = (todo_id or "").strip()
+    new_status = (new_status or "").strip().lower()
+    if conv_id:
+        if new_status not in GEN_SESSION_TODO_STATUSES:
+            new_status = "todo"
+        with get_connection() as conn:
+            row = conn.execute("SELECT conversation_id FROM gen_session_todos WHERE id = ?", (todo_id,)).fetchone()
+        if not row:
+            return {"error": "Task not found", "id": todo_id, "task_id": todo_id}
+        if row["conversation_id"] != conv_id:
+            return {"error": f"Task {todo_id} không thuộc phiên {conv_id}", "code": "wrong_conversation", "id": todo_id, "task_id": todo_id}
+    if new_status == "done":
+        res = complete_task(session_id, todo_id, evidence_ref or "", project_id=project_id, force=force, reason=reason)
+        res.setdefault("id", todo_id)
+        if "error" not in res:
+            res["new_status"] = "done"
+        return res
+    with get_connection() as conn:
+        if conv_id:
+            params = [new_status]
+            extra = ""
+            if evidence_ref:
+                # Không đè bằng chứng của task đã done qua đường đổi trạng thái thường
+                extra = ", evidence_ref = CASE WHEN status = 'done' THEN evidence_ref ELSE ? END"
+                params.append(evidence_ref)
+            cur = conn.execute(f"UPDATE gen_session_todos SET status = ?, updated_at = CURRENT_TIMESTAMP{extra} WHERE id = ? AND conversation_id = ?",
+                               params + [todo_id, conv_id])
+        else:
+            cur = conn.execute("UPDATE todos SET status = ? WHERE id = ? AND project_id = ?", (new_status, todo_id, project_id))
+        updated = cur.rowcount > 0
+        conn.commit()
+    if not updated:
+        return {"error": "Task not found", "id": todo_id, "task_id": todo_id}
+    if not conv_id:
+        _refresh_roadmap_status(todo_id, project_id)
+    return {"status": "updated", "id": todo_id, "new_status": new_status}
 
 def reclaim_stalled_tasks(timeout_seconds=None, project_id="PRJ-GEN-WORKPLACE"):
     """
@@ -3805,11 +3905,11 @@ def is_role_worktree(session_id, cwd):
     real = os.path.realpath(cwd)
     return real == wt and real != repo and os.path.exists(os.path.join(wt, ".git"))
 
-def ensure_agy_plan_permissions(p_dir, cwd):
+def ensure_agy_plan_permissions(p_dir, cwd, extra_dirs=()):
     """
-    Thêm quy tắc chỉ đọc vào permissions.allow của hồ sơ agy (<p_dir>/antigravity-cli/settings.json) để agy -p --mode plan
-    đọc được file và chạy lệnh chỉ đọc trong worktree của vai thay vì bị auto-denied:
-      read_file(<cwd>) + command(ls|cat|grep|git status|git log|git diff|...).
+    Thêm quy tắc chỉ đọc vào permissions.allow của hồ sơ agy (<p_dir>/antigravity-cli/settings.json) để agy -p
+    đọc được file và chạy lệnh chỉ đọc trong thư mục làm việc (worktree của vai / thư mục chat Gen) thay vì bị auto-denied:
+      read_file(<cwd>) [+ read_file(<extra_dirs>...)] + command(ls|cat|grep|git status|git log|git diff|...).
     Giữ nguyên mọi khóa khác; file hỏng / permissions sai kiểu → không đụng. Tắt bằng GW_AGY_PLAN_ALLOW=0. Trả danh sách quy tắc vừa thêm.
     """
     if (os.environ.get("GW_AGY_PLAN_ALLOW", "1") or "").strip().lower() in ("0", "false", "no", "off"):
@@ -3818,7 +3918,12 @@ def ensure_agy_plan_permissions(p_dir, cwd):
     # Chỉ ghi vào hồ sơ agy đã có thư mục antigravity-cli: tạo mới sẽ làm _agy_env đổi ANTIGRAVITY_APP_DATA_DIR của hồ sơ
     if not p_dir or not os.path.isdir(cli_dir) or not cwd:
         return []
-    rules = [f"read_file({os.path.realpath(cwd)})"] + [f"command({c})" for c in AGY_PLAN_READONLY_COMMANDS]
+    dirs = []
+    for d in [cwd] + [x for x in (extra_dirs or ()) if x]:
+        real = os.path.realpath(str(d))
+        if real not in dirs:
+            dirs.append(real)
+    rules = [f"read_file({d})" for d in dirs] + [f"command({c})" for c in AGY_PLAN_READONLY_COMMANDS]
     path = os.path.join(cli_dir, "settings.json")
     with _AGY_SETTINGS_LOCK:
         try:
@@ -4354,6 +4459,7 @@ def get_vault_list():
         {"id": "ENV-GW_EVENT_WEBHOOK_URL", "name": "GW_EVENT_WEBHOOK_URL", "owner": "Môi trường", "scope": "Webhook sự kiện task_completed / dispatch_finished", "status": "bật" if os.environ.get("GW_EVENT_WEBHOOK_URL") else "tắt"},
         {"id": "ENV-GW_AGY_WRITE_ROLES", "name": "GW_AGY_WRITE_ROLES", "owner": "Môi trường", "scope": "Vai được bật --dangerously-skip-permissions cho agy-run (chỉ trong worktree riêng)", "status": ", ".join(sorted(agy_write_roles())) or "không vai nào"},
         {"id": "ENV-GW_WARROOM_SKIP_PERMISSIONS", "name": "GW_WARROOM_SKIP_PERMISSIONS", "owner": "Môi trường", "scope": "Lối thoát cuối: agy war-room (--mode plan) bỏ hỏi quyền, chỉ trong worktree của vai", "status": "bật" if _env_on("GW_WARROOM_SKIP_PERMISSIONS") else "tắt"},
+        {"id": "ENV-GW_GEN_CHAT_SKIP_PERMISSIONS", "name": "GW_GEN_CHAT_SKIP_PERMISSIONS", "owner": "Môi trường", "scope": "Lối thoát cuối: chat Gen / Orchestrator (agy --print) bỏ hỏi quyền; mặc định chỉ đọc theo permissions.allow", "status": "bật" if _env_on("GW_GEN_CHAT_SKIP_PERMISSIONS") else "tắt"},
         {"id": "ENV-GW_AUTO_UPDATE", "name": "GW_AUTO_UPDATE", "owner": "Môi trường", "scope": f"Tự cập nhật từ origin/{os.environ.get('GW_AUTO_UPDATE_BRANCH') or 'main'} mỗi {os.environ.get('GW_AUTO_UPDATE_SEC') or 120}s", "status": "tắt" if os.environ.get("GW_AUTO_UPDATE", "1").strip().lower() in ("0", "false", "no", "off") else "bật"},
         {"id": "ENV-GOOGLE_OAUTH", "name": "GOOGLE_OAUTH_CLIENT_ID/SECRET", "owner": "Môi trường (.env)", "scope": "Đổi code OAuth lấy token Google", "status": "đã cấu hình" if (GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET) else "chưa cấu hình"},
     ]
@@ -4400,13 +4506,10 @@ def verify_ssot_event(event_id, new_status="ssot", project_id="PRJ-GEN-WORKPLACE
         conn.commit()
         return True
 
-def update_todo_status(todo_id, new_status, project_id="PRJ-GEN-WORKPLACE"):
-    project_id = normalize_project_id(project_id)
+def _refresh_roadmap_status(todo_id, project_id):
+    """Tính lại trạng thái roadmap chứa task sau khi task đổi trạng thái."""
     with get_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute("UPDATE todos SET status = ? WHERE id = ? AND project_id = ?", (new_status, todo_id, project_id))
-        updated = cursor.rowcount > 0  # id không tồn tại → False (trước đây luôn True)
-
         cursor.execute("SELECT roadmap_id FROM todos WHERE id = ? AND project_id = ?", (todo_id, project_id))
         r_row = cursor.fetchone()
         if r_row:
@@ -4417,9 +4520,15 @@ def update_todo_status(todo_id, new_status, project_id="PRJ-GEN-WORKPLACE"):
             dones = stat["dones"] or 0
             rm_status = "done" if total > 0 and dones == total else ("live" if dones > 0 else "queued")
             cursor.execute("UPDATE roadmaps SET status = ?, todos_count = ? WHERE id = ?", (rm_status, total, rm_id))
-
         conn.commit()
-        return updated
+
+def update_todo_status(todo_id, new_status, project_id="PRJ-GEN-WORKPLACE", session_id="", evidence_ref="", force=False, reason=""):
+    """Đổi trạng thái task roadmap (bảng todos). Sang 'done' → qua complete_task (set_task_status). Trả dict như set_task_status."""
+    project_id = normalize_project_id(project_id)
+    res = set_task_status(todo_id, new_status, project_id, session_id=session_id, evidence_ref=evidence_ref, force=force, reason=reason)
+    if res.get("status") == "completed":
+        _refresh_roadmap_status(todo_id, project_id)
+    return res
 
 def create_new_project(name, repo_path, plan_text=""):
     name = (name or "").strip()
@@ -4851,6 +4960,11 @@ def describe_agy_error(usage):
         reason = f"không tìm thấy lệnh agy ({usage.get('bin') or _agy_bin()})"
     elif code == "EMPTY_RESPONSE":
         reason = "agy thoát 0 nhưng không có nội dung trả lời"
+    elif code == "PERMISSION_DENIED":
+        dirs = ", ".join(usage.get("read_dirs") or []) or "thư mục làm việc"
+        reason = (f"agy bị từ chối quyền / không ra kết quả ({usage.get('match') or 'auto-denied'}). Chat Gen chạy KHÔNG có "
+                  f"--dangerously-skip-permissions: chỉ được đọc trong {dirs} và chạy lệnh chỉ đọc (ls, cat, grep, git log...). "
+                  "Việc cần ghi/sửa file hãy giao qua war-room / worker; lối thoát cuối (không khuyến nghị): GW_GEN_CHAT_SKIP_PERMISSIONS=1")
     elif code.startswith("EXIT_"):
         reason = f"agy thoát mã {code[5:]}"
     else:
@@ -4864,7 +4978,7 @@ def call_agy_cli_turn(conv_id, user_message, model=None, account="owner_default"
     Gọi agy CLI thật cho 1 lượt chat:
     - Kế thừa ngữ cảnh phiên (agy_conv_id), dùng profile OAuth của account, ghi quota_probe.
     - Trả (reply, conversation_id, usage). KHÔNG bao giờ bịa reply: lỗi → reply rỗng và usage["error"]
-      là mã lỗi thật (RESOURCE_EXHAUSTED / TIMEOUT / AGY_NOT_FOUND / EXIT_<rc> / EMPTY_RESPONSE / EXCEPTION),
+      là mã lỗi thật (RESOURCE_EXHAUSTED / TIMEOUT / AGY_NOT_FOUND / EXIT_<rc> / EMPTY_RESPONSE / PERMISSION_DENIED / EXCEPTION),
       usage["detail"] là đuôi output thật của agy.
     """
     agy_conv_id = None
@@ -4890,17 +5004,34 @@ def call_agy_cli_turn(conv_id, user_message, model=None, account="owner_default"
         prompt_payload = user_message
 
     model_slug = resolve_agy_model_slug(model)
-    cmd = [_agy_bin(), "--output-format", "json", "--print", prompt_payload, "--dangerously-skip-permissions", "--model", model_slug]
-    if agy_conv_id:
-        cmd.extend(["--conversation", agy_conv_id])
 
     # Thư mục làm việc: thư mục riêng của phiên nếu có, không thì thư mục repo
     work_dir = "/workspace" if os.path.isdir("/workspace") else str(BASE_DIR)
     sess_dir = Path("/workspace/sessions") / conv_id
     if not sess_dir.exists():
         sess_dir = BASE_DIR / "workspace" / "sessions" / conv_id
-    if sess_dir.exists():
+    has_sess_dir = sess_dir.exists()
+    if has_sess_dir:
         work_dir = str(sess_dir)
+
+    # Quyền (Issue #7): mặc định KHÔNG --dangerously-skip-permissions. agy --print không tương tác nên tool cần quyền
+    # bị auto-denied → cấp quy tắc chỉ đọc (read_file(thư mục làm việc + repo) + command(ls|cat|grep|git log|...)) trong
+    # permissions.allow của hồ sơ agy, giống war-room (PR #15). Lối thoát cuối, opt-in: GW_GEN_CHAT_SKIP_PERMISSIONS=1.
+    skip_permissions = _env_on("GW_GEN_CHAT_SKIP_PERMISSIONS")
+    read_dirs = []
+    for d in (work_dir, str(BASE_DIR)):
+        real = os.path.realpath(d)
+        if real not in read_dirs:
+            read_dirs.append(real)
+    cmd = [_agy_bin(), "--output-format", "json", "--print", prompt_payload]
+    if skip_permissions:
+        cmd.append(AGY_SKIP_PERMISSIONS_FLAG)
+    else:
+        ensure_agy_plan_permissions(p_dir, read_dirs[0], extra_dirs=read_dirs[1:])
+    cmd.extend(["--model", model_slug])
+    if agy_conv_id:
+        cmd.extend(["--conversation", agy_conv_id])
+    if has_sess_dir:
         cmd.extend(["--add-dir", str(sess_dir)])
 
     def _save_conv(ret_id, tokens):
@@ -4933,6 +5064,16 @@ def call_agy_cli_turn(conv_id, user_message, model=None, account="owner_default"
             return "", agy_conv_id, {"error": f"EXIT_{res.returncode}", "detail": err_output[-800:]}
         reply, ret_id, usage = _parse_agy_json_turn(res.stdout)
         _save_conv(ret_id, usage.get("total_tokens", 0) if isinstance(usage, dict) else 0)
+        # Thoát 0 nhưng bị từ chối quyền ("no output produced", "auto-denied") → lỗi rõ, không coi là trả lời
+        if reply:
+            denied = agy_output_denied(reply)
+        else:
+            m = AGY_DENIED_RE.search(err_output)
+            denied = m.group(0) if m else ""
+        if denied:
+            print(f"[AGY Runner] chat Gen bị từ chối quyền ({denied}): {err_output[-300:]}")
+            return "", ret_id or agy_conv_id, {"error": "PERMISSION_DENIED", "match": denied, "read_dirs": read_dirs,
+                                               "skip_permissions": skip_permissions, "detail": (err_output or reply)[-800:]}
         if not reply:
             return "", ret_id or agy_conv_id, {"error": "EMPTY_RESPONSE", "detail": err_output[-800:]}
         return reply, ret_id or agy_conv_id, dict(usage)
@@ -4981,6 +5122,10 @@ def send_gen_chat(conv_id, author, message, model, account="owner_default"):
         cited_notes = sorted(set(re.findall(r'#(?:NOTE|EVT|SEC|TOOL|FILE)-\d+', reply_content)))
         is_error = False
         applied_kanban = parse_and_apply_agent_kanban_updates(conv_id, reply_content)
+        refused = [u for u in applied_kanban if "BỊ TỪ CHỐI" in u]
+        if refused:
+            # Ghi rõ vào tin trả lời để người dùng thấy task KHÔNG được chuyển (không im lặng coi như xong)
+            reply_content += "\n\n[Kanban] " + "\n[Kanban] ".join(refused)
     else:
         reply_content = f"agy không trả lời: {describe_agy_error(usage)}. Không có phản hồi tự sinh."
         engine_used = "error"
@@ -5375,24 +5520,50 @@ def get_gen_session_todos(conv_id, project_id="PRJ-GEN-WORKPLACE"):
             todos.append(d)
         return todos
 
-def save_gen_session_todo(conv_id, todo_id=None, title="Nhiệm vụ mới", description="", status="todo", priority="high", assigned_agent="Gen Core", checklist=None, evidence_ref="", order_idx=0, owner_id="owner-ryan", viec_ref=""):
+def save_gen_session_todo(conv_id, todo_id=None, title="Nhiệm vụ mới", description="", status="todo", priority="high", assigned_agent="Gen Core", checklist=None, evidence_ref="", order_idx=0, owner_id="owner-ryan", viec_ref="", session_id="", force=False, reason=""):
     """
     Tạo mới / cập nhật task Kanban của phiên. TẠO MỚI bắt buộc viec_ref khớp ^VIEC-[0-9]+$ (mã việc Kho Ryan),
     thiếu/sai → {"error": "Thiếu viec_ref (mã việc trong Kho Ryan, vd VIEC-12)"}. Cập nhật: viec_ref rỗng → giữ giá trị cũ.
+    status='done' (task chưa done) KHÔNG ghi thẳng: các trường khác được lưu với trạng thái cũ, rồi chuyển sang done qua
+    complete_task (evidence_ref, session_id, force, reason) — bị từ chối → {"error", "code", "saved": True}, trạng thái giữ nguyên.
+    Task đã done: không đổi evidence_ref qua đường này (sửa bằng chứng phải qua complete_task force=true).
     """
     checklist = checklist or []
     viec_ok, viec_ref = validate_viec_ref(viec_ref)
+    status = (status or "todo").strip().lower()
+    if status not in GEN_SESSION_TODO_STATUSES:
+        status = "todo"
+    evidence_ref = (evidence_ref or "").strip()
+    complete_after = False
     with get_connection() as conn:
         cursor = conn.cursor()
         is_new = True
         if todo_id:
-            cursor.execute("SELECT viec_ref FROM gen_session_todos WHERE id = ? AND conversation_id = ?", (todo_id, conv_id))
+            cursor.execute("SELECT viec_ref, conversation_id, status, evidence_ref FROM gen_session_todos WHERE id = ?", (todo_id,))
             existing = cursor.fetchone()
+            if existing and existing["conversation_id"] != conv_id:
+                return {"error": f"Task {todo_id} thuộc phiên khác ({existing['conversation_id']})", "code": "wrong_conversation", "id": todo_id}
             if existing:
                 is_new = False
                 if not viec_ref:
                     viec_ref = existing["viec_ref"] or ""
                     viec_ok = True
+                if existing["status"] == "done":
+                    if status == "done" and evidence_ref and evidence_ref != (existing["evidence_ref"] or ""):
+                        return {"error": f"Task {todo_id} đã done với bằng chứng '{existing['evidence_ref'] or ''}' — sửa bằng chứng "
+                                         "phải qua complete_task force=true (có ghi nhật ký).", "code": "already_done", "id": todo_id}
+                    evidence_ref = existing["evidence_ref"] or ""
+                elif status == "done":
+                    complete_after = True
+                    status = existing["status"]
+        if is_new and status == "done":
+            complete_after = True
+            status = "todo"
+        done_evidence = evidence_ref if complete_after else ""
+        if complete_after and not is_new:
+            evidence_ref = existing["evidence_ref"] or ""
+        elif complete_after:
+            evidence_ref = ""
         if is_new and not viec_ok:
             return {"error": VIEC_REF_ERROR, "viec_ref": viec_ref, "id": todo_id}
         if not is_new and viec_ref and not viec_ok:
@@ -5433,7 +5604,15 @@ def save_gen_session_todo(conv_id, todo_id=None, title="Nhiệm vụ mới", des
             updated_at = CURRENT_TIMESTAMP
         """, (todo_id, conv_id, title, description, status, priority, assigned_agent, json.dumps(normalized_chk, ensure_ascii=False), evidence_ref, order_idx, owner_id, viec_ref))
         conn.commit()
-    return {"status": "saved", "id": todo_id, "title": title, "viec_ref": viec_ref, "created": is_new}
+    res = {"status": "saved", "id": todo_id, "title": title, "viec_ref": viec_ref, "created": is_new, "task_status": status}
+    if complete_after:
+        done = set_task_status(todo_id, "done", conv_id=conv_id, session_id=session_id, evidence_ref=done_evidence, force=force, reason=reason)
+        if "error" in done:
+            done.update({"saved": True, "id": todo_id, "title": title, "viec_ref": viec_ref, "created": is_new, "task_status": status,
+                         "error": f"Đã lưu các trường khác nhưng KHÔNG chuyển sang done: {done['error']}"})
+            return done
+        res.update({"task_status": "done", "completed": done})
+    return res
 
 def toggle_gen_session_todo_checklist_item(conv_id, todo_id, item_id, done_status=None):
     with get_connection() as conn:
@@ -5491,21 +5670,13 @@ def toggle_gen_session_todo_checklist_item(conv_id, todo_id, item_id, done_statu
         conn.commit()
     return {"status": "updated", "id": todo_id, "item_id": item_id, "all_done": all_done, "new_status": new_status}
 
-def update_gen_session_todo_status(conv_id, todo_id, new_status, evidence_ref=None):
-    valid_statuses = ["todo", "in_progress", "review", "done"]
-    if new_status not in valid_statuses:
-        new_status = "todo"
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        updates = ["status = ?", "updated_at = CURRENT_TIMESTAMP"]
-        params = [new_status]
-        if evidence_ref:
-            updates.append("evidence_ref = ?")
-            params.append(evidence_ref)
-        params.extend([todo_id, conv_id])
-        cursor.execute(f"UPDATE gen_session_todos SET {', '.join(updates)} WHERE id = ? AND conversation_id = ?", params)
-        conn.commit()
-    return {"status": "updated", "id": todo_id, "new_status": new_status}
+GEN_SESSION_TODO_STATUSES = ("todo", "in_progress", "review", "done")
+
+def update_gen_session_todo_status(conv_id, todo_id, new_status, evidence_ref=None, session_id="", force=False, reason=""):
+    """Đổi trạng thái task Kanban phiên. Sang 'done' → complete_task (qua set_task_status): thiếu/sai evidence hoặc
+    người gọi không giữ task → {"error", "code"}, trạng thái không đổi."""
+    return set_task_status(todo_id, new_status, conv_id=conv_id, session_id=session_id, evidence_ref=evidence_ref or "",
+                           force=force, reason=reason)
 
 def delete_gen_session_todo(conv_id, todo_id):
     with get_connection() as conn:
@@ -5541,9 +5712,21 @@ def format_session_kanban_for_agent(conv_id, todos):
     lines.append("   - Nêu rõ task nào đang liên quan hoặc được giải quyết.")
     lines.append("   - Khi hoàn thành hạng mục checklist hoặc đổi trạng thái task, hãy ghi chú cú pháp chuẩn:")
     lines.append("     [KANBAN_UPDATE: <ID_TASK> | STATUS: <in_progress/review/done> | CHECK: <item_id> | EVIDENCE: <bằng_chứng>]")
-    lines.append("     Hoặc ngắn gọn: [TASK_DONE: <ID_TASK>]")
+    lines.append("   - STATUS: done CHỈ được nhận khi EVIDENCE kiểm được (commit SHA có trong repo, URL PR GitHub có thật, dispatch:<id>, warroom:<id>, file trong ~/gw-reports/)")
+    lines.append("     và task không do worker khác đang giữ (claim). Thiếu/sai bằng chứng → hệ thống từ chối, task giữ nguyên trạng thái.")
     lines.append("==================================================")
     return "\n".join(lines)
+
+def gen_chat_session_id(conv_id):
+    """Danh tính của agent chat Gen khi đổi trạng thái task (dùng cho kiểm người giữ task trong complete_task)."""
+    return f"gen-chat:{conv_id}"
+
+def _describe_kanban_apply(tid, status, res):
+    if isinstance(res, dict) and "error" in res:
+        return f"Task {tid} -> {status} BỊ TỪ CHỐI: {res['error']}"
+    if status == "done":
+        return f"Task {tid} -> Hoàn thành (Done), bằng chứng {res.get('evidence_ref', '')} ({res.get('verified_by', '')})"
+    return f"Task {tid} -> {status}"
 
 def parse_and_apply_agent_kanban_updates(conv_id, agent_text):
     """Phân tích các chỉ thị cập nhật Kanban từ câu trả lời của Agent và tự động ghi vào SQLite."""
@@ -5563,15 +5746,15 @@ def parse_and_apply_agent_kanban_updates(conv_id, agent_text):
             toggle_gen_session_todo_checklist_item(conv_id, tid, item_id, done_status=True)
             updates_made.append(f"Checklist {item_id} của {tid} -> Hoàn thành")
         if status:
-            update_gen_session_todo_status(conv_id, tid, status, evidence_ref=evidence)
-            updates_made.append(f"Task {tid} -> {status}")
+            res = update_gen_session_todo_status(conv_id, tid, status, evidence_ref=evidence, session_id=gen_chat_session_id(conv_id))
+            updates_made.append(_describe_kanban_apply(tid, status, res))
 
-    # Mẫu 2: [TASK_DONE: TSK-01]
+    # Mẫu 2: [TASK_DONE: TSK-01] — không kèm bằng chứng nên complete_task sẽ từ chối (task giữ nguyên trạng thái)
     done_matches = re.findall(r'\[TASK_DONE:\s*([A-Za-z0-9_-]+)\]', agent_text, re.IGNORECASE)
     for tid in done_matches:
         tid = tid.strip()
-        update_gen_session_todo_status(conv_id, tid, "done")
-        updates_made.append(f"Task {tid} -> Hoàn thành (Done)")
+        res = update_gen_session_todo_status(conv_id, tid, "done", session_id=gen_chat_session_id(conv_id))
+        updates_made.append(_describe_kanban_apply(tid, "done", res))
 
     return updates_made
 

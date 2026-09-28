@@ -182,7 +182,7 @@ check("get_dispatch_log(limit) giới hạn", len(db.get_dispatch_log(1)) == 1)
 
 print("[9] webhook không tới được → chỉ log, API vẫn ok; tắt env → không gửi")
 os.environ["GW_EVENT_WEBHOOK_URL"] = "http://127.0.0.1:9/khong-ai-nghe"
-res = db.complete_task("gw-qa-agy", "TODO-V2", head_sha)
+res = db.complete_task("gw-backend-agy", "TODO-V2", head_sha)  # người đang giữ task (#18)
 check("complete vẫn ok, webhook_sent False", res.get("status") == "completed" and res.get("webhook_sent") is False, str(res))
 os.environ["GW_EVENT_WEBHOOK_URL"] = ""
 n_before = len(RECEIVED)

@@ -372,7 +372,7 @@ TOOLS = [
     },
     {
         "name": "complete_task",
-        "description": "Nghiệm thu hoàn tất nhiệm vụ với bằng chứng KIỂM ĐƯỢC: commit SHA có trong repo, file không rỗng trong ~/gw-reports/ hoặc repo/worktree, dispatch:<id> (lần giao việc done, khớp task), warroom:<id> (tin trả lời của agent), hoặc URL PR GitHub có thật (kiểm qua GitHub API; không gọi được mạng → từ chối). Bằng chứng không kiểm được → lỗi, trạng thái không đổi. Task đã done → lỗi code 'already_done', không ghi đè trừ khi force=true (được ghi log).",
+        "description": "Nghiệm thu hoàn tất nhiệm vụ với bằng chứng KIỂM ĐƯỢC: commit SHA có trong repo, file không rỗng trong ~/gw-reports/ hoặc repo/worktree, dispatch:<id> (lần giao việc done, khớp task), warroom:<id> (tin trả lời của agent), hoặc URL PR GitHub có thật (kiểm qua GitHub API; không gọi được mạng → từ chối). Bằng chứng không kiểm được → lỗi, trạng thái không đổi. Chỉ người đang giữ task (claim_task) được đóng; task chưa ai claim thì ai cũng đóng được; người khác → lỗi code 'not_holder' kèm held_by, đóng thay phải force=true (ghi nhật ký task_evidence_audit). Task đã done → lỗi code 'already_done', không ghi đè trừ khi force=true (được ghi log). Đây là đường DUY NHẤT chuyển task sang done.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -395,7 +395,7 @@ TOOLS = [
                 },
                 "force": {
                     "type": "boolean",
-                    "description": "Chỉ dùng khi cần sửa bằng chứng của task ĐÃ done: ghi đè và lưu nhật ký task_evidence_audit (cũ → mới).",
+                    "description": "Chỉ dùng khi (a) cần sửa bằng chứng của task ĐÃ done, hoặc (b) đóng thay task đang do worker khác giữ. Cả hai đều lưu nhật ký task_evidence_audit (action override_evidence / force_close).",
                     "default": False
                 },
                 "reason": {

@@ -602,11 +602,11 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             new_status = data.get("status") or data.get("new_status")
             project_id = data.get("project_id", "PRJ-GEN-WORKPLACE")
             if todo_id and new_status:
-                success = db.update_todo_status(todo_id, new_status, project_id)
-                if not success:
-                    self._send_json(404, {"error": "Task not found", "id": todo_id})
-                    return
-                self._send_json(200, {"status": "updated", "id": todo_id, "new_status": new_status, "success": success})
+                # Sang 'done' → complete_task (kiểm evidence + chỉ người giữ task; force ghi audit) — #18
+                res = db.update_todo_status(todo_id, new_status, project_id, **_status_change_args(data))
+                if "error" not in res:
+                    res["success"] = True
+                self._send_json(db.task_error_http_status(res), res)
             else:
                 self._send_json(400, {"error": "Missing id or status"})
             return
@@ -864,15 +864,8 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             reason = str(data.get("reason") or "").strip()
             if session_id and todo_id and evidence_ref:
                 res = db.complete_task(session_id, todo_id, evidence_ref, verified_by, project_id, force=force, reason=reason)
-                if "error" not in res:
-                    status_code = 200
-                elif res.get("code") == "already_done":
-                    status_code = 409
-                elif res.get("error") == "Task not found":
-                    status_code = 404
-                else:
-                    status_code = 400
-                self._send_json(status_code, res)
+                # 200 ok; 404 không có task; 409 đã done / người khác đang giữ (not_holder, kèm held_by); 400 bằng chứng sai
+                self._send_json(db.task_error_http_status(res), res)
             else:
                 self._send_json(400, {"error": "Missing session_id, todo_id (or task_id), or evidence_ref"})
             return
@@ -1149,9 +1142,11 @@ class SwarmHandler(SimpleHTTPRequestHandler):
                     self._send_json(400, {"error": f"Phiên chat không tồn tại: {conv_id}"})
                     return
                 # Tạo mới (không có id / id chưa tồn tại) bắt buộc viec_ref khớp ^VIEC-[0-9]+$ → thiếu/sai trả 400
+                # status='done' → qua complete_task (evidence_ref + người giữ task); bị từ chối → 400/409, trạng thái giữ nguyên
                 res = db.save_gen_session_todo(conv_id, todo_id, title, description, status, priority, assigned_agent, checklist,
-                                               evidence_ref, order_idx=order_idx, owner_id=owner_id, viec_ref=viec_ref)
-                self._send_json(400 if "error" in res else 200, res)
+                                               evidence_ref, order_idx=order_idx, owner_id=owner_id, viec_ref=viec_ref,
+                                               **_status_change_args(data, with_evidence=False))
+                self._send_json(db.task_error_http_status(res), res)
             else:
                 self._send_json(400, {"error": "Missing conv_id or title"})
             return
@@ -1172,10 +1167,10 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             conv_id = data.get("conv_id") or data.get("conversation_id")
             todo_id = data.get("todo_id") or data.get("id")
             new_status = data.get("status") or data.get("new_status")
-            evidence_ref = data.get("evidence_ref")
             if conv_id and todo_id and new_status:
-                res = db.update_gen_session_todo_status(conv_id, todo_id, new_status, evidence_ref)
-                self._send_json(200, res)
+                # Sang 'done' (kéo thả / nút Nghiệm thu) → complete_task: thiếu/sai evidence 400, người khác giữ / đã done 409
+                res = db.update_gen_session_todo_status(conv_id, todo_id, new_status, **_status_change_args(data))
+                self._send_json(db.task_error_http_status(res), res)
             else:
                 self._send_json(400, {"error": "Missing conv_id, todo_id, or status"})
             return
@@ -1192,6 +1187,19 @@ class SwarmHandler(SimpleHTTPRequestHandler):
 
         self.send_response(404)
         self.end_headers()
+
+UI_SESSION_ID = "owner-ui"
+
+def _status_change_args(data, with_evidence=True):
+    """Tham số chung cho các API đổi trạng thái task: người gọi (mặc định owner-ui), evidence_ref, force, reason."""
+    args = {
+        "session_id": str(data.get("session_id") or UI_SESSION_ID).strip(),
+        "force": data.get("force") in (True, 1, "1", "true", "True", "yes"),
+        "reason": str(data.get("reason") or "").strip(),
+    }
+    if with_evidence:
+        args["evidence_ref"] = str(data.get("evidence_ref") or "").strip()
+    return args
 
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
     daemon_threads = True
