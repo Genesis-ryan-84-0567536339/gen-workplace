@@ -3284,7 +3284,7 @@ def ensure_role_worktree(session_id):
     return repo
 
 def dispatch_warroom_to_agent(project_id, channel_id, session_id, message, timeout=WARROOM_DISPATCH_TIMEOUT_SEC):
-    """Chạy agy thật (--mode plan --sandbox -p <tin>) với profile của worker session_id trong worktree riêng; ghi trả lời thật vào chat_messages và dispatch_log (#3)."""
+    """Chạy agy thật (--mode plan -p <tin>) với profile của worker session_id trong worktree riêng; ghi trả lời thật vào chat_messages và dispatch_log (#3)."""
     project_id = normalize_project_id(project_id)
     account_type, profile_dir = "owner_default", ""
     try:
@@ -3297,7 +3297,12 @@ def dispatch_warroom_to_agent(project_id, channel_id, session_id, message, timeo
         pass
     p_dir = os.path.expanduser(profile_dir) if profile_dir else _profile_dir(account_type)
     cwd = ensure_role_worktree(session_id)
-    cmd = [_agy_bin(), f"--gemini_dir={p_dir}", "--mode", "plan", "--sandbox", "-p", message]
+    # --mode plan: agy chỉ đọc, không sửa file. Không dùng --sandbox vì sandbox chặn cả việc đọc repo
+    # (agy chỉ trả "Để tôi khám phá..." rồi dừng). Dặn trả lời trọn trong một lượt vì -p không tương tác.
+    prompt = (f"{message}\n\n(Bạn là {session_id}, đang ở worktree của repo gen-workplace. "
+              "Hãy tự đọc file cần thiết rồi trả lời ĐẦY ĐỦ ngay trong một lượt bằng tiếng Việt; "
+              "không hỏi lại, không chỉ nêu kế hoạch.)")
+    cmd = [_agy_bin(), f"--gemini_dir={p_dir}", "--mode", "plan", "-p", prompt]
     started_at = time.strftime("%Y-%m-%d %H:%M:%S")
     t0 = time.time()
     exit_code = -1
