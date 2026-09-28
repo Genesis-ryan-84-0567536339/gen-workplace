@@ -4251,12 +4251,11 @@ body.resizing-active, body.resizing-active * {
       </div>
     </div>
 
-    <button class="projectSelect" onclick="openProjectPicker()">
+    <div class="projectSelect" title="Dự án đang điều phối">
       <span class="projectDot"></span>
       <strong id="topProjectName">gen-workplace</strong>
       <span class="topmeta" id="topProjectMeta">main · 6 vai</span>
-      <span class="projectCaret">⌄</span>
-    </button>
+    </div>
 
     <div class="topRight">
       <span class="topmeta" id="syncState">Git: main</span>
@@ -4267,7 +4266,6 @@ body.resizing-active, body.resizing-active * {
         <span class="ownerDisplayName" id="topOwnerDisplayName">Ryan</span>
         <span class="ownerSubLabel" id="topOwnerSubLabel" style="display:none">Owner</span>
       </button>
-      <button class="btn primary" onclick="openModal()">+ Dự án</button>
     </div>
   </header>
 
@@ -4413,11 +4411,7 @@ body.resizing-active, body.resizing-active * {
                 <span>Sổ tay Tạm thời (Scratchpad)</span>
                 <span style="font-size:10px;opacity:0.6;margin-left:4px" onclick="event.stopPropagation()">×</span>
               </button>
-              <button class="genVsCodeTab" data-vstab="console" onclick="switchGenVsTab('console')">
-                <span></span>
-                <span>Live Terminal Console</span>
-                <span style="font-size:10px;opacity:0.6;margin-left:4px" onclick="event.stopPropagation()">×</span>
-              </button>
+              
               <button class="genVsCodeTab" data-vstab="ssot" onclick="switchGenVsTab('ssot')">
                 <span></span>
                 <span>SSOT Spec Gốc</span>
@@ -4704,15 +4698,7 @@ body.resizing-active, body.resizing-active * {
               </div>
 
               <!-- PANE 4: Console Output -->
-              <div class="genVsCodePane" id="genVsPane-console">
-                <div style="background:var(--bg);border-bottom:1px solid #161f2e;padding:6px 12px;display:flex;align-items:center;justify-content:space-between">
-                  <span style="font-size:10.5px;color:var(--muted);font-family:var(--mono)">Terminal Output: Gen Core Engine</span>
-                  <button class="btn small" style="font-size:9.5px;padding:1px 6px" onclick="clearGenConsole()">Xóa màn hình</button>
-                </div>
-                <div style="flex:1;overflow:auto;padding:12px;font-family:var(--mono);font-size:11px;line-height:1.6;color:var(--text);background:#05070a" id="genConsoleOutput">
-                  <span style="color:var(--muted2)">▸ Sẵn sàng nhận lệnh thực thi từ Gen Core...</span>
-                </div>
-              </div>
+              
 
               <!-- PANE 5: SSOT Spec Gốc -->
               <div class="genVsCodePane" id="genVsPane-ssot" style="padding:16px;overflow-y:auto">
@@ -4963,7 +4949,7 @@ body.resizing-active, body.resizing-active * {
             <p>Trò chuyện với Gen, xem trí nhớ SSOT, định nghĩa vai, skill và MCP tool dùng chung cho mọi dự án.</p>
           </div>
           <div class="actions">
-            <button class="btn" onclick="loadOrchChatMessages()">Đồng bộ SSOT</button>
+            <button class="btn" onclick="loadOrchChatMessages()">Tải lại chat</button>
             <button class="btn primary" onclick="orchSpawnWorker()">+ Spawn Worker Mới</button>
           </div>
         </div>
@@ -5408,7 +5394,6 @@ body.resizing-active, body.resizing-active * {
               <div class="commandDeckNav">
                 <button class="deckNavTab active" data-decktab="workbench" onclick="switchDeckTab('workbench', this)">Bàn Làm Việc & Live Console</button>
                 <button class="deckNavTab" data-decktab="sop" onclick="switchDeckTab('sop', this)">Hồ Sơ Chức Trách & SOP</button>
-                <button class="deckNavTab" data-decktab="chat" onclick="switchDeckTab('chat', this)">Trao Đổi & Bàn Giao</button>
                 <button class="deckNavTab" data-decktab="thinking" onclick="switchDeckTab('thinking', this)">Mạch Tư Duy</button>
                 <button class="deckNavTab" data-decktab="kanban" onclick="switchDeckTab('kanban', this)">Kanban</button>
                 <button class="deckNavTab" data-decktab="oauth" onclick="switchDeckTab('oauth', this)">OAuth</button>
@@ -5556,42 +5541,7 @@ body.resizing-active, body.resizing-active * {
               </div>
 
               <!-- Deck Panel Chat -->
-              <div class="deckPanel" id="deckPanel-chat" style="display:none;flex:1;min-height:0">
-                <div class="runtimeGrid" style="width:100%;min-height:360px;margin:0;border:0;border-radius:0">
-                  <div class="card chat" id="rtChatCard" style="border:0;border-radius:0;border-right:1px solid var(--line)">
-                    <div class="cardHead" style="min-height:36px;padding:8px 12px">
-                      <div>
-                        <strong id="chatTitle">Chat Worker</strong>
-                        <div class="hint" id="chatPath">Handoff nhiệm vụ & trao đổi chéo giữa các Role</div>
-                      </div>
-                      <div class="chatTabs">
-                        <button class="chatTab active" data-chat="thread" onclick="switchChat('thread', this)">Tất cả trao đổi</button>
-                        <button class="chatTab" data-chat="io" onclick="switchChat('io', this)">I/O Contract</button>
-                      </div>
-                    </div>
-                    <div class="chatMessages" id="chatMessages"></div>
-                    <div class="chatInputRow">
-                      <button class="iconBtn" onclick="insertAt('@')" title="@mention">@</button>
-                      <button class="iconBtn" onclick="insertAt('⚠️')">⚠️</button>
-                      <button class="iconBtn" onclick="insertAt('🔥')">🔥</button>
-                      <button class="iconBtn" onclick="insertAt('')"></button>
-                      <input id="chatInput" class="chatInput" placeholder="Gửi chỉ thị cho worker…" onkeydown="if(event.key==='Enter')sendRuntimeMessage()"/>
-                      <button class="btn small primary" onclick="sendRuntimeMessage()">Gửi</button>
-                    </div>
-                  </div>
-                  <div class="card" id="rtInspCard" style="border:0;border-radius:0;min-width:220px;max-width:280px">
-                    <div class="cardHead" style="min-height:36px;padding:8px 12px">
-                      <strong id="runtimeStatus">Context Inspector</strong>
-                      <div class="insTabs" style="display:flex;gap:4px">
-                        <button class="insTab active" onclick="switchInspector('context',this)">Ctx</button>
-                        <button class="insTab" onclick="switchInspector('events',this)">Events</button>
-                        <button class="insTab" onclick="switchInspector('files',this)">Files</button>
-                      </div>
-                    </div>
-                    <div id="runtimeInspectorBody" style="padding:10px;font-size:11px;overflow-y:auto;max-height:320px"></div>
-                  </div>
-                </div>
-              </div>
+              
 
               <div class="deckPanel" id="deckPanel-thinking" style="display:none;flex-direction:column;flex:1;min-height:0;height:100%;overflow:hidden;padding:12px;gap:10px">
                 <!-- Thanh Toolbar Nhận Thức Tinh Gọn -->
@@ -5758,7 +5708,7 @@ body.resizing-active, body.resizing-active * {
                 <textarea class="sourceText" id="sourceInput" oninput="sourceChanged()" placeholder="Nhập chỉ thị tổng thể / PRD tại đây..."></textarea>
                 <div class="sourceMeta">
                   <span class="fileTag">SSOT_ORIGINAL_SPEC.md</span>
-                  <button class="btn small" onclick="attachPlan()">+ File</button>
+                  <button class="btn small" onclick="attachPlan()">Nạp SSOT spec</button>
                   <span class="sourceLock">Khóa theo Input</span>
                 </div>
               </div>
@@ -6861,73 +6811,7 @@ function escapeHtml(s) {
 }
 
 // Cấu hình Sub-Tabs theo từng Phân khu chức năng (Loại bỏ trùng lặp với Sidebar)
-const SUBTAB_CONFIG = {
-  gen_workplace: {
-    icon: '',
-    name: 'Không Gian Làm Việc Chính (Owner ↔ Gen IDE)',
-    tabs: [
-      { id: 'vstab-kanban_todo', label: 'Kanban & Todos Phiên', action: () => switchGenVsTab('kanban_todo') },
-      { id: 'vstab-files_repo', label: 'Files & Repo Explorer', action: () => switchGenVsTab('files_repo') },
-      { id: 'vstab-file', label: 'File Viewer', action: () => switchGenVsTab('file') },
-      { id: 'vstab-evidence', label: 'Bằng Chứng & Note ID', action: () => switchGenVsTab('evidence') },
-      { id: 'vstab-scratchpad', label: 'Sổ Tay Tạm Thời', action: () => switchGenVsTab('scratchpad') },
-      { id: 'vstab-console', label: 'Live Console', action: () => switchGenVsTab('console') },
-      { id: 'vstab-ssot', label: 'SSOT Spec', action: () => switchGenVsTab('ssot') }
-    ]
-  },
-  orchestrator: {
-    icon: '',
-    name: 'Tổng Chỉ Huy Toàn Cục',
-    tabs: [
-      { id: 'orch-chat', label: 'Chat Trực Tiếp', action: () => switchOrchTab('chat') },
-      { id: 'orch-memory', label: 'Trí Nhớ & SSOT', action: () => switchOrchTab('memory') },
-      { id: 'orch-def', label: 'Định Nghĩa & Role', action: () => switchOrchTab('definition') },
-      { id: 'orch-skills', label: 'Skills Hệ Thống', action: () => switchOrchTab('skills') },
-      { id: 'orch-mcps', label: 'MCP Tools', action: () => switchOrchTab('mcps') },
-      { id: 'orch-swarm', label: 'Swarm Directory', action: () => switchOrchTab('swarm') }
-    ]
-  },
-  warroom: {
-    icon: '',
-    name: 'Phòng Giao Ban Swarm',
-    tabs: [
-      { id: 'wr-warroom', label: 'Core Gen ↔ Toàn Đội', action: () => switchWarRoomChannel('war_room') },
-      { id: 'wr-standup', label: 'Leader ↔ Nhân Viên', action: () => switchWarRoomChannel('standup') },
-      { id: 'wr-handoff', label: 'Hợp Đồng I/O & Bàn Giao', action: () => switchWarRoomChannel('handoff') }
-    ]
-  },
-  runtimes: {
-    icon: '◉',
-    name: 'Swarm Chuyên Gia',
-    tabs: [
-      { id: 'rt-workbench', label: 'Bàn Làm Việc & Console', action: () => switchDeckTab('workbench') },
-      { id: 'rt-sop', label: 'Hồ Sơ SOP', action: () => switchDeckTab('sop') },
-      { id: 'rt-chat', label: 'Trao Đổi & Bàn Giao', action: () => switchDeckTab('chat') },
-      { id: 'rt-thinking', label: 'Mạch Tư Duy', action: () => switchDeckTab('thinking') },
-      { id: 'rt-kanban', label: 'Live Kanban', action: () => switchDeckTab('kanban') },
-      { id: 'rt-oauth', label: 'Tài Khoản & Quota', action: () => switchDeckTab('oauth') }
-    ]
-  },
-  implementation: {
-    icon: '◈',
-    name: 'Kế Hoạch & Tiến Độ',
-    tabs: [
-      { id: 'imp-plan', label: '01 · 3 Cột (Input Roadmap Todo)', target: '#impRow1' },
-      { id: 'imp-roles', label: '02 · Bảng Roles & Đổi Model AI', target: '.implRow2_Roles' }
-    ]
-  },
-  data: {
-    icon: '▦',
-    name: 'Trung Tâm Dữ Liệu',
-    tabs: [
-      { id: 'data-repo', label: 'Git Repo & Commits', action: () => switchData('repo') },
-      { id: 'data-db', label: 'SQLite 3 Database & Schemas', action: () => switchData('db') },
-      { id: 'data-vault', label: 'Vault & Secrets Ref', action: () => switchData('vault') },
-      { id: 'data-files', label: 'File Manager & Artifacts', action: () => switchData('files') },
-      { id: 'data-catalog', label: 'Catalog & sự kiện', action: () => switchData('catalog') }
-    ]
-  }
-};
+
 
 let currentScreen = 'warroom';
 let activeSubTabs = {};
@@ -6939,51 +6823,7 @@ function scrollToTarget(selector) {
   }
 }
 
-function updateSubtopNav(screenId) {
-  currentScreen = screenId;
-  const cfg = SUBTAB_CONFIG[screenId];
-  if (!cfg) return;
 
-  const iconEl = $('subtopDomainIcon');
-  const textEl = $('subtopDomainText');
-  const tabsContainer = $('subtopTabs');
-
-  if (iconEl) iconEl.textContent = cfg.icon;
-  if (textEl) textEl.textContent = cfg.name;
-
-  if (!tabsContainer) return;
-
-  const activeTabId = activeSubTabs[screenId] || cfg.tabs[0]?.id;
-
-  tabsContainer.innerHTML = cfg.tabs.map(tab => {
-    const isActive = tab.id === activeTabId;
-    return `
-      <button class="subTab ${isActive ? 'active' : ''}" 
-              data-sub="${tab.id}" 
-              onclick="onSubTabClick('${screenId}', '${tab.id}')">
-        ${tab.label}
-      </button>
-    `;
-  }).join('');
-}
-
-function onSubTabClick(screenId, tabId) {
-  activeSubTabs[screenId] = tabId;
-  document.querySelectorAll('.subTab').forEach(b => {
-    b.classList.toggle('active', b.dataset.sub === tabId);
-  });
-
-  const cfg = SUBTAB_CONFIG[screenId];
-  if (!cfg) return;
-  const tab = cfg.tabs.find(t => t.id === tabId);
-  if (!tab) return;
-
-  if (tab.action) {
-    tab.action();
-  } else if (tab.target) {
-    scrollToTarget(tab.target);
-  }
-}
 
 // Navigation Screen Switching
 function go(id, el) {
@@ -6993,7 +6833,6 @@ function go(id, el) {
   if (el) el.classList.add('active');
   else document.querySelector('.navItem[data-nav="' + id + '"]')?.classList.add('active');
 
-  updateSubtopNav(id);
 
   const contentEl = document.querySelector('.content');
   if (id === 'gen_workplace') {
@@ -7334,7 +7173,7 @@ function renderImplementation() {
       <td class="roleInst">${escapeHtml(r.instruction)} <span class="lock">khóa theo SSOT</span></td>
       <td>
         <span class="chip ${r.name.includes('Backend') ? 'live' : r.name.includes('Lead') ? 'done' : r.name.includes('QA') ? 'wait' : 'done'}">
-          ${r.name.includes('Backend') ? 'running' : r.name.includes('Lead') ? 'ready' : r.name.includes('QA') ? 'waiting' : 'ready'}
+          ${(() => { const st = (state.tmuxSessions || []).find(t => t.role_name === r.name)?.status; return st === 'active' ? 'đang chạy' : st === 'hibernated' ? 'ngủ đông' : st === 'paused' ? 'tạm dừng' : st === 'idle' ? 'rảnh' : '—'; })()}
         </span>
       </td>
       <td>
@@ -7770,7 +7609,7 @@ function switchAgentView(viewName, el) {
   } else if (viewName === 'oauth') {
     refreshOauthProfiles();
   } else if (viewName === 'chat' || viewName === 'kanban') {
-    renderRuntimes();
+    renderKanban();
   }
 }
 
@@ -8350,6 +8189,11 @@ async function sendWbTmuxPredefinedCmd(cmd) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ session_id: sid, command: cmd })
     });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      showToast('Từ chối: ' + (err.reason || err.error || res.status));
+      return;
+    }
     if (res.ok) {
       showToast(`Đã gửi "${cmd}" tới ${sid}`);
       setTimeout(async () => {
@@ -8510,6 +8354,7 @@ function renderThinkingCards() {
   if (listEl && steps.length === 0) {
     listEl.innerHTML = '<div class="emptyState" style="grid-column:1/-1">Chưa có luồng suy nghĩ thật. Mục này sẽ hiện khi agy xuất log tư duy qua API /api/thinking/trace.</div>';
     document.querySelectorAll('.circuitDeepCanvas').forEach(el => { el.style.display = 'none'; });
+    ['btnThinkingPrev', 'btnThinkingNext'].forEach(id => { if ($(id)) $(id).disabled = true; });
     return;
   }
   if (listEl) {
@@ -8757,11 +8602,12 @@ async function sendOrchMessage() {
     if (chat) {
       const agentDiv = document.createElement('div');
       agentDiv.className = 'orchMsgAgent';
+      agentDiv.className = 'orchMsgAgent error';
       agentDiv.innerHTML = `
-        <div class="orchBubbleAvatar"></div>
+        <div class="orchBubbleAvatar">!</div>
         <div>
-          <div class="orchBubble">Chỉ thị đã ghi nhận tại Orchestrator Control Plane. Swarm đang tiếp nhận: <em>"${escapeHtml(text)}"</em>.</div>
-          <div class="orchMsgMeta">Genesis Orchestrator · ${now} · Local Fallback</div>
+          <div class="orchBubble">Không gửi được tới agy (lỗi mạng hoặc server). Tin chưa được xử lý.</div>
+          <div class="orchMsgMeta">Lỗi · ${now}</div>
         </div>
       `;
       chat.appendChild(agentDiv);
@@ -8818,56 +8664,16 @@ async function loadOrchChatMessages() {
 function renderOrchMemory() {
   const container = $('orchMemoryContent');
   if (!container) return;
-
-  container.innerHTML = `
-    <div class="orchSection">
-      <div class="orchSectionHead">
-        <h4>Nguồn Chuẩn Tối Cao (SSOT Brain Repository)</h4>
-        <span class="orchToggle">Khóa Đồng Bộ</span>
-      </div>
-      <div class="orchSectionBody">
-        <div class="orchMemoryEntry">
-          <span class="orchMemTag">BOOTSTRAP</span>
-          <div class="orchMemText">
-            <strong>Genesis Brain Bootstrap:</strong> Tuân thủ branch <code>main</code> của repository <code>Genesis-ryan-84-0567536339/Brain</code> (file <code>BOOTSTRAP.md</code>). Luôn lấy trạng thái Brain làm nguồn chuẩn, không suy diễn từ trí nhớ cũ.
-          </div>
-        </div>
-        <div class="orchMemoryEntry">
-          <span class="orchMemTag">POLICY</span>
-          <div class="orchMemText">
-            <strong>Autonomous Execution & Full Bypass Policy:</strong> Agent tự động chạy toàn bộ lệnh terminal, đọc/ghi file, MCP tool và duyệt web mà không dừng hỏi quyền trung gian. Chỉ dừng khi hoàn thành hoặc cần quyết định định hướng kiến trúc.
-          </div>
-        </div>
-        <div class="orchMemoryEntry">
-          <span class="orchMemTag">WORKSPACE</span>
-          <div class="orchMemText">
-            <strong>Thư mục làm việc:</strong> <code>/workspace</code> (Container Mount: <code>/workspace:z</code>). Cổng phục vụ UI: <code>http://localhost:8888</code>.
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="orchSection">
-      <div class="orchSectionHead">
-        <h4>Trạng Thái Kho Dữ Liệu & Hạn Ngạch Bền Vững</h4>
-        <span class="orchToggle">Realtime</span>
-      </div>
-      <div class="orchSectionBody">
-        <div class="orchMemoryEntry">
-          <span class="orchMemTag">SQLITE WAL</span>
-          <div class="orchMemText">
-            Database core: <code>/app/data/gen-workplace.db</code> (hoặc host <code>data/gen-workplace.db</code>). Chế độ WAL tối ưu truy vấn đa luồng, hỗ trợ FTS5 Catalog tra cứu sub-millisecond.
-          </div>
-        </div>
-        <div class="orchMemoryEntry">
-          <span class="orchMemTag">SWARM SCOPE</span>
-          <div class="orchMemText">
-            Quản trị 6 nhân sự AI độc lập: Lead Architect, Backend & DB, Frontend UI, DevOps, QA Tester, Security Auditor. Quota token được cân bằng động giữa Gemini 3.8 và Claude Sonnet 4.6.
-          </div>
-        </div>
-      </div>
-    </div>
-  `;
+  const items = state.ssot || [];
+  if (!items.length) {
+    container.innerHTML = '<div class="emptyState">Chưa có mục SSOT nào. Nạp đặc tả ở "Việc & tiến độ" → "Lưu nguồn" để tạo mục đầu tiên.</div>';
+    return;
+  }
+  container.innerHTML = items.map(x => `
+    <div class="orchMemoryEntry">
+      <span class="orchMemTag">${escapeHtml(x.id || '')}</span>
+      <div><b>${escapeHtml(x.title || '')}</b><div class="orchMemText">${escapeHtml(x.body || x.content || '')}</div></div>
+    </div>`).join('');
 }
 
 function renderOrchDefinition() {
@@ -9100,33 +8906,8 @@ async function orchSpawnWorker() {
       return;
     }
   } catch (e) {
-    console.warn('[Spawn Worker] Fallback to local:', e);
+    showToast('Không tạo được worker: ' + e.message);
   }
-
-  const sid = 'gw-' + roleName.toLowerCase().replace(/[^a-z0-9]/g, '-').slice(0, 15) + '-agy';
-  if (!state.tmuxSessions) state.tmuxSessions = [];
-  const exists = state.tmuxSessions.find(s => s.id === sid);
-  if (!exists) {
-    state.tmuxSessions.push({
-      id: sid,
-      role_name: roleName,
-      status: 'running',
-      pid: Math.floor(Math.random() * 20000 + 70000),
-      cpu_percent: 0.1,
-      memory_rss_mb: 45.2,
-      account_label: 'Mặc định (Owner Gmail: ~/.gemini)',
-      account_type: 'owner_default',
-      email: '',
-      conversation_id: 'conv-' + sid,
-      quota_gemini: { percent: 85 },
-      quota_anthropic: { percent: 92 },
-      terminal_output: `[Worker ${roleName} (${sid}) initialized by Orchestrator]\nReady to accept tasks.`
-    });
-  }
-
-  renderExpertSquadGrid();
-  renderOrchSwarmCards();
-  showToast('Đã spawn thành công worker: ' + roleName);
 }
 
 async function promptClaimTask(defaultTaskId) {
@@ -9152,7 +8933,7 @@ async function promptClaimTask(defaultTaskId) {
       await refreshTmuxSessions();
       if (typeof loadTodos === 'function') loadTodos();
     } else {
-      alert(`⚠️ Không thể khóa task: ${data.detail || 'Lỗi không xác định'}`);
+      alert(`Không thể khóa task: ${data.error || data.detail || 'Lỗi không xác định'}`);
     }
   } catch (e) {
     alert(`Lỗi kết nối: ${e.message}`);
@@ -9189,7 +8970,7 @@ async function promptCompleteTask() {
       await refreshTmuxSessions();
       if (typeof loadTodos === 'function') loadTodos();
     } else {
-      alert(`⚠️ Không thể nghiệm thu task: ${data.detail || 'Lỗi không xác định'}`);
+      alert(`Không thể nghiệm thu task: ${data.error || data.detail || 'Lỗi không xác định'}`);
     }
   } catch (e) {
     alert(`Lỗi kết nối: ${e.message}`);
@@ -9366,9 +9147,10 @@ async function sendTmuxKey(key) {
   }
 }
 
-async function clearTmuxTerminal() {
-  await sendWbTmuxPredefinedCmd('clear');
-  showToast('Đã xóa màn hình console');
+function clearTmuxTerminal() {
+  const out = $('wbTerminalOutput');
+  if (out) out.innerHTML = '';
+  showToast('Đã xóa màn hình hiển thị (terminal thật không đổi)');
 }
 
 function restartTmuxSession() {
@@ -9600,6 +9382,17 @@ function renderOauthProfiles() {
 
   syncGenAccountSelects();
 
+  const host = $('deckOauthContent');
+  if (host && !$('oauthProfileRows')) {
+    host.innerHTML = `
+      <div class="oauthGrid" style="display:flex;gap:12px;margin-bottom:12px">
+        <div class="oauthStatCard"><div class="oauthStatVal" id="oaStatActive">0</div><div class="oauthStatLabel">Đã đăng nhập</div></div>
+        <div class="oauthStatCard"><div class="oauthStatVal" id="oaStatPending">0</div><div class="oauthStatLabel">Chưa đăng nhập / hết hạn</div></div>
+      </div>
+      <table class="oauthProfileTable dataTable"><thead><tr><th>Hồ sơ</th><th>Email</th><th>Trạng thái</th><th>Hạn token</th><th>Đang gán cho</th><th></th></tr></thead><tbody id="oauthProfileRows"></tbody></table>`;
+    if ($('oaStatActive')) $('oaStatActive').textContent = activeCount;
+    if ($('oaStatPending')) $('oaStatPending').textContent = pendingCount;
+  }
   const rows = $('oauthProfileRows');
   if (rows) {
     if (profiles.length === 0) {
@@ -9802,6 +9595,11 @@ async function startGoogleOAuthFlow() {
 
     if (res.ok) {
       const data = await res.json();
+      if (data.ok === false || !data.oauth_url) {
+        showToast(data.error || 'Không tạo được link đăng nhập (chưa cấu hình GOOGLE_OAUTH_CLIENT_ID?)');
+        if (btn) btn.textContent = 'Khởi chạy đăng nhập Google';
+        return;
+      }
       currentOauthUrl = data.oauth_url || '';
       if ($('oaUrlBox')) $('oaUrlBox').style.display = 'flex';
       if ($('oaUrlDisplay')) $('oaUrlDisplay').textContent = currentOauthUrl;
@@ -9964,6 +9762,11 @@ async function assignCurrentOauthToActiveSession() {
         profile_id: oauthTargetProfileId
       })
     });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.status === 'error' || data.error) {
+      showToast('Không gán được: ' + (data.error || data.message || res.status));
+      return;
+    }
     if (res.ok) {
       showToast(`Đã gán tài khoản cho Role ${sid}!`);
       closeOauthModal();
@@ -10012,11 +9815,12 @@ async function sendOaTermCmd() {
   if (out) out.innerHTML += '<br>$ ' + escapeHtml(cmd);
 
   try {
-    await fetch('/api/tmux/send', {
+    const res = await fetch('/api/tmux/send', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ session_id: 'gw-oauth-login', command: cmd })
     });
+    if (!res.ok) { const err = await res.json().catch(() => ({})); showToast('Không thực hiện được: ' + (err.error || err.reason || res.status)); return; }
     showToast('Đã gửi lệnh vào terminal');
   } catch (err) {}
 }
@@ -10033,175 +9837,16 @@ async function sendOaTermKey(key) {
 }
 
 // Runtimes, Comms, Threads & Reactions
-function refreshRuntimes() {
-  renderRuntimes();
-  showToast('Danh sách Runtime đã được cập nhật');
-}
-
-function renderRuntimes() {
-  if (!state.runtimes || state.runtimes.length === 0) return;
-  const r = state.runtimes[state.selectedRuntime] || state.runtimes[0];
-  if (!r) return;
-
-  const cnt = $('runtimeCount');
-  if (cnt) cnt.textContent = state.runtimes.length + ' đang kết nối';
-
-  const items = $('runtimeItems');
-  if (items) {
-    items.innerHTML = state.runtimes.map((x, i) => `
-      <div class="runtimeItem ${i === state.selectedRuntime ? 'active' : ''}" onclick="selectRuntime(${i})">
-        <div class="r1">
-          <b><span class="rtDot ${x.status === 'running' ? 'rtRun' : x.status === 'waiting' ? 'rtWait' : 'rtOff'}"></span>${escapeHtml(x.role)}</b>
-          <span class="chip ${x.status === 'running' ? 'live' : x.status === 'done' ? 'done' : 'wait'}">${x.status}</span>
-        </div>
-        <small>${escapeHtml(x.cli)} · ${escapeHtml(x.task)} · ${escapeHtml(x.id)}</small>
-      </div>
-    `).join('');
-  }
-
-  if ($('chatTitle')) $('chatTitle').textContent = r.role + ' · ' + r.id;
-  if ($('chatPath')) $('chatPath').textContent = r.path + ' · ' + r.branch;
-  if ($('runtimeStatus')) $('runtimeStatus').textContent = r.status;
-  renderChat();
-  renderInspector();
-  renderKanban();
-}
-
-function selectRuntime(i) {
-  state.selectedRuntime = i;
-  state.chatMode = 'thread';
-  state.inspectorMode = 'context';
-  persist();
-  renderRuntimes();
-}
-
-function switchChat(mode, el) {
-  state.chatMode = mode;
-  document.querySelectorAll('.chatTab').forEach(x => x.classList.remove('active'));
-  if (el) el.classList.add('active');
-  else document.querySelector(`.chatTab[data-chat="${mode}"]`)?.classList.add('active');
-  
-  if (currentScreen === 'runtimes') {
-    const subId = 'rt-' + mode;
-    activeSubTabs['runtimes'] = subId;
-    document.querySelectorAll('.subTab').forEach(b => b.classList.toggle('active', b.dataset.sub === subId));
-  }
-  renderChat();
-}
 
 
-function renderThreadBar() {
-  const threads = ['all', 'Repo Init', 'Live Mount', 'Installer', 'Database'];
-  if ($('threadBar')) {
-    $('threadBar').innerHTML = threads.map(t => `
-      <button class="threadBtn ${state.selectedThread === t ? 'active' : ''}" onclick="selectThread('${t}')">
-        ${t === 'all' ? 'Tất cả' : t}
-      </button>
-    `).join('');
-  }
-}
 
-function selectThread(t) {
-  state.selectedThread = t;
-  renderChat();
-}
 
-function renderChat() {
-  const r = state.runtimes[state.selectedRuntime];
-  renderThreadBar();
-  if (state.chatMode === 'thread') {
-    let msgs = r.messages;
-    if (state.selectedThread !== 'all') {
-      msgs = msgs.filter(m => (m.tag || '').toLowerCase().includes(state.selectedThread.toLowerCase()));
-    }
 
-    $('chatMessages').innerHTML = msgs.map(m => `
-      <div class="msg">
-        <div class="msgHead">
-          <strong>${escapeHtml(m.author)}</strong>
-          <span>${m.time}</span>
-          <span class="ref">${m.tag || ''}</span>
-        </div>
-        <div class="msgBody">${m.body}</div>
-        <div class="reaction">
-          ${(m.react || []).map(x => `<span class="react">${escapeHtml(x)}</span>`).join('')}
-        </div>
-      </div>
-    `).join('');
-  } else if (state.chatMode === 'trace') {
-    $('chatMessages').innerHTML = r.trace.map(t => `
-      <div class="traceRow">
-        <b class="mono">${escapeHtml(t.split(' ')[0])}</b>
-        <small>${escapeHtml(t.substring(t.indexOf(' ') + 1))}</small>
-      </div>
-    `).join('');
-  } else {
-    $('chatMessages').innerHTML = `
-      <div class="detailBox" style="margin-bottom:8px">
-        <b>Request</b>
-        <p>${escapeHtml(r.io.request)}</p>
-      </div>
-      <div class="detailBox" style="margin-bottom:8px">
-        <b>Input Contract</b>
-        <p>${escapeHtml(r.io.input)}</p>
-      </div>
-      <div class="detailBox" style="margin-bottom:8px">
-        <b>Output Artifact</b>
-        <p>${escapeHtml(r.io.output)}</p>
-      </div>
-      <div class="detailBox">
-        <b>Kết Luận & Quyết Định</b>
-        <p>${escapeHtml(r.io.conclusion)}</p>
-      </div>
-    `;
-  }
-}
 
-function switchInspector(mode, el) {
-  state.inspectorMode = mode;
-  document.querySelectorAll('.insTab').forEach(x => x.classList.remove('active'));
-  el.classList.add('active');
-  renderInspector();
-}
 
-function renderInspector() {
-  const r = state.runtimes[state.selectedRuntime];
-  if (state.inspectorMode === 'context') {
-    $('runtimeInspectorBody').innerHTML = `
-      <div class="kv2"><span>Role</span><b>${escapeHtml(r.role)}</b></div>
-      <div class="kv2"><span>Task ID</span><b>${escapeHtml(r.task)}</b></div>
-      <div class="kv2"><span>CLI Engine</span><b>${escapeHtml(r.cli)}</b></div>
-      <div class="kv2"><span>Git Branch</span><b>${escapeHtml(r.branch)}</b></div>
-      <div class="kv2"><span>Input Ref</span><b>${escapeHtml(r.io.input)}</b></div>
-      <div class="kv2"><span>Output Ref</span><b>${escapeHtml(r.io.output)}</b></div>
-      <div class="requiredRefs">
-        <b>Tham chiếu SSOT bắt buộc</b>
-      </div>
-      <div class="log">
-        ${r.trace.map(x => `<div>${escapeHtml(x)}</div>`).join('')}
-      </div>
-    `;
-  } else if (state.inspectorMode === 'events') {
-    $('runtimeInspectorBody').innerHTML = state.events.filter(e => e.runtime.includes(r.role.split(' ')[0])).map(e => `
-      <div class="traceRow">
-        <b>${e.id}</b>
-        <small>${escapeHtml(e.request)} · <span class="chip ${e.status === 'ssot' ? 'done' : 'wait'}">${e.status}</span></small>
-      </div>
-    `).join('') || '<div class="hint">Chưa có event nào của role này.</div>';
-  } else {
-    $('runtimeInspectorBody').innerHTML = `
-      <div class="traceRow"><b>FILE-01</b><small>docs/SSOT_ORIGINAL_SPEC.md</small></div>
-      <div class="traceRow"><b>FILE-06</b><small>docker-compose.yml · live mount :z</small></div>
-      <div class="traceRow"><b>SEC-01</b><small>PORT=8888 · live active</small></div>
-    `;
-  }
-}
 
-function insertAt(text) {
-  const input = $('chatInput');
-  input.value += (input.value ? ' ' : '') + text + ' ';
-  input.focus();
-}
+
+
 
 function insertEmoji(emoji) {
   const input = $('chatInput');
@@ -10209,77 +9854,6 @@ function insertEmoji(emoji) {
   input.focus();
 }
 
-function sendRuntimeMessage() {
-  const input = $('chatInput');
-  const text = input.value.trim();
-  if (!text) return;
-
-  const current = state.tmuxSessions?.find(s => s.id === state.selectedTmuxSessionId) || state.tmuxSessions?.[0];
-  const roleName = current?.role_name || 'Lead Architect';
-  const now = new Date().toLocaleTimeString('vi-VN', { hour12: false });
-
-  // Pick legacy runtimes slot too for compatibility
-  const r = state.runtimes?.[state.selectedRuntime];
-  let reacts = ['đã nhận'];
-  if (text.includes('⚠️')) reacts.push('⚠️ cảnh báo');
-  if (text.includes('👎')) reacts.push('👎 đánh giá tệ');
-  if (text.includes('❓')) reacts.push('❓ cần làm rõ');
-  if (text.includes('🔥')) reacts.push('🔥 blocker');
-
-  const msgHtml = `
-    <div class="msg">
-      <div class="msgHead">
-        <strong>Owner (Ryan)</strong>
-        <span>${now}</span>
-        <span class="ref">${text.includes('@') ? 'mention' : 'chỉ thị'}</span>
-      </div>
-      <div class="msgBody">${escapeHtml(text)}</div>
-      <div class="reaction">
-        ${reacts.map(x => `<span class="react">${escapeHtml(x)}</span>`).join('')}
-      </div>
-    </div>
-    <div class="msg" style="border-left-color:var(--accent)">
-      <div class="msgHead">
-        <strong style="color:var(--accent)">${escapeHtml(roleName)}</strong>
-        <span>${now}</span>
-        <span class="chip live" style="font-size:9px;padding:1px 5px">Đã nhận</span>
-      </div>
-      <div class="msgBody" style="color:var(--muted);font-style:italic">Đã nhận chỉ thị. Đang phân tích và chuẩn bị thực thi...</div>
-    </div>
-  `;
-
-  const chatEl = $('chatMessages');
-  if (chatEl) {
-    chatEl.insertAdjacentHTML('beforeend', msgHtml);
-    chatEl.scrollTop = chatEl.scrollHeight;
-  }
-
-  // Also push to legacy runtimes for backward compatibility
-  if (r) {
-    r.messages.push({ author: 'Owner (Ryan)', time: now, tag: text.includes('@') ? 'mention' : 'message', body: escapeHtml(text), react: reacts });
-    r.trace.push(now + ' message dispatched by Owner → ' + roleName);
-  }
-
-  input.value = '';
-  persist();
-  showToast('Đã gửi chỉ thị đến ' + roleName);
-
-  // Send real directive to SQLite DB & tmux session
-  try {
-    fetch('/api/runtime/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        message: text,
-        session_id: current?.id || 'gw-lead-agy',
-        project_id: 'PRJ-GEN-WORKPLACE',
-        author: 'Owner (Ryan)'
-      })
-    });
-  } catch (e) {
-    console.warn('Lỗi gửi runtime chat:', e);
-  }
-}
 
 // Live Kanban Drag & Drop
 function renderKanban() {
@@ -10780,7 +10354,7 @@ async function initGenWorkplace() {
 
 // 1. Quota Telemetry Sync (2-Tier Architecture: Cửa sổ 5h & Hạn mức tuần)
 function syncGenQuotaTelemetry() {
-  const s0 = (state.tmuxSessions && state.tmuxSessions[0]) || {};
+  const s0 = (state.tmuxSessions && state.tmuxSessions[0]) || state.liveQuota || {};
   const qG = s0.quota_gemini || { status: 'unknown', status_label: 'chưa kiểm tra' };
   const qC = s0.quota_anthropic || { status: 'unknown', status_label: 'chưa kiểm tra' };
 
@@ -10942,10 +10516,7 @@ async function checkLiveQuotaNow() {
             s.quota_anthropic = data.claude;
           });
         } else {
-          state.tmuxSessions = [{
-            quota_gemini: data.gemini,
-            quota_anthropic: data.claude
-          }];
+          state.liveQuota = { quota_gemini: data.gemini, quota_anthropic: data.claude };
         }
         syncGenQuotaTelemetry();
         renderExpertSquadGrid();
@@ -11117,11 +10688,12 @@ async function openNewGenChatModal() {
 
 async function togglePinGenSession(convId, newPinStatus) {
   try {
-    await fetch('/api/gen/conversations/update', {
+    const res = await fetch('/api/gen/conversations/update', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ conv_id: convId, is_pinned: newPinStatus })
     });
+    if (!res.ok) { const err = await res.json().catch(() => ({})); showToast('Không thực hiện được: ' + (err.error || err.reason || res.status)); return; }
     await loadGenConversations();
     showToast(newPinStatus ? 'Đã ghim phiên' : 'Đã bỏ ghim phiên');
   } catch (e) {
@@ -11132,11 +10704,12 @@ async function togglePinGenSession(convId, newPinStatus) {
 async function deleteGenSession(convId) {
   if (!confirm('Bạn có chắc chắn muốn xóa phiên hội thoại này?')) return;
   try {
-    await fetch('/api/gen/conversations/delete', {
+    const res = await fetch('/api/gen/conversations/delete', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ conv_id: convId })
     });
+    if (!res.ok) { const err = await res.json().catch(() => ({})); showToast('Không thực hiện được: ' + (err.error || err.reason || res.status)); return; }
     showToast('Đã xóa phiên hội thoại');
     await loadGenConversations();
   } catch (e) {
@@ -11583,7 +11156,7 @@ async function handleGenAccountChange(newAccount) {
     cur.account_profile = newAccount;
   }
   try {
-    await fetch('/api/gen/conversations/update', {
+    const res = await fetch('/api/gen/conversations/update', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -11591,10 +11164,11 @@ async function handleGenAccountChange(newAccount) {
         account: newAccount
       })
     });
+    if (!res.ok) { const err = await res.json().catch(() => ({})); showToast('Không đổi được tài khoản: ' + (err.error || res.status)); return; }
     showToast(`Đã chuyển tài khoản Google sang [${newAccount}]!`);
     await checkLiveQuotaNow();
   } catch (e) {
-    showToast('Đã đổi tài khoản: ' + newAccount);
+    showToast('Lỗi mạng khi đổi tài khoản: ' + e.message);
   }
 }
 
@@ -13252,11 +12826,12 @@ function openNewNoteModal() {
 async function deleteGenNote(noteId) {
   if (!confirm(`Xóa ghi chú #${noteId}?`)) return;
   try {
-    await fetch('/api/gen/notes/delete', {
+    const res = await fetch('/api/gen/notes/delete', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: noteId, project_id: 'PRJ-GEN-WORKPLACE' })
     });
+    if (!res.ok) { const err = await res.json().catch(() => ({})); showToast('Không thực hiện được: ' + (err.error || err.reason || res.status)); return; }
     showToast(`Đã xóa #${noteId}`);
     await loadGenNotes();
   } catch (e) {
@@ -13284,11 +12859,6 @@ async function loadGenSsotSpec() {
   } catch (e) {}
 }
 
-function clearGenConsole() {
-  if ($('genConsoleOutput')) {
-    $('genConsoleOutput').innerHTML = '<span style="color:var(--muted2)">▸ Đã xóa màn hình console. Sẵn sàng...</span>';
-  }
-}
 
 // Data Center Real Loaders (100% Real Repo, DB & Files)
 async function loadGitData() {
@@ -13652,7 +13222,6 @@ function submitRuntime() {
   closeModal();
   state.selectedRuntime = state.runtimes.length - 1;
   persist();
-  renderRuntimes();
   renderOverview();
   showToast(id + ' đã được kích hoạt');
 }
@@ -13682,7 +13251,6 @@ function refreshAll() {
   try { renderDashboardProjects(); } catch (e) { console.warn('[refreshAll] renderDashboardProjects:', e); }
   try { renderImplementation(); } catch (e) { console.warn('[refreshAll] renderImplementation:', e); }
   try { renderOverview(); } catch (e) { console.warn('[refreshAll] renderOverview:', e); }
-  try { renderRuntimes(); } catch (e) { console.warn('[refreshAll] renderRuntimes:', e); }
   try { renderMemory(); } catch (e) { console.warn('[refreshAll] renderMemory:', e); }
   try { refreshTmuxSessions(); } catch (e) { console.warn('[refreshAll] refreshTmuxSessions:', e); }
   try { refreshOauthProfiles(); } catch (e) { console.warn('[refreshAll] refreshOauthProfiles:', e); }
@@ -13856,7 +13424,7 @@ function renderWarRoomMessages(messages) {
           <span class="wrTime">${escapeHtml(m.created_time || '')}</span>
         </div>
         <div class="wrBubble">
-          ${m.body}
+          ${escapeHtml(m.body || '').replace(/\n/g, '<br>')}
           ${reactsHtml}
         </div>
       </div>
@@ -13930,33 +13498,6 @@ try {
   console.error('[Boot] initGenWorkplace failed:', e);
 }
 
-// Seed deck with welcome messages once DOM is ready
-setTimeout(() => {
-  const chatEl = $('chatMessages');
-  if (chatEl && chatEl.children.length === 0) {
-    const now = new Date().toLocaleTimeString('vi-VN', { hour12: false });
-    chatEl.innerHTML = `
-      <div class="msg" style="border-left-color:var(--accent)">
-        <div class="msgHead">
-          <strong style="color:var(--accent)">Lead Architect</strong>
-          <span>${now}</span>
-          <span class="chip live" style="font-size:9px;padding:1px 5px">Live</span>
-        </div>
-        <div class="msgBody">Swarm đã sẵn sàng. 6 chuyên gia đang trực chiến theo đặc tả SSOT gốc. Mọi chỉ thị của Owner sẽ được tiếp nhận và phân bổ ngay lập tức.</div>
-        <div class="reaction"><span class="react">đã nhận</span></div>
-      </div>
-    `;
-  }
-
-  // Load & Seed Orchestrator Chat IDE & War Room
-  loadOrchChatMessages();
-  loadWarRoomMessages(true);
-  checkLiveQuotaNow();
-
-  // Init subtop nav for current active screen
-  const activeScreen = document.querySelector('.screen.active')?.id || 'warroom';
-  updateSubtopNav(activeScreen);
-}, 200);
 
 // =========================================================================
 // REAL-TIME AUTO-POLL & LIVE SYNCHRONIZATION ENGINE (MỖI 2.5 GIÂY)
@@ -13964,7 +13505,7 @@ setTimeout(() => {
 // =========================================================================
 let autoSyncRunning = false;
 setInterval(async () => {
-  if (autoSyncRunning) return;
+  if (autoSyncRunning || document.hidden) return;
   autoSyncRunning = true;
   try {
     // 1. Tự động đồng bộ tin nhắn War Room nếu đang ở màn hình War Room
@@ -14005,14 +13546,12 @@ setInterval(async () => {
     renderExpertSquadGrid();
     updateCommandDeck();
     if (state.currentDeckTab === 'kanban') renderKanban();
-    const curActive = document.querySelector('.screen.active')?.id;
-    if (curActive === 'memory') renderMemory();
   } catch (e) {
     // ignore network tick
   } finally {
     autoSyncRunning = false;
   }
-}, 2500);
+}, 5000);
 
 // ==========================================
 // MCP SERVER CONTROL PLANE JAVASCRIPT
