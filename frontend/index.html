@@ -4457,7 +4457,7 @@ body.resizing-active, body.resizing-active * {
                       <span style="font-size:15px"></span>
                       <div>
                         <div style="display:flex;align-items:center;gap:6px">
-                          <strong style="font-size:12.5px;color:var(--text)" id="genSessionFilesTitle">Tệp Của Phiên: conv-gen-core-01</strong>
+                          <strong style="font-size:12.5px;color:var(--text)" id="genSessionFilesTitle">Tệp của phiên</strong>
                           <button class="btn small" style="font-size:9px;padding:1px 5px" onclick="renameCurrentGenSession()" title="Đổi tên tiêu đề phiên này"></button>
                         </div>
                         <div style="font-size:10px;color:var(--muted)" id="genSessionFilesSubtitle">Không gian thư mục làm việc riêng biệt của phiên chat này</div>
@@ -4480,7 +4480,7 @@ body.resizing-active, body.resizing-active * {
                   <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
                     <div class="genSessionPathBadge">
                       <span>Thư mục phiên:</span>
-                      <strong id="genSessionDirPath">/workspace/sessions/conv-gen-core-01</strong>
+                      <strong id="genSessionDirPath">—</strong>
                     </div>
                     <div style="display:flex;align-items:center;gap:6px">
                       <button class="btn small primary" style="font-size:9.5px;padding:2px 8px" onclick="createSessionFilePrompt()" title="Tạo tệp mới trong phiên làm việc này">+ File Mới</button>
@@ -4578,7 +4578,7 @@ body.resizing-active, body.resizing-active * {
                               <span class="genFileDetailName" id="detailFileName">README.md</span>
                               <span class="genFileTypeBadge" id="detailFileScopeBadge" style="background:var(--accent);color:#fff">Session File</span>
                             </div>
-                            <div class="genFileDetailPath" id="detailFilePath">/workspace/sessions/conv-gen-core-01/README.md</div>
+                            <div class="genFileDetailPath" id="detailFilePath">—</div>
                           </div>
                         </div>
                         <div class="genFileDetailActions">
@@ -8365,16 +8365,26 @@ async function sendWbTmuxPredefinedCmd(cmd) {
 
 async function sendWbTmuxRoleTask() {
   const sid = state.selectedTmuxSessionId || 'gw-lead-agy';
-  const roleTasks = {
-    'gw-lead-agy': 'echo "=== [LEAD ARCHITECT] AUDITING SSOT & TASK DAG ===" && cat docs/SSOT_ORIGINAL_SPEC.md | head -n 30 && echo "[LEAD ARCHITECT] SSOT Locked 100%. All contracts verified."',
-    'gw-backend-agy': 'echo "=== [BACKEND] VERIFYING SQLITE WAL & FTS5 ===" && python3 -c "import sqlite3; conn = sqlite3.connect(\'/app/data/gen-workplace.db\'); print(\'SQLite Mode:\', conn.execute(\'PRAGMA journal_mode;\').fetchone()[0], \'| Todos count:\', conn.execute(\'SELECT count(*) FROM todos;\').fetchone()[0])"',
-    'gw-frontend-agy': 'echo "=== [FRONTEND] SYNCING SPA MISSION CONTROL ===" && wc -l /app/frontend/index.html && echo "[FRONTEND] 0-error state synchronized."',
-    'gw-devops-agy': 'echo "=== [DEVOPS] CHECKING DOCKER DAEMON & HEALTH ===" && curl -s http://localhost:8888/api/status',
-    'gw-qa-agy': 'echo "=== [QA TESTER] RUNNING REGRESSION SUITE ===" && echo "-> /api/status: 200 OK | /api/tmux/sessions: 200 OK | All tests passed."',
-    'gw-security-agy': 'echo "=== [SECURITY AUDITOR] AUDITING PERMISSIONS & VAULT ===" && ls -ld /app/data /workspace && echo "[SECURITY] Zero secret leakage verified."'
-  };
-  const cmd = roleTasks[sid] || 'gw-status';
-  await sendWbTmuxPredefinedCmd(cmd);
+  try {
+    const res = await fetch('/api/swarm/dispatch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project_id: state.project?.name || 'gen-workplace', session_id: sid })
+    });
+    const data = await res.json().catch(() => ({}));
+    const r = (data.results || {})[sid] || {};
+    if (res.ok && r.status === 'dispatched') {
+      showToast(`Đã giao ${r.task_id || 'task'} cho ${sid} (agy đang chạy, báo cáo: ${r.report_path || '~/gw-reports'})`);
+    } else {
+      showToast('Không chạy được: ' + (r.reason || data.reason || data.error || res.status));
+    }
+    setTimeout(async () => {
+      await refreshTmuxSessions();
+      if ($('wbTerminalOutput')) $('wbTerminalOutput').scrollTop = $('wbTerminalOutput').scrollHeight;
+    }, 500);
+  } catch (e) {
+    showToast('Lỗi giao việc: ' + e.message);
+  }
 }
 
 async function triggerDispatchSwarmAll() {
@@ -8386,8 +8396,10 @@ async function triggerDispatchSwarmAll() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ project_id: prj })
     });
+    const data = await res.json().catch(() => ({}));
     if (res.ok) {
-      showToast('Đã truyền lệnh thành công tới cả 6 Agent Swarm!');
+      const errs = Object.entries(data.results || {}).filter(([, r]) => r.status !== 'dispatched').map(([k, r]) => `${k}: ${r.reason || 'lỗi'}`);
+      showToast(`Đã giao việc cho ${data.dispatched_count || 0}/6 worker` + (errs.length ? ` · không chạy: ${errs.join('; ')}` : ''));
       setTimeout(async () => {
         await refreshTmuxSessions();
         if ($('wbTerminalOutput')) $('wbTerminalOutput').scrollTop = $('wbTerminalOutput').scrollHeight;
@@ -10610,7 +10622,7 @@ function initResizersAndSidebars() {
 
 let genState = {
   conversations: [],
-  currentConvId: 'conv-gen-core-01',
+  currentConvId: null,
   currentModel: 'Gemini 3.1 Pro (High)',
   currentAccount: 'owner_default',
   currentVsTab: 'files_repo',
@@ -11000,8 +11012,18 @@ async function loadGenConversations() {
     if (res.ok) {
       const data = await res.json();
       genState.conversations = data.conversations || [];
+      if (genState.conversations.length === 0 && !genState._creatingFirstConv) {
+        genState._creatingFirstConv = true;
+        try {
+          const cr = await fetch('/api/gen/conversations/create', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ project_id: 'PRJ-GEN-WORKPLACE', title: 'Phiên 1', model: genState.currentModel || 'Gemini 3.8 Flash (High)', account: genState.currentAccount || 'owner_default' })
+          });
+          if (cr.ok) { const c = await cr.json(); if (c && c.id) genState.conversations = [c]; }
+        } catch (e) { console.warn('[Gen Conversations] Không tạo được phiên đầu:', e); }
+      }
       if (!genState.conversations.some(c => c.id === genState.currentConvId)) {
-        genState.currentConvId = genState.conversations[0]?.id || 'conv-gen-core-01';
+        genState.currentConvId = genState.conversations[0]?.id || null;
       }
       renderGenConversationsList();
     }
@@ -14517,7 +14539,7 @@ async function testMcpTool(toolName) {
 
   const defaultArgs = {};
   if (toolName === 'get_live_quota') { defaultArgs.profile_id = 'owner_default'; defaultArgs.force_refresh = false; }
-  if (toolName === 'list_kanban_tasks') { defaultArgs.conv_id = 'conv-gen-core-01'; }
+  if (toolName === 'list_kanban_tasks') { defaultArgs.conv_id = genState.currentConvId || ''; }
   if (toolName === 'read_workspace_file') { defaultArgs.file_path = 'backend/main.py'; }
   if (toolName === 'get_worker_terminal_output') { defaultArgs.session_id = 'gw-lead-agy'; defaultArgs.lines = 20; }
 
