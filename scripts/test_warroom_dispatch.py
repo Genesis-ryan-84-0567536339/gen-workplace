@@ -93,7 +93,7 @@ check("worktree riêng tồn tại", os.path.exists(os.path.join(wt_dir, ".git")
 check("agy chạy với cwd = worktree", f"cwd={os.path.realpath(wt_dir)}" in reply["body"] or f"cwd={wt_dir}" in reply["body"], reply["body"][:300])
 branches = subprocess.run(["git", "-C", DISPATCH_REPO, "branch", "--list", "wt/gw-backend-agy"], capture_output=True, text=True).stdout
 check("nhánh wt/gw-backend-agy được tạo", "wt/gw-backend-agy" in branches, branches)
-check("lệnh có --mode plan --sandbox -p", "args=--gemini_dir=" in reply["body"] and "--mode plan --sandbox -p @backend" in reply["body"], reply["body"][:300])
+check("lệnh có --mode plan -p (không --sandbox) và dặn trả lời trọn lượt", "args=--gemini_dir=" in reply["body"] and "--mode plan -p @backend" in reply["body"] and "--sandbox" not in reply["body"] and "trả lời ĐẦY ĐỦ" in reply["body"], reply["body"][:300])
 with db.get_connection() as conn:
     dl = conn.execute("SELECT * FROM dispatch_log WHERE session_id='gw-backend-agy' ORDER BY id DESC LIMIT 1").fetchone()
 check("dispatch_log có dòng exit_code=0 + report_path", dl is not None and dl["exit_code"] == 0 and dl["report_path"] and os.path.exists(dl["report_path"]), dict(dl) if dl else "none")
