@@ -94,7 +94,9 @@ google-chrome --headless=new --virtual-time-budget=3000 --dump-dom http://localh
 |---|---|---|
 | `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` | (rỗng) | Bắt buộc để đăng nhập Google. Không còn client ID hard-code; thiếu → API trả lỗi "Chưa cấu hình GOOGLE_OAUTH_CLIENT_ID trong .env". |
 | `GW_AGY_BIN` | `agy` | Đường dẫn CLI agy. Test trỏ tới script giả để chạy không cần agy thật. |
-| `GW_RECLAIM_INTERVAL_SEC` | `300` | Chu kỳ thread nền `[reclaim]` thu hồi task `in_progress` treo (`GW_RECLAIM_TIMEOUT_SEC` = ngưỡng treo, mặc định bằng chu kỳ). |
+| `GW_RECLAIM_INTERVAL_SEC` | `300` | Chu kỳ thread nền `[reclaim]` thu hồi task `in_progress` treo (`GW_RECLAIM_TIMEOUT_SEC` = ngưỡng treo, mặc định bằng chu kỳ). Cùng ngưỡng này quyết định khi nào khóa `claim_task` quá hạn và worker khác được claim lại (#16). |
+| `GITHUB_TOKEN` | (rỗng) | Có thì gửi `Authorization: Bearer` khi kiểm URL PR làm bằng chứng (repo private, tránh rate limit 60 lượt/giờ). |
+| `GW_GITHUB_API_TIMEOUT_SEC` | `5` | Timeout gọi `https://api.github.com/repos/<owner>/<repo>/pulls/<n>` khi kiểm bằng chứng PR. |
 | `GW_WORKTREE_ROOT` | `<repo>/../gw-worktrees` | Nơi tạo worktree riêng `wt/<session_id>` cho từng vai khi chatroom gọi agy. |
 | `GW_DISPATCH_REPO` | thư mục repo | Repo nguồn để `git worktree add` (test dùng repo git tạm). |
 | `GW_EVENT_WEBHOOK_URL` | (rỗng = tắt) | URL nhận POST JSON sự kiện `task_completed` / `dispatch_finished` (Issue #12, xem 3.8). |
@@ -113,12 +115,15 @@ google-chrome --headless=new --virtual-time-budget=3000 --dump-dom http://localh
 ### 3.3. Nhãn tài khoản (#5)
 `account_label` trong `GET /api/tmux/sessions` là giá trị TÍNH: `profileN (email)` hoặc `profileN (chưa đăng nhập)`; `owner_default` → `Mặc định (...)`. Không còn email giả `owner@genesis.local`. MCP `switch_google_account` chỉ nhận `account_id`.
 
-### 3.4. Bằng chứng nghiệm thu (#4)
-`POST /api/task/complete` và MCP `complete_task` chỉ nhận `evidence_ref` kiểm được:
+### 3.4. Bằng chứng nghiệm thu (#4, #16)
+`POST /api/task/complete` và MCP `complete_task` chỉ nhận `evidence_ref` kiểm được (chi tiết hợp đồng API ở 3.8):
 - commit SHA 7–40 hex có trong repo → `verified_by = git:commit`;
-- file tồn tại (tuyệt đối, tương đối repo, hoặc `~/gw-reports/...`) → `file`;
-- `https://github.com/<owner>/<repo>/pull/<n>` → `github:pr`.
-Không đạt → `{"error": ...}` và trạng thái giữ nguyên. Lúc `init_db`, task `done` có evidence không kiểm được được đặt lại về `review`.
+- file **không rỗng** nằm trong `~/gw-reports/`, repo app (`GW_DISPATCH_REPO`) hoặc `GW_WORKTREE_ROOT` (đường dẫn tuyệt đối, tương đối repo hoặc `~/...`; symlink/`../` được giải thật, file trong `.git` không nhận) → `file`;
+- `dispatch:<id>` — dòng `dispatch_log` có status `done` (dòng cũ không có status: đã xong và exit 0); dispatch có `task_id` thì phải trùng task đang nghiệm thu → `dispatch`;
+- `warroom:<id>` — tin `chat_messages` cùng dự án, tác giả là worker (`gw-*-agy` / phiên tmux) hoặc `Orchestrator (agy)`, không phải tin lỗi; nếu là trả lời của một dispatch thì dispatch đó phải `done` → `warroom`;
+- `https://github.com/<owner>/<repo>/pull/<n>` — gọi GitHub API công khai kiểm PR có thật (200) → `github:pr`. 404 / 401 / 403 / mất mạng / timeout → **từ chối**, kèm lý do.
+Không đạt → `{"error": ...}` và trạng thái giữ nguyên. Lúc `init_db`, task `done` có evidence không kiểm được được đặt lại về `review` — bước rà soát này
+dùng luật cũ (URL PR chỉ kiểm định dạng, file chỉ cần tồn tại, không gọi mạng) nên task đã done trước #16 không bị hạ cấp.
 
 ### 3.5. Quota từ kết quả gọi thật (#6)
 - Mỗi lần runner agy chạy (chat, probe, dispatch) ghi 1 dòng `quota_probe(profile_id, model, status, reset_at, checked_at, raw)`.
@@ -153,7 +158,7 @@ Tin trong War Room có `@backend|@frontend|@devops|@qa|@security|@lead` → thre
 ```bash
 python3 -m py_compile backend/*.py
 python3 scripts/test_directive_guard.py
-python3 scripts/test_task_evidence.py      # #4
+python3 scripts/test_task_evidence.py      # #4, #16: bằng chứng (GitHub API giả), chống ghi đè task done, claim nguyên tử 2 thread
 python3 scripts/test_quota_probe.py        # #6
 python3 scripts/test_warroom_dispatch.py   # #3
 python3 scripts/test_no_fake_reply.py      # #12: không bịa câu trả lời, dispatch task thật, attach_cmd
@@ -178,6 +183,10 @@ python3 scripts/test_agy_permissions.py    # #7: alias không skip-permissions, 
 | `POST /api/gen/session/todos/save` | Tạo mới (không `id` hoặc `id` chưa có) **bắt buộc `viec_ref`** khớp `^VIEC-[0-9]+$` (mã việc trong Kho Ryan). Thiếu/sai → **400** `{"error": "Thiếu viec_ref (mã việc trong Kho Ryan, vd VIEC-12)"}`. Sửa task: không gửi `viec_ref` thì giữ mã cũ. Nhận thêm `order_idx`. Response `{status, id, title, viec_ref, created}`. |
 | MCP `create_kanban_task` | Thêm tham số bắt buộc `viec_ref`; thiếu → `isError: true` cùng câu báo trên. `list_kanban_tasks` / `GET /api/gen/session/todos` trả `viec_ref` trong mỗi todo. |
 | `POST /api/task/complete` / MCP `complete_task` | Response thêm `viec_ref`, `webhook_sent`. |
+| `POST /api/task/complete` / MCP `complete_task` (#16) | `evidence_ref` nhận thêm `dispatch:<id>` và `warroom:<id>`; URL PR được kiểm qua GitHub API; file phải không rỗng và nằm trong `~/gw-reports/`/repo/worktree (xem 3.4). `verified_by` ∈ `git:commit\|file\|github:pr\|dispatch\|warroom`. **Task đã `done`** → HTTP **409** `{"error", "code": "already_done", "evidence_ref", "verified_by"}` (bằng chứng hiện có), không ghi đè. Ghi đè có chủ đích: thêm `"force": true` (+ `"reason"`) — bằng chứng mới vẫn phải qua kiểm; response thêm `overridden: {old_evidence_ref, old_verified_by, reason}`; mỗi lần ghi đè lưu vào bảng `task_evidence_audit` và log `[evidence]`. Bằng chứng sai → 400; task không có → 404. Hoàn tất task Kanban nhả `claimed_by`/`locked_at`. |
+| `GET /api/task/evidence-audit?task_id=&limit=50` (#16) | `{items: [{id, created_at, task_id, table_name, project_id, session_id, old_evidence_ref, old_verified_by, new_evidence_ref, new_verified_by, reason}], count}`, mới nhất trước. |
+| `POST /api/task/claim` / MCP `claim_task` (#16) | Áp dụng cho cả `todos` và task Kanban phiên (`gen_session_todos`, thêm cột `claimed_by`, `locked_at`). Khóa **nguyên tử**: một câu `UPDATE ... WHERE` có điều kiện trong `BEGIN IMMEDIATE`, kiểm `rowcount` — nhiều worker gọi cùng lúc thì đúng 1 người thắng. Task `in_progress` đang do người khác giữ (`assigned_session_id`, hoặc `claimed_by`/`assigned_agent` với Kanban) và khóa chưa quá `GW_RECLAIM_TIMEOUT_SEC` → HTTP **409** `{"error", "code": "locked", "held_by", "locked_at" (UTC)}`. Người đang giữ gọi lại → 200, làm mới `locked_at`. Khóa quá hạn hoặc không có `locked_at` (dữ liệu cũ, task sửa tay trên UI) → worker khác claim được. Task `done` → 409 `code: already_done` (không mở lại task). Không có task → 404. |
+| `POST /api/task/reclaim` | `timeout_seconds` bỏ trống → dùng cùng ngưỡng với khóa claim (`GW_RECLAIM_TIMEOUT_SEC`). |
 | `GET /api/dispatch/log?limit=50` | `{items: [{id, session_id, command, exit_code, report_path, started_at, finished_at, task_id, viec_ref, channel_id, webhook_sent, status, kind, summary, request_msg_id, reply_msg_id}], count, webhook_enabled}` (mới nhất trước). `id` = `dispatch_id`. `status` ∈ `running\|done\|failed` (dòng cũ trước #9: `''`), `kind` ∈ `warroom\|tmux`. Dòng được ghi `running` ngay lúc giao việc. |
 | MCP `post_warroom_message` / `POST /api/warroom/send` | Response thêm `dispatches: [{session_id, dispatch_id}]` (mỗi `@vai` một lần giao) và `user_message.created_at`. |
 | `POST /api/swarm/dispatch` (bổ sung #9) | Mỗi `results[sid]` thêm `dispatch_id` (int khi `tmux_real`, `null` khi tmux không nhận lệnh). Thread nền đọc pane tmux tới dòng `=== XONG exit=N ===` sau tên file báo cáo → chốt `done/failed` và bắn webhook `dispatch_finished` (không cần ai poll). |
@@ -190,7 +199,7 @@ python3 scripts/test_agy_permissions.py    # #7: alias không skip-permissions, 
 ```json
 {"event": "task_completed | dispatch_finished", "project_id": "PRJ-GEN-WORKPLACE", "viec_ref": "VIEC-12",
  "task_id": "TSK-03", "session_id": "gw-backend-agy", "exit_code": 0, "status": "done | failed", "report_path": "~/gw-reports/warroom-....md",
- "evidence_ref": "<sha|file|PR url>", "verified_by": "git:commit", "at": "2026-09-28T09:00:00+07:00"}
+ "evidence_ref": "<sha|file|PR url|dispatch:<id>|warroom:<id>>", "verified_by": "git:commit", "at": "2026-09-28T09:00:00+07:00"}
 ```
 `task_completed` bắn khi `complete_task` thành công (`exit_code` = `null`); `dispatch_finished` bắn khi agy của chatroom chạy xong (`task_id`/`viec_ref` = task đang gán cho worker, có thể rỗng), và khi lệnh giao qua `/api/swarm/dispatch` in dòng `=== XONG exit=N ===` (thread nền theo dõi pane, #9). `status` = `failed` cả khi `exit_code` = 0 nhưng agy bị auto-denied / không ra kết quả; `status` rỗng với `task_completed`.
 

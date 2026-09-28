@@ -7891,7 +7891,7 @@ function updateCommandDeck() {
   if (taskEl) {
     if (current.task_status === 'done') {
       const evText = current.evidence_ref ? ` (${current.evidence_ref})` : '';
-      taskEl.innerHTML = `<span style="color:var(--green);font-weight:700">ĐÃ NGHIỆM THU:</span> ${escapeHtml(current.current_task_id)} · ${escapeHtml(current.task_title || '')} <span class="chip done" style="font-size:9px;padding:1px 6px;margin-left:6px" title="${escapeHtml(current.evidence_ref || 'Verified')}">✓ Bằng chứng commit: ${escapeHtml(current.evidence_ref ? current.evidence_ref.slice(0, 32) : 'verified')}</span>`;
+      taskEl.innerHTML = `<span style="color:var(--green);font-weight:700">ĐÃ NGHIỆM THU:</span> ${escapeHtml(current.current_task_id)} · ${escapeHtml(current.task_title || '')} <span class="chip done" style="font-size:9px;padding:1px 6px;margin-left:6px" title="${escapeHtml(current.evidence_ref || 'Verified')}">✓ Bằng chứng: ${escapeHtml(current.evidence_ref ? current.evidence_ref.slice(0, 32) : 'verified')}</span>`;
       taskEl.style.color = 'var(--green)';
       taskEl.style.background = 'rgba(34,197,94,0.12)';
       taskEl.style.borderColor = 'rgba(34,197,94,0.35)';
@@ -8724,8 +8724,8 @@ function renderOrchDefinition() {
           <li><strong>Điều 1: Đúng việc mới sinh (Demand-Driven Spawning):</strong> Không bao giờ spawn nhân sự bừa bãi. Chỉ spawn khi có đầu việc Todo cụ thể chưa ai đảm nhận.</li>
           <li><strong>Điều 2: 1 Profile = 1 Identity (Cô lập OAuth Pool):</strong> Mỗi nhân sự chạy trên 1 runtime tmux tách biệt, profile Google/Claude độc lập để chống cạn hạn ngạch chung (chống lỗi 429).</li>
           <li><strong>Điều 3: Khóa ranh giới thư mục 0-Conflict:</strong> Whitelist thư mục được sửa (Allowed Paths) và Blacklist thư mục cấm (Blocked Paths) được sinh vào <code>ROLE.md</code>. Cấm tuyệt đối xâm lấn file của đồng đội.</li>
-          <li><strong>Điều 4: Khóa độc quyền nhiệm vụ (Atomic Task Mutex):</strong> Worker phải claim task qua <code>/api/task/claim</code> trước khi làm. Tuyệt đối không cho 2 worker cùng nhận 1 task.</li>
-          <li><strong>Điều 5: Nghiệm thu bằng chứng (Evidence-Backed Completion):</strong> Cấm tự nhận "Done" bằng lời nói. Bắt buộc nộp commit hash hoặc artifact qua <code>/api/task/complete</code> mới được duyệt.</li>
+          <li><strong>Điều 4: Khóa độc quyền nhiệm vụ (Atomic Task Mutex):</strong> Worker phải claim task qua <code>/api/task/claim</code> trước khi làm. Tuyệt đối không cho 2 worker cùng nhận 1 task (task đang có người giữ → 409 kèm <code>held_by</code>; claim lại được khi khóa quá hạn).</li>
+          <li><strong>Điều 5: Nghiệm thu bằng chứng (Evidence-Backed Completion):</strong> Cấm tự nhận "Done" bằng lời nói. Bắt buộc nộp bằng chứng kiểm được (commit SHA, file báo cáo trong <code>~/gw-reports/</code>/repo, <code>dispatch:&lt;id&gt;</code>, <code>warroom:&lt;id&gt;</code> hoặc URL PR GitHub có thật) qua <code>/api/task/complete</code> mới được duyệt. Task đã done không bị ghi đè bằng chứng (trừ khi <code>force</code>, có ghi nhật ký).</li>
           <li><strong>Điều 6: Vòng đời tiết kiệm & Chống Zombie:</strong> Tự động ngủ đông (0% CPU, 0MB RAM) khi rảnh rỗi. Thu hồi task nếu worker bị crash quá 5 phút không heartbeat.</li>
         </ul>
       </div>
@@ -8932,6 +8932,8 @@ async function promptClaimTask(defaultTaskId) {
       showToast(`Đã khóa thành công task ${taskId.trim()} cho ${current.role_name}!`);
       await refreshTmuxSessions();
       if (typeof loadTodos === 'function') loadTodos();
+    } else if (data.code === 'locked' && data.held_by) {
+      alert(`Không thể khóa task: đang do ${data.held_by} giữ${data.locked_at ? ` (khóa lúc ${data.locked_at} UTC)` : ''}. Chờ người đó nhả khóa hoặc khóa quá hạn rồi thử lại.`);
     } else {
       alert(`Không thể khóa task: ${data.error || data.detail || 'Lỗi không xác định'}`);
     }
@@ -8947,26 +8949,36 @@ async function promptCompleteTask() {
   const taskId = current.current_task_id || prompt(`[Nghiệm Thu Nhiệm Vụ] Nhập mã Task ID mà ${current.role_name} đã hoàn thành:`);
   if (!taskId || !taskId.trim()) return;
 
-  const evidence = prompt(`[Bằng Chứng Nghiệm Thu Bắt Buộc] Nhập Commit Hash, đường dẫn Artifact hoặc Test Log cho task ${taskId.trim()}:`);
+  const evidence = prompt(`[Bằng Chứng Nghiệm Thu Bắt Buộc] Nhập bằng chứng kiểm được cho task ${taskId.trim()}:\n- commit SHA có trong repo\n- file báo cáo không rỗng (~/gw-reports/... hoặc trong repo/worktree)\n- dispatch:<id> (lần giao việc đã done)\n- warroom:<id> (tin trả lời của agent)\n- URL PR GitHub có thật`);
   if (!evidence || !evidence.trim()) {
-    alert('⚠️ Điều lệ số 5: Không thể hoàn tất nhiệm vụ mà không có bằng chứng (Evidence)! Yêu cầu nhập commit hash hoặc artifact path.');
+    alert('⚠️ Điều lệ số 5: Không thể hoàn tất nhiệm vụ mà không có bằng chứng (Evidence)! Yêu cầu nhập commit SHA, file báo cáo, dispatch:<id>, warroom:<id> hoặc URL PR.');
     return;
   }
 
+  const sendComplete = (extra) => fetch('/api/task/complete', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(Object.assign({
+      task_id: taskId.trim(),
+      session_id: current.id,
+      evidence_ref: evidence.trim(),
+      project_id: state.project?.id || 'PRJ-GEN-WORKPLACE'
+    }, extra || {}))
+  });
+
   try {
-    const res = await fetch('/api/task/complete', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        task_id: taskId.trim(),
-        session_id: current.id,
-        evidence_ref: evidence.trim(),
-        project_id: state.project?.id || 'PRJ-GEN-WORKPLACE'
-      })
-    });
-    const data = await res.json();
+    let res = await sendComplete();
+    let data = await res.json();
+    if (res.status === 409 && data.code === 'already_done') {
+      const reason = prompt(`Task ${taskId.trim()} đã nghiệm thu với bằng chứng "${data.evidence_ref || ''}".\nGhi đè bằng "${evidence.trim()}"? Việc ghi đè sẽ được lưu nhật ký.\nNhập lý do để ghi đè (để trống = hủy):`);
+      if (!reason || !reason.trim()) return;
+      res = await sendComplete({ force: true, reason: reason.trim() });
+      data = await res.json();
+    }
     if (res.ok) {
-      showToast(`Nghiệm thu thành công task ${taskId.trim()}! Bằng chứng đã lưu vào hệ thống.`);
+      showToast(data.overridden
+        ? `Đã ghi đè bằng chứng task ${taskId.trim()} (${data.verified_by}); đã lưu nhật ký.`
+        : `Nghiệm thu thành công task ${taskId.trim()} (${data.verified_by})! Bằng chứng đã lưu vào hệ thống.`);
       await refreshTmuxSessions();
       if (typeof loadTodos === 'function') loadTodos();
     } else {
