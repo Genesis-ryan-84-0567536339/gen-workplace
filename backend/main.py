@@ -658,13 +658,19 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             })
             return
 
-        # 6.2. Truyền lệnh / Điều phối luồng làm việc đồng loạt cho 6 Agent Swarm
+        # 6.2. "Chạy Task này" (session_id) / "Chạy Toàn Bộ Swarm" (không session_id): lệnh agy thật cho task đang gán,
+        #      qua allowlist directive_guard. results = {sid: {status: dispatched|error, task_id, command, reason, ...}}
         if path == "/api/swarm/dispatch":
             project_id = data.get("project_id", "PRJ-GEN-WORKPLACE")
-            results = db.dispatch_swarm_workflow(project_id)
+            session_id = (data.get("session_id") or "").strip() or None
+            results = db.dispatch_swarm_workflow(project_id, session_id)
+            n_ok = sum(1 for r in results.values() if r.get("status") == "dispatched")
             self._send_json(200, {
-                "status": "dispatched",
+                "status": "dispatched" if n_ok else "error",
                 "project_id": project_id,
+                "session_id": session_id,
+                "dispatched_count": n_ok,
+                "error_count": len(results) - n_ok,
                 "results": results,
                 "time": time.strftime("%H:%M:%S")
             })
