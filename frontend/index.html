@@ -8602,37 +8602,6 @@ function stepThinkingNext() {
   }
 }
 
-function simulateLiveThinking() {
-  const btn = $('btnSimulateThinking');
-  const chip = $('thinkingStatusChip');
-  if (btn) {
-    btn.disabled = true;
-    btn.textContent = 'Đang tổng hợp...';
-  }
-  if (chip) {
-    chip.textContent = 'Đang suy luận trực tiếp...';
-    chip.style.color = 'var(--yellow)';
-  }
-
-  let idx = 0;
-  const timer = setInterval(() => {
-    if (idx < currentThinkingStepsData.length) {
-      selectThinkingStep(idx);
-      idx++;
-    } else {
-      clearInterval(timer);
-      if (btn) {
-        btn.disabled = false;
-        btn.textContent = 'Tái suy luận (Stream)';
-      }
-      if (chip) {
-        chip.textContent = 'chưa có dữ liệu';
-        chip.style.color = '';
-      }
-      showToast('Đã hoàn tất duyệt chuỗi suy luận 5 giai đoạn!');
-    }
-  }, 450);
-}
 
 function copyThinkingTrace() {
   const current = state.tmuxSessions.find(s => s.id === state.selectedTmuxSessionId) || state.tmuxSessions[0];
@@ -9525,9 +9494,6 @@ async function submitAccountChange() {
   }
 }
 
-function openNewTmuxModal() {
-  showToast('Khởi tạo thêm Role: hãy dùng nút Khởi tạo Role trong khu Implementation');
-}
 
 // Mở modal cấu hình / đổi tài khoản Google cho phiên chat Gen Core & Swarm
 function openGenAccountSwitcherModal() {
@@ -10158,7 +10124,7 @@ function renderChat() {
         </div>
         <div class="msgBody">${m.body}</div>
         <div class="reaction">
-          ${(m.react || []).map(x => `<span class="react" onclick="reactMsg('${escapeHtml(x)}')">${escapeHtml(x)}</span>`).join('')}
+          ${(m.react || []).map(x => `<span class="react">${escapeHtml(x)}</span>`).join('')}
         </div>
       </div>
     `).join('');
@@ -10243,10 +10209,6 @@ function insertEmoji(emoji) {
   input.focus();
 }
 
-function reactMsg(label) {
-  showToast('Đã thả reaction: ' + label);
-}
-
 function sendRuntimeMessage() {
   const input = $('chatInput');
   const text = input.value.trim();
@@ -10273,7 +10235,7 @@ function sendRuntimeMessage() {
       </div>
       <div class="msgBody">${escapeHtml(text)}</div>
       <div class="reaction">
-        ${reacts.map(x => `<span class="react" onclick="reactMsg('${escapeHtml(x)}')">${escapeHtml(x)}</span>`).join('')}
+        ${reacts.map(x => `<span class="react">${escapeHtml(x)}</span>`).join('')}
       </div>
     </div>
     <div class="msg" style="border-left-color:var(--accent)">
@@ -13497,13 +13459,6 @@ function filterTable(id, q) {
 }
 
 // Memory, SSOT & Catalog Tra Cứu Nhanh
-function syncMemories() {
-  $('memorySyncState').textContent = 'đã sync ' + new Date().toLocaleTimeString('vi-VN', { hour12: false });
-  state.roleMemory.forEach(x => x.summary = x.summary.replace('waiting', 'synced'));
-  persist();
-  renderMemory();
-  showToast('Đã sync toàn bộ bộ nhớ của 6 Role vào SSOT gen-workplace');
-}
 
 function renderMemory() {
   const catalogList = (state.refs && state.refs.length > 0) ? state.refs : ((state.catalog || []).map(c => [c.id, c.type, c.title, c.desc]));
@@ -13529,29 +13484,7 @@ function renderMemory() {
   const cnt = $('ssotCount'); if (cnt) cnt.textContent = (state.ssot?.length || 0) + ' mục';
 }
 
-function selectMemory(i) {
-  state.selectedMemory = i;
-  renderMemory();
-}
 
-function selectSSOT(i) {
-  state.selectedSSOT = i;
-  document.querySelectorAll('.ssotItem').forEach((x, j) => x.classList.toggle('selected', j === i));
-  const s = state.ssot && state.ssot[i];
-  if (s && $('ssotFactDetail')) {
-    $('ssotFactDetail').innerHTML = `
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-        <strong style="color:var(--accent);font-size:12px">${escapeHtml(s.id)} · ${escapeHtml(s.title)}</strong>
-        <span class="chip done" style="font-size:9.5px">✓ Verified SSOT</span>
-      </div>
-      <div style="color:var(--text);line-height:1.55;margin-bottom:8px;font-size:11.5px">${escapeHtml(s.body)}</div>
-      <div style="display:flex;align-items:center;justify-content:space-between;font-size:10px;color:var(--muted);border-top:1px solid rgba(255,255,255,0.06);padding-top:6px">
-        <span>Nguồn kiểm chứng: <code style="color:var(--green)">${escapeHtml(s.source)}</code></span>
-        <span>Xác thực: ${escapeHtml(s.verified)}</span>
-      </div>
-    `;
-  }
-}
 
 async function openFullSSOTModal() {
   const modal = $('ssotFullModal');
@@ -13634,9 +13567,6 @@ function verifyEvent(i) {
   showToast(id + ' đã được nâng thành dữ kiện SSOT!');
 }
 
-function clarifyEvent(i) {
-  showToast('Đã gửi yêu cầu làm rõ cho ' + state.events[i].id + ' vào thread của runtime');
-}
 
 function openEventModal() {
   $('modalTitle').textContent = 'Ghi nhận Sự Kiện Mới';
