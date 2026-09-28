@@ -4256,8 +4256,14 @@ def send_gen_chat(conv_id, author, message, model, account="owner_default"):
         "kanban_updates": applied_kanban
     }
 
+def _shorten_line(text, limit=160):
+    """Rút gọn 1 tin nhắn về 1 dòng (gộp khoảng trắng), cắt ở limit ký tự kèm '…' — nguyên văn, không thêm chữ."""
+    one_line = " ".join((text or "").split())
+    return one_line if len(one_line) <= limit else one_line[:limit].rstrip() + "…"
+
+
 def compact_gen_conversation(conv_id, model_from="", model_to="", manual=False):
-    """Tự động nén (compact) ngữ cảnh hội thoại cũ dạng lũy tiến và bảo toàn các Note ID làm bằng chứng."""
+    """Nén (compact) các tin chưa nén của phiên thành 1 tóm tắt CHỈ gồm dữ liệu thật; < 2 tin → skipped, không ghi gì."""
     with get_connection() as conn:
         cursor = conn.cursor()
         if model_to and model_to.strip():
@@ -4265,47 +4271,45 @@ def compact_gen_conversation(conv_id, model_from="", model_to="", manual=False):
             conn.commit()
 
         cursor.execute("""
-        SELECT * FROM gen_messages 
+        SELECT * FROM gen_messages
         WHERE conversation_id = ? AND is_compacted = 0 AND role != 'compact'
         ORDER BY id ASC
         """, (conv_id,))
         uncompacted = cursor.fetchall()
-        if len(uncompacted) < 2 and not manual:
-            return {"status": "skipped", "reason": "Not enough messages to compact"}
+        # manual hay không cũng vậy: không có gì để nén thì không ghi snapshot / tin tóm tắt nào
+        if len(uncompacted) < 2:
+            return {"status": "skipped", "reason": "Chưa đủ tin để nén", "message_count": len(uncompacted)}
 
         count = len(uncompacted)
         all_notes = set()
-        user_topics = []
-        assistant_decisions = []
+        user_msgs = []
+        assistant_msgs = []
         import re
         for m in uncompacted:
-            content = m["content"]
-            found = re.findall(r'#NOTE-\d+|#EVT-\d+', content)
-            for f in found:
+            content = m["content"] or ""
+            for f in re.findall(r'#NOTE-\d+|#EVT-\d+', content):
                 all_notes.add(f)
             if m["role"] == "user":
-                clean_t = content.strip().split('\n')[0][:60]
-                if clean_t and clean_t not in user_topics:
-                    user_topics.append(clean_t)
+                user_msgs.append(content)
             elif m["role"] == "assistant":
-                lines = [l.strip() for l in content.split('\n') if l.strip().startswith(('-', '*', '•', '1.', '2.', '3.'))]
-                if lines:
-                    assistant_decisions.extend(lines[:2])
+                assistant_msgs.append(content)
 
         cpt_id = f"CPT-{uuid.uuid4().hex[:6].upper()}"
         notes_list = sorted(list(all_notes))
-        
-        topics_str = " · ".join(user_topics[:3]) if user_topics else "Thảo luận điều phối và kiến trúc hệ thống"
-        decisions_str = " | ".join(assistant_decisions[:3]) if assistant_decisions else "Đã thống nhất cơ chế bảo toàn SSOT và ranh giới whitelist"
-        notes_str = ", ".join(notes_list) if notes_list else "(chưa có ghi chú)"
+        last_users = [t for t in (_shorten_line(x) for x in user_msgs[-3:]) if t]
+        last_assistants = [t for t in (_shorten_line(x) for x in assistant_msgs[-3:]) if t]
 
-        summary = (
-            f"📦 **Progressive Context Compact ({cpt_id})** · Chuyển tiếp ngữ cảnh từ `{model_from or 'Trước'}` sang `{model_to or 'Hiện tại'}`:\n"
-            f"- **Chủ đề cốt lõi:** {topics_str}\n"
-            f"- **Quyết định chốt:** {decisions_str}\n"
-            f"- **Bằng chứng & Note ID dựng chứng:** {notes_str}\n"
-            f"*(Đã nén và lưu trữ {count} tin nhắn trước đó vào SQLite WAL để tối ưu quota token)*"
-        )
+        # Tóm tắt chỉ gồm: số tin thật, trích nguyên văn (rút gọn) 3 câu hỏi / 3 trả lời gần nhất, danh sách #NOTE/#EVT thật
+        lines = [f"📦 **Nén ngữ cảnh ({cpt_id})**: đã nén {count} tin nhắn trước đó"
+                 + (f", chuyển từ `{model_from}` sang `{model_to}`" if (model_from or model_to) else "") + "."]
+        if last_users:
+            lines.append(f"- **Câu hỏi người dùng gần nhất ({len(last_users)}/{len(user_msgs)}):**")
+            lines.extend(f"  {i}. {t}" for i, t in enumerate(last_users, 1))
+        if last_assistants:
+            lines.append(f"- **Trả lời agy gần nhất ({len(last_assistants)}/{len(assistant_msgs)}):**")
+            lines.extend(f"  {i}. {t}" for i, t in enumerate(last_assistants, 1))
+        lines.append("- **Note/Event được nhắc tới:** " + (", ".join(notes_list) if notes_list else "không có"))
+        summary = "\n".join(lines)
 
         cursor.execute("""
         INSERT INTO gen_compact_snapshots (id, conversation_id, model_from, model_to, summary, note_ids_json, message_count, owner_id)
