@@ -10,7 +10,14 @@
 set -euo pipefail
 
 BRANCH="${1:-main}"
-REPO_DIR="${GW_REPO_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+# Thư mục repo: GW_REPO_DIR > thư mục hiện tại nếu là repo git > thư mục cha của script
+if [ -n "${GW_REPO_DIR:-}" ]; then
+  REPO_DIR="$GW_REPO_DIR"
+elif git rev-parse --show-toplevel >/dev/null 2>&1; then
+  REPO_DIR="$(git rev-parse --show-toplevel)"
+else
+  REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+fi
 LOG_DIR="${GW_LOG_DIR:-$HOME/gw-reports}"
 mkdir -p "$LOG_DIR"
 
