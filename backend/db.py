@@ -506,6 +506,28 @@ def init_db():
             cursor.execute("ALTER TABLE gen_session_todos ADD COLUMN viec_ref TEXT DEFAULT '';")
         except Exception:
             pass
+        # Khóa claim cho task Kanban phiên: ai đang giữ + lúc khóa (Issue #16)
+        for col, col_type in [("claimed_by", "TEXT DEFAULT ''"), ("locked_at", "TEXT DEFAULT ''")]:
+            try:
+                cursor.execute(f"ALTER TABLE gen_session_todos ADD COLUMN {col} {col_type};")
+            except Exception:
+                pass
+        # Nhật ký ghi đè bằng chứng của task đã done (complete_task force=True, Issue #16)
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS task_evidence_audit (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            task_id TEXT NOT NULL,
+            table_name TEXT DEFAULT '',
+            project_id TEXT DEFAULT '',
+            session_id TEXT DEFAULT '',
+            old_evidence_ref TEXT DEFAULT '',
+            old_verified_by TEXT DEFAULT '',
+            new_evidence_ref TEXT DEFAULT '',
+            new_verified_by TEXT DEFAULT '',
+            reason TEXT DEFAULT ''
+        );
+        """)
 
         # 21. MCP Agent Tokens & Permissions (Chuẩn bảo mật Gen-hub OAuth / Bearer)
         cursor.execute("""
@@ -601,7 +623,8 @@ def migrate_unverified_done_tasks():
             for table in ("todos", "gen_session_todos"):
                 cursor.execute(f"SELECT id, evidence_ref FROM {table} WHERE status = 'done'")
                 for r in cursor.fetchall():
-                    ok, _, _ = verify_evidence_ref(r["evidence_ref"])
+                    # legacy=True: không gọi mạng lúc khởi động, giữ luật cũ cho URL PR / file để task done trước đây không bị hạ cấp
+                    ok, _, _ = verify_evidence_ref(r["evidence_ref"], legacy=True)
                     if not ok:
                         cursor.execute(f"UPDATE {table} SET status = 'review' WHERE id = ?", (r["id"],))
                         changed += cursor.rowcount
@@ -2944,15 +2967,155 @@ def process_orch_instruction(user_message, project_id="PRJ-GEN-WORKPLACE", model
 # ═══════════════════════════════════════════════════════════════════════════
 
 EVIDENCE_SHA_RE = re.compile(r"^[0-9a-f]{7,40}$")
-EVIDENCE_PR_RE = re.compile(r"^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/pull/[0-9]+/?$")
+EVIDENCE_PR_RE = re.compile(r"^https://github\.com/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)/pull/([0-9]+)/?$")
+EVIDENCE_DISPATCH_RE = re.compile(r"^dispatch:\s*#?([0-9]{1,18})$", re.IGNORECASE)
+EVIDENCE_WARROOM_RE = re.compile(r"^warroom:\s*#?([0-9]{1,18})$", re.IGNORECASE)
+EVIDENCE_FORMATS_HINT = ("commit SHA có trong repo, file không rỗng trong ~/gw-reports/ hoặc repo/worktree, "
+                         "dispatch:<id> (lần giao việc done), warroom:<id> (tin trả lời của agent) "
+                         "hoặc URL PR GitHub có thật (https://github.com/<owner>/<repo>/pull/<n>)")
+GITHUB_API_BASE = "https://api.github.com"
+DISPATCH_OK_STATUSES = ("done", "ok")
 
-def verify_evidence_ref(evidence_ref):
-    """Kiểm bằng chứng nghiệm thu: commit SHA có trong repo, đường dẫn file tồn tại, hoặc URL PR GitHub. Trả (ok, verified_by, message)."""
+def _github_api_timeout():
+    try:
+        return max(1.0, float(os.environ.get("GW_GITHUB_API_TIMEOUT_SEC", "5")))
+    except ValueError:
+        return 5.0
+
+def _verify_github_pr(owner, repo, number):
+    """Gọi GitHub API công khai kiểm PR có thật. Không gọi được mạng / bị từ chối → (False, lý do); không bao giờ im lặng cho qua."""
+    import urllib.request
+    import urllib.error
+    url = f"{GITHUB_API_BASE}/repos/{owner}/{repo}/pulls/{number}"
+    headers = {"Accept": "application/vnd.github+json", "User-Agent": "gen-workplace-evidence-check",
+               "X-GitHub-Api-Version": "2022-11-28"}
+    token = (os.environ.get("GITHUB_TOKEN") or "").strip()
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    try:
+        req = urllib.request.Request(url, headers=headers, method="GET")
+        with urllib.request.urlopen(req, timeout=_github_api_timeout()) as resp:
+            code = getattr(resp, "status", None) or resp.getcode()
+            data = json.loads(resp.read().decode("utf-8", errors="replace") or "{}")
+    except urllib.error.HTTPError as e:
+        detail = ""
+        try:
+            body = json.loads(e.read().decode("utf-8", errors="replace") or "{}")
+            detail = str(body.get("message") or "")[:200] if isinstance(body, dict) else ""
+        except Exception:
+            pass
+        detail = f": {detail}" if detail else ""
+        if e.code == 404:
+            hint = "" if token else " (repo private thì đặt GITHUB_TOKEN)"
+            return False, f"PR {owner}/{repo}#{number} không tồn tại trên GitHub (404){hint}"
+        if e.code in (401, 403, 429):
+            return False, (f"GitHub API từ chối khi kiểm PR {owner}/{repo}#{number} (HTTP {e.code}{detail or ': sai token hoặc hết rate limit'}) "
+                           "— chưa kiểm được nên không nhận")
+        return False, f"GitHub API lỗi HTTP {e.code}{detail} khi kiểm PR {owner}/{repo}#{number} — chưa kiểm được nên không nhận"
+    except Exception as e:
+        reason = getattr(e, "reason", None) or e
+        return False, (f"Không gọi được GitHub API để kiểm PR {owner}/{repo}#{number} ({type(e).__name__}: {reason}) — "
+                       "chưa kiểm được nên không nhận; thử lại hoặc dùng commit SHA / dispatch:<id>")
+    if code != 200 or not isinstance(data, dict) or str(data.get("number")) != str(number):
+        return False, f"GitHub API trả dữ liệu không khớp PR {owner}/{repo}#{number} (HTTP {code})"
+    state = "merged" if data.get("merged_at") else (data.get("state") or "?")
+    return True, f"PR {owner}/{repo}#{number} có thật trên GitHub ({state})"
+
+def _evidence_file_roots():
+    """Thư mục được nhận làm nơi chứa file bằng chứng: ~/gw-reports, repo app, repo dispatch, thư mục worktree của các vai."""
+    roots = [os.path.join(HOME_DIR, "gw-reports"), str(BASE_DIR), os.environ.get("GW_DISPATCH_REPO") or "", _worktree_root()]
+    out = []
+    for r in roots:
+        if r:
+            rp = os.path.realpath(os.path.expanduser(r))
+            if rp not in out:
+                out.append(rp)
+    return out
+
+def _verify_evidence_file(ev, legacy=False):
+    if ev.startswith("~"):
+        candidate = os.path.expanduser(ev)
+    elif os.path.isabs(ev):
+        candidate = ev
+    else:
+        candidate = str(BASE_DIR / ev)
+    if legacy:
+        # Rà soát task done cũ lúc khởi động: giữ luật cũ (file tồn tại) để không hạ cấp bằng chứng đã nhận trước đây
+        if os.path.exists(candidate):
+            return True, f"File tồn tại: {candidate}"
+        return False, ""
+    real = os.path.realpath(candidate)
+    if not os.path.exists(real):
+        return False, ""
+    inside = [root for root in _evidence_file_roots() if real == root or real.startswith(root + os.sep)]
+    if not inside:
+        return False, (f"File '{ev}' nằm ngoài ~/gw-reports/, repo và worktree của các vai — không nhận làm bằng chứng")
+    if ".git" in Path(os.path.relpath(real, inside[0])).parts:
+        return False, f"File '{ev}' nằm trong thư mục .git — không nhận làm bằng chứng"
+    if not os.path.isfile(real):
+        return False, f"'{ev}' không phải file thường — không nhận làm bằng chứng"
+    if os.path.getsize(real) == 0:
+        return False, f"File '{ev}' rỗng — không nhận làm bằng chứng"
+    return True, f"File không rỗng: {real}"
+
+def _verify_evidence_dispatch(dispatch_id, task_id=""):
+    row = _get_dispatch_row(dispatch_id)
+    if not row:
+        return False, f"dispatch:{dispatch_id} không có trong dispatch_log"
+    status = _row_status(row)
+    if status not in DISPATCH_OK_STATUSES:
+        return False, f"dispatch:{dispatch_id} có status '{status}' (cần done) — không nhận làm bằng chứng"
+    d_task = (row.get("task_id") or "").strip()
+    if task_id and d_task and d_task != task_id:
+        return False, f"dispatch:{dispatch_id} thuộc task {d_task}, không phải {task_id}"
+    return True, f"dispatch:{dispatch_id} ({row.get('kind') or 'dispatch'}, {row.get('session_id')}) đã {status}"
+
+def _verify_evidence_warroom(msg_id, project_id="PRJ-GEN-WORKPLACE"):
+    with get_connection() as conn:
+        m = conn.execute("SELECT id, project_id, author, tag FROM chat_messages WHERE id = ?", (msg_id,)).fetchone()
+        if not m:
+            return False, f"warroom:{msg_id} không tồn tại"
+        if project_id and (m["project_id"] or "") != project_id:
+            return False, f"warroom:{msg_id} thuộc dự án khác ({m['project_id']})"
+        author = (m["author"] or "").strip()
+        workers = {r["id"] for r in conn.execute("SELECT id FROM tmux_sessions").fetchall()}
+        d = conn.execute("SELECT id, status, exit_code, finished_at FROM dispatch_log WHERE reply_msg_id = ? ORDER BY id DESC LIMIT 1",
+                         (msg_id,)).fetchone()
+    is_agent = author in workers or author in WARROOM_ROLE_SESSIONS.values() or author == "Orchestrator (agy)" or d is not None
+    if not is_agent or (m["tag"] or "") == "Error" or author.endswith("(lỗi)"):
+        return False, f"warroom:{msg_id} (tác giả '{author}') không phải tin trả lời của agent — không nhận làm bằng chứng"
+    if d is not None and _row_status(dict(d)) not in DISPATCH_OK_STATUSES:
+        return False, f"warroom:{msg_id} là trả lời của dispatch:{d['id']} có status '{_row_status(dict(d))}' — không nhận làm bằng chứng"
+    return True, f"warroom:{msg_id} là tin trả lời của {author}"
+
+def verify_evidence_ref(evidence_ref, task_id="", project_id="PRJ-GEN-WORKPLACE", legacy=False):
+    """
+    Kiểm bằng chứng nghiệm thu. Trả (ok, verified_by, message). Nhận:
+    - commit SHA 7–40 hex có trong repo → git:commit
+    - dispatch:<id>: dòng dispatch_log status done/ok (có task_id thì phải khớp task) → dispatch
+    - warroom:<id>: tin chat_messages là trả lời của agent (dispatch của nó, nếu có, phải done) → warroom
+    - https://github.com/<owner>/<repo>/pull/<n>: PR có thật theo GitHub API (không gọi được mạng → từ chối) → github:pr
+    - file không rỗng trong ~/gw-reports/, repo hoặc worktree → file
+    legacy=True: chỉ dùng cho rà soát task done cũ lúc khởi động — không gọi mạng, URL PR chỉ kiểm định dạng, file chỉ cần tồn tại.
+    """
     ev = (evidence_ref or "").strip()
     if not ev:
-        return False, "", "Thiếu evidence_ref (commit SHA, đường dẫn file hoặc URL PR GitHub)"
-    if EVIDENCE_PR_RE.match(ev):
-        return True, "github:pr", "URL PR GitHub hợp lệ"
+        return False, "", f"Thiếu evidence_ref ({EVIDENCE_FORMATS_HINT})"
+    project_id = normalize_project_id(project_id) if project_id else project_id
+    m = EVIDENCE_DISPATCH_RE.match(ev)
+    if m:
+        ok, msg = _verify_evidence_dispatch(int(m.group(1)), "" if legacy else (task_id or ""))
+        return ok, ("dispatch" if ok else ""), msg
+    m = EVIDENCE_WARROOM_RE.match(ev)
+    if m:
+        ok, msg = _verify_evidence_warroom(int(m.group(1)), "" if legacy else project_id)
+        return ok, ("warroom" if ok else ""), msg
+    m = EVIDENCE_PR_RE.match(ev)
+    if m:
+        if legacy:
+            return True, "github:pr", "URL PR GitHub (định dạng hợp lệ, không kiểm mạng khi rà soát dữ liệu cũ)"
+        ok, msg = _verify_github_pr(m.group(1), m.group(2), m.group(3))
+        return ok, ("github:pr" if ok else ""), msg
     if EVIDENCE_SHA_RE.match(ev.lower()):
         try:
             res = subprocess.run(["git", "-C", str(BASE_DIR), "cat-file", "-e", f"{ev}^{{commit}}"], capture_output=True, timeout=5.0)
@@ -2961,140 +3124,218 @@ def verify_evidence_ref(evidence_ref):
         except Exception:
             pass
         return False, "", f"Commit {ev} không tồn tại trong repo {BASE_DIR}"
-    if ev.startswith("~"):
-        candidate = os.path.expanduser(ev)
-    elif os.path.isabs(ev):
-        candidate = ev
-    else:
-        candidate = str(BASE_DIR / ev)
-    if os.path.exists(candidate):
-        return True, "file", f"File tồn tại: {candidate}"
-    return False, "", f"Bằng chứng không kiểm được: '{ev}' không phải commit SHA trong repo, file tồn tại hay URL PR GitHub (https://github.com/<owner>/<repo>/pull/<n>)"
+    ok, msg = _verify_evidence_file(ev, legacy=legacy)
+    if ok:
+        return True, "file", msg
+    if msg:
+        return False, "", msg
+    return False, "", f"Bằng chứng không kiểm được: '{ev}' không phải {EVIDENCE_FORMATS_HINT}"
 
-def claim_task(session_id, todo_id, project_id="PRJ-GEN-WORKPLACE"):
+def task_lock_timeout_sec():
+    """Ngưỡng coi khóa task là quá hạn (giây) — cùng ngưỡng thread [reclaim]: GW_RECLAIM_TIMEOUT_SEC, mặc định = GW_RECLAIM_INTERVAL_SEC (300)."""
+    try:
+        interval = max(5, int(os.environ.get("GW_RECLAIM_INTERVAL_SEC", "300")))
+    except ValueError:
+        interval = 300
+    try:
+        return int(os.environ.get("GW_RECLAIM_TIMEOUT_SEC", str(interval)))
+    except ValueError:
+        return interval
+
+# Khóa còn hiệu lực = task in_progress, có người giữ khác người gọi, locked_at chưa quá ngưỡng.
+# Task in_progress không có locked_at (dữ liệu cũ / sửa tay) coi như khóa quá hạn — giống reclaim_stalled_tasks.
+_LOCK_STALE_SQL = "(locked_at IS NULL OR locked_at = '' OR strftime('%s', 'now') - strftime('%s', locked_at) > ?)"
+
+def _claim_refused(table, todo_id, project_id, session_id):
+    """Đọc lại task sau khi UPDATE có điều kiện không trúng dòng nào để báo lý do + ai đang giữ."""
+    with get_connection() as conn:
+        if table == "todos":
+            r = conn.execute("SELECT status, assigned_session_id AS holder, locked_at FROM todos WHERE id = ? AND project_id = ?",
+                             (todo_id, project_id)).fetchone()
+        else:
+            r = conn.execute("""SELECT status, COALESCE(NULLIF(claimed_by, ''), assigned_agent, '') AS holder, locked_at
+                                FROM gen_session_todos WHERE id = ? AND project_id = ?""", (todo_id, project_id)).fetchone()
+    if not r:
+        return {"error": "Task not found", "task_id": todo_id}
+    if r["status"] == "done":
+        return {"error": f"Task {todo_id} đã done — không claim lại được", "code": "already_done", "task_id": todo_id}
+    if r["status"] != "in_progress" or not (r["holder"] or "").strip():
+        return {"error": f"Task {todo_id} vừa đổi trạng thái trong lúc claim — thử lại", "code": "retry", "task_id": todo_id}
+    return {"error": f"Task {todo_id} đang bị khóa bởi {r['holder']} (locked_at {r['locked_at'] or '?'} UTC); "
+                     f"chỉ claim lại được khi người đó nhả khóa hoặc khóa quá {task_lock_timeout_sec()}s",
+            "code": "locked", "task_id": todo_id, "held_by": r["holder"], "locked_at": r["locked_at"] or "", "session_id": session_id}
+
+def claim_task(session_id, todo_id, project_id="PRJ-GEN-WORKPLACE", lock_timeout_sec=None):
     """
-    Khóa độc quyền nhiệm vụ (Atomic Task Mutex):
-    - Ngăn chặn 2 agent tranh chấp cùng 1 task (loại bỏ 100% race condition).
-    - Kiểm tra ràng buộc tiền đề (depends_on): chỉ cho nhận khi task phụ thuộc đã hoàn tất.
-    - Hỗ trợ cả bảng roadmap 'todos' và bảng phiên 'gen_session_todos'.
-    - Cập nhật thời điểm khóa (locked_at) và gán task cho session.
+    Khóa độc quyền nhiệm vụ (Atomic Task Mutex) cho cả bảng roadmap 'todos' và Kanban phiên 'gen_session_todos':
+    - Nguyên tử: một câu UPDATE có điều kiện trong WHERE (BEGIN IMMEDIATE), kiểm rowcount → hai worker không cùng thắng.
+    - Từ chối khi task in_progress đang do người khác giữ và khóa chưa quá hạn (ngưỡng = reclaim_stalled_tasks);
+      trả {"error", "code": "locked", "held_by", "locked_at"}. Người đang giữ gọi lại → làm mới locked_at.
+    - Không claim task đã done (tránh mở lại rồi ghi đè bằng chứng).
+    - 'todos': kiểm ràng buộc tiền đề (depends_on) trước khi khóa.
     """
     project_id = normalize_project_id(project_id)
+    session_id = (session_id or "").strip()
+    todo_id = (todo_id or "").strip()
+    if not session_id or not todo_id:
+        return {"error": "Thiếu session_id hoặc task_id"}
+    timeout = task_lock_timeout_sec() if lock_timeout_sec is None else int(lock_timeout_sec)
+
     with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT id, status, assigned_session_id, depends_on FROM todos WHERE id = ? AND project_id = ?", (todo_id, project_id))
-        todo = cursor.fetchone()
+        todo = conn.execute("SELECT id, depends_on FROM todos WHERE id = ? AND project_id = ?", (todo_id, project_id)).fetchone()
+        table = "todos" if todo else None
         if not todo:
-            # Fallback sang bảng gen_session_todos nếu là task Kanban theo phiên
-            cursor.execute("SELECT id, status, assigned_agent FROM gen_session_todos WHERE id = ? AND project_id = ?", (todo_id, project_id))
-            gen_todo = cursor.fetchone()
-            if not gen_todo:
-                return {"error": "Task not found"}
-
-            cursor.execute("""
-            UPDATE gen_session_todos 
-            SET status = 'in_progress', assigned_agent = ?, updated_at = CURRENT_TIMESTAMP
-            WHERE id = ? AND project_id = ?
-            """, (session_id, todo_id, project_id))
-
-            cursor.execute("""
-            UPDATE tmux_sessions 
-            SET current_task_id = ?, last_heartbeat = CURRENT_TIMESTAMP
-            WHERE id = ?
-            """, (todo_id, session_id))
-
-            conn.commit()
-            return {"status": "claimed", "task_id": todo_id, "session_id": session_id}
-
-        # 1. Kiểm tra tranh chấp
-        if todo["status"] == "in_progress" and todo["assigned_session_id"] and todo["assigned_session_id"] != session_id:
-            return {"error": f"Task is already locked by active session {todo['assigned_session_id']}"}
-
-        # 2. Kiểm tra chuỗi phụ thuộc (Dependency Chain)
-        if todo["depends_on"]:
-            cursor.execute("SELECT status FROM todos WHERE id = ? AND project_id = ?", (todo["depends_on"], project_id))
-            dep = cursor.fetchone()
+            if conn.execute("SELECT 1 FROM gen_session_todos WHERE id = ? AND project_id = ?", (todo_id, project_id)).fetchone():
+                table = "gen_session_todos"
+        if table is None:
+            return {"error": "Task not found", "task_id": todo_id}
+        if table == "todos" and todo["depends_on"]:
+            dep = conn.execute("SELECT status FROM todos WHERE id = ? AND project_id = ?", (todo["depends_on"], project_id)).fetchone()
             if dep and dep["status"] != "done":
                 return {"error": f"Prerequisite task {todo['depends_on']} is not done yet (status: {dep['status']})"}
 
-        # 3. Khóa độc quyền cho session
-        cursor.execute("""
-        UPDATE todos 
-        SET status = 'in_progress', assigned_session_id = ?, locked_at = CURRENT_TIMESTAMP
-        WHERE id = ? AND project_id = ?
-        """, (session_id, todo_id, project_id))
+    with get_connection() as conn:
+        conn.isolation_level = None  # tự quản giao dịch: BEGIN IMMEDIATE giữ khóa ghi ngay từ đầu
+        conn.execute("BEGIN IMMEDIATE")
+        try:
+            if table == "todos":
+                cur = conn.execute(f"""
+                UPDATE todos
+                SET status = 'in_progress', assigned_session_id = ?, locked_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND project_id = ? AND status != 'done'
+                  AND (status != 'in_progress' OR COALESCE(assigned_session_id, '') IN ('', ?) OR {_LOCK_STALE_SQL})
+                """, (session_id, todo_id, project_id, session_id, timeout))
+            else:
+                cur = conn.execute(f"""
+                UPDATE gen_session_todos
+                SET status = 'in_progress', assigned_agent = ?, claimed_by = ?, locked_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND project_id = ? AND status != 'done'
+                  AND (status != 'in_progress' OR COALESCE(NULLIF(claimed_by, ''), assigned_agent, '') IN ('', ?) OR {_LOCK_STALE_SQL})
+                """, (session_id, session_id, todo_id, project_id, session_id, timeout))
+            won = cur.rowcount == 1
+            if won:
+                conn.execute("UPDATE tmux_sessions SET current_task_id = ?, last_heartbeat = CURRENT_TIMESTAMP WHERE id = ?",
+                             (todo_id, session_id))
+            conn.execute("COMMIT")
+        except Exception:
+            conn.execute("ROLLBACK")
+            raise
+    if not won:
+        return _claim_refused(table, todo_id, project_id, session_id)
+    return {"status": "claimed", "task_id": todo_id, "session_id": session_id}
 
-        cursor.execute("""
-        UPDATE tmux_sessions 
-        SET current_task_id = ?, last_heartbeat = CURRENT_TIMESTAMP
-        WHERE id = ?
-        """, (todo_id, session_id))
+def _log_evidence_override(conn, table, todo_id, project_id, session_id, old_ev, old_by, new_ev, new_by, reason):
+    conn.execute("""
+    INSERT INTO task_evidence_audit (task_id, table_name, project_id, session_id, old_evidence_ref, old_verified_by,
+                                     new_evidence_ref, new_verified_by, reason)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (todo_id, table, project_id, session_id or "", old_ev or "", old_by or "", new_ev, new_by, reason or ""))
+    print(f"[evidence] force ghi đè bằng chứng task {todo_id} ({table}) bởi {session_id}: '{old_ev}' → '{new_ev}'"
+          + (f" — lý do: {reason}" if reason else ""))
 
-        conn.commit()
-        return {"status": "claimed", "task_id": todo_id, "session_id": session_id}
+def get_task_evidence_audit(task_id="", limit=50):
+    """Nhật ký ghi đè bằng chứng (complete_task force=True), mới nhất trước."""
+    with get_connection() as conn:
+        if task_id:
+            rows = conn.execute("SELECT * FROM task_evidence_audit WHERE task_id = ? ORDER BY id DESC LIMIT ?", (task_id, limit)).fetchall()
+        else:
+            rows = conn.execute("SELECT * FROM task_evidence_audit ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+    return [dict(r) for r in rows]
 
-def complete_task(session_id, todo_id, evidence_ref, verified_by="Lead Architect", project_id="PRJ-GEN-WORKPLACE"):
+def complete_task(session_id, todo_id, evidence_ref, verified_by="Lead Architect", project_id="PRJ-GEN-WORKPLACE", force=False, reason=""):
     """
-    Nghiệm thu hoàn tất có bằng chứng kiểm được (Evidence-Backed Completion, #4):
-    - evidence_ref phải là commit SHA có trong repo, file tồn tại hoặc URL PR GitHub (verify_evidence_ref).
+    Nghiệm thu hoàn tất có bằng chứng kiểm được (Evidence-Backed Completion, #4, #16):
+    - evidence_ref phải qua verify_evidence_ref (commit SHA / file không rỗng trong ~/gw-reports·repo·worktree /
+      dispatch:<id> done khớp task / warroom:<id> trả lời của agent / URL PR GitHub có thật).
     - Không đạt → trả {"error": ...} và KHÔNG đổi trạng thái.
-    - verified_by được tính: 'git:commit' / 'file' / 'github:pr' (tham số verified_by chỉ giữ để tương thích API).
-    - Hỗ trợ cập nhật cả bảng roadmap 'todos' và bảng phiên 'gen_session_todos'.
+    - Task đã done → {"error", "code": "already_done"} và KHÔNG ghi đè; chỉ ghi đè khi force=True,
+      mỗi lần ghi đè được lưu vào task_evidence_audit (bằng chứng cũ → mới, ai, lý do) và in log.
+    - verified_by được tính: 'git:commit' / 'file' / 'github:pr' / 'dispatch' / 'warroom' (tham số verified_by chỉ giữ để tương thích API).
     - Tự động nhả khóa session để sẵn sàng nhận nhiệm vụ tiếp theo.
     """
     project_id = normalize_project_id(project_id)
-    ok, verified_by, msg = verify_evidence_ref(evidence_ref)
+    todo_id = (todo_id or "").strip()
+    with get_connection() as conn:
+        table, row = None, None
+        for tbl, by_col in (("todos", "verified_by"), ("gen_session_todos", "'' AS verified_by")):
+            row = conn.execute(f"SELECT status, evidence_ref, {by_col} FROM {tbl} WHERE id = ? AND project_id = ?",
+                               (todo_id, project_id)).fetchone()
+            if row:
+                table = tbl
+                break
+    if table is None:
+        return {"error": "Task not found", "task_id": todo_id}
+    was_done = row["status"] == "done"
+    if was_done and not force:
+        return {"error": f"Task {todo_id} đã done với bằng chứng '{row['evidence_ref'] or ''}' — không ghi đè. "
+                         "Cần sửa bằng chứng thì gọi lại với force=true (sẽ được ghi log).",
+                "code": "already_done", "task_id": todo_id, "evidence_ref": row["evidence_ref"] or "", "verified_by": row["verified_by"] or ""}
+
+    ok, verified_by, msg = verify_evidence_ref(evidence_ref, task_id=todo_id, project_id=project_id)
     if not ok:
         return {"error": msg, "task_id": todo_id}
     evidence_ref = evidence_ref.strip()
 
     with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("""
-        UPDATE todos
-        SET status = 'done', evidence_ref = ?, verified_by = ?, assigned_session_id = ''
-        WHERE id = ? AND project_id = ?
-        """, (evidence_ref.strip(), verified_by, todo_id, project_id))
-
-        if cursor.rowcount == 0:
-            cursor.execute("""
-            UPDATE gen_session_todos
-            SET status = 'done', evidence_ref = ?, updated_at = CURRENT_TIMESTAMP
-            WHERE id = ? AND project_id = ?
-            """, (evidence_ref, todo_id, project_id))
-            if cursor.rowcount == 0:
-                return {"error": "Task not found", "task_id": todo_id}
-
-        cursor.execute("""
-        UPDATE tmux_sessions
-        SET current_task_id = '', last_heartbeat = CURRENT_TIMESTAMP
-        WHERE id = ?
-        """, (session_id,))
-
-        conn.commit()
+        conn.isolation_level = None
+        conn.execute("BEGIN IMMEDIATE")
+        try:
+            done_guard = "" if force else " AND status != 'done'"
+            by_col = "verified_by" if table == "todos" else "'' AS verified_by"
+            old = conn.execute(f"SELECT status, evidence_ref, {by_col} FROM {table} WHERE id = ? AND project_id = ?",
+                               (todo_id, project_id)).fetchone()
+            if table == "todos":
+                cur = conn.execute(f"""
+                UPDATE todos
+                SET status = 'done', evidence_ref = ?, verified_by = ?, assigned_session_id = ''
+                WHERE id = ? AND project_id = ?{done_guard}
+                """, (evidence_ref, verified_by, todo_id, project_id))
+            else:
+                cur = conn.execute(f"""
+                UPDATE gen_session_todos
+                SET status = 'done', evidence_ref = ?, claimed_by = '', locked_at = '', updated_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND project_id = ?{done_guard}
+                """, (evidence_ref, todo_id, project_id))
+            if cur.rowcount == 0:
+                conn.execute("ROLLBACK")
+                return {"error": f"Task {todo_id} vừa được nghiệm thu bởi lượt gọi khác — không ghi đè", "code": "already_done", "task_id": todo_id}
+            overridden = bool(old and old["status"] == "done")
+            if overridden:
+                _log_evidence_override(conn, table, todo_id, project_id, session_id, old["evidence_ref"], old["verified_by"],
+                                       evidence_ref, verified_by, reason)
+            conn.execute("UPDATE tmux_sessions SET current_task_id = '', last_heartbeat = CURRENT_TIMESTAMP WHERE id = ?", (session_id,))
+            conn.execute("COMMIT")
+        except Exception:
+            conn.execute("ROLLBACK")
+            raise
 
     viec_ref = get_task_viec_ref(todo_id, project_id)
     webhook_sent = send_event_webhook("task_completed", project_id=project_id, viec_ref=viec_ref, task_id=todo_id,
                                       session_id=session_id, exit_code=None, report_path="", evidence_ref=evidence_ref, verified_by=verified_by)
-    return {"status": "completed", "task_id": todo_id, "viec_ref": viec_ref, "evidence_ref": evidence_ref, "verified_by": verified_by,
-            "verify_message": msg, "webhook_sent": webhook_sent}
+    res = {"status": "completed", "task_id": todo_id, "viec_ref": viec_ref, "evidence_ref": evidence_ref, "verified_by": verified_by,
+           "verify_message": msg, "webhook_sent": webhook_sent}
+    if overridden:
+        res["overridden"] = {"old_evidence_ref": old["evidence_ref"] or "", "old_verified_by": old["verified_by"] or "", "reason": reason or ""}
+    return res
 
-def reclaim_stalled_tasks(timeout_seconds=300, project_id="PRJ-GEN-WORKPLACE"):
+def reclaim_stalled_tasks(timeout_seconds=None, project_id="PRJ-GEN-WORKPLACE"):
     """
     Thu hồi nhiệm vụ bị treo từ Agent bóng ma / crash (Anti-Zombie Reclamation):
     - Quét các task 'in_progress' bị giữ quá timeout mà session không gửi heartbeat
       (kể cả task seed/không có locked_at — không ai thật sự đang giữ).
     - Nhả task về lại trạng thái 'queued' để worker khác nhận việc.
+    - timeout_seconds=None → task_lock_timeout_sec() (cùng ngưỡng claim_task dùng để cho claim lại).
     """
     project_id = normalize_project_id(project_id)
+    if timeout_seconds is None:
+        timeout_seconds = task_lock_timeout_sec()
     with get_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute("""
+        cursor.execute(f"""
         UPDATE todos
         SET status = 'queued', assigned_session_id = '', locked_at = NULL
         WHERE project_id = ? AND status = 'in_progress'
-          AND (locked_at IS NULL OR locked_at = ''
-               OR strftime('%s', 'now') - strftime('%s', locked_at) > ?)
+          AND {_LOCK_STALE_SQL}
         """, (project_id, timeout_seconds))
         reclaimed = cursor.rowcount
         conn.commit()

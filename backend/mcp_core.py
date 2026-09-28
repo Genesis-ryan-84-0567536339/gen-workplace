@@ -323,7 +323,7 @@ TOOLS = [
     },
     {
         "name": "claim_task",
-        "description": "Khóa độc quyền (claim) nhiệm vụ cho một worker/agent cụ thể theo cơ chế Mutex chống xung đột tranh chấp nhiệm vụ.",
+        "description": "Khóa độc quyền (claim) nhiệm vụ cho một worker (todos roadmap hoặc task Kanban phiên). Nguyên tử: task in_progress đang do worker khác giữ (khóa chưa quá hạn GW_RECLAIM_TIMEOUT_SEC) → lỗi code 'locked' kèm held_by; người đang giữ gọi lại → làm mới khóa; task đã done → lỗi code 'already_done'.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -346,7 +346,7 @@ TOOLS = [
     },
     {
         "name": "complete_task",
-        "description": "Nghiệm thu hoàn tất nhiệm vụ với bằng chứng KIỂM ĐƯỢC: commit SHA có trong repo, đường dẫn file tồn tại, hoặc URL PR GitHub. Bằng chứng không kiểm được → lỗi, trạng thái không đổi.",
+        "description": "Nghiệm thu hoàn tất nhiệm vụ với bằng chứng KIỂM ĐƯỢC: commit SHA có trong repo, file không rỗng trong ~/gw-reports/ hoặc repo/worktree, dispatch:<id> (lần giao việc done, khớp task), warroom:<id> (tin trả lời của agent), hoặc URL PR GitHub có thật (kiểm qua GitHub API; không gọi được mạng → từ chối). Bằng chứng không kiểm được → lỗi, trạng thái không đổi. Task đã done → lỗi code 'already_done', không ghi đè trừ khi force=true (được ghi log).",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -360,12 +360,27 @@ TOOLS = [
                 },
                 "evidence_ref": {
                     "type": "string",
-                    "description": "Commit SHA (7-40 hex, có trong repo), đường dẫn file tồn tại (tuyệt đối / tương đối repo / ~/gw-reports/...), hoặc https://github.com/<owner>/<repo>/pull/<n>."
+                    "description": "Commit SHA (7-40 hex, có trong repo); file không rỗng trong ~/gw-reports/, repo hoặc worktree (tuyệt đối / tương đối repo / ~/gw-reports/...); dispatch:<id>; warroom:<id>; hoặc https://github.com/<owner>/<repo>/pull/<n> (PR có thật)."
                 },
                 "verified_by": {
                     "type": "string",
-                    "description": "Không còn dùng: hệ thống tự đặt 'git:commit' / 'file' / 'github:pr' theo loại bằng chứng.",
+                    "description": "Không còn dùng: hệ thống tự đặt 'git:commit' / 'file' / 'github:pr' / 'dispatch' / 'warroom' theo loại bằng chứng.",
                     "default": ""
+                },
+                "force": {
+                    "type": "boolean",
+                    "description": "Chỉ dùng khi cần sửa bằng chứng của task ĐÃ done: ghi đè và lưu nhật ký task_evidence_audit (cũ → mới).",
+                    "default": False
+                },
+                "reason": {
+                    "type": "string",
+                    "description": "Lý do ghi đè (lưu vào nhật ký khi force=true).",
+                    "default": ""
+                },
+                "project_id": {
+                    "type": "string",
+                    "description": "ID dự án (mặc định 'PRJ-GEN-WORKPLACE').",
+                    "default": "PRJ-GEN-WORKPLACE"
                 }
             },
             "required": ["session_id", "task_id", "evidence_ref"]
@@ -870,7 +885,9 @@ def execute_tool(name: str, args: dict) -> dict:
             session_id = args.get("session_id")
             task_id = args.get("task_id")
             evidence = args.get("evidence_ref")
-            res = db.complete_task(session_id, task_id, evidence, "", "PRJ-GEN-WORKPLACE")
+            force = args.get("force") in (True, 1, "1", "true", "True")
+            res = db.complete_task(session_id, task_id, evidence, "", args.get("project_id") or "PRJ-GEN-WORKPLACE",
+                                   force=force, reason=str(args.get("reason") or ""))
             return {"content": [{"type": "text", "text": json.dumps(res, ensure_ascii=False, indent=2)}], "isError": "error" in res}
 
         # 15. update_task_checklist
@@ -1116,7 +1133,7 @@ def handle_jsonrpc_request(req: dict) -> dict:
                 "BẠN ĐANG THỰC THI NHIỆM VỤ THEO QUY CHUẨN ANTI-CHAOS CỦA GENESIS SWARM WORKPLACE:\n"
                 "1. Luôn claim_task trước khi thực hiện để giữ khóa Mutex, tránh xung đột giữa các agent.\n"
                 "2. Kiểm tra hạn mức get_live_quota để chọn mô hình AI thích hợp (ưu tiên Flash cho tác vụ thường, Pro cho tổng hợp, Sonnet cho logic chuyên sâu).\n"
-                "3. Khi hoàn thành, gọi complete_task và cung cấp evidence_ref bắt buộc (đường dẫn file, commit, log).\n"
+                "3. Khi hoàn thành, gọi complete_task và cung cấp evidence_ref kiểm được (commit SHA, file báo cáo trong ~/gw-reports/, dispatch:<id>, warroom:<id> hoặc URL PR GitHub có thật).\n"
                 "4. Đánh dấu checklist tương ứng qua update_task_checklist."
             )
             return {

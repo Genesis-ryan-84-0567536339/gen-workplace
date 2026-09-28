@@ -224,6 +224,19 @@ class SwarmHandler(SimpleHTTPRequestHandler):
                 self._send_json(500, {"error": str(e)})
             return
 
+        # 0.82. Nhật ký ghi đè bằng chứng (complete_task force=true, #16): GET /api/task/evidence-audit?task_id=&limit=50
+        if path == "/api/task/evidence-audit":
+            try:
+                limit = max(1, min(500, int(query.get("limit", ["50"])[0])))
+            except ValueError:
+                limit = 50
+            try:
+                items = db.get_task_evidence_audit(query.get("task_id", [""])[0].strip(), limit)
+                self._send_json(200, {"items": items, "count": len(items)})
+            except Exception as e:
+                self._send_json(500, {"error": str(e)})
+            return
+
         # 0.85. Chờ kết quả worker (#9): GET /api/dispatch/wait?dispatch_id=12&timeout_sec=60 (hoặc task_id= / session_id=)
         if path == "/api/dispatch/wait":
             self._handle_dispatch_wait({k: v[0] for k, v in query.items() if v})
@@ -832,7 +845,8 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             project_id = data.get("project_id", "PRJ-GEN-WORKPLACE")
             if session_id and todo_id:
                 res = db.claim_task(session_id, todo_id, project_id)
-                status_code = 409 if "error" in res else 200
+                # 409: đang bị người khác khóa (kèm held_by) / đã done / thiếu tiền đề; 404: không có task
+                status_code = 200 if "error" not in res else (404 if res.get("error") == "Task not found" else 409)
                 self._send_json(status_code, res)
             else:
                 self._send_json(400, {"error": "Missing session_id or todo_id (or task_id)"})
@@ -845,9 +859,18 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             evidence_ref = data.get("evidence_ref", "").strip()
             verified_by = data.get("verified_by", "Lead Architect")
             project_id = data.get("project_id", "PRJ-GEN-WORKPLACE")
+            force = data.get("force") in (True, 1, "1", "true", "True", "yes")
+            reason = str(data.get("reason") or "").strip()
             if session_id and todo_id and evidence_ref:
-                res = db.complete_task(session_id, todo_id, evidence_ref, verified_by, project_id)
-                status_code = 400 if "error" in res else 200
+                res = db.complete_task(session_id, todo_id, evidence_ref, verified_by, project_id, force=force, reason=reason)
+                if "error" not in res:
+                    status_code = 200
+                elif res.get("code") == "already_done":
+                    status_code = 409
+                elif res.get("error") == "Task not found":
+                    status_code = 404
+                else:
+                    status_code = 400
                 self._send_json(status_code, res)
             else:
                 self._send_json(400, {"error": "Missing session_id, todo_id (or task_id), or evidence_ref"})
@@ -855,7 +878,11 @@ class SwarmHandler(SimpleHTTPRequestHandler):
 
         # 16. Thu hồi nhiệm vụ bị treo (Anti-Zombie Task Reclamation)
         if path == "/api/task/reclaim":
-            timeout = int(data.get("timeout_seconds", 300))
+            try:
+                timeout = int(data["timeout_seconds"]) if data.get("timeout_seconds") not in (None, "") else None
+            except (TypeError, ValueError):
+                self._send_json(400, {"error": "timeout_seconds phải là số nguyên"})
+                return
             project_id = data.get("project_id", "PRJ-GEN-WORKPLACE")
             res = db.reclaim_stalled_tasks(timeout, project_id)
             self._send_json(200, res)
@@ -1176,10 +1203,8 @@ def start_reclaim_worker():
         interval = max(5, int(os.environ.get("GW_RECLAIM_INTERVAL_SEC", "300")))
     except ValueError:
         interval = 300
-    try:
-        timeout = int(os.environ.get("GW_RECLAIM_TIMEOUT_SEC", str(interval)))
-    except ValueError:
-        timeout = interval
+    # Cùng ngưỡng claim_task dùng để cho claim lại task có khóa quá hạn (#16)
+    timeout = db.task_lock_timeout_sec()
 
     def _loop():
         while True:
