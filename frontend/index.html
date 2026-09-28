@@ -1835,7 +1835,7 @@ body.resizing-active, body.resizing-active * {
 
 /* ═══════════════════════════════════════════════════
    GENESIS CORE ORCHESTRATOR — 2-COLUMN LIST + DETAIL & TABS
-   Bố cục thống nhất với bảng màu Nocturne Slate của toàn hệ thống
+   Bố cục thống nhất với bảng màu chung (theme.css)
    ═══════════════════════════════════════════════════ */
 .orchDualLayout {
   display: grid;
@@ -4267,7 +4267,6 @@ body.resizing-active, body.resizing-active * {
         <span class="ownerDisplayName" id="topOwnerDisplayName">Ryan</span>
         <span class="ownerSubLabel" id="topOwnerSubLabel" style="display:none">Owner</span>
       </button>
-      <button class="iconBtn" onclick="showToast('Tra cứu nhanh: Ctrl K')" title="Tra cứu nhanh (Ctrl K)">⌘</button>
       <button class="btn primary" onclick="openModal()">+ Dự án</button>
     </div>
   </header>
@@ -4298,18 +4297,12 @@ body.resizing-active, body.resizing-active * {
           <span class="navIcon">▣</span><span>Worker &amp; terminal</span>
         </button>
         <button class="navItem" data-nav="implementation" onclick="go('implementation', this)">
-          <span class="navIcon">◇</span><span>Kế hoạch &amp; tiến độ</span>
-        </button>
-        <button class="navItem" data-nav="dashboard" onclick="go('dashboard', this)">
-          <span class="navIcon">▥</span><span>Tổng quan</span>
+          <span class="navIcon">◇</span><span>Việc &amp; tiến độ</span>
         </button>
       </div>
 
       <div class="navGroup">
         <div class="navLabel">Tri thức &amp; dữ liệu</div>
-        <button class="navItem" data-nav="memory" onclick="go('memory', this)">
-          <span class="navIcon">◌</span><span>Bộ nhớ SSOT</span>
-        </button>
         <button class="navItem" data-nav="data" onclick="go('data', this)">
           <span class="navIcon">▧</span><span>Trung tâm dữ liệu</span>
         </button>
@@ -5013,8 +5006,8 @@ body.resizing-active, body.resizing-active * {
               <div class="orchListItem" onclick="openAccountModal()">
                 <span class="orchItemIcon"></span>
                 <div class="orchItemInfo">
-                  <strong>owner@genesis.local</strong>
-                  <small id="orchOwnerQuotaSmall">Owner Profile · 5h: 85% | Tuần: 37% · Tuần: 0%</small>
+                  <strong class="orchOwnerEmail">chưa đăng nhập</strong>
+                  <small id="orchOwnerQuotaSmall">—</small>
                 </div>
               </div>
               <div class="orchListItem" onclick="openAccountModal()">
@@ -5052,7 +5045,7 @@ body.resizing-active, body.resizing-active * {
                     <p>
                       <span>Phân vùng: <code style="color:var(--accent);font-size:10.5px">SSOT Global Control Plane</code></span>
                       <span>·</span>
-                      <span>Tài khoản: <span style="color:var(--text)">owner@genesis.local</span></span>
+                      <span>Tài khoản: <span style="color:var(--text)" class="orchOwnerEmail">chưa đăng nhập</span></span>
                       <span>·</span>
                       <span>Phạm vi: <span style="color:var(--muted)">Độc lập toàn cục (All Projects)</span></span>
                     </p>
@@ -5239,7 +5232,7 @@ body.resizing-active, body.resizing-active * {
                   <div class="wrMemberAvatar"></div>
                   <div>
                     <strong style="color:var(--text)">QA Tester</strong>
-                    <div style="font-size:10px;color:var(--muted)">Auto-Wake & Test Suite</div>
+                    <div style="font-size:10px;color:var(--muted)">Kiểm thử &amp; nghiệm thu</div>
                   </div>
                 </div>
                 <button class="wrMentionBtn" onclick="insertWarRoomAt('@QA ')">@QA</button>
@@ -5372,7 +5365,7 @@ body.resizing-active, body.resizing-active * {
                       <span>·</span>
                       <span class="expertCardAccount" id="deckAgentAccountBox" style="cursor:pointer" onclick="openAccountModal()" title="Nhấp để đổi tài khoản / profile">
                         <span class="gIconBadge">G</span>
-                        <span id="deckAgentEmail">owner@genesis.local</span>
+                        <span id="deckAgentEmail">—</span>
                       </span>
                     </p>
                   </div>
@@ -5708,8 +5701,8 @@ body.resizing-active, body.resizing-active * {
       <section class="screen" id="implementation">
         <div class="pageHead">
           <div>
-            <h1>Kế hoạch &amp; tiến độ</h1>
-            <p>Chuyển hóa Input tổng + File Plan thành Roadmap 5 Phase, phân rã Todo DAG và cấu hình Model AI cho từng Role chuyên môn.</p>
+            <h1>Việc &amp; tiến độ</h1>
+            <p>Kanban theo vai (mỗi việc gắn mã VIEC-n trong Kho Ryan), roadmap sinh từ đặc tả, và model AI cho từng vai.</p>
           </div>
           <div class="actions">
             <span class="chip done" id="sourceState">Nguồn đồng bộ SSOT</span>
@@ -5729,6 +5722,30 @@ body.resizing-active, body.resizing-active * {
         <!-- CẤU TRÚC CHUẨN SSOT CỦA RYAN: HÀNG 01 (3 CỘT INPUT - ROADMAP - TODO) + HÀNG 02 (BẢNG ROLES & ĐỔI MODEL) -->
         <div class="implMasterTierStack">
           <!-- HÀNG 01: 1 HÀNG 3 CỘT CÂN XỨNG (INPUT/PLAN ROADMAP TODO DAG) -->
+          <div class="card" id="dashKanbanCard" style="margin-bottom:0;display:flex;flex-direction:column;width:100%">
+            <div class="cardHead" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding:10px 16px">
+              <div style="display:flex;align-items:center;gap:10px">
+                <span style="font-size:18px"></span>
+                <div>
+                  <strong style="font-size:13px;color:var(--text)">Kanban theo vai</strong>
+                  <div class="hint">Việc của từng vai, tiến độ và bàn giao giữa các vai.</div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px">
+                <div class="tabPills" style="display:flex;background:#0b0f17;padding:2px;border-radius:6px;border:1px solid var(--line)">
+                  <button class="tabPill active" id="tabDashKanbanRoles" onclick="switchDashKanbanView('roles')" style="font-size:10.5px;padding:4px 12px;border:none;border-radius:4px;cursor:pointer;background:var(--panel3);color:var(--accent);font-weight:600">Theo 6 Role Teams</button>
+                  <button class="tabPill" id="tabDashKanbanStages" onclick="switchDashKanbanView('stages')" style="font-size:10.5px;padding:4px 12px;border:none;border-radius:4px;cursor:pointer;background:transparent;color:var(--muted);font-weight:600">Theo 4 Trạng Thái</button>
+                </div>
+                <button class="btn small" onclick="renderDashboardKanban()" title="Làm mới bảng Kanban">↻ Làm mới</button>
+              </div>
+            </div>
+            <div class="cardBody" style="padding:12px;overflow-x:auto;width:100%">
+              <div id="dashRoleKanbanBoard" style="display:grid;gap:10px;width:100%">
+                <!-- Dynamic rendering by renderDashboardKanban() -->
+              </div>
+            </div>
+          </div>
+
           <div class="implRow1_ThreeCols">
             <!-- Cột 1: 01 · Input & File Plan Gốc -->
             <div class="card implCardCol" id="impRow1">
@@ -5812,196 +5829,12 @@ body.resizing-active, body.resizing-active * {
       <!-- ========================================================================= -->
       <!-- 1. DASHBOARD: QUẢN LÝ DỰ ÁN THẬT -->
       <!-- ========================================================================= -->
-      <section class="screen" id="dashboard">
-        <div class="pageHead">
-          <div>
-            <h1>Tổng quan</h1>
-            <p>Số liệu dự án, tiến độ roadmap và bảng Kanban theo từng vai.</p>
-          </div>
-          <div class="actions">
-            <button class="btn" onclick="showToast('Đã đồng bộ trạng thái git repo')">Làm mới Git</button>
-            <button class="btn primary" onclick="openModal()">+ Tạo dự án</button>
-          </div>
-        </div>
 
-        <div style="display:flex;flex-direction:column;gap:14px;width:100%">
-          <!-- HÀNG 01: CHỈ SỐ STATS & CHI TIẾT WORKSPACE -->
-          <div style="display:grid;grid-template-columns:360px minmax(0, 1fr);gap:12px">
-            <!-- 4 Stats Cards 2x2 -->
-            <div class="overviewStats" id="dashStatsCard" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-              <div class="stat" style="padding:10px 14px"><b id="ovProjects" style="font-size:18px">1</b><span style="font-size:10.5px">Dự án</span></div>
-              <div class="stat" style="padding:10px 14px"><b id="ovRoadmap" style="font-size:18px">5</b><span style="font-size:10.5px">Roadmap Phase</span></div>
-              <div class="stat" style="padding:10px 14px"><b id="ovTodo" style="font-size:18px">17</b><span style="font-size:10.5px">Todo tasks</span></div>
-              <div class="stat" style="padding:10px 14px"><b id="ovActive" style="font-size:18px">6</b><span style="font-size:10.5px">Runtimes Swarm</span></div>
-            </div>
-
-            <!-- Workspace Detail -->
-            <div class="card" style="margin-bottom:0">
-              <div class="cardHead" style="padding:8px 14px">
-                <div>
-                  <strong style="font-size:12.5px;color:var(--text)">Project đang chọn: gen-workplace</strong>
-                  <div class="hint" id="dashboardSelectedMeta" style="font-size:10.5px">/workspace</div>
-                </div>
-                <span class="chip done">Branch main · Clean</span>
-              </div>
-              <div class="cardBody" id="dashboardSelected" style="padding:8px 14px"></div>
-            </div>
-          </div>
-
-          <!-- HÀNG 02: BẢNG KANBAN CÁC ROLE TEAM (100% FULL HÀNG NGANG TOÀN MÀN HÌNH) -->
-          <div class="card" id="dashKanbanCard" style="margin-bottom:0;display:flex;flex-direction:column;width:100%">
-            <div class="cardHead" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding:10px 16px">
-              <div style="display:flex;align-items:center;gap:10px">
-                <span style="font-size:18px"></span>
-                <div>
-                  <strong style="font-size:13px;color:var(--text)">Kanban theo vai</strong>
-                  <div class="hint">Việc của từng vai, tiến độ và bàn giao giữa các vai.</div>
-                </div>
-              </div>
-              <div style="display:flex;align-items:center;gap:8px">
-                <div class="tabPills" style="display:flex;background:#0b0f17;padding:2px;border-radius:6px;border:1px solid var(--line)">
-                  <button class="tabPill active" id="tabDashKanbanRoles" onclick="switchDashKanbanView('roles')" style="font-size:10.5px;padding:4px 12px;border:none;border-radius:4px;cursor:pointer;background:var(--panel3);color:var(--accent);font-weight:600">Theo 6 Role Teams</button>
-                  <button class="tabPill" id="tabDashKanbanStages" onclick="switchDashKanbanView('stages')" style="font-size:10.5px;padding:4px 12px;border:none;border-radius:4px;cursor:pointer;background:transparent;color:var(--muted);font-weight:600">Theo 4 Trạng Thái</button>
-                </div>
-                <button class="btn small" onclick="renderDashboardKanban()" title="Làm mới bảng Kanban">↻ Làm mới</button>
-              </div>
-            </div>
-            <div class="cardBody" style="padding:12px;overflow-x:auto;width:100%">
-              <div id="dashRoleKanbanBoard" style="display:grid;gap:10px;width:100%">
-                <!-- Dynamic rendering by renderDashboardKanban() -->
-              </div>
-            </div>
-          </div>
-
-          <!-- HÀNG 03: TIẾN TRÌNH THỰC THI & QUẢN TRỊ WORKSPACE -->
-          <div class="overviewMain" id="dashProgressCard" style="grid-template-columns:360px minmax(0, 1fr);gap:12px;display:grid">
-            <div class="card" id="dashProjectsCard" style="margin-bottom:0">
-              <div class="cardHead">
-                <strong style="font-size:12px">Dự án đang quản trị</strong>
-                <span class="badge" style="font-size:9.5px;background:var(--panel3);color:var(--green)">Active</span>
-              </div>
-              <div class="cardBody" id="dashboardProjectList" style="padding:10px"></div>
-            </div>
-            <div class="card" style="margin-bottom:0">
-              <div class="cardHead">
-                <strong>Tiến trình thực thi Swarm</strong>
-                <span class="chip live">TRỰC TIẾP</span>
-              </div>
-              <div class="cardBody" id="overviewSteps"></div>
-            </div>
-          </div>
-        </div>
-      </section>
 
       <!-- ========================================================================= -->
       <!-- 5. NƠI LÀM VIỆC: 2 CỘT MEMORY & CATALOG TRA CỨU THẬT -->
       <!-- ========================================================================= -->
-      <section class="screen" id="memory">
-        <div class="pageHead">
-          <div>
-            <h1>Bộ nhớ SSOT</h1>
-            <p>Memory từng Role được sync; Trưởng nhóm thẩm định và nâng sự kiện thành SSOT bắt buộc; Catalog ID tra cứu nhanh không cần audit toàn cục.</p>
-          </div>
-          <div class="actions">
-            <span class="chip done" id="memorySyncState">đã sync SSOT</span>
-            <button class="btn" onclick="syncMemories()">Sync memory</button>
-            <button class="btn primary" onclick="openEventModal()">+ Ghi event</button>
-          </div>
-        </div>
 
-        <!-- BỐ CỤC 2 CỘT CHỈNH THỂ: 320px TRA CỨU TRÁI + FLEX 1 BỘ NHỚ SSOT PHẢI -->
-        <div class="cockpitShell">
-          <!-- Cột Trái: Tra cứu nhanh ID FTS5 & Sự kiện chờ thẩm định -->
-          <div class="cockpitListPane">
-            <div class="cockpitPaneHeader">
-              <span class="cockpitPaneTitle">Tra Cứu Nhanh & Sự Kiện</span>
-              <span class="badge" style="font-size:9.5px;background:var(--panel3);color:var(--accent)">FTS5 Engine</span>
-            </div>
-            <div class="cockpitPaneScroll">
-              <!-- Bảng Catalog Tra Cứu Nhanh ID Toàn Cục -->
-              <div class="card memoryIndex" id="memCatalogCard" style="border:none;background:transparent;padding:0">
-                <div style="font-size:10.5px;font-weight:700;color:var(--text);margin-bottom:6px">Tra cứu nhanh ID (Catalog)</div>
-                <div class="indexToolbar" style="margin-bottom:8px">
-                  <input class="searchBox" placeholder="Tìm mã ID, sự kiện, vault, mcp tool, file..." oninput="filterRefs(this.value)">
-                </div>
-                <div style="max-height:220px;overflow-y:auto;border:1px solid var(--line);border-radius:6px">
-                  <table class="eventTable" style="margin:0">
-                    <thead>
-                      <tr>
-                        <th>Mã ID</th>
-                        <th>Loại</th>
-                        <th>Target</th>
-                      </tr>
-                    </thead>
-                    <tbody id="refRows"></tbody>
-                  </table>
-                </div>
-              </div>
-
-              <!-- Event Register: Bảng Xác Thực Sự Kiện -->
-              <div class="card" id="memEventCard" style="border:none;background:transparent;padding:0;margin-top:10px">
-                <div style="font-size:10.5px;font-weight:700;color:var(--text);margin-bottom:6px">Sự kiện chờ thẩm định (Events)</div>
-                <div style="max-height:220px;overflow-y:auto;border:1px solid var(--line);border-radius:6px">
-                  <table class="eventTable" style="margin:0">
-                    <thead>
-                      <tr>
-                        <th>ID</th>
-                        <th>Role</th>
-                        <th>Status</th>
-                      </tr>
-                    </thead>
-                    <tbody id="eventRows"></tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Cột Phải: Không Gian Bộ Nhớ SSOT (Master SSOT Facts & Role Memory) -->
-          <div class="cockpitDetailPane">
-            <div class="cockpitPaneHeader">
-              <span class="cockpitPaneTitle">Bộ Nhớ SSOT Toàn Dự Án & Memory Từng Role</span>
-              <div style="display:flex;align-items:center;gap:8px">
-                <span class="chip done" id="ssotCount">8 verified</span>
-                <button class="btn small primary" onclick="openFullSSOTModal()" style="font-size:11px;padding:3px 10px;font-weight:600">Xem Toàn Văn SSOT Gốc</button>
-              </div>
-            </div>
-            <div class="cockpitDetailBody" style="gap:14px">
-              <div class="memoryGrid" id="memGridCard" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:0">
-                <!-- Cột 1: Memory Tổng (SSOT Toàn Dự Án) -->
-                <div class="card" style="margin-bottom:0;display:flex;flex-direction:column">
-                  <div class="cardHead">
-                    <div>
-                      <strong>Master SSOT Toàn Dự Án</strong>
-                      <div class="hint">8 trụ cột quy chuẩn bất biến của Ryan</div>
-                    </div>
-                    <button class="btn small" onclick="openFullSSOTModal()" title="Mở file docs/SSOT_ORIGINAL_SPEC.md">Toàn văn </button>
-                  </div>
-                  <div class="cardBody" style="display:flex;flex-direction:column;gap:10px;flex:1">
-                    <div class="ssotList" id="ssotList" style="max-height:260px"></div>
-                    <div class="ssotFactDetail" id="ssotFactDetail" style="background:var(--bg);border:1px solid var(--panel3);border-radius:6px;padding:10px;font-size:11px"></div>
-                  </div>
-                </div>
-
-                <!-- Cột 2: Memory Từng Role (Sync Realtime) -->
-                <div class="card" style="margin-bottom:0;display:flex;flex-direction:column">
-                  <div class="cardHead">
-                    <div>
-                      <strong>Memory Từng Role</strong>
-                      <div class="hint">đồng bộ trực tiếp từ 6 phiên runtime</div>
-                    </div>
-                    <span class="hint">6 roles</span>
-                  </div>
-                  <div class="cardBody" style="display:flex;flex-direction:column;gap:10px;flex:1">
-                    <div class="memoryList" id="roleMemoryList" style="max-height:260px"></div>
-                    <div class="memoryDetail" id="memoryDetail" style="background:var(--bg);border:1px solid var(--panel3);border-radius:6px;padding:10px;font-size:11px;margin-top:0"></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
 
       <!-- ========================================================================= -->
       <!-- 4. TRUNG TÂM DỮ LIỆU (DỮ LIỆU THẬT CỦA REPO GEN-WORKPLACE) -->
@@ -6043,6 +5876,10 @@ body.resizing-active, body.resizing-active * {
                   <div style="font-weight:600;font-size:12px;color:var(--text)">File Manager & Artifacts</div>
                   <div style="font-size:10px;color:var(--muted)">Mã nguồn thật, specs và cây file</div>
                 </button>
+                <button class="dataTab" onclick="switchData('catalog', this)" style="text-align:left;padding:10px 12px;border-radius:6px;width:100%;border:1px solid transparent;background:#141921">
+                  <div style="font-weight:600;font-size:12px;color:var(--text)">Catalog &amp; sự kiện</div>
+                  <div style="font-size:10px;color:var(--muted)">Mã tham chiếu và sự kiện nghiệm thu</div>
+                </button>
               </div>
             </div>
           </div>
@@ -6071,7 +5908,6 @@ body.resizing-active, body.resizing-active * {
               <div class="cardBody">
                 <div class="codeBox" id="repoWorkspace"></div>
                 <div style="height: 8px"></div>
-                <button class="btn" onclick="showToast('Git status: clean, 2 commits on main')">Kiểm tra Git</button>
               </div>
             </div>
           </div>
@@ -6194,6 +6030,44 @@ body.resizing-active, body.resizing-active * {
             </div>
           </div>
         </div>
+        <div class="dataPane" id="data-catalog">
+          <div class="cardHead" style="padding:10px 14px"><strong>Catalog tra cứu &amp; sự kiện</strong><span class="hint">Mã tham chiếu (#EVT, #DB, #FILE…) và sự kiện đã nghiệm thu. Trống nếu chưa ghi.</span></div>
+          <div class="cardBody" style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+            <div class="card memoryIndex" id="memCatalogCard" style="border:none;background:transparent;padding:0">
+                <div style="font-size:10.5px;font-weight:700;color:var(--text);margin-bottom:6px">Tra cứu nhanh ID (Catalog)</div>
+                <div class="indexToolbar" style="margin-bottom:8px">
+                  <input class="searchBox" placeholder="Tìm mã ID, sự kiện, vault, mcp tool, file..." oninput="filterRefs(this.value)">
+                </div>
+                <div style="max-height:220px;overflow-y:auto;border:1px solid var(--line);border-radius:6px">
+                  <table class="eventTable" style="margin:0">
+                    <thead>
+                      <tr>
+                        <th>Mã ID</th>
+                        <th>Loại</th>
+                        <th>Target</th>
+                      </tr>
+                    </thead>
+                    <tbody id="refRows"></tbody>
+                  </table>
+                </div>
+              </div>
+            <div class="card" id="memEventCard" style="border:none;background:transparent;padding:0;margin-top:10px">
+                <div style="font-size:10.5px;font-weight:700;color:var(--text);margin-bottom:6px">Sự kiện chờ thẩm định (Events)</div>
+                <div style="max-height:220px;overflow-y:auto;border:1px solid var(--line);border-radius:6px">
+                  <table class="eventTable" style="margin:0">
+                    <thead>
+                      <tr>
+                        <th>ID</th>
+                        <th>Role</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody id="eventRows"></tbody>
+                  </table>
+                </div>
+              </div>
+          </div>
+        </div>
             </div><!-- /cockpitDetailBody -->
           </div><!-- /cockpitDetailPane -->
         </div><!-- /cockpitShell -->
@@ -6264,7 +6138,7 @@ body.resizing-active, body.resizing-active * {
         <label>Chọn Tài khoản / Profile Google</label>
         <select id="accountSelect" onchange="onAccountOptionChange()">
           <option value="owner_default">Mặc định (Owner Gmail: ~/.gemini)</option>
-          <option value="profile1">Profile #1 (claude.bot@genesis.local)</option>
+          <option value="profile1">Profile #1 (~/.agy-profiles/profile1)</option>
           <option value="profile2">Profile #2 (~/.agy-profiles/profile2)</option>
           <option value="profile3">Profile #3 (~/.agy-profiles/profile3)</option>
           <option value="profile4">Profile #4 (~/.agy-profiles/profile4)</option>
@@ -6515,7 +6389,7 @@ body.resizing-active, body.resizing-active * {
           </div>
           <div class="field" style="margin-bottom:0">
             <label>Email gắn với hồ sơ</label>
-            <input type="email" id="ownerInputEmail" value="owner@genesis.local">
+            <input type="email" id="ownerInputEmail" value="" placeholder="email của Boss">
           </div>
         </div>
         <div class="field" style="margin-bottom:10px">
@@ -6551,6 +6425,10 @@ body.resizing-active, body.resizing-active * {
         <div class="field" style="margin-bottom:0">
           <label>Mã Nhiệm Vụ (Task ID)</label>
           <input type="text" id="todoModalTaskId" placeholder="TSK-01" style="font-family:var(--mono)">
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label>Mã việc trong Kho Ryan (bắt buộc)</label>
+          <input type="text" id="todoModalViecRef" placeholder="VIEC-12" pattern="VIEC-[0-9]+" style="font-family:var(--mono)">
         </div>
         <div class="field" style="margin-bottom:0">
           <label>Độ Ưu Tiên (Priority)</label>
@@ -6945,17 +6823,11 @@ const state = {
     plan: 'docs/SSOT_ORIGINAL_SPEC.md'
   },
   activeProjectIndex: 0,
-  sourceText: `# ĐẶC TẢ DỰ ÁN GEN-WORKPLACE (MULTI-AGENT SWARM ORCHESTRATOR)
-1. Bảng Console điều phối đa Agent Swarm quản lý nhiều dự án.
-2. Khu Implementation: Hàng 01 chia 3 cột (Input+Plan -> Roadmap -> Todo). Hàng 02 chọn CLI Engine cho từng Role (Gemini CLI agy, Claude Code CLI, Cursor CLI, Codex Security CLI) với Instruction khóa theo Input tổng. Hàng 03 Sơ đồ live workflow từng node có checklist In-Output.
-3. Khu Data Center: Git Repo (tuân thủ quy tắc Genesis Brain: Branch riêng + PR), Database, Vault, File Manager.
-4. Khu Môi Trường Agent: Runtimes tự ghi tư duy (Thinking log), Chatroom thread @mention bàn giao task kèm file, phản ứng emoji thực tế (, ⚠️, 👎, , ❓, 🔥), Live Kanban cả team do Trưởng nhóm phụ trách cập nhật live times.
-5. Khu Nơi Làm Việc (Workplace): 2 cột Memory tổng Master SSOT vs Memory từng Role sync realtime + Catalog tra nhanh ID (#EVT, #SEC, #MCP, #FILE, #TOOL) để agent lấy dữ kiện tức thì không cần audit toàn cục mỗi phiên.
-6. Đóng gói phân phối All-In-One: Cài đặt 1 lệnh trên giao diện TUI có thanh loading %, tự động kiểm tra môi trường (OS, Git, Docker, Compose), chạy 100% trong Docker container đa nền tảng, tự tạo Desktop Icon để nhấp đúp gọi WebApp ngay lập tức.`,
+  sourceText: '',
   projects: [
     {
       name: 'gen-workplace',
-      meta: '6 role · Docker live mount · Active',
+      meta: '6 vai',
       repo: '/workspace'
     }
   ],
@@ -6973,153 +6845,16 @@ const state = {
   tmuxMode: 'single',
   agentCurrentView: 'tmux',
   oauthProfiles: [],
-  roadmap: [
-    { id: 'RM-01', title: 'Core Architecture & SSOT Spec', desc: 'Thiết lập repo local, lưu nguyên văn đặc tả gốc của Owner vào docs/SSOT_ORIGINAL_SPEC.md.', todos: 3, status: 'done' },
-    { id: 'RM-02', title: 'Docker Engine & Live Mount', desc: 'Container hóa toàn bộ hệ thống với Dockerfile, docker-compose.yml và live bind mount :z.', todos: 2, status: 'done' },
-    { id: 'RM-03', title: 'One-Command TUI Installer', desc: 'Kịch bản install.sh + installer_tui.py với progress bar %, kiểm tra Docker/OS/Git, tự tạo Desktop Icon.', todos: 3, status: 'done' },
-    { id: 'RM-04', title: 'SQLite Database & CLI Connectors', desc: 'Tích hợp SQLite Core DB, FTS5 catalog lookup, process runner kết nối agy & claude CLI thực tế.', todos: 3, status: 'live' },
-    { id: 'RM-05', title: 'GitHub Publication & Release', desc: 'Gắn tag v1.0, publish repo lên GitHub cho cộng đồng, hỗ trợ 1-command curl install.', todos: 2, status: 'queued' }
-  ],
-  todos: [
-    [
-      { id: 'TODO-01', title: 'Khởi tạo Git repo /workspace', role: 'Lead Architect', status: 'done' },
-      { id: 'TODO-02', title: 'Lưu đặc tả gốc vào docs/SSOT_ORIGINAL_SPEC.md', role: 'Lead Architect', status: 'done' },
-      { id: 'TODO-03', title: 'Chuyển đổi giao diện sang phong cách Gen-workplace v1.1', role: 'Frontend Specialist', status: 'done' }
-    ],
-    [
-      { id: 'TODO-04', title: 'Viết Dockerfile container hóa Python backend + WebApp', role: 'DevOps Engineer', status: 'done' },
-      { id: 'TODO-05', title: 'Cấu hình docker-compose live mount với cờ SELinux :z', role: 'DevOps Engineer', status: 'done' }
-    ],
-    [
-      { id: 'TODO-06', title: 'Xây dựng installer_tui.py với thanh loading % đồ họa', role: 'Backend Specialist', status: 'done' },
-      { id: 'TODO-07', title: 'Kịch bản install.sh tự động kiểm tra Git & Docker daemon', role: 'DevOps Engineer', status: 'done' },
-      { id: 'TODO-08', title: 'Tạo shortcut Desktop Gen-workplace.desktop tự động', role: 'DevOps Engineer', status: 'done' }
-    ],
-    [
-      { id: 'TODO-09', title: 'Khởi tạo SQLite WAL DB & FTS5 virtual table', role: 'Backend Specialist', status: 'live' },
-      { id: 'TODO-10', title: 'Kết nối API /api/state và /api/catalog với SQLite', role: 'Backend Specialist', status: 'wait' },
-      { id: 'TODO-11', title: 'Tích hợp Process Runner gọi agy CLI thời gian thực', role: 'Lead Architect', status: 'queued' }
-    ],
-    [
-      { id: 'TODO-12', title: 'Kiểm thử cross-platform trên macOS và Windows WSL2', role: 'QA Tester', status: 'queued' },
-      { id: 'TODO-13', title: 'Publish repository lên GitHub và gắn release v1.0', role: 'Lead Architect', status: 'queued' }
-    ]
-  ],
-  roles: [
-    { id: 'ROLE-01', key: 'L', name: 'Lead Architect', model: 'Gemini 2.5 Pro (Thinking)', cli: 'Gemini CLI (agy --effort high)', scope: 'Quản trị SSOT, điều phối toàn bộ tiến trình gen-workplace', instruction: 'Chịu trách nhiệm bảo toàn SSOT đặc tả gốc, thẩm định evidence từ các role và điều phối live workflow.' },
-    { id: 'ROLE-02', key: 'B', name: 'Backend & DB Specialist', model: 'Gemini 2.5 Pro (Thinking)', cli: 'Claude Code CLI', scope: 'Python daemon, SQLite WAL, FTS5 catalog và runner', instruction: 'Thực thi API control plane, tối ưu truy vấn FTS5 catalog sub-ms và stream log terminal.' },
-    { id: 'ROLE-03', key: 'F', name: 'Frontend Specialist', model: 'Gemini 2.5 Flash', cli: 'Cursor CLI', scope: 'Web console UI, CSS Gen-workplace v1.1, real-time sync', instruction: 'Duy trì phong cách thiết kế tối kỹ thuật v1.1, bind dữ liệu thật từ backend và tối ưu UX.' },
-    { id: 'ROLE-04', key: 'D', name: 'DevOps & Packaging', model: 'Gemini 2.5 Flash', cli: 'Gemini CLI (agy --agent devops)', scope: 'Docker, SELinux bind mounts, TUI installer, desktop shortcut', instruction: 'Đảm bảo môi trường container chạy ổn định trên Linux, macOS và Windows, script 1-command installer hoàn hảo.' },
-    { id: 'ROLE-05', key: 'Q', name: 'QA Tester', model: 'Gemini 2.5 Flash Thinking', cli: 'Gemini CLI (agy)', scope: 'Kiểm thử cross-platform, test API /api/status, xác thực installer', instruction: 'Chạy regression tests, nghiệm thu thanh loading % của installer và báo cáo phản hồi.' },
-    { id: 'ROLE-06', key: 'S', name: 'Security Auditor', model: 'Claude 3.7 Sonnet (Thinking)', cli: 'Codex Security CLI', scope: 'Phân quyền volume Docker, audit file permission, kiểm soát Vault', instruction: 'Kiểm tra an toàn SELinux, cô lập quyền hạn biến môi trường và thẩm định secret boundary.' }
-  ],
-  nodes: [
-    { id: 'NODE-01', title: 'Spec Ingestion & SSOT Freezing', role: 'Lead Architect', status: 'done', x: 20, y: 42, input: 'Yêu cầu bài toán từ Ryan', output: 'docs/SSOT_ORIGINAL_SPEC.md & master_ssot', check: 'SSOT locked, 0% drift', handoff: '→ Architecture Breakdown', checklist: ['Tiếp nhận yêu cầu nguyên văn', 'Khóa file SSOT_ORIGINAL_SPEC.md', 'Ghi nhận vào CSDL master_ssot'] },
-    { id: 'NODE-02', title: 'Architecture Breakdown & DAG', role: 'Lead Architect', status: 'done', x: 260, y: 42, input: 'SSOT gốc & Target Features', output: 'Roadmap RM-01..RM-05 & Todo DAG', check: 'depends_on chain locked', handoff: '→ Parallel 0-Conflict Build', checklist: ['Phân rã lộ trình theo mốc kiến trúc', 'Tạo Todo list gắn chặt depends_on', 'Ký kết Hợp đồng Giao diện I/O'] },
-    { id: 'NODE-03', title: 'Core Engine & Parallel Build', role: 'Backend & Frontend', status: 'live', x: 500, y: 42, input: 'API & Schema Contracts', output: 'Codebase sạch trong Allowed Paths', check: '0-Conflict, Atomic Mutex pass', handoff: '→ Dual-Gate Verification', checklist: ['Khóa độc quyền Task Mutex (/api/task/claim)', 'Xây dựng SQLite WAL DB & REST APIs', 'Hoàn thiện Mission Control SPA'] },
-    { id: 'NODE-04', title: 'Dual-Gate QA & Security Audit', role: 'QA & Security', status: 'wait', x: 740, y: 42, input: 'Mã nguồn & Artifacts', output: 'Chứng thư kiểm định & Test Logs', check: '100% test pass, 0 secret leak', handoff: '→ Packaging & Release', checklist: ['Kiểm toán bảo mật Vault & OAuth PKCE', 'Chạy tự động Test Suite & Auto-wake', 'Nghiệm thu bằng chứng (/api/task/complete)'] },
-    { id: 'NODE-05', title: 'Packaging, Release & Sleep', role: 'DevOps & Orchestrator', status: 'wait', x: 500, y: 185, input: 'Mã nguồn đã nghiệm thu', output: 'Docker Release v1.0 & BLUF Briefing', check: 'Container verified, 0MB RAM sleep', handoff: '→ Bàn giao cho Ryan', checklist: ['Đóng gói Docker Compose cờ :z SELinux', 'Kiểm tra installer_tui.py & desktop shortcut', 'Kích hoạt ngủ đông tiết kiệm & Báo cáo BLUF'] }
-  ],
-  runtimes: [
-    {
-      id: 'runtime-01', role: 'Lead Architect', cli: 'Gemini CLI (agy)', task: 'RM-04', branch: 'main', status: 'running', path: '/workspace',
-      messages: [
-        { author: 'Lead Architect', time: '20:34:26', tag: 'Repo Init', body: 'Đã khởi tạo repo <code>/workspace</code> và lưu đặc tả gốc vào <code>docs/SSOT_ORIGINAL_SPEC.md</code>.', react: ['đã nhận', 'done'] },
-        { author: 'Lead Architect', time: '20:47:08', tag: 'Live Mount', body: 'Đã cấu hình Live Mount với cờ SELinux <code>:z</code>. Mọi chỉnh sửa trên host sẽ tự động phản ánh tức thì vào container!', react: ['live reload', 'xác nhận'] }
-      ],
-      trace: ['20:34 repo created', '20:35 SSOT spec written', '20:47 live mount verified'],
-      io: { input: 'Owner Request', output: 'gen-workplace git repo', request: 'init real project', conclusion: 'live & running' }
-    },
-    {
-      id: 'runtime-02', role: 'Backend & DB Specialist', cli: 'Claude Code CLI', task: 'TODO-09', branch: 'main', status: 'running', path: '/workspace',
-      messages: [
-        { author: 'Backend', time: '20:35:45', tag: 'Installer', body: 'Đã xây dựng xong bộ cài đặt <code>installer_tui.py</code> có thanh loading progress bar % và kiểm tra môi trường.', react: ['done', '🔥 mượt mà'] },
-        { author: 'Backend', time: '20:56:00', tag: 'Database', body: 'Đang triển khai SQLite WAL Core Database và FTS5 Virtual Table cho Catalog tra nhanh ID.', react: ['đang chạy'] }
-      ],
-      trace: ['20:35 installer_tui.py implemented', '20:56 designing SQLite FTS5 catalog'],
-      io: { input: 'Database spec', output: 'SQLite FTS5 schema', request: 'build zero-audit catalog', conclusion: 'in progress' }
-    },
-    {
-      id: 'runtime-03', role: 'Frontend Specialist', cli: 'Cursor CLI', task: 'TODO-03', branch: 'main', status: 'running', path: '/workspace',
-      messages: [{ author: 'Frontend', time: '20:10:23', tag: 'Style v1.1', body: 'Đã chuyển đổi toàn bộ layout sang phong cách Gen-workplace v1.1 tinh tế, không rối mắt.', react: ['done'] }],
-      trace: ['20:10 applied v1.1 palette', '20:57 wiped mock data, replaced with real repo data'],
-      io: { input: 'Gen-workplace-v1.1-dynamic.html', output: 'frontend/index.html', request: 'apply technical dark theme', conclusion: 'done' }
-    },
-    {
-      id: 'runtime-04', role: 'DevOps & Packaging', cli: 'Gemini CLI (agy)', task: 'TODO-05', branch: 'main', status: 'done', path: '/workspace',
-      messages: [{ author: 'DevOps', time: '20:36:58', tag: 'Docker Up', body: 'Container <code>gen-workplace-app</code> đã khởi động thành công trên cổng 8888.', react: ['done', 'online'] }],
-      trace: ['20:35 Dockerfile created', '20:36 image built', '20:47 container live-mounted'],
-      io: { input: 'docker-compose.yml', output: 'container 28a7c6b51b94', request: 'containerize app', conclusion: 'done' }
-    },
-    {
-      id: 'runtime-05', role: 'QA Tester', cli: 'Gemini CLI', task: 'TODO-08', branch: 'main', status: 'done', path: '/workspace',
-      messages: [{ author: 'QA', time: '20:37:05', tag: 'Shortcut', body: 'Đã xác thực shortcut <code>~/Desktop/Gen-workplace.desktop</code> tồn tại và mở được WebApp.', react: ['verified'] }],
-      trace: ['20:37 checked desktop entry', '20:37 curl status 200 OK'],
-      io: { input: 'Gen-workplace.desktop', output: 'QA pass', request: 'verify desktop icon', conclusion: 'done' }
-    },
-    {
-      id: 'runtime-06', role: 'Security Auditor', cli: 'Codex Security CLI', task: 'TODO-05', branch: 'main', status: 'done', path: '/workspace',
-      messages: [{ author: 'Security', time: '20:46:47', tag: 'SELinux', body: 'Đã kiểm tra SELinux Enforcing trên host và gán nhãn <code>:z</code> an toàn cho Docker mounts.', react: ['secure'] }],
-      trace: ['20:46 audit getenforce', '20:47 confirmed zero permission leak'],
-      io: { input: 'SELinux policy', output: 'secure volume mount', request: 'enforce security', conclusion: 'done' }
-    }
-  ],
-  kanban: {
-    backlog: [
-      ['TODO-13', 'Publish repository lên GitHub và gắn release v1.0', 'Lead'],
-      ['TODO-12', 'Kiểm thử cross-platform trên macOS và Windows WSL2', 'QA']
-    ],
-    ready: [
-      ['TODO-10', 'Kết nối API /api/state và /api/catalog với SQLite', 'Backend']
-    ],
-    progress: [
-      ['TODO-09', 'Khởi tạo SQLite WAL DB & FTS5 virtual table', 'Backend']
-    ],
-    done: [
-      ['TODO-01', 'Khởi tạo Git repo /workspace', 'Lead'],
-      ['TODO-02', 'Lưu đặc tả gốc vào docs/SSOT_ORIGINAL_SPEC.md', 'Lead'],
-      ['TODO-03', 'Chuyển đổi giao diện sang phong cách Gen-workplace v1.1', 'Frontend'],
-      ['TODO-04', 'Viết Dockerfile container hóa Python backend + WebApp', 'DevOps'],
-      ['TODO-05', 'Cấu hình docker-compose live mount với cờ SELinux :z', 'DevOps'],
-      ['TODO-06', 'Xây dựng installer_tui.py với thanh loading % đồ họa', 'Backend'],
-      ['TODO-08', 'Tạo shortcut Desktop Gen-workplace.desktop tự động', 'DevOps']
-    ]
-  },
-  ssot: [
-    { id: 'SSOT-SPEC-01', title: 'Đặc Tả Gốc Bất Biến Của Owner', body: 'Bản đặc tả 5 phân khu (Dashboard, Implementation 3 hàng, Data Center, Runtimes, Workplace) và tiêu chuẩn cài đặt 1 lệnh TUI Docker là Single Source of Truth bất biến của toàn dự án.', source: 'EVT-03 · docs/SSOT_ORIGINAL_SPEC.md', verified: '20:35' },
-    { id: 'SSOT-INSTALL-02', title: 'Tiêu Chuẩn Cài Đặt TUI & Desktop Icon', body: 'Kịch bản cài đặt phải có thanh đo tiến độ loading %, tự kiểm tra môi trường OS/Docker/Git và tự sinh shortcut desktop Gen-workplace.desktop khi kết thúc.', source: 'EVT-02 · installer_tui.py', verified: '20:37' },
-    { id: 'SSOT-DOCKER-03', title: 'Môi Trường Container Hóa Đa Nền Tảng', body: 'Toàn bộ backend, frontend và data runtimes phải đóng gói khép kín trong Docker container để chạy đồng nhất trên Linux, macOS và Windows.', source: 'EVT-01 · docker-compose.yml', verified: '20:47' },
-    { id: 'SSOT-LIVE-MOUNT-04', title: 'Cơ Chế Live Mount Hot-Reload', body: 'Thư mục frontend/ và backend/ được mount trực tiếp vào container với cờ SELinux :z, đảm bảo mọi thay đổi code trên repo được cập nhật tức thì trên WebApp khi F5.', source: 'COMMIT ae4e196', verified: '20:47' }
-  ],
-  roleMemory: [
-    { role: 'Lead Architect', runtime: 'runtime-01', summary: 'SSOT verified · Git repo live', detail: 'Quản trị repo chính thức /workspace, đã chốt 4 quy tắc SSOT.' },
-    { role: 'Backend Specialist', runtime: 'runtime-02', summary: 'Installer TUI complete · SQLite FTS5 active', detail: 'Đã hoàn thành installer_tui.py và đang xây dựng cơ sở dữ liệu SQLite tra cứu nhanh.' },
-    { role: 'Frontend Specialist', runtime: 'runtime-03', summary: 'Theme v1.1 synced · Mock data purged', detail: 'Đã dọn dẹp sạch toàn bộ dữ liệu giả cũ, nạp 100% dữ liệu thực của repo gen-workplace.' },
-    { role: 'DevOps & Packaging', runtime: 'runtime-04', summary: 'Docker live mount running on port 8888', detail: 'Container gen-workplace-app đang phục vụ ổn định với live volume bind mounts.' },
-    { role: 'QA Tester', runtime: 'runtime-05', summary: 'Desktop shortcut & HTTP 200 OK verified', detail: 'Đã kiểm tra thành công shortcut trên Desktop và API /api/status phản hồi chuẩn.' },
-    { role: 'Security Auditor', runtime: 'runtime-06', summary: 'SELinux :z flags applied', detail: 'Phân quyền volume Docker hoàn toàn an toàn và tương thích với SELinux Enforcing.' }
-  ],
-  refs: [
-    ['EVT-01', 'Event', 'DOCKER_CONTAINER_STARTED', 'Container gen-workplace-app khởi động thành công với live bind mount'],
-    ['EVT-02', 'Event', 'TUI_INSTALLER_VERIFIED', 'Kịch bản install.sh và installer_tui.py tạo thành công shortcut Desktop'],
-    ['EVT-03', 'Event', 'SSOT_ORIGINAL_SPEC_FROZEN', 'Bản đặc tả gốc của Owner được lưu trữ làm SSOT v1.0'],
-    ['FILE-01', 'File', 'docs/SSOT_ORIGINAL_SPEC.md', 'Tài liệu nguồn sự thật duy nhất (Nguyên văn spec của Owner)'],
-    ['FILE-02', 'File', 'install.sh', 'Kịch bản khởi động cài đặt 1 lệnh all-in-one'],
-    ['FILE-03', 'File', 'installer_tui.py', 'Bộ cài đặt giao diện TUI có thanh loading % tiến độ'],
-    ['FILE-04', 'File', 'backend/main.py', 'Backend daemon điều phối Swarm Control Plane'],
-    ['FILE-05', 'File', 'frontend/index.html', 'Giao diện WebApp chuẩn phong cách v1.1'],
-    ['FILE-06', 'File', 'docker-compose.yml', 'Cấu hình Docker Compose đa nền tảng với live mount'],
-    ['TOOL-01', 'Tool', './install.sh', 'Lệnh cài đặt tự động kiểm tra môi trường'],
-    ['TOOL-02', 'Tool', 'docker compose up -d', 'Lệnh khởi chạy container nền'],
-    ['SEC-01', 'Vault', 'PORT=8888', 'Cổng WebApp được expose ra máy host'],
-    ['SEC-02', 'Vault', 'DATA_DIR=/app/data', 'Thư mục lưu trữ volume dữ liệu bền vững'],
-    ['DB-01', 'Database', 'SQLite WAL Core DB', 'Cơ sở dữ liệu trung tâm cho Catalog tra nhanh ID']
-  ],
-  events: [
-    { id: 'EVT-01', runtime: 'DevOps / runtime-04', request: 'Khởi động container gen-workplace-app với live bind mount', evidence: 'docker-compose.yml · port 8888', status: 'ssot', time: '20:47' },
-    { id: 'EVT-02', runtime: 'DevOps / runtime-05', request: 'Kiểm thử kịch bản installer_tui.py và tạo Desktop icon', evidence: 'Gen-workplace.desktop verified', status: 'ssot', time: '20:37' },
-    { id: 'EVT-03', runtime: 'Lead / runtime-01', request: 'Lưu trữ đặc tả gốc của Owner thành SSOT bất biến', evidence: 'docs/SSOT_ORIGINAL_SPEC.md', status: 'ssot', time: '20:35' }
-  ]
+  roadmap: [],
+  todos: [],
+  roles: [],
+  nodes: [],
+  runtimes: [],
+  kanban: { backlog: [], ready: [], progress: [], done: [] },
+  ssot: [],
+  roleMemory: [],
+  refs: [],
+  events: []
 };
 
 const $ = id => document.getElementById(id);
@@ -7183,24 +6918,6 @@ const SUBTAB_CONFIG = {
       { id: 'imp-roles', label: '02 · Bảng Roles & Đổi Model AI', target: '.implRow2_Roles' }
     ]
   },
-  dashboard: {
-    icon: '⌂',
-    name: 'Tổng Quan Dashboard',
-    tabs: [
-      { id: 'dash-overview', label: 'Tổng quan & Chỉ số', target: '#dashStatsCard' },
-      { id: 'dash-kanban', label: 'Kanban 6 Role Teams', target: '#dashKanbanCard' },
-      { id: 'dash-progress', label: 'Tiến trình Swarm & Roles', target: '#dashProgressCard' }
-    ]
-  },
-  memory: {
-    icon: '◌',
-    name: 'Bộ Nhớ SSOT',
-    tabs: [
-      { id: 'mem-dual', label: '2 Cột Memory (Master SSOT vs Role)', target: '#memGridCard' },
-      { id: 'mem-catalog', label: 'Fast ID Catalog (FTS5)', action: () => { scrollToTarget('#memCatalogCard'); document.querySelector('.indexToolbar .searchBox')?.focus(); } },
-      { id: 'mem-events', label: 'Sự Kiện Chờ Thẩm Định', target: '#memEventCard' }
-    ]
-  },
   data: {
     icon: '▦',
     name: 'Trung Tâm Dữ Liệu',
@@ -7208,7 +6925,8 @@ const SUBTAB_CONFIG = {
       { id: 'data-repo', label: 'Git Repo & Commits', action: () => switchData('repo') },
       { id: 'data-db', label: 'SQLite 3 Database & Schemas', action: () => switchData('db') },
       { id: 'data-vault', label: 'Vault & Secrets Ref', action: () => switchData('vault') },
-      { id: 'data-files', label: 'File Manager & Artifacts', action: () => switchData('files') }
+      { id: 'data-files', label: 'File Manager & Artifacts', action: () => switchData('files') },
+      { id: 'data-catalog', label: 'Catalog & sự kiện', action: () => switchData('catalog') }
     ]
   }
 };
@@ -7300,13 +7018,8 @@ function go(id, el) {
     if (!state.currentDeckTab) state.currentDeckTab = 'chat';
   } else if (id === 'warroom') {
     loadWarRoomMessages(true);
-  } else if (id === 'memory') {
-    renderMemory();
   } else if (id === 'implementation') {
     renderImplementation();
-  } else if (id === 'dashboard') {
-    renderOverview();
-    renderDashboardProjects();
     renderDashboardKanban();
   } else if (id === 'data') {
     switchData('repo');
@@ -7555,6 +7268,9 @@ function renderImplementation() {
   }
   
   // 1. Roadmap List
+  if (!state.roadmap || state.roadmap.length === 0) {
+    $('roadmapList').innerHTML = '<div class="emptyState">Chưa có roadmap. Nạp đặc tả rồi bấm "AI sinh cấu trúc", hoặc tạo việc trực tiếp trên Kanban.</div>';
+  } else
   $('roadmapList').innerHTML = state.roadmap.map((r, i) => `
     <div class="roadmapRow ${i === state.selectedRoadmap ? 'selected' : ''}" onclick="selectRoadmap(${i})">
       <div class="rmNo">${i + 1}</div>
@@ -7572,6 +7288,7 @@ function renderImplementation() {
   // 2. Todo List
   const todos = state.todos[state.selectedRoadmap] || [];
   $('selectedRoadmapTitle').textContent = `${state.roadmap[state.selectedRoadmap]?.id || ''} · ${state.roadmap[state.selectedRoadmap]?.title || ''}`;
+  if (todos.length === 0) $('todoList').innerHTML = '<div class="emptyState">Chưa có việc trong giai đoạn này.</div>'; else
   $('todoList').innerHTML = todos.map(t => `
     <div class="todoItem ${t.status === 'done' ? 'done' : ''}" onclick="toggleTodoStatus('${t.id}', '${t.status}')" style="cursor:pointer" title="Nhấp để nghiệm thu hoặc mở lại task">
       <span class="check" style="cursor:pointer">${t.status === 'done' ? '✓' : ''}</span>
@@ -7784,6 +7501,7 @@ function resetWorkflow() {
 
 // Dashboard Renderers
 function renderDashboardProjects() {
+  return; // màn Tổng quan đã gộp vào Việc & tiến độ
   const list = $('dashboardProjectList');
   list.innerHTML = state.projects.map((p, i) => {
     const selected = p.name === state.project.name;
@@ -7839,6 +7557,7 @@ function renderDashboardProjects() {
 }
 
 function renderOverview() {
+  return; // màn Tổng quan đã gộp vào Việc & tiến độ
   const active = state.runtimes.filter(r => r.status === 'running').length;
   if ($('ovRoadmap')) $('ovRoadmap').textContent = state.roadmap.length;
   if ($('ovTodo')) $('ovTodo').textContent = state.todos.flat().length;
@@ -8093,17 +7812,7 @@ async function refreshTmuxSessions(showNotify = false) {
     console.warn('[Tmux Sync] Backend unreachable, using fallback sessions:', e);
   }
 
-  // Fallback default 6 roles if empty
-  if (!state.tmuxSessions || state.tmuxSessions.length === 0) {
-    state.tmuxSessions = [
-      { id: 'gw-lead-agy', role_name: 'Lead Architect', cli_tool: 'agy', account_type: 'owner_default', account_label: 'Mặc định (Owner Gmail)', email: 'owner@genesis.local', is_auth: true, profile_dir: '', status: 'active', pid: 30129, terminal_output: '[gw-lead-agy:0] agy CLI ready.' },
-      { id: 'gw-backend-agy', role_name: 'Backend Dev', cli_tool: 'agy', account_type: 'profile1', account_label: 'Profile #1 (owner@genesis.local)', email: 'owner@genesis.local', is_auth: true, profile_dir: '~/.agy-profiles/profile1', status: 'active', pid: 30130, terminal_output: '[gw-backend-agy:0] agy CLI ready.' },
-      { id: 'gw-frontend-agy', role_name: 'Frontend Dev', cli_tool: 'agy', account_type: 'profile2', account_label: 'Profile #2 (claude.bot@genesis.local)', email: 'claude.bot@genesis.local', is_auth: true, profile_dir: '', status: 'active', pid: 30131, terminal_output: '[gw-frontend-agy:0] agy CLI ready.' },
-      { id: 'gw-devops-agy', role_name: 'DevOps & Docker', cli_tool: 'agy', account_type: 'profile3', account_label: 'Profile #3 (shared.bot@genesis.local)', email: 'shared.bot@genesis.local', is_auth: true, profile_dir: '~/.agy-profiles/profile3', status: 'active', pid: 30132, terminal_output: '[gw-devops-agy:0] agy CLI ready.' },
-      { id: 'gw-qa-agy', role_name: 'QA & Verification', cli_tool: 'agy', account_type: 'profile4', account_label: 'Profile #4 (shared.bot@genesis.local)', email: 'shared.bot@genesis.local', is_auth: true, profile_dir: '~/.agy-profiles/profile4', status: 'active', pid: 30133, terminal_output: '[gw-qa-agy:0] agy CLI ready.' },
-      { id: 'gw-security-agy', role_name: 'Security & Secret Vault', cli_tool: 'agy', account_type: 'owner_default', account_label: 'Mặc định (Owner Gmail)', email: 'owner@genesis.local', is_auth: true, profile_dir: '', status: 'active', pid: 30134, terminal_output: '[gw-security-agy:0] agy CLI ready.' }
-    ];
-  }
+  if (!state.tmuxSessions) state.tmuxSessions = [];
 
   if (!state.tmuxSessions.some(s => s.id === state.selectedTmuxSessionId)) {
     state.selectedTmuxSessionId = state.tmuxSessions[0]?.id || 'gw-lead-agy';
@@ -8151,9 +7860,9 @@ const ROLE_DETAILS = {
     inputFrom: 'Nhận yêu cầu đề bài trực tiếp từ Ryan (Owner)',
     outputTo: 'Chuyển giao Schema CSDL cho Backend & Khung giao diện cho Frontend',
     checklist: [
-      { text: 'Tiếp nhận đề bài và khóa SSOT (docs/SSOT_ORIGINAL_SPEC.md)', done: true },
-      { text: 'Phân rã Roadmap tuần tự và tạo Todo list gắn depends_on', done: true },
-      { text: 'Khóa Hợp đồng Giao diện I/O giữa các chuyên gia', done: true },
+      { text: 'Tiếp nhận đề bài và khóa SSOT (docs/SSOT_ORIGINAL_SPEC.md)', done: false },
+      { text: 'Phân rã Roadmap tuần tự và tạo Todo list gắn depends_on', done: false },
+      { text: 'Khóa Hợp đồng Giao diện I/O giữa các chuyên gia', done: false },
       { text: 'Đối soát bằng chứng thực tế trước khi ký verified_by', done: false }
     ]
   },
@@ -8163,21 +7872,21 @@ const ROLE_DETAILS = {
     inputFrom: 'Nhận mô hình dữ liệu & yêu cầu nghiệp vụ từ Lead Architect',
     outputTo: 'Bàn giao Endpoint API cho Frontend UI & kịch bản kiểm thử cho QA Tester',
     checklist: [
-      { text: 'Khởi tạo và duy trì SQLite WAL mode (/app/data/gen-workplace.db)', done: true },
-      { text: 'Phát triển API Control Plane (/api/state, /api/task/claim, /api/task/complete)', done: true },
-      { text: 'Tối ưu hóa FTS5 virtual catalog cho tốc độ truy vấn < 10ms', done: true },
+      { text: 'Khởi tạo và duy trì SQLite WAL mode (/app/data/gen-workplace.db)', done: false },
+      { text: 'Phát triển API Control Plane (/api/state, /api/task/claim, /api/task/complete)', done: false },
+      { text: 'Tối ưu hóa FTS5 virtual catalog cho tốc độ truy vấn < 10ms', done: false },
       { text: 'Nộp bằng chứng Git commit hash và test log cho Lead Architect', done: false }
     ]
   },
   'gw-frontend-agy': {
     title: 'Frontend Specialist (Chuyên Gia Giao Diện SPA)',
-    mission: 'Xây dựng giao diện Mission Control, đồng bộ thời gian thực, bảng điều khiển Nocturne Slate.',
+    mission: 'Xây dựng giao diện Mission Control, đồng bộ thời gian thực, bảng điều khiển.',
     inputFrom: 'Nhận REST API & JSON schema từ Backend Specialist',
     outputTo: 'Bàn giao WebApp hoàn thiện cho QA Tester và Ryan nghiệm thu',
     checklist: [
-      { text: 'Thiết kế giao diện 2 cột List+Detail & Tabs trực quan chuẩn Nocturne Slate', done: true },
-      { text: 'Đồng bộ trạng thái Quota song song (Gemini 3.8 + Claude Sonnet 4.6)', done: true },
-      { text: 'Tích hợp bảng điều khiển chuyên gia Live Workbench & Terminal trực tiếp', done: true },
+      { text: 'Thiết kế giao diện 2 cột List+Detail & Tabs trực quan chuẩn giao diện chung', done: false },
+      { text: 'Đồng bộ trạng thái Quota song song (Gemini 3.8 + Claude Sonnet 4.6)', done: false },
+      { text: 'Tích hợp bảng điều khiển chuyên gia Live Workbench & Terminal trực tiếp', done: false },
       { text: 'Kiểm tra cú pháp 0-error trên trình duyệt', done: false }
     ]
   },
@@ -8187,21 +7896,21 @@ const ROLE_DETAILS = {
     inputFrom: 'Nhận mã nguồn từ Backend & Frontend Specialist',
     outputTo: 'Bàn giao Container chạy ổn định và bộ cài đặt 1-command cho người dùng',
     checklist: [
-      { text: 'Cấu hình Dockerfile & docker-compose.yml với cờ :z live mount', done: true },
-      { text: 'Xây dựng installer_tui.py với thanh loading % và kiểm tra OS/Docker', done: true },
-      { text: 'Tạo shortcut Desktop Gen-workplace.desktop tự động', done: true },
+      { text: 'Cấu hình Dockerfile & docker-compose.yml với cờ :z live mount', done: false },
+      { text: 'Xây dựng installer_tui.py với thanh loading % và kiểm tra OS/Docker', done: false },
+      { text: 'Tạo shortcut Desktop Gen-workplace.desktop tự động', done: false },
       { text: 'Tối ưu hóa tài nguyên: 0% CPU và 0MB RAM khi kích hoạt ngủ đông', done: false }
     ]
   },
   'gw-qa-agy': {
     title: 'QA Tester (Chuyên Gia Kiểm Thẩm & Đảm Bảo Chất Lượng)',
-    mission: 'Kiểm thử tự động chu kỳ Auto-Wake 68ms, API regression test và lập báo cáo nghiệm thu.',
+    mission: 'Kiểm thử tự động, API regression test và lập báo cáo nghiệm thu.',
     inputFrom: 'Nhận endpoint API và tính năng mới từ Dev Team',
     outputTo: 'Cấp chứng nhận kiểm định (Sign-off Certificate) cho Lead Architect',
     checklist: [
-      { text: 'Kiểm thử chu kỳ Tạm dừng -> Ngủ đông -> Tự động đánh thức (Auto-Wake)', done: true },
-      { text: 'Kiểm tra tính bất biến của Conversation ID qua các chu kỳ tái khởi động', done: true },
-      { text: 'Chạy regression test suite trên các API endpoints', done: true },
+      { text: 'Kiểm thử chu kỳ Tạm dừng -> Ngủ đông -> Tự động đánh thức (Auto-Wake)', done: false },
+      { text: 'Kiểm tra tính bất biến của Conversation ID qua các chu kỳ tái khởi động', done: false },
+      { text: 'Chạy regression test suite trên các API endpoints', done: false },
       { text: 'Báo cáo lỗi và cung cấp bằng chứng nghiệm thu thực nghiệm', done: false }
     ]
   },
@@ -8211,9 +7920,9 @@ const ROLE_DETAILS = {
     inputFrom: 'Nhận mã nguồn, cấu hình Docker và luồng lưu trữ token',
     outputTo: 'Báo cáo thẩm định an ninh và xác thực zero-secret-leak cho Lead Architect',
     checklist: [
-      { text: 'Quét toàn bộ repo ngăn ngừa rò rỉ API key và token OAuth dạng plaintext', done: true },
-      { text: 'Thẩm định cơ chế xác thực Google OAuth 2.0 chuẩn RFC 7636 PKCE', done: true },
-      { text: 'Kiểm tra phân quyền thư mục ~/.gemini và cấu hình volume SELinux', done: true },
+      { text: 'Quét toàn bộ repo ngăn ngừa rò rỉ API key và token OAuth dạng plaintext', done: false },
+      { text: 'Thẩm định cơ chế xác thực Google OAuth 2.0 chuẩn RFC 7636 PKCE', done: false },
+      { text: 'Kiểm tra phân quyền thư mục ~/.gemini và cấu hình volume SELinux', done: false },
       { text: 'Xác lập ranh giới bảo vệ Secret Vault bất khả xâm phạm', done: false }
     ]
   }
@@ -8774,314 +8483,12 @@ function renderThinkingCards() {
     if (d && d.latency_ms && $('thinkingLatency')) $('thinkingLatency').textContent = d.latency_ms;
     if (d && d.tokens && $('thinkingTokens')) $('thinkingTokens').textContent = d.tokens;
   }).catch(() => {
-    if ($('thinkingLatency')) $('thinkingLatency').textContent = '12ms';
-    if ($('thinkingTokens')) $('thinkingTokens').textContent = '480';
+    if ($('thinkingLatency')) $('thinkingLatency').textContent = '—';
+    if ($('thinkingTokens')) $('thinkingTokens').textContent = '—';
   });
 
-  const THINKING_DATA = {
-    'gw-lead-agy': [
-      {
-        stage: 'goal',
-        anchor: '',
-        stageLabel: 'MỤC TIÊU VAI TRÒ',
-        title: 'Giai đoạn 01 · Phân Rã Mục Tiêu & Đặc Tả SSOT',
-        duration: '+28ms',
-        thought: 'Tiếp nhận chỉ đạo từ Ryan (Owner). Khóa đặc tả SSOT nguyên bản (docs/SSOT_ORIGINAL_SPEC.md) làm nguồn chân lý duy nhất. Mục tiêu: Thiết lập Swarm 6 chuyên gia tự vận hành, 0 xung đột, áp dụng cơ chế Task Mutex trên nền tảng SQLite WAL.',
-        tool_call: null
-      },
-      {
-        stage: 'reason',
-        anchor: '',
-        stageLabel: 'SUY LUẬN BỐI CẢNH',
-        title: 'Giai đoạn 02 · Rà Soát Phụ Thuộc Đồ Thị (DAG Alignment)',
-        duration: '+42ms',
-        thought: 'Phân tích thứ tự phụ thuộc giữa các Role: Backend Specialist phải thiết lập Schema và WAL trước (RM-01 -> TODO-01). Sau đó Frontend mới có thể kết nối REST API để render UI. QA Tester chỉ được nghiệm thu khi cả 2 đã nộp Git Commit Hash.',
-        tool_call: null
-      },
-      {
-        stage: 'tool',
-        anchor: '',
-        stageLabel: 'CÔNG CỤ THỰC THI',
-        title: 'Giai đoạn 03 · Khảo Sát Mã Nguồn & Giám Sát Runtime',
-        duration: '+65ms',
-        thought: 'Thực thi kiểm tra tính toàn vẹn của tệp SSOT và đồng bộ trạng thái runtime qua TMUX control socket.',
-        tool_call: {
-          cmd: 'read_file("docs/SSOT_ORIGINAL_SPEC.md") && tmux_capture_pane("gw-lead-agy", lines=500)',
-          output: '{"ssot_hash": "a8f3b92c", "status": "LOCKED", "active_sessions": 6, "exit_code": 0}'
-        }
-      },
-      {
-        stage: 'verify',
-        anchor: '',
-        stageLabel: 'TỰ KIỂM THẨM AN NINH',
-        title: 'Giai đoạn 04 · Thẩm Định Ranh Giới Whitelist',
-        duration: '+34ms',
-        thought: 'Kiểm toán ranh giới file: Lead chỉ được phép chỉnh sửa docs/** và architecture/**. Tuyệt đối không can thiệp vào secret credentials ~/.gemini hay code triển khai trực tiếp của Backend/Frontend. Rà soát xung đột = 0.',
-        tool_call: null
-      },
-      {
-        stage: 'conclude',
-        anchor: '',
-        stageLabel: 'KẾT LUẬN & BÀN GIAO',
-        title: 'Giai đoạn 05 · Tổng Hợp Kế Hoạch & Ký Nghiệm Thu',
-        duration: '+19ms',
-        thought: 'Mô hình nhận thức hội tụ hoàn toàn. Đã phân công TODO-01 cho @Backend và TODO-02 cho @Frontend. Ký xác thực quy chuẩn SSOT, chuyển giao sang bước kiểm thử.',
-        tool_call: null
-      }
-    ],
-    'gw-backend-agy': [
-      {
-        stage: 'goal',
-        anchor: '',
-        stageLabel: 'MỤC TIÊU VAI TRÒ',
-        title: 'Giai đoạn 01 · Thiết Kế CSDL SQLite WAL & REST API',
-        duration: '+22ms',
-        thought: 'Nhận yêu cầu kiến trúc từ Lead Architect. Nhiệm vụ: Xây dựng cơ sở dữ liệu SQLite trong Docker với chế độ WAL (Write-Ahead Logging), tối ưu thời gian phản hồi < 10ms và xây dựng cơ chế Task Mutex bảo vệ chống ghi đè.',
-        tool_call: null
-      },
-      {
-        stage: 'reason',
-        anchor: '',
-        stageLabel: 'SUY LUẬN BỐI CẢNH',
-        title: 'Giai đoạn 02 · Tối Ưu Hóa Bộ Nhớ & Vòng Đời Ngủ Đông',
-        duration: '+51ms',
-        thought: 'Khi kích hoạt ngủ đông (sleep), cần chụp lại 500 dòng buffer terminal lưu vào SQLite gen-workplace.db trước khi hủy process tmux để giải phóng 100% RAM. Khi có lệnh mới, cơ chế Auto-Wake phải tự tái sinh phiên trong < 70ms.',
-        tool_call: null
-      },
-      {
-        stage: 'tool',
-        anchor: '',
-        stageLabel: 'CÔNG CỤ THỰC THI',
-        title: 'Giai đoạn 03 · Khởi Tạo SQLite WAL & Tuyến API',
-        duration: '+78ms',
-        thought: 'Thực thi cấu hình WAL mode và khởi chạy endpoint điều khiển /api/tmux/action.',
-        tool_call: {
-          cmd: 'sqlite3 /app/data/gen-workplace.db "PRAGMA journal_mode=WAL;" && fastapi_register_route("/api/tmux/action")',
-          output: '{"journal_mode": "wal", "busy_timeout": 5000, "api_latency_ms": 4.8, "status": 200}'
-        }
-      },
-      {
-        stage: 'verify',
-        anchor: '',
-        stageLabel: 'TỰ KIỂM THẨM AN NINH',
-        title: 'Giai đoạn 04 · Kiểm Tra Phân Quyền Thư Mục',
-        duration: '+31ms',
-        thought: 'Ranh giới an toàn: Chỉ thao tác trên backend/** và data/**. Không được can thiệp vào frontend/** hoặc Dockerfile để tránh xung đột mã nguồn với DevOps.',
-        tool_call: null
-      },
-      {
-        stage: 'conclude',
-        anchor: '',
-        stageLabel: 'KẾT LUẬN & BÀN GIAO',
-        title: 'Giai đoạn 05 · Bàn Giao REST API & Schema',
-        duration: '+16ms',
-        thought: 'Hệ thống CSDL và API Control Plane đã hoàn tất 100%. Bàn giao Endpoint /api/state cho Frontend Specialist và phát tín hiệu cho QA bắt đầu kiểm thử tải.',
-        tool_call: null
-      }
-    ],
-    'gw-frontend-agy': [
-      {
-        stage: 'goal',
-        anchor: '',
-        stageLabel: 'MỤC TIÊU VAI TRÒ',
-        title: 'Giai đoạn 01 · Tối Ưu Hóa Giao Diện Mission Control SPA',
-        duration: '+25ms',
-        thought: 'Thiết kế lại toàn bộ giao diện theo chuẩn Nocturne Slate: 6 Pods chuyên gia tinh gọn cao 64px ở cột trái và Live Workbench toàn chiều rộng (100% width) ở cột phải, loại bỏ hoàn toàn các thanh ngang xếp chồng gây rối mắt.',
-        tool_call: null
-      },
-      {
-        stage: 'reason',
-        anchor: '',
-        stageLabel: 'SUY LUẬN BỐI CẢNH',
-        title: 'Giai đoạn 02 · Tái Cấu Trúc Khung Nhìn Trực Quan',
-        duration: '+48ms',
-        thought: 'Trước đây giao diện lồng 3 cột làm Terminal bị hẹp dẹp dí. Cần chuyển khối SOP tóm tắt thành dải Ribbon 3 card ngang bên trên, nhường toàn bộ diện tích bên dưới cho Terminal rộng rãi, font Monospace chuẩn hacker.',
-        tool_call: null
-      },
-      {
-        stage: 'tool',
-        anchor: '',
-        stageLabel: 'CÔNG CỤ THỰC THI',
-        title: 'Giai đoạn 03 · Cập Nhật DOM & Xác Thực JavaScript',
-        duration: '+72ms',
-        thought: 'Áp dụng CSS Grid/Flexbox và kiểm tra cú pháp JS không phát sinh bất kỳ ngoại lệ nào trên trình duyệt.',
-        tool_call: {
-          cmd: 'replace_file_content("frontend/index.html") && node -e "validate_js_syntax()"',
-          output: '{"syntax_valid": true, "dom_elements_bound": 42, "bundle_size": "298KB", "exit_code": 0}'
-        }
-      },
-      {
-        stage: 'verify',
-        anchor: '',
-        stageLabel: 'TỰ KIỂM THẨM AN NINH',
-        title: 'Giai đoạn 04 · Bảo Mật Token & Client Boundary',
-        duration: '+29ms',
-        thought: 'Xác nhận mã frontend hoàn toàn không lưu trữ API Key hay Access Token dạng plaintext trong LocalStorage/Cookies. Mọi tương tác OAuth chỉ dùng Session ID trung gian.',
-        tool_call: null
-      },
-      {
-        stage: 'conclude',
-        anchor: '',
-        stageLabel: 'KẾT LUẬN & BÀN GIAO',
-        title: 'Giai đoạn 05 · Hoàn Thiện Trải Nghiệm Người Dùng',
-        duration: '+18ms',
-        thought: 'Giao diện đạt chuẩn SaaS cao cấp, trực quan, tốc độ tải tức thì. Đã thông báo @QA Tester để thực hiện nghiệm thu hiển thị.',
-        tool_call: null
-      }
-    ],
-    'gw-devops-agy': [
-      {
-        stage: 'goal',
-        anchor: '',
-        stageLabel: 'MỤC TIÊU VAI TRÒ',
-        title: 'Giai đoạn 01 · Đóng Gói Container & Quản Trị Tài Nguyên',
-        duration: '+20ms',
-        thought: 'Container hóa toàn bộ ứng dụng trong gen-workplace-app với Docker Compose, cấu hình cờ :z cho SELinux và tối ưu hóa mức tiêu thụ tài nguyên về 0% CPU khi rảnh rỗi.',
-        tool_call: null
-      },
-      {
-        stage: 'reason',
-        anchor: '',
-        stageLabel: 'SUY LUẬN BỐI CẢNH',
-        title: 'Giai đoạn 02 · Kiểm Soát Vòng Đời Tiến Trình (Process Tree)',
-        duration: '+44ms',
-        thought: 'Đảm bảo khi thực hiện lệnh sleep_all, toàn bộ session tmux được giải phóng bộ nhớ sạch sẽ, chỉ giữ lại file SQLite và tiến trình Web server nhẹ nhàng.',
-        tool_call: null
-      },
-      {
-        stage: 'tool',
-        anchor: '',
-        stageLabel: 'CÔNG CỤ THỰC THI',
-        title: 'Giai đoạn 03 · Giám Sát Cổng & Live Mount',
-        duration: '+60ms',
-        thought: 'Kiểm tra container stats và tình trạng live sync giữa máy chủ host và container.',
-        tool_call: {
-          cmd: 'docker stats gen-workplace-app --no-stream && netstat -tuln | grep 8888',
-          output: '{"container": "gen-workplace-app", "status": "Up", "cpu_percent": 0.0, "ports": "8888/tcp"}'
-        }
-      },
-      {
-        stage: 'verify',
-        anchor: '',
-        stageLabel: 'TỰ KIỂM THẨM AN NINH',
-        title: 'Giai đoạn 04 · Thẩm Định Quyền Tập Tin SELinux',
-        duration: '+33ms',
-        thought: 'Kiểm tra cờ :z trên volume bind-mount ngăn chặn lỗi quyền Permission Denied trên môi trường Fedora/RHEL.',
-        tool_call: null
-      },
-      {
-        stage: 'conclude',
-        anchor: '',
-        stageLabel: 'KẾT LUẬN & BÀN GIAO',
-        title: 'Giai đoạn 05 · Bàn Giao Container Sản Phẩm',
-        duration: '+15ms',
-        thought: 'Hạ tầng hoạt động bền bỉ, thời gian khởi động container < 2 giây. Bàn giao kịch bản cài đặt cho QA và Ryan.',
-        tool_call: null
-      }
-    ],
-    'gw-qa-agy': [
-      {
-        stage: 'goal',
-        anchor: '',
-        stageLabel: 'MỤC TIÊU VAI TRÒ',
-        title: 'Giai đoạn 01 · Thiết Lập Kịch Bản Kiểm Thử Hồi Quy',
-        duration: '+24ms',
-        thought: 'Kiểm tra tính nhất quán toàn diện của Swarm: vòng đời Tạm dừng -> Ngủ đông -> Đánh thức -> Tự động đánh thức (Auto-Wake) khi nhận lệnh từ bàn phím.',
-        tool_call: null
-      },
-      {
-        stage: 'reason',
-        anchor: '',
-        stageLabel: 'SUY LUẬN BỐI CẢNH',
-        title: 'Giai đoạn 02 · Xác Thực Tính Bất Biến Của Ngữ Cảnh',
-        duration: '+46ms',
-        thought: 'Phải đảm bảo Conversation ID không bị xáo trộn hoặc mất mát sau mỗi chu kỳ hibernate. Dữ liệu tin nhắn trong War Room và lịch sử chat phải nguyên vẹn.',
-        tool_call: null
-      },
-      {
-        stage: 'tool',
-        anchor: '',
-        stageLabel: 'CÔNG CỤ THỰC THI',
-        title: 'Giai đoạn 03 · Kiểm Thử Tải & Tốc Độ Đánh Thức',
-        duration: '+68ms',
-        thought: 'Đo lường thời gian trễ Auto-Wake khi gửi payload REST API.',
-        tool_call: {
-          cmd: 'curl -s -X POST http://localhost:8888/api/tmux/send -d \'{"session_id":"gw-backend-agy","command":"echo PING"}\'',
-          output: '{"status": 200, "auto_wake_ms": 68, "session_active": true, "verification": "PASS"}'
-        }
-      },
-      {
-        stage: 'verify',
-        anchor: '',
-        stageLabel: 'TỰ KIỂM THẨM AN NINH',
-        title: 'Giai đoạn 04 · Đối Soát Bằng Chứng Nghiệm Thu',
-        duration: '+30ms',
-        thought: 'Kiểm tra 100% test case trong bộ test suite, không có race condition hoặc lỗi treo tiến trình.',
-        tool_call: null
-      },
-      {
-        stage: 'conclude',
-        anchor: '',
-        stageLabel: 'KẾT LUẬN & BÀN GIAO',
-        title: 'Giai đoạn 05 · Cấp Chứng Nhận Kiểm Định (Sign-Off)',
-        duration: '+17ms',
-        thought: 'Toàn bộ 14 test cases đạt chuẩn (PASS 100%). Cấp chứng nhận nghiệm thu chất lượng phần mềm cho Lead Architect.',
-        tool_call: null
-      }
-    ],
-    'gw-security-agy': [
-      {
-        stage: 'goal',
-        anchor: '',
-        stageLabel: 'MỤC TIÊU VAI TRÒ',
-        title: 'Giai đoạn 01 · Kiểm Toán Bảo Mật & Rò Rỉ Bí Mật (Secret Vault)',
-        duration: '+21ms',
-        thought: 'Quét toàn bộ mã nguồn kiểm tra rò rỉ API Keys, thẩm định cơ chế xác thực Google OAuth 2.0 PKCE (RFC 7636) và cô lập token.',
-        tool_call: null
-      },
-      {
-        stage: 'reason',
-        anchor: '',
-        stageLabel: 'SUY LUẬN BỐI CẢNH',
-        title: 'Giai đoạn 02 · Kiểm Tra Luồng Ủy Quyền OAuth',
-        duration: '+49ms',
-        thought: 'Cần xác thực rằng token ủy quyền OAuth được phân quyền theo đúng thư mục profile riêng biệt, không có tình trạng dùng chung gây chiếm quyền tài khoản giữa các agent.',
-        tool_call: null
-      },
-      {
-        stage: 'tool',
-        anchor: '',
-        stageLabel: 'CÔNG CỤ THỰC THI',
-        title: 'Giai đoạn 03 · Quét Khóa Bí Mật & Kiểm Tra RFC 7636',
-        duration: '+64ms',
-        thought: 'Chạy công cụ rà soát token và kiểm tra phân quyền thư mục ~/.gemini.',
-        tool_call: {
-          cmd: 'find . -name "*.py" -exec grep -Hn "ya29\\." {} \\; && stat -c "%a %n" ~/.gemini',
-          output: '{"leaks_found": 0, "vault_mode": "700", "rfc7636_pkce": "COMPLIANT", "status": "SECURE"}'
-        }
-      },
-      {
-        stage: 'verify',
-        anchor: '',
-        stageLabel: 'TỰ KIỂM THẨM AN NINH',
-        title: 'Giai đoạn 04 · Khóa Quyền Hạn Bất Khả Xâm Phạm',
-        duration: '+28ms',
-        thought: 'Xác lập ranh giới cô lập tuyệt đối: Không một agent nào được đọc profile của agent khác ngoài profile được cấp quyền trong database.',
-        tool_call: null
-      },
-      {
-        stage: 'conclude',
-        anchor: '',
-        stageLabel: 'KẾT LUẬN & BÀN GIAO',
-        title: 'Giai đoạn 05 · Cấp Chứng Thư An Toàn An Ninh',
-        duration: '+14ms',
-        thought: 'Hệ thống đạt tiêu chuẩn an toàn cấp doanh nghiệp (0 lỗ hổng nghiêm trọng). Phê duyệt cho phép đưa vào vận hành thực tế.',
-        tool_call: null
-      }
-    ]
-  };
-
-  const steps = THINKING_DATA[sid] || THINKING_DATA['gw-lead-agy'];
+  // Chưa có nguồn luồng suy nghĩ thật từ agy: không hiển thị dữ liệu bịa.
+  const steps = [];
   currentThinkingStepsData = steps;
 
   if (typeof state.selectedThinkingStepIndex !== 'number' || state.selectedThinkingStepIndex >= steps.length) {
@@ -9090,6 +8497,12 @@ function renderThinkingCards() {
 
   // 1. Render Top Horizontal Pipeline Circuit Bar (5 Trạm Nối Ngang Phát Sáng)
   const listEl = $('pipelineCircuitBar') || $('thinkingStepsList');
+  if (listEl && steps.length === 0) {
+    listEl.innerHTML = '<div class="emptyState" style="grid-column:1/-1">Chưa có luồng suy nghĩ thật. Mục này sẽ hiện khi agy xuất log tư duy qua API /api/thinking/trace.</div>';
+    const canvas = $('circuitDeepCanvasBody') || $('thinkingDetailBody');
+    if (canvas) canvas.innerHTML = '';
+    return;
+  }
   if (listEl) {
     listEl.innerHTML = steps.map((s, idx) => {
       const isActive = idx === state.selectedThinkingStepIndex;
@@ -9335,7 +8748,7 @@ async function sendOrchMessage() {
 
     if (res.ok) {
       const data = await res.json();
-      const reply = data.reply || 'Đã chấp hành chỉ thị của Owner.';
+      const reply = data.reply || ('Không có phản hồi từ agy' + (data.error ? ': ' + escapeHtml(String(data.error)) : '') + '.');
       const agentTime = data.agent_time || now;
 
       if (chat) {
@@ -9345,7 +8758,7 @@ async function sendOrchMessage() {
           <div class="orchBubbleAvatar"></div>
           <div>
             <div class="orchBubble">${reply}</div>
-            <div class="orchMsgMeta">Genesis Orchestrator · ${agentTime} · SSOT Synced</div>
+            <div class="orchMsgMeta">${escapeHtml(data.author || 'Orchestrator')} · ${agentTime}</div>
           </div>
         `;
         chat.appendChild(agentDiv);
@@ -9420,19 +8833,7 @@ async function loadOrchChatMessages() {
   }
 
   if (chat.children.length === 0) {
-    const now = new Date().toLocaleTimeString('vi-VN', { hour12: false });
-    chat.innerHTML = `
-      <div class="orchMsgAgent">
-        <div class="orchBubbleAvatar"></div>
-        <div>
-          <div class="orchBubble">
-            Xin chào Ryan! Tôi là <strong>Genesis Orchestrator</strong> — Trung tâm chỉ huy tối cao và điều phối toàn bộ Swarm.<br>
-            Tôi đã bootstrap toàn bộ ngữ cảnh từ Brain (<code>BOOTSTRAP.md</code>), sẵn sàng đẻ ra các worker chuyên môn theo nhu cầu của Plan hoặc nhận chỉ thị trực tiếp từ bạn qua Chat IDE này.
-          </div>
-          <div class="orchMsgMeta">Genesis Orchestrator · ${now} · SSOT Ready</div>
-        </div>
-      </div>
-    `;
+    chat.innerHTML = '<div class="emptyState">Chưa có hội thoại. Gõ chỉ thị bên dưới; agy sẽ trả lời thật (hoặc báo lỗi thật).</div>';
   }
 }
 
@@ -9737,7 +9138,7 @@ async function orchSpawnWorker() {
       memory_rss_mb: 45.2,
       account_label: 'Mặc định (Owner Gmail: ~/.gemini)',
       account_type: 'owner_default',
-      email: 'owner@genesis.local',
+      email: '',
       conversation_id: 'conv-' + sid,
       quota_gemini: { percent: 85 },
       quota_anthropic: { percent: 92 },
@@ -10192,6 +9593,8 @@ async function refreshOauthProfiles() {
       const data = await res.json();
       if (data && Array.isArray(data.profiles)) {
         state.oauthProfiles = data.profiles;
+        const owner = data.profiles.find(p => p.id === 'owner_default');
+        document.querySelectorAll('.orchOwnerEmail').forEach(el => { el.textContent = (owner && owner.email) ? owner.email : 'chưa đăng nhập'; });
       }
     }
   } catch (e) {
@@ -10788,7 +10191,6 @@ function renderInspector() {
       <div class="kv2"><span>Output Ref</span><b>${escapeHtml(r.io.output)}</b></div>
       <div class="requiredRefs">
         <b>Tham chiếu SSOT bắt buộc</b>
-        <div>SSOT-SPEC-01 · SSOT-INSTALL-02 · SSOT-DOCKER-03 · SSOT-LIVE-MOUNT-04</div>
       </div>
       <div class="log">
         ${r.trace.map(x => `<div>${escapeHtml(x)}</div>`).join('')}
@@ -11320,10 +10722,10 @@ function renderOwnerProfileModal(data) {
   const inBio = $('ownerInputBio');
 
   if (dName) dName.textContent = data.display_name || 'Ryan (Owner)';
-  if (dEmail) dEmail.textContent = data.email || 'owner@genesis.local';
+  if (dEmail) dEmail.textContent = data.email || 'chưa đặt';
   if (dBio) dBio.textContent = data.bio || '';
   if (inName) inName.value = data.display_name || 'Ryan (Owner)';
-  if (inEmail) inEmail.value = data.email || 'owner@genesis.local';
+  if (inEmail) inEmail.value = data.email || '';
   if (inBio) inBio.value = data.bio || '';
 
   const s = data.stats || {};
@@ -11342,7 +10744,7 @@ async function saveOwnerProfile() {
     btn.textContent = 'Đang lưu...';
   }
   const display_name = $('ownerInputDisplayName')?.value.trim() || 'Ryan (Owner)';
-  const email = $('ownerInputEmail')?.value.trim() || 'owner@genesis.local';
+  const email = $('ownerInputEmail')?.value.trim() || '';
   const bio = $('ownerInputBio')?.value.trim() || '';
 
   try {
@@ -11864,7 +11266,7 @@ function renderGenChatMessages() {
     const formatted = formatGenChatMessage(m.content);
 
     return `
-      <div class="genMsg ${isUser ? 'user' : 'assistant'}" style="${m.is_compacted ? 'opacity:0.65;border:1px dashed var(--line2);border-radius:8px;padding:4px' : ''}">
+      <div class="genMsg ${isUser ? 'user' : 'assistant'}${String(m.author || '').includes('(lỗi)') ? ' error' : ''}" style="${m.is_compacted ? 'opacity:0.65;border:1px dashed var(--line2);border-radius:8px;padding:4px' : ''}">
         <div class="genMsgMeta">
           ${isUser ? `<span style="font-weight:700;color:var(--yellow)">${escapeHtml(m.author || 'Ryan (Owner)')}</span>` : `<span style="font-weight:600;color:var(--accent)">Gen Core (${escapeHtml(m.model || 'Gemini Pro')})</span>`}
           <span>${escapeHtml(timeStr)}</span>
@@ -13134,7 +12536,7 @@ function renderGenSessionTodoTable() {
             <input type="checkbox" ${isTaskDone ? 'checked' : ''} onchange="moveSessionTodoStatus('${t.id}', this.checked ? 'done' : 'in_progress')" title="Chuyển trạng thái task sang Hoàn thành" style="accent-color:var(--green);cursor:pointer">
           </td>
           <td>
-            <span class="genKanbanCardId">${escapeHtml(t.id)}</span>
+            <span class="genKanbanCardId">${escapeHtml(t.id)}</span>${t.viec_ref ? `<span class="badge viec">${escapeHtml(t.viec_ref)}</span>` : ''}
           </td>
           <td>
             <div style="font-weight:700;color:var(--text);font-size:12px;display:flex;align-items:center;gap:6px">
@@ -13350,7 +12752,7 @@ function renderGenSessionKanban() {
           <div class="genKanbanCard" onclick="openEditSessionTodoModal('${t.id}')" style="cursor:pointer">
             <div class="genKanbanCardHead">
               <div style="display:flex;align-items:center;gap:5px">
-                <span class="genKanbanCardId">${escapeHtml(t.id)}</span>
+                <span class="genKanbanCardId">${escapeHtml(t.id)}</span>${t.viec_ref ? `<span class="badge viec">${escapeHtml(t.viec_ref)}</span>` : ''}
                 <span class="badge" style="font-size:8.5px;background:var(--panel3);color:var(--muted)">${escapeHtml(t.assigned_agent || 'Gen Core')}</span>
               </div>
               <span class="genKanbanPriorityBadge ${priorityClass}">${escapeHtml(t.priority || 'high')}</span>
@@ -13474,6 +12876,7 @@ function openNewSessionTodoModal() {
   // Tự sinh ID task tiếp theo
   const currentCount = (genState.sessionTodos || []).length + 1;
   $('todoModalTaskId').value = `TSK-${String(currentCount).padStart(2, '0')}`;
+  if ($('todoModalViecRef')) $('todoModalViecRef').value = '';
   $('todoModalPriority').value = 'high';
   $('todoModalTitle').value = '';
   $('todoModalDesc').value = '';
@@ -13503,6 +12906,7 @@ function openEditSessionTodoModal(todoId) {
   $('sessionTodoModalTitle').textContent = `Chỉnh Sửa Nhiệm Vụ [${t.id}]`;
   $('todoModalId').value = t.id;
   $('todoModalTaskId').value = t.id;
+  if ($('todoModalViecRef')) $('todoModalViecRef').value = t.viec_ref || '';
   $('todoModalPriority').value = t.priority || 'high';
   $('todoModalTitle').value = t.title || '';
   $('todoModalDesc').value = t.description || '';
@@ -13596,6 +13000,7 @@ async function saveSessionTodoFromModal() {
         assigned_agent: agent,
         checklist: checklist,
         evidence_ref: evidence,
+        viec_ref: ($('todoModalViecRef')?.value || '').trim(),
         owner_id: 'owner-ryan'
       })
     });
@@ -13604,7 +13009,8 @@ async function saveSessionTodoFromModal() {
       closeSessionTodoModal();
       await loadGenSessionTodos();
     } else {
-      showToast('Lỗi lưu nhiệm vụ');
+      const err = await res.json().catch(() => ({}));
+      showToast('Không lưu được: ' + (err.error || err.reason || res.status));
     }
   } catch (err) {
     showToast('Lỗi lưu nhiệm vụ: ' + err.message);
@@ -14043,6 +13449,7 @@ function switchData(id, el) {
   else if (id === 'db') loadDbData();
   else if (id === 'vault') loadVaultData();
   else if (id === 'files') loadFilesData();
+  else if (id === 'catalog') renderMemory();
 }
 
 function refreshData() {
@@ -14069,70 +13476,27 @@ function syncMemories() {
 }
 
 function renderMemory() {
-  $('ssotCount').textContent = (state.ssot?.length || 0) + ' verified';
-  
-  // 1. Master SSOT List
-  const selSSOT = state.selectedSSOT || 0;
-  $('ssotList').innerHTML = (state.ssot || []).map((s, i) => `
-    <div class="ssotItem ${i === selSSOT ? 'selected' : ''}" onclick="selectSSOT(${i})">
-      <b>${escapeHtml(s.id)} · ${escapeHtml(s.title)}</b>
-      <p style="overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${escapeHtml(s.body)}</p>
-      <p class="mono" style="margin-top:4px;color:var(--muted2)">${escapeHtml(s.source)} · ${escapeHtml(s.verified)}</p>
-    </div>
-  `).join('');
-
-  if (state.ssot && state.ssot.length > 0) {
-    selectSSOT(selSSOT);
-  }
-
-  // 2. Role Memories List
-  $('roleMemoryList').innerHTML = (state.roleMemory || []).map((m, i) => `
-    <div class="memoryItem ${i === (state.selectedMemory || 0) ? 'selected' : ''}" onclick="selectMemory(${i})">
-      <b>${escapeHtml(m.role)} · <span style="color:var(--accent)">${escapeHtml(m.runtime || m.role)}</span></b>
-      <p style="overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${escapeHtml(m.summary || m.body || '')}</p>
-    </div>
-  `).join('');
-
-  const m = (state.roleMemory && state.roleMemory[state.selectedMemory || 0]) || (state.roleMemory && state.roleMemory[0]);
-  if (m) {
-    $('memoryDetail').innerHTML = `
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-        <strong style="color:var(--accent);font-size:12px">${escapeHtml(m.role)} Snapshot</strong>
-        <span class="chip done" style="font-size:9.5px">${m.synced ? '✓ Đã gộp SSOT' : 'Live Memory'}</span>
-      </div>
-      <p style="color:var(--text);line-height:1.55;margin:0;font-size:11.5px">${escapeHtml(m.detail || m.body || '')}</p>
-      <div style="display:flex;align-items:center;justify-content:space-between;font-size:10px;color:var(--muted);border-top:1px solid rgba(255,255,255,0.06);margin-top:8px;padding-top:6px">
-        <span>Tags: ${(m.tags || ['ssot']).map(t => `<code style="color:var(--purple);margin-right:4px">#${escapeHtml(t)}</code>`).join('')}</span>
-        <span>Cập nhật: ${escapeHtml(m.time || 'vừa xong')}</span>
-      </div>
-    `;
-  }
-
-  // 3. Quick ID Lookup Catalog (Khớp 3 cột: Mã ID, Loại, Target)
   const catalogList = (state.refs && state.refs.length > 0) ? state.refs : ((state.catalog || []).map(c => [c.id, c.type, c.title, c.desc]));
-  $('refRows').innerHTML = catalogList.map(r => `
+  const refRows = $('refRows');
+  if (refRows) {
+    refRows.innerHTML = catalogList.length ? catalogList.map(r => `
     <tr>
       <td class="ref" style="font-weight:700;color:var(--accent)">${escapeHtml(r[0])}</td>
-      <td><span class="chip" style="font-size:9.5px">${escapeHtml(r[1])}</span></td>
-      <td style="color:var(--text);font-size:11px" title="${escapeHtml(r[3] || '')}"><b>${escapeHtml(r[2])}</b></td>
-    </tr>
-  `).join('');
-
-  // 4. Event Register (Khớp 3 cột: ID, Role, Status)
-  const eventList = (state.events && state.events.length > 0) ? state.events : [
-    { id: 'EVT-01', runtime: 'DevOps / runtime-04', request: 'Khởi động container với live bind mount :z', evidence: 'docker-compose.yml · port 8888', status: 'ssot', time: '20:47' },
-    { id: 'EVT-02', runtime: 'DevOps / runtime-05', request: 'Kiểm thử kịch bản installer_tui.py và Desktop icon', evidence: 'Gen-workplace.desktop verified', status: 'ssot', time: '20:37' },
-    { id: 'EVT-03', runtime: 'Lead / runtime-01', request: 'Lưu trữ đặc tả gốc của Owner thành SSOT bất biến', evidence: 'docs/SSOT_ORIGINAL_SPEC.md', status: 'ssot', time: '20:35' },
-    { id: 'EVT-04', runtime: 'Backend / runtime-02', request: 'Triển khai SQLite WAL mode và FTS5 Catalog', evidence: 'data/gen-workplace.db', status: 'ssot', time: '20:56' },
-    { id: 'EVT-05', runtime: 'QA / runtime-05', request: 'Kiểm thử chu kỳ Auto-Wake 68ms và API Suite', evidence: '100% test suite pass', status: 'ssot', time: '21:05' }
-  ];
-  $('eventRows').innerHTML = eventList.map((e, i) => `
+      <td><span class="chip">${escapeHtml(r[1])}</span></td>
+      <td style="color:var(--text)" title="${escapeHtml(r[3] || '')}"><b>${escapeHtml(r[2])}</b></td>
+    </tr>`).join('') : '<tr><td colspan="3" class="emptyState">Chưa có mã tham chiếu nào.</td></tr>';
+  }
+  const eventList = state.events || [];
+  const eventRows = $('eventRows');
+  if (eventRows) {
+    eventRows.innerHTML = eventList.length ? eventList.map(e => `
     <tr>
-      <td class="ref" style="font-weight:700;color:var(--accent)">${e.id}</td>
-      <td style="font-size:11px;color:var(--text)">${escapeHtml(e.runtime)}</td>
-      <td><span class="chip ${e.status === 'ssot' ? 'done' : 'wait'}" style="font-size:9.5px">${e.status === 'ssot' ? '✓ SSOT' : e.status}</span></td>
-    </tr>
-  `).join('');
+      <td class="ref" style="font-weight:700;color:var(--accent)">${escapeHtml(e.id)}</td>
+      <td style="color:var(--text)">${escapeHtml(e.runtime || e.role || '')}</td>
+      <td><span class="chip ${e.status === 'ssot' ? 'done' : 'wait'}">${e.status === 'ssot' ? 'đã nghiệm thu' : escapeHtml(e.status || '')}</span></td>
+    </tr>`).join('') : '<tr><td colspan="3" class="emptyState">Chưa có sự kiện nào.</td></tr>';
+  }
+  const cnt = $('ssotCount'); if (cnt) cnt.textContent = (state.ssot?.length || 0) + ' mục';
 }
 
 function selectMemory(i) {
