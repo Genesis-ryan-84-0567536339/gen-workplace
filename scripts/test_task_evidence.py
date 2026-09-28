@@ -67,33 +67,32 @@ ok, by, _ = db.verify_evidence_ref("https://github.com/acme/gen-workplace/pull/1
 check("URL PR GitHub → github:pr", ok and by == "github:pr", f"({by})")
 check("URL không phải PR → lỗi", db.verify_evidence_ref("https://github.com/acme/gen-workplace/issues/12")[0] is False)
 
-print("[2] seed: task done phải có bằng chứng kiểm được")
+print("[2] sau Issue #12: không còn todo seed; tạo fixture riêng cho test")
 with db.get_connection() as conn:
-    rows = conn.execute("SELECT id, status, evidence_ref, verified_by FROM todos ORDER BY id").fetchall()
-for r in rows:
-    if r["status"] == "done":
-        check(f"{r['id']} done có evidence kiểm được ({r['evidence_ref']}, {r['verified_by']})",
-              db.verify_evidence_ref(r["evidence_ref"])[0] and r["verified_by"] in ("git:commit", "file", "github:pr"))
-todo08 = next(r for r in rows if r["id"] == "TODO-08")
-check("TODO-08 (không có bằng chứng thật) → queued, evidence rỗng", todo08["status"] == "queued" and todo08["evidence_ref"] == "")
+    n_seed = conn.execute("SELECT count(*) FROM todos").fetchone()[0]
+    conn.execute("INSERT INTO roadmaps (id, project_id, title, description, todos_count, status, order_idx) VALUES ('RM-T5', 'PRJ-GEN-WORKPLACE', 'Roadmap test', '', 2, 'queued', 1)")
+    conn.execute("INSERT INTO todos (id, roadmap_id, project_id, title, assigned_role, status) VALUES ('TODO-T12', 'RM-T5', 'PRJ-GEN-WORKPLACE', 'Kiểm thử fixture 12', 'QA Tester', 'queued')")
+    conn.execute("INSERT INTO todos (id, roadmap_id, project_id, title, assigned_role, status) VALUES ('TODO-T13', 'RM-T5', 'PRJ-GEN-WORKPLACE', 'Kiểm thử fixture 13', 'Lead Architect', 'queued')")
+    conn.commit()
+check("bảng todos trống sau khi khởi tạo (không seed giả)", n_seed == 0, str(n_seed))
 
 print("[3] claim + complete với bằng chứng sai → lỗi, trạng thái giữ nguyên")
-res = db.claim_task("gw-qa-agy", "TODO-12")
-check("claim TODO-12", res.get("status") == "claimed", str(res))
-res = db.complete_task("gw-qa-agy", "TODO-12", "100% test suite pass (68ms auto-wake)")
+res = db.claim_task("gw-qa-agy", "TODO-T12")
+check("claim TODO-T12", res.get("status") == "claimed", str(res))
+res = db.complete_task("gw-qa-agy", "TODO-T12", "100% test suite pass (68ms auto-wake)")
 check("complete với câu chữ mẫu → error", "error" in res, str(res))
-res = db.complete_task("gw-qa-agy", "TODO-12", "deadbeef")
+res = db.complete_task("gw-qa-agy", "TODO-T12", "deadbeef")
 check("complete với SHA lạ → error", "error" in res, str(res))
 with db.get_connection() as conn:
-    r = conn.execute("SELECT status, evidence_ref, assigned_session_id FROM todos WHERE id = 'TODO-12'").fetchone()
-check("TODO-12 vẫn in_progress, evidence rỗng", r["status"] == "in_progress" and r["evidence_ref"] == "" and r["assigned_session_id"] == "gw-qa-agy", dict(r))
+    r = conn.execute("SELECT status, evidence_ref, assigned_session_id FROM todos WHERE id = 'TODO-T12'").fetchone()
+check("TODO-T12 vẫn in_progress, evidence rỗng", r["status"] == "in_progress" and r["evidence_ref"] == "" and r["assigned_session_id"] == "gw-qa-agy", dict(r))
 
 print("[4] complete với SHA HEAD thật → ok, verified_by = git:commit")
-res = db.complete_task("gw-qa-agy", "TODO-12", head_sha, verified_by="Lead Architect")
+res = db.complete_task("gw-qa-agy", "TODO-T12", head_sha, verified_by="Lead Architect")
 check("complete ok", res.get("status") == "completed", str(res))
 check("verified_by = git:commit (không còn 'Lead Architect')", res.get("verified_by") == "git:commit", str(res))
 with db.get_connection() as conn:
-    r = conn.execute("SELECT status, evidence_ref, verified_by FROM todos WHERE id = 'TODO-12'").fetchone()
+    r = conn.execute("SELECT status, evidence_ref, verified_by FROM todos WHERE id = 'TODO-T12'").fetchone()
 check("DB: done + SHA + git:commit", r["status"] == "done" and r["evidence_ref"] == head_sha and r["verified_by"] == "git:commit", dict(r))
 
 print("[5] task không tồn tại → error")
@@ -102,17 +101,17 @@ check("Task not found", "error" in res, str(res))
 
 print("[6] migrate: done với evidence giả → review")
 with db.get_connection() as conn:
-    conn.execute("INSERT INTO todos (id, roadmap_id, project_id, title, assigned_role, status, evidence_ref, verified_by) VALUES ('TODO-99', 'RM-05', 'PRJ-GEN-WORKPLACE', 'Giả', 'QA Tester', 'done', '100% test suite pass (68ms auto-wake)', 'Lead Architect')")
+    conn.execute("INSERT INTO todos (id, roadmap_id, project_id, title, assigned_role, status, evidence_ref, verified_by) VALUES ('TODO-99', 'RM-T5', 'PRJ-GEN-WORKPLACE', 'Giả', 'QA Tester', 'done', '100% test suite pass (68ms auto-wake)', 'Lead Architect')")
 n = db.migrate_unverified_done_tasks()
 with db.get_connection() as conn:
     r = conn.execute("SELECT status FROM todos WHERE id = 'TODO-99'").fetchone()
-    r12 = conn.execute("SELECT status FROM todos WHERE id = 'TODO-12'").fetchone()
+    r12 = conn.execute("SELECT status FROM todos WHERE id = 'TODO-T12'").fetchone()
 check("TODO-99 → review", r["status"] == "review", f"n={n}")
-check("TODO-12 (SHA thật) vẫn done", r12["status"] == "done")
+check("TODO-T12 (SHA thật) vẫn done", r12["status"] == "done")
 
 print("[7] reclaim_stalled_tasks")
 with db.get_connection() as conn:
-    conn.execute("UPDATE todos SET status='in_progress', assigned_session_id='gw-devops-agy', locked_at=datetime('now', '-1 hour') WHERE id='TODO-13'")
+    conn.execute("UPDATE todos SET status='in_progress', assigned_session_id='gw-devops-agy', locked_at=datetime('now', '-1 hour') WHERE id='TODO-T13'")
 res = db.reclaim_stalled_tasks(300)
 check("thu hồi 1 task treo", res.get("reclaimed_count") == 1, str(res))
 

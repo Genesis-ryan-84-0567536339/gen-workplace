@@ -570,6 +570,7 @@ def init_db():
         conn.commit()
 
     migrate_unverified_done_tasks()
+    purge_seed_data()
 
 def migrate_unverified_done_tasks():
     """Di trú nhỏ: task 'done' (todos & gen_session_todos) có evidence không kiểm được → 'review' (#4)."""
@@ -591,246 +592,231 @@ def migrate_unverified_done_tasks():
         print(f"[migrate] Đặt lại {changed} task 'done' thiếu bằng chứng kiểm được về 'review'")
     return changed
 
-def seed_ssot_events():
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT count(*) FROM ssot_events WHERE project_id = 'PRJ-GEN-WORKPLACE'")
-        if cursor.fetchone()[0] == 0:
-            events_data = [
-                ("EVT-01", "PRJ-GEN-WORKPLACE", "runtime-04", "DevOps & Packaging", "Khởi động container gen-workplace-app với live bind mount :z", "docker-compose.yml · port 8888", "ssot", "20:47"),
-                ("EVT-02", "PRJ-GEN-WORKPLACE", "runtime-05", "DevOps & Packaging", "Kiểm thử kịch bản installer_tui.py và tạo Desktop icon", "Gen-workplace.desktop verified", "ssot", "20:37"),
-                ("EVT-03", "PRJ-GEN-WORKPLACE", "runtime-01", "Lead Architect", "Lưu trữ đặc tả gốc của Owner thành SSOT bất biến", "docs/SSOT_ORIGINAL_SPEC.md", "ssot", "20:35"),
-                ("EVT-04", "PRJ-GEN-WORKPLACE", "runtime-02", "Backend & DB Specialist", "Triển khai SQLite WAL mode và FTS5 Full-Text Catalog", "data/gen-workplace.db (<1ms query)", "ssot", "20:56"),
-                ("EVT-05", "PRJ-GEN-WORKPLACE", "runtime-05", "QA Tester", "Kiểm thử chu kỳ Auto-Wake 68ms và API Regression Suite", "100% test pass · latency 68ms", "ssot", "21:05")
-            ]
-            for ev in events_data:
-                cursor.execute("""
-                INSERT OR IGNORE INTO ssot_events (id, project_id, runtime_id, role_name, request, evidence, status, verified_time)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """, ev)
-            conn.commit()
-
-
 def seed_real_project():
-    """Điền dữ liệu thực tế 100% của repository gen-workplace vào SQLite Core DB."""
+    """Chỉ tạo bản ghi project PRJ-GEN-WORKPLACE và cấu hình 6 vai (agent_roles). Không còn seed roadmap/todo/chat/catalog/sự kiện giả."""
     with get_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM projects WHERE id = 'PRJ-GEN-WORKPLACE'")
-        if cursor.fetchone()[0] > 0:
-            return  # Đã có dữ liệu thật
-
-        now_str = datetime.now().strftime("%H:%M:%S")
-
-        # 1. Project thật
         spec_path = BASE_DIR / "docs" / "SSOT_ORIGINAL_SPEC.md"
-        if not spec_path.exists():
-            spec_path = Path("/app/docs/SSOT_ORIGINAL_SPEC.md")
-        default_source_text = spec_path.read_text(encoding="utf-8") if spec_path.exists() else """# ĐẶC TẢ DỰ ÁN GEN-WORKPLACE (MULTI-AGENT SWARM ORCHESTRATOR)
-1. Bảng Console điều phối đa Agent Swarm quản lý nhiều dự án.
-2. Khu Implementation: Hàng 01 chia 3 cột (Input+Plan -> Roadmap -> Todo). Hàng 02 chọn CLI Engine cho từng Role.
-3. Khu Data Center: Git Repo, Database, Vault, File Manager.
-4. Khu Môi Trường Agent: Runtimes tự ghi tư duy, Chatroom thread @mention.
-5. Khu Nơi Làm Việc (Workplace): 2 cột Memory tổng Master SSOT vs Memory từng Role sync realtime + Catalog tra nhanh ID.
-6. Đóng gói phân phối All-In-One: Cài đặt 1 lệnh trên giao diện TUI có loading %, chạy 100% Docker, tự tạo Desktop Icon."""
-
+        source_text = spec_path.read_text(encoding="utf-8") if spec_path.exists() else ""
         cursor.execute("""
-        INSERT INTO projects (id, name, repo_path, branch, plan_file, source_text, meta, status)
+        INSERT OR IGNORE INTO projects (id, name, repo_path, branch, plan_file, source_text, meta, status)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            'PRJ-GEN-WORKPLACE',
-            'gen-workplace',
-            str(BASE_DIR),
-            'main',
-            'docs/SSOT_ORIGINAL_SPEC.md',
-            default_source_text,
-            '6 role · Docker live mount · Active SSOT',
-            'active'
-        ))
+        """, ('PRJ-GEN-WORKPLACE', 'gen-workplace', str(BASE_DIR), 'main', 'docs/SSOT_ORIGINAL_SPEC.md', source_text, '6 vai · SQLite WAL', 'active'))
 
-        # 2. Roadmaps thật
-        roadmaps = [
-            ('RM-01', 'Core Architecture & SSOT Spec', 'Thiết lập repo local, lưu nguyên văn đặc tả gốc của Owner vào docs/SSOT_ORIGINAL_SPEC.md.', 3, 'done', 1),
-            ('RM-02', 'Docker Engine & Live Mount', 'Container hóa toàn bộ hệ thống với Dockerfile, docker-compose.yml và live bind mount :z.', 2, 'done', 2),
-            ('RM-03', 'One-Command TUI Installer', 'Kịch bản install.sh + installer_tui.py với progress bar %, kiểm tra Docker/OS/Git, tự tạo Desktop Icon.', 3, 'done', 3),
-            ('RM-04', 'SQLite Database & CLI Connectors', 'Tích hợp SQLite Core DB, FTS5 catalog lookup, process runner kết nối agy & claude CLI thực tế.', 3, 'live', 4),
-            ('RM-05', 'GitHub Publication & Release', 'Gắn tag v1.0, publish repo lên GitHub cho cộng đồng, hỗ trợ 1-command curl install.', 2, 'queued', 5)
-        ]
-        for r in roadmaps:
-            cursor.execute("INSERT INTO roadmaps (id, project_id, title, description, todos_count, status, order_idx) VALUES (?, 'PRJ-GEN-WORKPLACE', ?, ?, ?, ?, ?)", r)
-
-        # 3. Todos thật
-        # Cột cuối là bằng chứng thật (file trong repo); chỉ ghi 'done' khi verify_evidence_ref() kiểm được,
-        # còn lại về 'queued' với evidence_ref rỗng (#4).
-        todos = [
-            ('TODO-01', 'RM-01', 'Khởi tạo Git repo và lưu cấu trúc dự án', 'Lead Architect', 'done', 'README.md'),
-            ('TODO-02', 'RM-01', 'Lưu đặc tả gốc vào docs/SSOT_ORIGINAL_SPEC.md', 'Lead Architect', 'done', 'docs/SSOT_ORIGINAL_SPEC.md'),
-            ('TODO-03', 'RM-01', 'Chuyển đổi giao diện sang phong cách Gen-workplace v1.1', 'Frontend Specialist', 'done', 'frontend/index.html'),
-            ('TODO-04', 'RM-02', 'Viết Dockerfile container hóa Python backend + WebApp', 'DevOps Engineer', 'done', 'Dockerfile'),
-            ('TODO-05', 'RM-02', 'Cấu hình docker-compose live mount với cờ SELinux :z', 'DevOps Engineer', 'done', 'docker-compose.yml'),
-            ('TODO-06', 'RM-03', 'Xây dựng installer_tui.py với thanh loading % đồ họa', 'Backend Specialist', 'done', 'installer_tui.py'),
-            ('TODO-07', 'RM-03', 'Kịch bản install.sh tự động kiểm tra Git & Docker daemon', 'DevOps Engineer', 'done', 'install.sh'),
-            ('TODO-08', 'RM-03', 'Tạo shortcut Desktop Gen-workplace.desktop tự động', 'DevOps Engineer', 'done', ''),
-            ('TODO-09', 'RM-04', 'Khởi tạo SQLite WAL DB & FTS5 virtual table', 'Backend Specialist', 'done', 'backend/db.py'),
-            ('TODO-10', 'RM-04', 'Kết nối API /api/state và /api/catalog với SQLite', 'Backend Specialist', 'live', ''),
-            ('TODO-11', 'RM-04', 'Tích hợp Process Runner gọi agy CLI thời gian thực', 'Lead Architect', 'queued', ''),
-            ('TODO-12', 'RM-05', 'Kiểm thử cross-platform trên macOS và Windows WSL2', 'QA Tester', 'queued', ''),
-            ('TODO-13', 'RM-05', 'Publish repository lên GitHub và gắn release v1.0', 'Lead Architect', 'queued', '')
-        ]
-        for tid, rm, title, role, status, evidence in todos:
-            verified_by = ''
-            if status == 'done':
-                ok, verified_by, _ = verify_evidence_ref(evidence)
-                if not ok:
-                    status, evidence, verified_by = 'queued', '', ''
-            cursor.execute("INSERT INTO todos (id, roadmap_id, project_id, title, assigned_role, status, evidence_ref, verified_by) VALUES (?, ?, 'PRJ-GEN-WORKPLACE', ?, ?, ?, ?, ?)",
-                           (tid, rm, title, role, status, evidence, verified_by))
-
-        # 4. Roles thật
         roles = [
             ('ROLE-01', 'L', 'Lead Architect', 'Gemini CLI (agy --effort high)', 'Quản trị SSOT, điều phối toàn bộ tiến trình gen-workplace', 'Chịu trách nhiệm bảo toàn SSOT đặc tả gốc, thẩm định evidence từ các role và điều phối live workflow.'),
             ('ROLE-02', 'B', 'Backend & DB Specialist', 'Claude Code CLI', 'Python daemon, SQLite WAL, FTS5 catalog và runner', 'Thực thi API control plane, tối ưu truy vấn FTS5 catalog sub-ms và stream log terminal.'),
             ('ROLE-03', 'F', 'Frontend Specialist', 'Cursor CLI', 'Web console UI, CSS Gen-workplace v1.1, real-time sync', 'Duy trì phong cách thiết kế tối kỹ thuật v1.1, bind dữ liệu thật từ backend và tối ưu UX.'),
-            ('ROLE-04', 'D', 'DevOps & Packaging', 'Gemini CLI (agy --agent devops)', 'Docker, SELinux bind mounts, TUI installer, desktop shortcut', 'Đảm bảo môi trường container chạy ổn định trên Linux, macOS và Windows, script 1-command installer hoàn hảo.'),
+            ('ROLE-04', 'D', 'DevOps & Packaging', 'Gemini CLI (agy --agent devops)', 'Systemd service, tmux, cài đặt và cập nhật app trên host', 'Đảm bảo app chạy ổn định trên host Linux (systemd + tmux), script cài đặt/cập nhật 1 lệnh.'),
             ('ROLE-05', 'Q', 'QA Tester', 'Gemini CLI (agy)', 'Kiểm thử cross-platform, test API /api/status, xác thực installer', 'Chạy regression tests, nghiệm thu thanh loading % của installer và báo cáo phản hồi.'),
-            ('ROLE-06', 'S', 'Security Auditor', 'Codex Security CLI', 'Phân quyền volume Docker, audit file permission, kiểm soát Vault', 'Kiểm tra an toàn SELinux, cô lập quyền hạn biến môi trường và thẩm định secret boundary.')
+            ('ROLE-06', 'S', 'Security Auditor', 'Codex Security CLI', 'Phân quyền thư mục, audit file permission, kiểm soát Vault', 'Kiểm tra an toàn phân quyền, cô lập biến môi trường và thẩm định secret boundary.')
         ]
         for rl in roles:
-            cursor.execute("INSERT INTO agent_roles (id, project_id, role_key, name, cli_tool, scope, instruction) VALUES (?, 'PRJ-GEN-WORKPLACE', ?, ?, ?, ?, ?)", rl)
-
-        # 5. Workflow Nodes thật
-        nodes = [
-            ('NODE-01', 0, 'Spec Ingestion', 'Lead Architect', 'done', 20, 42, 'Đặc tả gốc của Owner', 'docs/SSOT_ORIGINAL_SPEC.md', 'SSOT locked', '→ Docker Architecture', json.dumps(['Lập repo gen-workplace', 'Ghi nguyên văn SSOT', 'Cam kết zero-drift'], ensure_ascii=False)),
-            ('NODE-02', 1, 'Container & Live Mount', 'DevOps Engineer', 'done', 260, 42, 'Dockerfile + docker-compose', 'gen-workplace-app (Live)', 'live bind mount verified', '→ TUI Installer', json.dumps(['Docker build 3.11-slim', 'Live mount cờ :z SELinux', 'Port 8888 200 OK'], ensure_ascii=False)),
-            ('NODE-03', 2, 'TUI Installer & Icon', 'DevOps + Backend', 'done', 500, 42, 'install.sh + installer_tui.py', 'Gen-workplace.desktop', '1-command launch verified', '→ Database & Catalog', json.dumps(['Thanh loading % trực quan', 'Pre-flight checks OS/Docker', 'Tạo Desktop Icon WebApp'], ensure_ascii=False)),
-            ('NODE-04', 3, 'Database & Catalog Engine', 'Backend & DB', 'live', 740, 42, 'SQLite FTS5 schema', 'Fast ID Catalog API', 'sub-ms query test', '→ Cross-Platform QA', json.dumps(['SQLite WAL mode', 'Bảng FTS5 Catalog', 'Zero-audit token saving'], ensure_ascii=False)),
-            ('NODE-05', 4, 'Cross-Platform QA', 'QA Tester', 'pending', 980, 42, 'Installer test matrix', 'QA Sign-off report', 'zero install issue', '→ GitHub Release', json.dumps(['Test Linux / Fedora / Ubuntu', 'Test macOS Docker Desktop', 'Test Windows WSL2'], ensure_ascii=False)),
-            ('NODE-06', 5, 'GitHub Release & Freeze', 'Lead Architect', 'pending', 500, 185, 'Clean git commits', 'GitHub Release v1.0', 'all issues resolved', '→ Community distribution', json.dumps(['Gắn tag v1.0.0', 'Push to GitHub main', '1-command curl ready'], ensure_ascii=False))
-        ]
-        for n in nodes:
-            cursor.execute("""
-            INSERT INTO workflow_nodes (id, project_id, step_index, title, role_name, status, coord_x, coord_y, input_desc, output_desc, check_desc, handoff_desc, checklist_json)
-            VALUES (?, 'PRJ-GEN-WORKPLACE', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, n)
-
-        # 6. Runtimes thật
-        runtimes = [
-            ('runtime-01', 'Lead Architect', 'Gemini CLI (agy)', 'RM-04', 'main', 'running', str(BASE_DIR),
-             json.dumps({'input': 'Owner Request', 'output': 'gen-workplace git repo', 'request': 'init real project', 'conclusion': 'live & running'}, ensure_ascii=False),
-             json.dumps(['20:34 repo created', '20:35 SSOT spec written', '20:47 live mount verified'], ensure_ascii=False)),
-            ('runtime-02', 'Backend & DB Specialist', 'Claude Code CLI', 'TODO-09', 'main', 'running', str(BASE_DIR),
-             json.dumps({'input': 'Database spec', 'output': 'SQLite FTS5 schema', 'request': 'build zero-audit catalog', 'conclusion': 'in progress'}, ensure_ascii=False),
-             json.dumps(['20:35 installer_tui.py implemented', '20:56 designing SQLite FTS5 catalog'], ensure_ascii=False)),
-            ('runtime-03', 'Frontend Specialist', 'Cursor CLI', 'TODO-03', 'main', 'running', str(BASE_DIR),
-             json.dumps({'input': 'Gen-workplace-v1.1-dynamic.html', 'output': 'frontend/index.html', 'request': 'apply technical dark theme', 'conclusion': 'done'}, ensure_ascii=False),
-             json.dumps(['20:10 applied v1.1 palette', '20:57 wiped mock data, replaced with real repo data'], ensure_ascii=False)),
-            ('runtime-04', 'DevOps & Packaging', 'Gemini CLI (agy)', 'TODO-05', 'main', 'done', str(BASE_DIR),
-             json.dumps({'input': 'docker-compose.yml', 'output': 'container gen-workplace-app', 'request': 'containerize app', 'conclusion': 'done'}, ensure_ascii=False),
-             json.dumps(['20:35 Dockerfile created', '20:36 image built', '20:47 container live-mounted'], ensure_ascii=False)),
-            ('runtime-05', 'QA Tester', 'Gemini CLI', 'TODO-08', 'main', 'done', str(BASE_DIR),
-             json.dumps({'input': 'Gen-workplace.desktop', 'output': 'QA pass', 'request': 'verify desktop icon', 'conclusion': 'done'}, ensure_ascii=False),
-             json.dumps(['20:37 checked desktop entry', '20:37 curl status 200 OK'], ensure_ascii=False)),
-            ('runtime-06', 'Security Auditor', 'Codex Security CLI', 'TODO-05', 'main', 'done', str(BASE_DIR),
-             json.dumps({'input': 'SELinux policy', 'output': 'secure volume mount', 'request': 'enforce security', 'conclusion': 'done'}, ensure_ascii=False),
-             json.dumps(['20:46 audit getenforce', '20:47 confirmed zero permission leak'], ensure_ascii=False))
-        ]
-        for rt in runtimes:
-            cursor.execute("""
-            INSERT INTO agent_runtimes (id, project_id, role_name, cli_tool, task_ref, branch, status, path, io_json, trace_json)
-            VALUES (?, 'PRJ-GEN-WORKPLACE', ?, ?, ?, ?, ?, ?, ?, ?)
-            """, rt)
-
-        # 7. Chat messages thật
-        messages = [
-            ('runtime-01', 'Lead Architect', '20:34:26', 'Repo Init', 'Đã khởi tạo repo và lưu đặc tả gốc vào <code>docs/SSOT_ORIGINAL_SPEC.md</code>.', json.dumps(['📥 đã nhận', '✅ done'], ensure_ascii=False)),
-            ('runtime-01', 'Lead Architect', '20:47:08', 'Live Mount', 'Đã cấu hình Live Mount với cờ SELinux <code>:z</code>. Mọi chỉnh sửa trên host sẽ tự động phản ánh tức thì vào container!', json.dumps(['🚀 live reload', '✅ xác nhận'], ensure_ascii=False)),
-            ('runtime-02', 'Backend & DB Specialist', '20:35:45', 'Installer', 'Đã xây dựng xong bộ cài đặt <code>installer_tui.py</code> có thanh loading progress bar % và kiểm tra môi trường.', json.dumps(['✅ done', '🔥 mượt mà'], ensure_ascii=False)),
-            ('runtime-02', 'Backend & DB Specialist', '20:56:00', 'Database', 'Đang triển khai SQLite WAL Core Database và FTS5 Virtual Table cho Catalog tra nhanh ID.', json.dumps(['⏳ đang chạy'], ensure_ascii=False)),
-            ('runtime-03', 'Frontend Specialist', '20:10:23', 'Style v1.1', 'Đã chuyển đổi toàn bộ layout sang phong cách Gen-workplace v1.1 tinh tế, không rối mắt.', json.dumps(['✅ done'], ensure_ascii=False)),
-            ('runtime-04', 'DevOps & Packaging', '20:36:58', 'Docker Up', 'Container <code>gen-workplace-app</code> đã khởi động thành công trên cổng 8888.', json.dumps(['✅ done', '🚀 online'], ensure_ascii=False)),
-            ('runtime-05', 'QA Tester', '20:37:05', 'Shortcut', 'Đã xác thực shortcut Desktop tồn tại và mở được WebApp.', json.dumps(['✅ verified'], ensure_ascii=False)),
-            ('runtime-06', 'Security Auditor', '20:46:47', 'SELinux', 'Đã kiểm tra SELinux Enforcing trên host và gán nhãn <code>:z</code> an toàn cho Docker mounts.', json.dumps(['✅ secure'], ensure_ascii=False))
-        ]
-        for m in messages:
-            cursor.execute("""
-            INSERT INTO chat_messages (project_id, runtime_id, author, created_time, tag, body, react_json)
-            VALUES ('PRJ-GEN-WORKPLACE', ?, ?, ?, ?, ?, ?)
-            """, m)
-
-        # 8. Master SSOT thật (8 Trụ Cột Quy Chuẩn Bất Biến Toàn Dự Án)
-        ssots = [
-            ('SSOT-SPEC-01', 'Đặc Tả Gốc Bất Biến Của Owner (Ryan)', 'Bản đặc tả 5 phân khu (Dashboard, Implementation 3 hàng, Data Center, Runtimes, Workplace) và tiêu chuẩn cài đặt 1 lệnh TUI Docker là Single Source of Truth bất biến của toàn dự án. Mọi suy diễn ngoài spec đều bị từ chối.', 'EVT-03 · docs/SSOT_ORIGINAL_SPEC.md', '20:35'),
-            ('SSOT-INSTALL-02', 'Tiêu Chuẩn Cài Đặt 1 Lệnh TUI & Desktop Shortcut', 'Kịch bản cài đặt phải có thanh đo tiến độ loading %, tự kiểm tra môi trường OS/Docker/Git và tự sinh shortcut desktop Gen-workplace.desktop khi kết thúc để người dùng click là mở WebApp ngay.', 'EVT-02 · installer_tui.py', '20:37'),
-            ('SSOT-DOCKER-03', 'Môi Trường Container Hóa Khép Kín Đa Nền Tảng', 'Toàn bộ backend, frontend và data runtimes phải đóng gói khép kín trong Docker container để chạy đồng nhất trên Linux, macOS và Windows (WSL2), đảm bảo zero-drift.', 'EVT-01 · docker-compose.yml', '20:47'),
-            ('SSOT-LIVE-MOUNT-04', 'Cơ Chế Live Mount Hot-Reload (:z SELinux)', 'Thư mục frontend/ và backend/ được mount trực tiếp vào container với cờ SELinux :z, đảm bảo mọi thay đổi code trên repo được cập nhật tức thì trên WebApp khi F5 mà không cần build lại image.', 'COMMIT ae4e196', '20:47'),
-            ('SSOT-TASK-MUTEX-05', 'Kỷ Luật Thép Task Mutex Khóa Độc Quyền (Anti-Chaos)', 'Mỗi nhiệm vụ chỉ do đúng 1 Agent khóa (locked_at). Kiểm tra ràng buộc tiền đề depends_on trước khi nhận việc. Thu hồi tự động các task bị treo quá 300s (Anti-Zombie Reclamation).', 'API /api/task/claim', '21:05'),
-            ('SSOT-EVIDENCE-06', 'Tiêu Chuẩn Nghiệm Thu Kép (Dual-Gate Verification)', 'Agent không thể tự ý chuyển task sang done nếu thiếu bằng chứng vật lý (commit hash / test log / artifact). Nghiệm thu bắt buộc có chữ ký phê chuẩn của Lead Architect.', 'API /api/task/complete', '21:10'),
-            ('SSOT-FTS5-CATALOG-07', 'Catalog Tra Nhanh Sub-Millisecond (Zero-Audit Tokens)', 'Mã định danh #EVT, #SEC, #MCP, #FILE, #TOOL, #TBL được lập chỉ mục FTS5 trong SQLite WAL, giúp các chuyên gia tra cứu dữ kiện tức thì dưới 1ms mà không cần quét lại toàn bộ repository.', 'SQLite FTS5 virtual table', '21:15'),
-            ('SSOT-ORCH-SWARM-08', 'Cơ Chế Phân Cấp Mệnh Lệnh 3 Tầng Kỷ Luật', 'Mệnh lệnh truyền từ Gen (Core Orchestrator vĩ mô) ➔ Lead Architect (Kế hoạch DAG kỹ thuật) ➔ 5 Chuyên gia chuyên môn. Giao ban, bàn giao I/O contract 100% bằng tiếng Việt.', 'Phòng Giao Ban War Room', '21:20')
-        ]
-        for s in ssots:
-            cursor.execute("""
-            INSERT INTO master_ssot (id, project_id, title, body, source_ref, verified_time)
-            VALUES (?, 'PRJ-GEN-WORKPLACE', ?, ?, ?, ?)
-            """, s)
-
-        # 9. Role Memories thật (Đầy đủ 6 Chuyên Gia)
-        memories = [
-            ('Lead Architect', 'Bảo tồn đặc tả SSOT gốc (docs/SSOT_ORIGINAL_SPEC.md), quản lý chuỗi Todo DAG, kiểm soát ranh giới Whitelist và duyệt bằng chứng nghiệm thu commit hash.', json.dumps(['ssot-freeze', 'dag-scheduler', 'dual-gate'], ensure_ascii=False), 1, '20:34'),
-            ('Backend & DB Specialist', 'Cấu hình SQLite với chế độ WAL (Write-Ahead Logging) và FTS5 để tối ưu hóa truy vấn catalog dưới 1ms. Triển khai API Task Mutex /api/task/claim.', json.dumps(['sqlite-wal', 'fts5-catalog', 'task-mutex'], ensure_ascii=False), 1, '20:56'),
-            ('Frontend Specialist', 'Áp dụng bảng màu Nocturne Slate v1.2, xây dựng Bàn Làm Việc Live Workbench 3 cột, stream terminal console và engine đồng bộ realtime 2.5s.', json.dumps(['live-workbench', 'realtime-sync', 'nocturne-slate'], ensure_ascii=False), 1, '20:10'),
-            ('DevOps & Packaging', 'Ghi chú SELinux: Docker volume trên Fedora/RHEL bắt buộc có hậu tố :z để tự động gán nhãn container_file_t. Xây dựng installer_tui.py và Desktop icon.', json.dumps(['docker-compose', 'selinux-z', 'tui-installer'], ensure_ascii=False), 1, '20:46'),
-            ('QA Tester', 'Thiết lập test suite tự động cho chu kỳ Auto-Wake 68ms, kiểm tra toàn bộ REST API endpoint và chứng thực bằng chứng commit hash trước khi bàn giao.', json.dumps(['auto-wake-68ms', 'api-regression', 'test-matrix'], ensure_ascii=False), 1, '20:37'),
-            ('Security Auditor', 'Kiểm toán Token Vault OAuth 2.0 PKCE và phân quyền thư mục. Đảm bảo zero-secret-leak, ngăn chặn rò rỉ credential ra log hoặc commit git.', json.dumps(['oauth-pkce', 'zero-leak', 'whitelist-guard'], ensure_ascii=False), 1, '20:46')
-        ]
-        for rm in memories:
-            cursor.execute("""
-            INSERT INTO role_memories (project_id, role_name, body, tags_json, synced_to_ssot, created_time)
-            VALUES ('PRJ-GEN-WORKPLACE', ?, ?, ?, ?, ?)
-            """, rm)
-
-        # 10. Fast ID Lookup Catalog thật (Zero-audit tokens!)
-        catalog = [
-            ('#FILE-01', 'FILE', 'docs/SSOT_ORIGINAL_SPEC.md', 'Tài liệu SSOT đặc tả gốc bất biến của Owner toàn dự án', 'docs/SSOT_ORIGINAL_SPEC.md', json.dumps({'type': 'markdown', 'lines': 140})),
-            ('#FILE-02', 'FILE', 'frontend/index.html', 'Giao diện Console hoàn chỉnh 100% phong cách Gen-workplace v1.1', 'frontend/index.html', json.dumps({'type': 'html', 'lines': 2755})),
-            ('#FILE-03', 'FILE', 'backend/main.py', 'Control Plane Server & API endpoint (/api/status, /api/state)', 'backend/main.py', json.dumps({'type': 'python', 'port': 8888})),
-            ('#FILE-04', 'FILE', 'installer_tui.py', 'Bộ cài đặt giao diện dòng lệnh TUI với progress bar % và dependency check', 'installer_tui.py', json.dumps({'type': 'tui'})),
-            ('#FILE-05', 'FILE', 'docker-compose.yml', 'Cấu hình docker-compose live mount với cờ SELinux :z', 'docker-compose.yml', json.dumps({'services': ['gen-workplace']})),
-            ('#FILE-06', 'FILE', 'Gen-workplace.desktop', 'Shortcut Desktop mở WebApp bằng trình duyệt mặc định', 'Gen-workplace.desktop', json.dumps({'type': 'desktop-entry'})),
-            ('#SEC-01', 'SEC', 'Docker Container Sandbox Boundary', 'Cách ly toàn bộ mã thực thi của các CLI Agent trong Docker container', '/etc/docker/daemon.json', json.dumps({'isolation': 'docker'})),
-            ('#SEC-02', 'SEC', 'Master Prompt Instruction Lock', 'Chỉ có thể chỉnh sửa hướng dẫn Agent Role thông qua ô Chat Input Tổng', 'frontend/index.html', json.dumps({'locked': True})),
-            ('#MCP-01', 'MCP', 'google-drive MCP Server', 'Tích hợp đọc tài liệu, trang tính từ Google Drive', 'antigravity-cli/mcp/google-drive', json.dumps({'tools': 42})),
-            ('#MCP-02', 'MCP', 'git-ops CLI Integration', 'Tự động kiểm soát commit, branch và pull request cho các subagent', 'builtin/git-ops', json.dumps({'cli': 'git'})),
-            ('#TOOL-01', 'TOOL', 'Gemini CLI (agy)', 'Antigravity CLI hỗ trợ chế độ autonomous và high-effort', 'agy', json.dumps({'version': '1.2.11'})),
-            ('#TOOL-02', 'TOOL', 'Claude Code CLI', 'Engine tư duy và kiểm chứng mã nguồn độc lập', 'claude-code', json.dumps({'model': 'sonnet'})),
-            ('#TOOL-03', 'TOOL', 'Codex Security CLI', 'Thẩm định an toàn, quyền truy cập tệp và phân tách bí mật', 'codex-cli', json.dumps({'sandbox': 'read-only'})),
-            ('#DB-01', 'DB', 'SQLite 3 WAL Database', 'Cơ sở dữ liệu cốt lõi lưu trữ toàn bộ thực thể và FTS5 Catalog tra cứu', '/app/data/gen-workplace.db', json.dumps({'journal': 'WAL', 'fts': 'fts5'})),
-            ('#EVT-01', 'EVT', 'Khởi tạo repo và commit đầu tiên 5f91e1e', 'Commit khởi tạo repo, Dockerfile và kịch bản TUI installer', 'git commit 5f91e1e', json.dumps({'author': 'Lead', 'time': '20:34'})),
-            ('#EVT-02', 'EVT', 'Cấu hình Live Mount Hot-Reload commit ae4e196', 'Thêm cờ :z cho SELinux trên Fedora giúp phản ánh code tức thì', 'git commit ae4e196', json.dumps({'author': 'DevOps', 'time': '20:47'})),
-            ('#EVT-03', 'EVT', 'Xóa sạch mock data, bind dữ liệu thật commit a4f63be', 'Thay thế toàn bộ mock data bằng dữ liệu thật của repository gen-workplace', 'git commit a4f63be', json.dumps({'author': 'Lead', 'time': '21:02'}))
-        ]
-        for c in catalog:
-            cursor.execute("""
-            INSERT INTO catalog_references (id, project_id, category, title, description, ref_path, metadata_json)
-            VALUES (?, 'PRJ-GEN-WORKPLACE', ?, ?, ?, ?, ?)
-            """, c)
-
-        # Seed ssot_events if empty
-        cursor.execute("SELECT count(*) FROM ssot_events WHERE project_id = 'PRJ-GEN-WORKPLACE'")
-        if cursor.fetchone()[0] == 0:
-            events_data = [
-                ("EVT-01", "PRJ-GEN-WORKPLACE", "runtime-04", "DevOps & Packaging", "Khởi động container gen-workplace-app với live bind mount :z", "docker-compose.yml · port 8888", "ssot", "20:47"),
-                ("EVT-02", "PRJ-GEN-WORKPLACE", "runtime-05", "DevOps & Packaging", "Kiểm thử kịch bản installer_tui.py và tạo Desktop icon", "Gen-workplace.desktop verified", "ssot", "20:37"),
-                ("EVT-03", "PRJ-GEN-WORKPLACE", "runtime-01", "Lead Architect", "Lưu trữ đặc tả gốc của Owner thành SSOT bất biến", "docs/SSOT_ORIGINAL_SPEC.md", "ssot", "20:35"),
-                ("EVT-04", "PRJ-GEN-WORKPLACE", "runtime-02", "Backend & DB Specialist", "Triển khai SQLite WAL mode và FTS5 Full-Text Catalog", "data/gen-workplace.db (<1ms query)", "ssot", "20:56"),
-                ("EVT-05", "PRJ-GEN-WORKPLACE", "runtime-05", "QA Tester", "Kiểm thử chu kỳ Auto-Wake 68ms và API Regression Suite", "100% test pass · latency 68ms", "ssot", "21:05")
-            ]
-            for ev in events_data:
-                cursor.execute("""
-                INSERT OR IGNORE INTO ssot_events (id, project_id, runtime_id, role_name, request, evidence, status, verified_time)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """, ev)
-
+            cursor.execute("INSERT OR IGNORE INTO agent_roles (id, project_id, role_key, name, cli_tool, scope, instruction) VALUES (?, 'PRJ-GEN-WORKPLACE', ?, ?, ?, ?, ?)", rl)
         conn.commit()
+
+# ---------------------------------------------------------------------------
+# Issue #12: bản ghi seed giả của các phiên bản trước (liệt kê tường minh theo ID + tiêu đề/nội dung đúng như code seed cũ).
+# purge_seed_data() chạy cuối init_db(), idempotent, chỉ xóa đúng các bản ghi này.
+# ---------------------------------------------------------------------------
+SEED_ROADMAPS = {
+    'RM-01': 'Core Architecture & SSOT Spec',
+    'RM-02': 'Docker Engine & Live Mount',
+    'RM-03': 'One-Command TUI Installer',
+    'RM-04': 'SQLite Database & CLI Connectors',
+    'RM-05': 'GitHub Publication & Release',
+}
+SEED_TODOS = {
+    'TODO-01': 'Khởi tạo Git repo và lưu cấu trúc dự án',
+    'TODO-02': 'Lưu đặc tả gốc vào docs/SSOT_ORIGINAL_SPEC.md',
+    'TODO-03': 'Chuyển đổi giao diện sang phong cách Gen-workplace v1.1',
+    'TODO-04': 'Viết Dockerfile container hóa Python backend + WebApp',
+    'TODO-05': 'Cấu hình docker-compose live mount với cờ SELinux :z',
+    'TODO-06': 'Xây dựng installer_tui.py với thanh loading % đồ họa',
+    'TODO-07': 'Kịch bản install.sh tự động kiểm tra Git & Docker daemon',
+    'TODO-08': 'Tạo shortcut Desktop Gen-workplace.desktop tự động',
+    'TODO-09': 'Khởi tạo SQLite WAL DB & FTS5 virtual table',
+    'TODO-10': 'Kết nối API /api/state và /api/catalog với SQLite',
+    'TODO-11': 'Tích hợp Process Runner gọi agy CLI thời gian thực',
+    'TODO-12': 'Kiểm thử cross-platform trên macOS và Windows WSL2',
+    'TODO-13': 'Publish repository lên GitHub và gắn release v1.0',
+}
+SEED_WORKFLOW_NODES = {
+    'NODE-01': 'Spec Ingestion', 'NODE-02': 'Container & Live Mount', 'NODE-03': 'TUI Installer & Icon',
+    'NODE-04': 'Database & Catalog Engine', 'NODE-05': 'Cross-Platform QA', 'NODE-06': 'GitHub Release & Freeze',
+}
+SEED_RUNTIMES = {
+    'runtime-01': 'Lead Architect', 'runtime-02': 'Backend & DB Specialist', 'runtime-03': 'Frontend Specialist',
+    'runtime-04': 'DevOps & Packaging', 'runtime-05': 'QA Tester', 'runtime-06': 'Security Auditor',
+}
+SEED_MASTER_SSOT = {
+    'SSOT-SPEC-01': 'Đặc Tả Gốc Bất Biến Của Owner (Ryan)',
+    'SSOT-INSTALL-02': 'Tiêu Chuẩn Cài Đặt 1 Lệnh TUI & Desktop Shortcut',
+    'SSOT-DOCKER-03': 'Môi Trường Container Hóa Khép Kín Đa Nền Tảng',
+    'SSOT-LIVE-MOUNT-04': 'Cơ Chế Live Mount Hot-Reload (:z SELinux)',
+    'SSOT-TASK-MUTEX-05': 'Kỷ Luật Thép Task Mutex Khóa Độc Quyền (Anti-Chaos)',
+    'SSOT-EVIDENCE-06': 'Tiêu Chuẩn Nghiệm Thu Kép (Dual-Gate Verification)',
+    'SSOT-FTS5-CATALOG-07': 'Catalog Tra Nhanh Sub-Millisecond (Zero-Audit Tokens)',
+    'SSOT-ORCH-SWARM-08': 'Cơ Chế Phân Cấp Mệnh Lệnh 3 Tầng Kỷ Luật',
+}
+SEED_CATALOG = {
+    '#FILE-01': 'docs/SSOT_ORIGINAL_SPEC.md', '#FILE-02': 'frontend/index.html', '#FILE-03': 'backend/main.py',
+    '#FILE-04': 'installer_tui.py', '#FILE-05': 'docker-compose.yml', '#FILE-06': 'Gen-workplace.desktop',
+    '#SEC-01': 'Docker Container Sandbox Boundary', '#SEC-02': 'Master Prompt Instruction Lock',
+    '#MCP-01': 'google-drive MCP Server', '#MCP-02': 'git-ops CLI Integration',
+    '#TOOL-01': 'Gemini CLI (agy)', '#TOOL-02': 'Claude Code CLI', '#TOOL-03': 'Codex Security CLI',
+    '#DB-01': 'SQLite 3 WAL Database',
+    '#EVT-01': 'Khởi tạo repo và commit đầu tiên 5f91e1e',
+    '#EVT-02': 'Cấu hình Live Mount Hot-Reload commit ae4e196',
+    '#EVT-03': 'Xóa sạch mock data, bind dữ liệu thật commit a4f63be',
+}
+SEED_SSOT_EVENTS = {
+    'EVT-01': 'Khởi động container gen-workplace-app với live bind mount :z',
+    'EVT-02': 'Kiểm thử kịch bản installer_tui.py và tạo Desktop icon',
+    'EVT-03': 'Lưu trữ đặc tả gốc của Owner thành SSOT bất biến',
+    'EVT-04': 'Triển khai SQLite WAL mode và FTS5 Full-Text Catalog',
+    'EVT-05': 'Kiểm thử chu kỳ Auto-Wake 68ms và API Regression Suite',
+}
+SEED_ROLE_MEMORIES = [
+    ('Lead Architect', 'Bảo tồn đặc tả SSOT gốc (docs/SSOT_ORIGINAL_SPEC.md), quản lý chuỗi Todo DAG, kiểm soát ranh giới Whitelist và duyệt bằng chứng nghiệm thu commit hash.'),
+    ('Backend & DB Specialist', 'Cấu hình SQLite với chế độ WAL (Write-Ahead Logging) và FTS5 để tối ưu hóa truy vấn catalog dưới 1ms. Triển khai API Task Mutex /api/task/claim.'),
+    ('Frontend Specialist', 'Áp dụng bảng màu Nocturne Slate v1.2, xây dựng Bàn Làm Việc Live Workbench 3 cột, stream terminal console và engine đồng bộ realtime 2.5s.'),
+    ('DevOps & Packaging', 'Ghi chú SELinux: Docker volume trên Fedora/RHEL bắt buộc có hậu tố :z để tự động gán nhãn container_file_t. Xây dựng installer_tui.py và Desktop icon.'),
+    ('QA Tester', 'Thiết lập test suite tự động cho chu kỳ Auto-Wake 68ms, kiểm tra toàn bộ REST API endpoint và chứng thực bằng chứng commit hash trước khi bàn giao.'),
+    ('Security Auditor', 'Kiểm toán Token Vault OAuth 2.0 PKCE và phân quyền thư mục. Đảm bảo zero-secret-leak, ngăn chặn rò rỉ credential ra log hoặc commit git.'),
+]
+# Tin chat_messages seed (nguyên văn) của seed_real_project (kênh runtime-0x) và get_warroom_messages cũ (war_room/standup/handoff)
+SEED_CHAT_BODIES = [
+    'Đã khởi tạo repo và lưu đặc tả gốc vào <code>docs/SSOT_ORIGINAL_SPEC.md</code>.',
+    'Đã cấu hình Live Mount với cờ SELinux <code>:z</code>. Mọi chỉnh sửa trên host sẽ tự động phản ánh tức thì vào container!',
+    'Đã xây dựng xong bộ cài đặt <code>installer_tui.py</code> có thanh loading progress bar % và kiểm tra môi trường.',
+    'Đang triển khai SQLite WAL Core Database và FTS5 Virtual Table cho Catalog tra nhanh ID.',
+    'Đã chuyển đổi toàn bộ layout sang phong cách Gen-workplace v1.1 tinh tế, không rối mắt.',
+    'Container <code>gen-workplace-app</code> đã khởi động thành công trên cổng 8888.',
+    'Đã xác thực shortcut Desktop tồn tại và mở được WebApp.',
+    'Đã kiểm tra SELinux Enforcing trên host và gán nhãn <code>:z</code> an toàn cho Docker mounts.',
+    'Chào Core Agent (Gen) và toàn thể Đội Ngũ Swarm. Mục tiêu hôm nay: Hoàn thiện hệ thống điều hành Gen-workplace v1.2, đảm bảo 0 xung đột, tuân thủ nghiêm ngặt 5 giai đoạn SOP.',
+    'Rõ mệnh lệnh của Ryan! Tôi (Gen - Core Orchestrator) đã phổ biến chỉ thị tới toàn thể 6 chuyên gia. Hệ thống đang chạy ở chế độ kỷ luật thép: 1 Profile = 1 Identity, Task Mutex độc quyền và nghiệm thu 100% bằng chứng vật lý.',
+    'Báo cáo Ryan và Gen: Đặc tả SSOT đã khóa bất biến tại <code>docs/SSOT_ORIGINAL_SPEC.md</code>. Tất cả 6 chuyên gia đã được cấp phát nhiệm vụ cụ thể trên Live Workbench.',
+    'Giao ban kỹ thuật hôm nay: @Backend tập trung hoàn thiện API Mutex Lock (/api/task/claim); @Frontend tối ưu Bàn Làm Việc Live Workbench 3 cột; @DevOps kiểm tra Live Mount :z; @QA chuẩn bị test suite; @Security rà soát token OAuth. Tất cả báo cáo tiến độ qua kênh này.',
+    'Đã nhận việc từ Leader! Tôi đang triển khai TODO-14 trong <code>backend/db.py</code>. Cam kết response time < 5ms và nộp commit hash trước 10h.',
+    'Đã nhận việc! Giao diện Live Workbench 3 cột x 2 hàng đang hoàn thiện trên <code>frontend/index.html</code>, tích hợp terminal console realtime.',
+    'Bàn giao Hợp đồng I/O cho @Frontend: Endpoint <code>POST /api/task/claim</code> và <code>POST /api/task/complete</code> đã sẵn sàng, trả về JSON chuẩn theo tài liệu <code>docs/STANDARD_SQUAD_AND_WORKFLOW.md</code>.',
+    'Xác nhận đã nhận spec từ @Backend. Đã bind dữ liệu vào các nút Claim/Complete trên Command Deck và cập nhật trạng thái realtime.',
+]
+# Câu mẫu do post_warroom_message / process_orch_instruction cũ tự sinh (khớp theo phần đầu nội dung)
+SEED_CHAT_BODY_PREFIXES = [
+    'Đã rõ chỉ thị của ',
+    'Chỉ huy tối cao ghi nhận mệnh lệnh',
+    'Chỉ huy tối cao đã ghi nhận chỉ thị',
+    'Rõ mệnh lệnh của Ryan',
+    'Báo cáo Ryan và Gen',
+    'Xin chào Ryan! Tôi là Genesis Orchestrator',
+    'Đã chấp hành mệnh lệnh tối cao',
+    'Đã chấp hành chỉ thị!',
+    'Đã tiếp nhận yêu cầu từ Leader (@Lead)!',
+    'Lead Architect đã ghi nhận báo cáo của ',
+    'Xác nhận đã nhận Hợp đồng I/O từ @Backend',
+    'Xác nhận đã nhận artifact bàn giao từ ',
+    'Báo cáo tiến độ Swarm: Đã hoàn tất',
+    'Tôi (Gen - Core Orchestrator) đã thiết lập và ban hành',
+    'Toàn bộ Swarm đang được neo vững chắc vào branch',
+]
+SEED_CHAT_BODY_CONTAINS = [
+    'Tôi (Lead Architect) đang giám sát chặt chẽ chuỗi Todo DAG',
+]
+# Tác giả giả của các câu mẫu cũ — khớp prefix/contains CHỈ áp dụng cho các tác giả này (tin của người dùng
+# hoặc trả lời agy thật có tác giả gw-*-agy / 'Orchestrator (agy)' không bao giờ bị xóa theo mẫu)
+SEED_CHAT_BOT_AUTHORS = ['Genesis Orchestrator', 'Lead Architect', 'Backend Specialist', 'Backend & DB Specialist',
+                         'Frontend Specialist', 'DevOps & Packaging', 'DevOps Engineer', 'QA Tester', 'Security Auditor']
+SEED_GEN_CONVERSATIONS = ['conv-gen-core-01', 'conv-gen-builder']
+SEED_GEN_GREETING = 'Sẵn sàng phục vụ Owner Ryan! Bạn muốn giao nhiệm vụ hoặc thảo luận kiến trúc nào hôm nay?'
+SEED_SESSION_TODO_TITLES = [
+    'Thiết lập hạ tầng Swarm & Cách ly Workspace phiên',
+    'Khóa quyền sở hữu độc quyền cho Owner Ryan (owner_profiles)',
+    'Xây dựng phân hệ Kanban & Checklist chuyên dụng theo phiên',
+    'Tự động hóa kiểm thử regression & Thẩm định bằng chứng',
+    'Tiếp nhận chỉ thị từ Owner Ryan & Phân tích nhiệm vụ',
+    'Thực thi tác vụ & Cập nhật tiến độ theo từng checklist',
+    'Báo cáo nghiệm thu kết quả cho Owner Ryan',
+]
+
+def purge_seed_data():
+    """
+    Xóa các bản ghi seed giả đã tồn tại trong DB (Issue #12). Chỉ xóa đúng ID + tiêu đề/nội dung như code seed cũ,
+    không đụng bản ghi khác. Idempotent. In log '[purge] xóa N bản ghi seed (bảng: ...)' khi có xóa.
+    """
+    counts = {}
+
+    def bump(table, n):
+        if n:
+            counts[table] = counts.get(table, 0) + n
+
+    try:
+        with get_connection() as conn:
+            cur = conn.cursor()
+            # todos trước roadmaps (todos → roadmaps ON DELETE CASCADE: chỉ xóa roadmap khi không còn todo nào)
+            for tid, title in SEED_TODOS.items():
+                cur.execute("DELETE FROM todos WHERE id = ? AND title = ?", (tid, title))
+                bump("todos", cur.rowcount)
+            for rid, title in SEED_ROADMAPS.items():
+                cur.execute("DELETE FROM roadmaps WHERE id = ? AND title = ? AND NOT EXISTS (SELECT 1 FROM todos t WHERE t.roadmap_id = roadmaps.id)", (rid, title))
+                bump("roadmaps", cur.rowcount)
+            for nid, title in SEED_WORKFLOW_NODES.items():
+                cur.execute("DELETE FROM workflow_nodes WHERE id = ? AND title = ?", (nid, title))
+                bump("workflow_nodes", cur.rowcount)
+            for rid, role in SEED_RUNTIMES.items():
+                cur.execute("DELETE FROM agent_runtimes WHERE id = ? AND role_name = ?", (rid, role))
+                bump("agent_runtimes", cur.rowcount)
+            for sid, title in SEED_MASTER_SSOT.items():
+                cur.execute("DELETE FROM master_ssot WHERE id = ? AND title = ?", (sid, title))
+                bump("master_ssot", cur.rowcount)
+            for cid, title in SEED_CATALOG.items():
+                cur.execute("DELETE FROM catalog_references WHERE id = ? AND title = ?", (cid, title))
+                bump("catalog_references", cur.rowcount)
+            for eid, req in SEED_SSOT_EVENTS.items():
+                cur.execute("DELETE FROM ssot_events WHERE id = ? AND request = ?", (eid, req))
+                bump("ssot_events", cur.rowcount)
+            for role, body in SEED_ROLE_MEMORIES:
+                cur.execute("DELETE FROM role_memories WHERE role_name = ? AND body = ?", (role, body))
+                bump("role_memories", cur.rowcount)
+            for body in SEED_CHAT_BODIES:
+                cur.execute("DELETE FROM chat_messages WHERE body = ?", (body,))
+                bump("chat_messages", cur.rowcount)
+            bot_in = ",".join("?" * len(SEED_CHAT_BOT_AUTHORS))
+            for prefix in SEED_CHAT_BODY_PREFIXES:
+                cur.execute(f"DELETE FROM chat_messages WHERE substr(body, 1, ?) = ? AND author IN ({bot_in})",
+                            [len(prefix), prefix] + SEED_CHAT_BOT_AUTHORS)
+                bump("chat_messages", cur.rowcount)
+            for frag in SEED_CHAT_BODY_CONTAINS:
+                cur.execute(f"DELETE FROM chat_messages WHERE instr(body, ?) > 0 AND author IN ({bot_in})",
+                            [frag] + SEED_CHAT_BOT_AUTHORS)
+                bump("chat_messages", cur.rowcount)
+            for conv_id in SEED_GEN_CONVERSATIONS:
+                for tbl in ("gen_messages", "gen_compact_snapshots", "gen_session_files", "gen_session_todos", "gen_scratchpad_notes"):
+                    cur.execute(f"DELETE FROM {tbl} WHERE conversation_id = ?", (conv_id,))
+                    bump(tbl, cur.rowcount)
+                cur.execute("DELETE FROM gen_conversations WHERE id = ?", (conv_id,))
+                bump("gen_conversations", cur.rowcount)
+            cur.execute("DELETE FROM gen_messages WHERE role = 'assistant' AND author = 'Gen Core' AND content = ?", (SEED_GEN_GREETING,))
+            bump("gen_messages", cur.rowcount)
+            for title in SEED_SESSION_TODO_TITLES:
+                cur.execute("DELETE FROM gen_session_todos WHERE id LIKE 'TSK-%' AND title = ?", (title,))
+                bump("gen_session_todos", cur.rowcount)
+            # Worker đang trỏ tới task seed đã bị xóa → bỏ gán
+            seed_ids = list(SEED_TODOS.keys())
+            cur.execute(f"UPDATE tmux_sessions SET current_task_id = '' WHERE current_task_id IN ({','.join('?' * len(seed_ids))}) "
+                        "AND NOT EXISTS (SELECT 1 FROM todos t WHERE t.id = tmux_sessions.current_task_id)", seed_ids)
+            bump("tmux_sessions.current_task_id", cur.rowcount)
+            conn.commit()
+    except Exception as e:
+        print(f"[purge] Lỗi khi xóa dữ liệu seed: {e}")
+        return {"total": 0, "tables": counts, "error": str(e)}
+
+    total = sum(counts.values())
+    if total:
+        print(f"[purge] xóa {total} bản ghi seed (bảng: " + ", ".join(f"{k}={v}" for k, v in counts.items()) + ")")
+    return {"total": total, "tables": counts}
 
 def get_full_state(project_id="PRJ-GEN-WORKPLACE"):
     """Lấy toàn bộ trạng thái hệ thống theo đúng định dạng state của WebApp."""
@@ -846,7 +832,7 @@ def get_full_state(project_id="PRJ-GEN-WORKPLACE"):
 
         live_branch = p_row["branch"]
         try:
-            br_res = subprocess.run(["git", "-C", "/app/repo", "branch", "--show-current"], capture_output=True, text=True, timeout=1.0)
+            br_res = subprocess.run(["git", "-C", find_repo_path(), "branch", "--show-current"], capture_output=True, text=True, timeout=1.0)
             if br_res.returncode == 0 and br_res.stdout.strip():
                 live_branch = br_res.stdout.strip()
         except Exception:
@@ -1009,12 +995,6 @@ def get_full_state(project_id="PRJ-GEN-WORKPLACE"):
                 "status": ev["status"],
                 "time": ev["verified_time"]
             })
-        if not events:
-            events = [
-                {"id": "EVT-01", "runtime": "DevOps / runtime-04", "request": "Khởi động container gen-workplace-app với live bind mount :z", "evidence": "docker-compose.yml · port 8888", "status": "ssot", "time": "20:47"},
-                {"id": "EVT-02", "runtime": "DevOps / runtime-05", "request": "Kiểm thử kịch bản installer_tui.py và tạo Desktop icon", "evidence": "Gen-workplace.desktop verified", "status": "ssot", "time": "20:37"},
-                {"id": "EVT-03", "runtime": "Lead / runtime-01", "request": "Lưu trữ đặc tả gốc của Owner thành SSOT bất biến", "evidence": "docs/SSOT_ORIGINAL_SPEC.md", "status": "ssot", "time": "20:35"}
-            ]
 
         # Kanban (Derived from todos)
         cursor.execute("SELECT * FROM todos WHERE project_id = ?", (project_id,))
@@ -1746,7 +1726,7 @@ SWARM_DEFAULT_CONFIG = [
         "anthropic_model": "Claude Sonnet 4.6 (Thinking)",
         "allowed_paths": ["docs/**", "workspace/roles/**", "AGENTS.md", "README.md", "ROADMAP.md"],
         "blocked_paths": [],
-        "current_task_id": "TODO-01",
+        "current_task_id": "",
         "scope": "Quản trị SSOT, điều phối toàn bộ tiến trình gen-workplace",
         "mission": "Chịu trách nhiệm bảo toàn SSOT đặc tả gốc, thẩm định evidence từ các role và điều phối live workflow."
     },
@@ -1760,7 +1740,7 @@ SWARM_DEFAULT_CONFIG = [
         "anthropic_model": "Claude Sonnet 4.6 (Thinking)",
         "allowed_paths": ["backend/**", "data/**", "migrations/**"],
         "blocked_paths": ["frontend/**", "Dockerfile", "docker-compose.yml"],
-        "current_task_id": "TODO-10",
+        "current_task_id": "",
         "scope": "Python daemon, SQLite WAL, FTS5 catalog và runner",
         "mission": "Thực thi API control plane, tối ưu truy vấn FTS5 catalog sub-ms, quản trị SQLite WAL và lock task."
     },
@@ -1774,7 +1754,7 @@ SWARM_DEFAULT_CONFIG = [
         "anthropic_model": "Claude Sonnet 4.6 (Thinking)",
         "allowed_paths": ["frontend/**", "assets/**"],
         "blocked_paths": ["backend/**", "data/**", "Dockerfile"],
-        "current_task_id": "TODO-03",
+        "current_task_id": "",
         "scope": "Web console UI, CSS Gen-workplace v1.1, real-time sync",
         "mission": "Duy trì phong cách thiết kế Nocturne Slate v1.1, bố cục 2 cột List+Detail & Tabs, bind dữ liệu thật từ backend."
     },
@@ -1788,7 +1768,7 @@ SWARM_DEFAULT_CONFIG = [
         "anthropic_model": "Claude Sonnet 4.6 (Thinking)",
         "allowed_paths": ["Dockerfile", "docker-compose.yml", "install.sh", "installer_tui.py", "*.desktop", "scripts/**"],
         "blocked_paths": ["backend/main.py", "frontend/**"],
-        "current_task_id": "TODO-05",
+        "current_task_id": "",
         "scope": "Docker, SELinux bind mounts, TUI installer, desktop shortcut",
         "mission": "Container hóa dịch vụ, tối ưu hóa SELinux :z mounts và kịch bản cài đặt 1-lệnh đồ họa TUI."
     },
@@ -1802,7 +1782,7 @@ SWARM_DEFAULT_CONFIG = [
         "anthropic_model": "Claude Sonnet 4.6 (Thinking)",
         "allowed_paths": ["tests/**", "qa_reports/**", "fixtures/**"],
         "blocked_paths": ["backend/**", "frontend/**", "Dockerfile"],
-        "current_task_id": "TODO-12",
+        "current_task_id": "",
         "scope": "Kiểm thử cross-platform, test API /api/status, xác thực installer",
         "mission": "Chạy regression tests, kiểm thử đa nền tảng (Linux, macOS, Windows WSL2), xác thực tính liên tục của conversation_id."
     },
@@ -1816,7 +1796,7 @@ SWARM_DEFAULT_CONFIG = [
         "anthropic_model": "Claude Opus 4.6 (Thinking)",
         "allowed_paths": ["vault/**", "security_audits/**", ".env.example"],
         "blocked_paths": ["backend/**", "frontend/**"],
-        "current_task_id": "TODO-05",
+        "current_task_id": "",
         "scope": "Phân quyền volume Docker, audit file permission, kiểm soát Vault",
         "mission": "Kiểm tra an toàn SELinux, cô lập quyền hạn biến môi trường và thẩm định secret boundary RFC 7636 PKCE."
     }
@@ -3197,35 +3177,6 @@ def get_warroom_messages(channel_id="war_room", project_id="PRJ-GEN-WORKPLACE", 
         """, (project_id, channel_id, limit))
         rows = cursor.fetchall()
 
-    if not rows:
-        # Tự động khởi tạo tin nhắn mở màn cho từng kênh nếu chưa có
-        seeds = {
-            "war_room": [
-                ("Ryan (Owner)", "08:00:00", "Directive", "Chào Core Agent (Gen) và toàn thể Đội Ngũ Swarm. Mục tiêu hôm nay: Hoàn thiện hệ thống điều hành Gen-workplace v1.2, đảm bảo 0 xung đột, tuân thủ nghiêm ngặt 5 giai đoạn SOP.", ["🚀 Quyết tâm", "👍 Nhất trí"]),
-                ("Genesis Orchestrator", "08:00:05", "Reply", "Rõ mệnh lệnh của Ryan! Tôi (Gen - Core Orchestrator) đã phổ biến chỉ thị tới toàn thể 6 chuyên gia. Hệ thống đang chạy ở chế độ kỷ luật thép: 1 Profile = 1 Identity, Task Mutex độc quyền và nghiệm thu 100% bằng chứng vật lý.", ["✅ Tiếp nhận"]),
-                ("Lead Architect", "08:00:10", "Report", "Báo cáo Ryan và Gen: Đặc tả SSOT đã khóa bất biến tại <code>docs/SSOT_ORIGINAL_SPEC.md</code>. Tất cả 6 chuyên gia đã được cấp phát nhiệm vụ cụ thể trên Live Workbench.", ["📋 Đã duyệt"])
-            ],
-            "standup": [
-                ("Lead Architect", "08:15:00", "Directive", "Giao ban kỹ thuật hôm nay: @Backend tập trung hoàn thiện API Mutex Lock (/api/task/claim); @Frontend tối ưu Bàn Làm Việc Live Workbench 3 cột; @DevOps kiểm tra Live Mount :z; @QA chuẩn bị test suite; @Security rà soát token OAuth. Tất cả báo cáo tiến độ qua kênh này.", ["🎯 Đã rõ"]),
-                ("Backend Specialist", "08:15:20", "Report", "Đã nhận việc từ Leader! Tôi đang triển khai TODO-14 trong <code>backend/db.py</code>. Cam kết response time < 5ms và nộp commit hash trước 10h.", ["⚙️ Đang làm"]),
-                ("Frontend Specialist", "08:15:35", "Report", "Đã nhận việc! Giao diện Live Workbench 3 cột x 2 hàng đang hoàn thiện trên <code>frontend/index.html</code>, tích hợp terminal console realtime.", ["🎨 Giao diện đẹp"])
-            ],
-            "handoff": [
-                ("Backend Specialist", "09:00:00", "IO", "Bàn giao Hợp đồng I/O cho @Frontend: Endpoint <code>POST /api/task/claim</code> và <code>POST /api/task/complete</code> đã sẵn sàng, trả về JSON chuẩn theo tài liệu <code>docs/STANDARD_SQUAD_AND_WORKFLOW.md</code>.", ["🤝 Đã nhận"]),
-                ("Frontend Specialist", "09:00:15", "IO", "Xác nhận đã nhận spec từ @Backend. Đã bind dữ liệu vào các nút Claim/Complete trên Command Deck và cập nhật trạng thái realtime.", ["✅ Đã kết nối"])
-            ]
-        }
-        channel_seeds = seeds.get(channel_id, seeds["war_room"])
-        with get_connection() as conn:
-            cursor = conn.cursor()
-            for author, ctime, tag, body, reacts in channel_seeds:
-                cursor.execute("""
-                INSERT INTO chat_messages (project_id, runtime_id, author, created_time, tag, body, react_json)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                """, (project_id, channel_id, author, ctime, tag, body, json.dumps(reacts, ensure_ascii=False)))
-            conn.commit()
-
-        return get_warroom_messages(channel_id, project_id, limit)
 
     results = []
     for r in rows:
@@ -3682,13 +3633,27 @@ def get_roles_sop():
     return sop_data
 
 def get_vault_list():
-    return [
-        {"id": "SEC-01", "name": "PORT", "owner": "Docker Env", "scope": f"Container Web Port = {os.environ.get('PORT', 8888)}", "status": "sẵn sàng"},
-        {"id": "SEC-02", "name": "DATA_DIR", "owner": "Docker Env", "scope": f"Path lưu volume = {os.environ.get('DATA_DIR', '/app/data')}", "status": "sẵn sàng"},
-        {"id": "SEC-03", "name": "DOCKER_CONTAINER", "owner": "Runtime Guard", "scope": f"Cờ phát hiện môi trường = {os.environ.get('DOCKER_CONTAINER', '0')}", "status": "sẵn sàng"},
-        {"id": "SEC-04", "name": "GOOGLE_OAUTH_TOKEN", "owner": "OAuth Pool", "scope": "Token xác thực ~/.gemini & ~/.agy-profiles", "status": "đã mã hóa"},
-        {"id": "CRD-01", "name": "GitHub Token", "owner": "Owner (Ryan)", "scope": "Phục vụ publish repo lên GitHub", "status": "sẵn sàng gắn"}
+    """Cấu hình/bí mật THẬT đang có hiệu lực: biến môi trường và trạng thái đăng nhập từng OAuth profile (không lộ giá trị)."""
+    items = [
+        {"id": "ENV-PORT", "name": "PORT", "owner": "Môi trường", "scope": f"Cổng web = {os.environ.get('PORT', 8888)}", "status": "đang dùng"},
+        {"id": "ENV-DATA_DIR", "name": "DATA_DIR", "owner": "Môi trường", "scope": f"Thư mục DB = {DATA_DIR}", "status": "đang dùng"},
+        {"id": "ENV-GW_AGY_BIN", "name": "GW_AGY_BIN", "owner": "Môi trường", "scope": f"Lệnh agy = {_agy_bin()}", "status": "đã đặt" if os.environ.get("GW_AGY_BIN") else "mặc định (agy trong PATH)"},
+        {"id": "ENV-GW_EVENT_WEBHOOK_URL", "name": "GW_EVENT_WEBHOOK_URL", "owner": "Môi trường", "scope": "Webhook sự kiện task_completed / dispatch_finished", "status": "bật" if os.environ.get("GW_EVENT_WEBHOOK_URL") else "tắt"},
+        {"id": "ENV-GOOGLE_OAUTH", "name": "GOOGLE_OAUTH_CLIENT_ID/SECRET", "owner": "Môi trường (.env)", "scope": "Đổi code OAuth lấy token Google", "status": "đã cấu hình" if (GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET) else "chưa cấu hình"},
     ]
+    try:
+        for prof in get_oauth_profiles():
+            email = prof.get("email") or ""
+            items.append({
+                "id": f"OAUTH-{prof.get('id')}",
+                "name": prof.get("name") or prof.get("id"),
+                "owner": "OAuth profile",
+                "scope": prof.get("path") or "",
+                "status": (f"đã đăng nhập ({email})" if email else "đã đăng nhập") if prof.get("is_auth") else "chưa đăng nhập"
+            })
+    except Exception as e:
+        items.append({"id": "OAUTH-ERR", "name": "OAuth profiles", "owner": "OAuth profile", "scope": str(e), "status": "lỗi đọc"})
+    return items
 
 def get_ssot_events(project_id="PRJ-GEN-WORKPLACE"):
     project_id = normalize_project_id(project_id)
@@ -3758,6 +3723,7 @@ def create_new_project(name, repo_path, plan_text=""):
 
 def get_role_thinking_trace(session_id, project_id="PRJ-GEN-WORKPLACE"):
     buffer_len = 0
+    t0 = time.time()
     try:
         res = subprocess.run(["tmux", "capture-pane", "-t", session_id, "-p", "-S", "-100"],
                              capture_output=True, text=True, timeout=1.5)
@@ -3766,18 +3732,15 @@ def get_role_thinking_trace(session_id, project_id="PRJ-GEN-WORKPLACE"):
     except Exception:
         pass
     
-    est_tokens = max(120, buffer_len // 4)
-    t0 = time.time()
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT model_name, role_key FROM agent_roles WHERE id = ? OR name = ?", (session_id, session_id))
-    latency_ms = max(8, int((time.time() - t0) * 1000) + 12)
+    est_tokens = buffer_len // 4  # ước lượng ~4 ký tự/token từ buffer tmux thật; 0 khi không có phiên
+    latency_ms = int((time.time() - t0) * 1000)
 
     return {
         "session_id": session_id,
         "latency_ms": f"{latency_ms}ms",
         "tokens": f"{est_tokens:,}",
-        "buffer_chars": buffer_len
+        "buffer_chars": buffer_len,
+        "note": "latency = thời gian tmux capture-pane thật; tokens = ước lượng buffer/4"
     }
 
 def get_system_skills():
@@ -3810,14 +3773,7 @@ def get_system_skills():
                         "tag": "Installed",
                         "desc": desc or f"Kỹ năng {item} tích hợp hệ thống"
                     })
-    if not skills:
-        skills = [
-            {"name": "chief-of-staff", "tag": "C-Suite", "desc": "Điều phối toàn cục, định tuyến bài toán đến chuyên gia phù hợp."},
-            {"name": "multi-agent-dispatch", "tag": "Execution", "desc": "Điều phối tác vụ nặng xuống agent CLI chạy nền trong phiên tmux."},
-            {"name": "code-review", "tag": "Quality", "desc": "Rà soát lỗi, thẩm định bảo mật, tối ưu hiệu năng và phong cách code."},
-            {"name": "deep-research", "tag": "Research", "desc": "Nghiên cứu đa kênh chuyên sâu, đối chiếu chéo ≥3 nguồn độc lập."}
-        ]
-    return skills
+    return skills  # không có skill cài trên máy → danh sách rỗng, không bịa
 
 def get_system_mcps():
     mcp_path = os.path.join(HOME_DIR, ".gemini", "antigravity-cli", "mcp")
@@ -3833,66 +3789,11 @@ def get_system_mcps():
                     "tools": f"{tools_count} tools",
                     "status": "active"
                 })
-    if not mcps:
-        mcps = [
-            {"name": "google-drive", "desc": "Đọc ghi Google Docs, Sheets, Forms, Drive", "tools": "42 tools", "status": "active"},
-            {"name": "git-ops", "desc": "Quản trị Git repository, branch, PR và commits", "tools": "8 tools", "status": "active"}
-        ]
-    return mcps
+    return mcps  # không có MCP cài trên máy → danh sách rỗng, không bịa
 
 # =========================================================================
 # GEN WORKPLACE IDE: OWNER ↔ GEN CORE ENGINE (3-COLUMN STUDIO)
 # =========================================================================
-
-def seed_gen_workplace():
-    """Khởi tạo phiên làm việc mặc định và sổ tay tạm thời giữa Owner Ryan & Gen."""
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT count(*) FROM gen_conversations WHERE id = 'conv-gen-core-01'")
-        if cursor.fetchone()[0] == 0:
-            conv_id = "conv-gen-core-01"
-            cursor.execute("""
-            INSERT OR IGNORE INTO gen_conversations (id, project_id, title, model, account_profile, is_pinned, active_tab, active_file, open_tabs_json, active_evidence_id, owner_id)
-            VALUES (?, 'PRJ-GEN-WORKPLACE', 'Kiến Trúc & Điều Phối Swarm Tối Cao', 'Gemini 3.8 Flash (High)', 'owner_default', 1, 'files_repo', 'backend/main.py', '["backend/main.py"]', 'NOTE-01', 'owner-ryan')
-            """, (conv_id,))
-
-            # Initial messages
-            initial_msgs = [
-                ("Ryan", "user", "Chào Gen! Tôi cần rà soát lại toàn bộ kiến trúc đa tác nhân Swarm và đảm bảo mọi chuyên gia tuân thủ chặt chẽ đặc tả gốc SSOT.", "Gemini 3.8 Flash (High)", "[]"),
-                ("Gen Core", "assistant", "Chào Ryan! Tôi (Gen - Core Orchestrator) đã sẵn sàng. Toàn bộ 6 Agent trong Swarm đang vận hành trên các phiên Tmux độc lập với ranh giới Whitelist rõ ràng. Mọi chỉ thị kiến trúc của bạn sẽ được tôi ghi nhận vào Sổ tay tạm thời với mã #NOTE-01 và đối soát trực tiếp với #EVT-03 (SSOT Spec gốc).", "Gemini 3.8 Flash (High)", '["#NOTE-01", "#EVT-03"]'),
-                ("Ryan", "user", "Tuyệt vời. Nhớ lưu ý kiểm soát dung lượng token quota khi gọi model nặng và tự động compact ngữ cảnh khi đổi sang Claude hoặc Gemini Flash.", "Gemini 3.8 Flash (High)", "[]"),
-                ("Gen Core", "assistant", "Rõ chỉ thị! Cơ chế Progressive Context Compaction đã được kích hoạt. Bất cứ khi nào bạn đổi Model hoặc phiên làm việc, tôi sẽ tự động cô đọng các quyết định và gắn kèm các Note ID dữ liệu (#NOTE-01, #NOTE-02...) để làm chứng cứ nghiệm thu vững chắc mà không hao tổn quota.", "Gemini 3.8 Flash (High)", '["#NOTE-01", "#NOTE-02"]')
-            ]
-            for author, role, content, model, notes in initial_msgs:
-                cursor.execute("""
-                INSERT INTO gen_messages (conversation_id, author, role, content, model, note_ids_json, owner_id)
-                VALUES (?, ?, ?, ?, ?, ?, 'owner-ryan')
-                """, (conv_id, author, role, content, model, notes))
-
-            initial_notes = [
-                ("NOTE-01", "PRJ-GEN-WORKPLACE", conv_id, "Nguyên Tắc SSOT Tuyệt Đối", "Ryan là Single Source of Truth tối cao. Mọi thay đổi kiến trúc phải được tham chiếu từ docs/SSOT_ORIGINAL_SPEC.md.", '["SSOT", "Architecture", "Priority-1"]', "docs/SSOT_ORIGINAL_SPEC.md", "Ryan"),
-                ("NOTE-02", "PRJ-GEN-WORKPLACE", conv_id, "Ranh Giới Bảo Mật Docker Volume :z", "Container hóa toàn bộ ứng dụng trên port 8888 với cờ SELinux :z, phân tách hoàn toàn Host và Container.", '["DevOps", "Docker", "Security"]', "docker-compose.yml · git commit a4f63be", "Ryan"),
-                ("NOTE-03", "PRJ-GEN-WORKPLACE", conv_id, "Hợp Đồng Bàn Giao I/O Giữa Các Role", "Mọi handoff giữa Backend, Frontend, QA và Security phải có bằng chứng commit hash hoặc test log trước khi ký nghiệm thu.", '["SOP", "Handoff", "Verification"]', "git commit 5f91e1e (Mutex API pass)", "Gen Core")
-            ]
-            for n in initial_notes:
-                cursor.execute("""
-                INSERT OR IGNORE INTO gen_scratchpad_notes (id, project_id, conversation_id, title, content, tags_json, evidence_ref, author, owner_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'owner-ryan')
-                """, n)
-
-        # Khởi tạo phiên Gen_workplace Builder chuyên dụng nếu chưa có
-        cursor.execute("""
-        INSERT OR IGNORE INTO gen_conversations (id, project_id, title, model, account_profile, is_pinned, active_tab, active_file, open_tabs_json, active_evidence_id, owner_id)
-        VALUES ('conv-gen-builder', 'PRJ-GEN-WORKPLACE', 'Gen_workplace Builder', 'Gemini 3.8 Flash (High)', 'owner_default', 1, 'kanban_todo', 'backend/db.py', '["backend/db.py"]', 'NOTE-BUILDER-01', 'owner-ryan')
-        """)
-
-        # Đảm bảo thư mục workspace cho phiên conv-gen-builder tồn tại
-        builder_sess_dir = Path("/workspace/sessions/conv-gen-builder")
-        if not builder_sess_dir.exists():
-            builder_sess_dir = BASE_DIR / "workspace" / "sessions" / "conv-gen-builder"
-        builder_sess_dir.mkdir(parents=True, exist_ok=True)
-
-        conn.commit()
 
 def get_owner_profile(owner_id="owner-ryan"):
     """Truy xuất hồ sơ Owner Ryan cùng số liệu thống kê toàn bộ tài sản dữ liệu thuộc quyền sở hữu."""
@@ -4024,12 +3925,6 @@ def create_gen_conversation(project_id="PRJ-GEN-WORKPLACE", title="Cuộc trò c
         INSERT INTO gen_conversations (id, project_id, title, model, account_profile, is_pinned, active_tab, active_file, open_tabs_json, active_evidence_id, owner_id)
         VALUES (?, ?, ?, ?, ?, 0, 'files_repo', 'backend/main.py', '["backend/main.py"]', 'NOTE-01', ?)
         """, (conv_id, project_id, title, model, account, owner_id))
-        
-        # Initial greeting
-        cursor.execute("""
-        INSERT INTO gen_messages (conversation_id, author, role, content, model, note_ids_json, owner_id)
-        VALUES (?, 'Gen Core', 'assistant', 'Sẵn sàng phục vụ Owner Ryan! Bạn muốn giao nhiệm vụ hoặc thảo luận kiến trúc nào hôm nay?', ?, '[]', ?)
-        """, (conv_id, model, owner_id))
         conn.commit()
     return {"id": conv_id, "title": title, "model": model, "account": account, "active_tab": "files_repo", "active_file": "backend/main.py", "open_tabs": ["backend/main.py"], "active_evidence_id": "NOTE-01", "owner_id": owner_id}
 
@@ -4644,7 +4539,7 @@ def get_file_content_safely(file_path):
             except Exception as e:
                 return {"error": str(e)}
 
-    repo_base = "/app/repo"
+    repo_base = find_repo_path()
     clean_p = file_path.lstrip("/").replace("\\", "/")
     if ".." in clean_p:
         return {"error": "Invalid path"}
@@ -4673,67 +4568,6 @@ def get_file_content_safely(file_path):
 # SESSION KANBAN & INTERACTIVE CHECKLIST ENGINE (PER-SESSION DAG)
 # =========================================================================
 
-def seed_session_default_todos(conv_id):
-    """Khởi tạo danh mục Kanban Todo & Checklist ban đầu cho phiên nếu đang trống."""
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT id FROM gen_conversations WHERE id = ?", (conv_id,))
-        if not cursor.fetchone():
-            return
-        cursor.execute("SELECT count(*) FROM gen_session_todos WHERE conversation_id = ?", (conv_id,))
-        if cursor.fetchone()[0] > 0:
-            return
-
-        if conv_id == "conv-gen-builder":
-            initial_todos = [
-                # Chưa có bằng chứng kiểm được (commit/file/PR) → 'review', evidence rỗng (#4)
-                ("TSK-01", conv_id, "PRJ-GEN-WORKPLACE", "Thiết lập hạ tầng Swarm & Cách ly Workspace phiên", "Kiểm tra container gen-workplace-app và quyền đọc ghi tại thư mục /workspace/sessions/conv-gen-builder.", "review", "critical", "Builder Agent", json.dumps([
-                    {"id": "chk-1", "text": "Xác nhận container gen-workplace-app chạy trên port 8888 với cờ SELinux :z", "done": True},
-                    {"id": "chk-2", "text": "Khởi tạo thư mục /workspace/sessions/conv-gen-builder cô lập", "done": True},
-                    {"id": "chk-3", "text": "Khóa đặc tả SSOT_ORIGINAL_SPEC.md làm kim chỉ nam phát triển", "done": True}
-                ], ensure_ascii=False), "", 1, "owner-ryan"),
-                ("TSK-02", conv_id, "PRJ-GEN-WORKPLACE", "Khóa quyền sở hữu độc quyền cho Owner Ryan (owner_profiles)", "Khởi tạo bảng owner_profiles và backfill owner_id='owner-ryan' cho toàn bộ CSDL.", "review", "critical", "Builder Agent", json.dumps([
-                    {"id": "chk-1", "text": "Khởi tạo bảng owner_profiles (id='owner-ryan') trong SQLite WAL", "done": True},
-                    {"id": "chk-2", "text": "Gán cờ owner_id='owner-ryan' trên 100% các bảng dữ liệu", "done": True},
-                    {"id": "chk-3", "text": "Tích hợp huy hiệu Sovereign Profile và Modal quản trị trên Topbar", "done": True}
-                ], ensure_ascii=False), "", 2, "owner-ryan"),
-                ("TSK-03", conv_id, "PRJ-GEN-WORKPLACE", "Xây dựng phân hệ Kanban & Checklist chuyên dụng theo phiên", "Tạo tab Kanban 4 cột trong Cột 2, ràng buộc Agent bắt buộc đối soát checklist khi làm việc.", "in_progress", "high", "Builder Agent", json.dumps([
-                    {"id": "chk-1", "text": "Thiết kế bảng gen_session_todos với trường checklist_json và status", "done": True},
-                    {"id": "chk-2", "text": "Triển khai REST API quản lý todos và toggle checklist item", "done": True},
-                    {"id": "chk-3", "text": "Thêm tab Kanban & Todos trong Cột 2 với 4 cột tương tác trực tiếp", "done": True},
-                    {"id": "chk-4", "text": "Ràng buộc bắt buộc Agent phải đối soát và cập nhật checklist khi trả lời", "done": True}
-                ], ensure_ascii=False), "PRJ-GEN-WORKPLACE · session: conv-gen-builder", 3, "owner-ryan"),
-                ("TSK-04", conv_id, "PRJ-GEN-WORKPLACE", "Tự động hóa kiểm thử regression & Thẩm định bằng chứng", "Kiểm định toàn diện chu trình tương tác giữa Ryan, Gen Core và hệ thống Kanban.", "todo", "medium", "QA & Verification", json.dumps([
-                    {"id": "chk-1", "text": "Viết kịch bản kiểm thử API REST /api/gen/session/todos", "done": False},
-                    {"id": "chk-2", "text": "Kiểm tra render Headless Chrome không có lỗi JavaScript console", "done": False},
-                    {"id": "chk-3", "text": "Nghiệm thu toàn bộ tài liệu bàn giao kỹ thuật", "done": False}
-                ], ensure_ascii=False), "SOP Phase 4 Verification", 4, "owner-ryan"),
-            ]
-        else:
-            initial_todos = [
-                ("TSK-01", conv_id, "PRJ-GEN-WORKPLACE", "Tiếp nhận chỉ thị từ Owner Ryan & Phân tích nhiệm vụ", "Core Agent tiếp nhận mệnh lệnh từ Ryan, đối soát đặc tả SSOT và lập danh mục checklist.", "in_progress", "high", "Gen Core", json.dumps([
-                    {"id": "chk-1", "text": "Nhận diện yêu cầu và chỉ thị trực tiếp từ Owner Ryan trong phòng chat", "done": True},
-                    {"id": "chk-2", "text": "Đối soát các ràng buộc kiến trúc với docs/SSOT_ORIGINAL_SPEC.md", "done": False},
-                    {"id": "chk-3", "text": "Ghi nhận mã bằng chứng Note ID tương ứng vào Sổ tay Scratchpad", "done": False}
-                ], ensure_ascii=False), "docs/SSOT_ORIGINAL_SPEC.md", 1, "owner-ryan"),
-                ("TSK-02", conv_id, "PRJ-GEN-WORKPLACE", "Thực thi tác vụ & Cập nhật tiến độ theo từng checklist", "Thực hiện từng hạng mục kỹ thuật, lưu log vật lý và kiểm tra kết quả.", "todo", "high", "Gen Core", json.dumps([
-                    {"id": "chk-1", "text": "Thực thi lệnh code hoặc script qua agy CLI thời gian thực", "done": False},
-                    {"id": "chk-2", "text": "Kiểm tra trạng thái thoát (exit code) và dữ liệu đầu ra", "done": False},
-                    {"id": "chk-3", "text": "Đánh dấu hoàn thành checklist [x] và chuyển task sang review", "done": False}
-                ], ensure_ascii=False), "agy CLI turn log", 2, "owner-ryan"),
-                ("TSK-03", conv_id, "PRJ-GEN-WORKPLACE", "Báo cáo nghiệm thu kết quả cho Owner Ryan", "Tổng kết kết quả thực hiện, đối chiếu bằng chứng và sẵn sàng nhận chỉ thị tiếp theo.", "todo", "medium", "Gen Core", json.dumps([
-                    {"id": "chk-1", "text": "Tổng hợp kết quả ngắn gọn, sắc nét theo chuẩn Executive Assistant", "done": False},
-                    {"id": "chk-2", "text": "Cập nhật trạng thái task sang Hoàn thành (Done)", "done": False}
-                ], ensure_ascii=False), "Báo cáo điều hành", 3, "owner-ryan"),
-            ]
-
-        for t in initial_todos:
-            cursor.execute("""
-            INSERT OR IGNORE INTO gen_session_todos (id, conversation_id, project_id, title, description, status, priority, assigned_agent, checklist_json, evidence_ref, order_idx, owner_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, t)
-        conn.commit()
-
 def get_gen_session_todos(conv_id, project_id="PRJ-GEN-WORKPLACE"):
     """Lấy danh sách Kanban Todo & Checklist chuyên dụng của phiên cụ thể."""
     with get_connection() as conn:
@@ -4744,17 +4578,6 @@ def get_gen_session_todos(conv_id, project_id="PRJ-GEN-WORKPLACE"):
         ORDER BY order_idx ASC, id ASC
         """, (conv_id,))
         rows = cursor.fetchall()
-        
-        # Nếu phiên chưa có todo nào, tự động seed bộ todo mẫu tương ứng
-        if not rows:
-            seed_session_default_todos(conv_id)
-            cursor.execute("""
-            SELECT * FROM gen_session_todos 
-            WHERE conversation_id = ?
-            ORDER BY order_idx ASC, id ASC
-            """, (conv_id,))
-            rows = cursor.fetchall()
-
         todos = []
         for r in rows:
             d = dict(r)
@@ -5160,7 +4983,5 @@ def verify_mcp_request_auth(headers=None, query=None, tool_name=None):
 init_db()
 seed_real_project()
 seed_tmux_sessions()
-seed_ssot_events()
-seed_gen_workplace()
 
 
