@@ -184,6 +184,16 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             self._send_json(200, db.get_mcp_auth_status())
             return
 
+        # 0.8. Nhật ký dispatch (agy thật chạy từ chatroom): GET /api/dispatch/log?limit=50 → {"items": [...], "count": n}
+        if path == "/api/dispatch/log":
+            limit = query.get("limit", ["50"])[0]
+            try:
+                items = db.get_dispatch_log(limit)
+                self._send_json(200, {"items": items, "count": len(items), "webhook_enabled": bool(os.environ.get("GW_EVENT_WEBHOOK_URL"))})
+            except Exception as e:
+                self._send_json(500, {"error": str(e)})
+            return
+
         # 0.9. Nhật ký allowlist lệnh gửi vào tmux (audit)
         if path == "/api/directive/audit":
             limit = query.get("limit", ["100"])[0]
@@ -1041,9 +1051,16 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             checklist = data.get("checklist", [])
             evidence_ref = data.get("evidence_ref", "")
             owner_id = data.get("owner_id", "owner-ryan")
+            viec_ref = (data.get("viec_ref") or "").strip()
+            try:
+                order_idx = int(data.get("order_idx", 0) or 0)
+            except (TypeError, ValueError):
+                order_idx = 0
             if conv_id and title:
-                res = db.save_gen_session_todo(conv_id, todo_id, title, description, status, priority, assigned_agent, checklist, evidence_ref, owner_id)
-                self._send_json(200, res)
+                # Tạo mới (không có id / id chưa tồn tại) bắt buộc viec_ref khớp ^VIEC-[0-9]+$ → thiếu/sai trả 400
+                res = db.save_gen_session_todo(conv_id, todo_id, title, description, status, priority, assigned_agent, checklist,
+                                               evidence_ref, order_idx=order_idx, owner_id=owner_id, viec_ref=viec_ref)
+                self._send_json(400 if "error" in res else 200, res)
             else:
                 self._send_json(400, {"error": "Missing conv_id or title"})
             return

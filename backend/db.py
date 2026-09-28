@@ -293,7 +293,8 @@ def init_db():
             ("depends_on", "TEXT DEFAULT ''"),
             ("locked_at", "TEXT DEFAULT ''"),
             ("evidence_ref", "TEXT DEFAULT ''"),
-            ("verified_by", "TEXT DEFAULT ''")
+            ("verified_by", "TEXT DEFAULT ''"),
+            ("viec_ref", "TEXT DEFAULT ''")
         ]:
             try:
                 cursor.execute(f"ALTER TABLE todos ADD COLUMN {col} {col_type};")
@@ -500,6 +501,11 @@ def init_db():
         );
         """)
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_gen_sess_todos_conv ON gen_session_todos(conversation_id, status);")
+        # Mã việc trong Kho Ryan (VIEC-n) gắn với task (Issue #12)
+        try:
+            cursor.execute("ALTER TABLE gen_session_todos ADD COLUMN viec_ref TEXT DEFAULT '';")
+        except Exception:
+            pass
 
         # 21. MCP Agent Tokens & Permissions (Chuẩn bảo mật Gen-hub OAuth / Bearer)
         cursor.execute("""
@@ -566,6 +572,11 @@ def init_db():
             finished_at TEXT DEFAULT ''
         );
         """)
+        for col, col_type in [("task_id", "TEXT DEFAULT ''"), ("viec_ref", "TEXT DEFAULT ''"), ("channel_id", "TEXT DEFAULT ''"), ("webhook_sent", "INTEGER DEFAULT 0")]:
+            try:
+                cursor.execute(f"ALTER TABLE dispatch_log ADD COLUMN {col} {col_type};")
+            except Exception:
+                pass
 
         conn.commit()
 
@@ -870,7 +881,9 @@ def get_full_state(project_id="PRJ-GEN-WORKPLACE"):
                     "id": t["id"],
                     "title": t["title"],
                     "role": t["assigned_role"],
-                    "status": t["status"]
+                    "status": t["status"],
+                    "viec_ref": t["viec_ref"] or "",
+                    "evidence_ref": t["evidence_ref"] or ""
                 })
             todos.append(rm_todos)
 
@@ -1006,7 +1019,7 @@ def get_full_state(project_id="PRJ-GEN-WORKPLACE"):
             "done": []
         }
         for t in all_todos:
-            item = [t["id"], t["title"], t["assigned_role"].split()[0]]
+            item = [t["id"], t["title"], (t["assigned_role"] or "").split()[0] if (t["assigned_role"] or "").strip() else "", t["viec_ref"] or ""]
             st = t["status"]
             if st == "done":
                 kanban["done"].append(item)
@@ -2057,19 +2070,24 @@ def get_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
             task_status = "idle"
             task_roadmap = ""
             evidence_ref = ""
+            task_viec_ref = ""
             if task_id:
-                cursor.execute("SELECT title, status, roadmap_id, evidence_ref FROM todos WHERE id = ? LIMIT 1", (task_id,))
+                cursor.execute("SELECT title, status, roadmap_id, evidence_ref, viec_ref FROM todos WHERE id = ? LIMIT 1", (task_id,))
                 t_row = cursor.fetchone()
+                if not t_row:
+                    cursor.execute("SELECT title, status, '' AS roadmap_id, evidence_ref, viec_ref FROM gen_session_todos WHERE id = ? LIMIT 1", (task_id,))
+                    t_row = cursor.fetchone()
                 if t_row:
                     task_title = t_row["title"]
                     task_status = t_row["status"]
                     task_roadmap = t_row["roadmap_id"] or ""
                     evidence_ref = t_row["evidence_ref"] or ""
+                    task_viec_ref = t_row["viec_ref"] or ""
             else:
                 # Tìm task gần nhất đã hoàn tất của chuyên gia này để thể hiện bằng chứng nghiệm thu thực tế
                 role_first_word = r["role_name"].split()[0]
                 cursor.execute("""
-                SELECT id, title, status, roadmap_id, evidence_ref 
+                SELECT id, title, status, roadmap_id, evidence_ref, viec_ref
                 FROM todos 
                 WHERE (assigned_role = ? OR assigned_role LIKE ?) AND status = 'done'
                 ORDER BY id DESC LIMIT 1
@@ -2081,6 +2099,7 @@ def get_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
                     task_status = "done"
                     task_roadmap = last_t["roadmap_id"] or ""
                     evidence_ref = last_t["evidence_ref"] or ""
+                    task_viec_ref = last_t["viec_ref"] or ""
 
             results.append({
                 "id": r["id"],
@@ -2105,6 +2124,7 @@ def get_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
                 "task_title": task_title,
                 "task_status": task_status,
                 "task_roadmap": task_roadmap,
+                "task_viec_ref": task_viec_ref,
                 "evidence_ref": evidence_ref,
                 "attach_cmd": f"tmux attach -t {r['id']}",
                 "updated_at": r["updated_at"]
@@ -2924,9 +2944,9 @@ def dispatch_swarm_workflow(project_id="PRJ-GEN-WORKPLACE", session_id=None):
             if not task_id:
                 results[sid] = {"status": "error", "reason": f"Worker {sid} không có task đang gán (current_task_id rỗng). Hãy claim task trước."}
                 continue
-            t = conn.execute("SELECT id, title, status FROM todos WHERE id = ? AND project_id = ?", (task_id, project_id)).fetchone()
+            t = conn.execute("SELECT id, title, status, viec_ref FROM todos WHERE id = ? AND project_id = ?", (task_id, project_id)).fetchone()
             if not t:
-                t = conn.execute("SELECT id, title, status FROM gen_session_todos WHERE id = ? AND project_id = ?", (task_id, project_id)).fetchone()
+                t = conn.execute("SELECT id, title, status, viec_ref FROM gen_session_todos WHERE id = ? AND project_id = ?", (task_id, project_id)).fetchone()
             if not t:
                 results[sid] = {"status": "error", "reason": f"Task {task_id} gán cho {sid} không tồn tại trong todos/gen_session_todos", "task_id": task_id}
                 continue
@@ -2935,7 +2955,7 @@ def dispatch_swarm_workflow(project_id="PRJ-GEN-WORKPLACE", session_id=None):
                 continue
             p_dir = os.path.expanduser(row["profile_dir"]) if row["profile_dir"] else _profile_dir(row["account_type"] or "owner_default")
             cmd, report_path = build_task_directive(sid, task_id, t["title"], p_dir)
-            results[sid] = {"status": "pending", "task_id": task_id, "task_title": t["title"], "command": cmd, "report_path": report_path}
+            results[sid] = {"status": "pending", "task_id": task_id, "task_title": t["title"], "viec_ref": t["viec_ref"] or "", "command": cmd, "report_path": report_path}
 
     for sid, r in results.items():
         if r["status"] != "pending":
@@ -3140,7 +3160,12 @@ def complete_task(session_id, todo_id, evidence_ref, verified_by="Lead Architect
         """, (session_id,))
 
         conn.commit()
-        return {"status": "completed", "task_id": todo_id, "evidence_ref": evidence_ref, "verified_by": verified_by, "verify_message": msg}
+
+    viec_ref = get_task_viec_ref(todo_id, project_id)
+    webhook_sent = send_event_webhook("task_completed", project_id=project_id, viec_ref=viec_ref, task_id=todo_id,
+                                      session_id=session_id, exit_code=None, report_path="", evidence_ref=evidence_ref, verified_by=verified_by)
+    return {"status": "completed", "task_id": todo_id, "viec_ref": viec_ref, "evidence_ref": evidence_ref, "verified_by": verified_by,
+            "verify_message": msg, "webhook_sent": webhook_sent}
 
 def reclaim_stalled_tasks(timeout_seconds=300, project_id="PRJ-GEN-WORKPLACE"):
     """
@@ -3197,6 +3222,74 @@ def get_warroom_messages(channel_id="war_room", project_id="PRJ-GEN-WORKPLACE", 
             "reacts": reacts
         })
     return results
+
+# ---------------------------------------------------------------------------
+# Việc gắn VIEC-n (Kho Ryan) + webhook sự kiện (Issue #12)
+# ---------------------------------------------------------------------------
+VIEC_REF_RE = re.compile(r"^VIEC-[0-9]+$")
+VIEC_REF_ERROR = "Thiếu viec_ref (mã việc trong Kho Ryan, vd VIEC-12)"
+EVENT_WEBHOOK_TIMEOUT_SEC = 5
+
+def validate_viec_ref(viec_ref):
+    """(ok, giá trị đã chuẩn hóa). Hợp lệ khi khớp ^VIEC-[0-9]+$."""
+    v = (viec_ref or "").strip().upper()
+    return (bool(VIEC_REF_RE.match(v)), v)
+
+def get_task_viec_ref(task_id, project_id="PRJ-GEN-WORKPLACE"):
+    """viec_ref của task trong todos hoặc gen_session_todos ('' nếu không có)."""
+    if not task_id:
+        return ""
+    try:
+        with get_connection() as conn:
+            for tbl in ("todos", "gen_session_todos"):
+                r = conn.execute(f"SELECT viec_ref FROM {tbl} WHERE id = ? AND project_id = ?", (task_id, project_id)).fetchone()
+                if r:
+                    return r["viec_ref"] or ""
+    except Exception:
+        pass
+    return ""
+
+def send_event_webhook(event, project_id="PRJ-GEN-WORKPLACE", viec_ref="", task_id="", session_id="", exit_code=None,
+                       report_path="", evidence_ref="", verified_by=""):
+    """
+    POST JSON tới GW_EVENT_WEBHOOK_URL (env; rỗng = tắt) khi task hoàn tất / dispatch kết thúc.
+    Payload: {event, project_id, viec_ref, task_id, session_id, exit_code, report_path, evidence_ref, verified_by, at}.
+    Timeout 5s; lỗi chỉ log, không ném. Trả True khi gửi được (HTTP 2xx).
+    """
+    url = (os.environ.get("GW_EVENT_WEBHOOK_URL") or "").strip()
+    if not url:
+        return False
+    payload = {
+        "event": event,
+        "project_id": normalize_project_id(project_id),
+        "viec_ref": viec_ref or "",
+        "task_id": task_id or "",
+        "session_id": session_id or "",
+        "exit_code": exit_code,
+        "report_path": report_path or "",
+        "evidence_ref": evidence_ref or "",
+        "verified_by": verified_by or "",
+        "at": datetime.now().astimezone().isoformat(timespec="seconds"),
+    }
+    try:
+        import urllib.request
+        req = urllib.request.Request(url, data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+                                     headers={"Content-Type": "application/json", "User-Agent": "gen-workplace-webhook"}, method="POST")
+        with urllib.request.urlopen(req, timeout=EVENT_WEBHOOK_TIMEOUT_SEC) as resp:
+            ok = 200 <= resp.status < 300
+            if not ok:
+                print(f"[webhook] {event} → HTTP {resp.status}")
+            return ok
+    except Exception as e:
+        print(f"[webhook] Không gửi được {event} tới {url}: {e}")
+        return False
+
+def get_dispatch_log(limit=50):
+    """Nhật ký dispatch_log (mới nhất trước) cho GET /api/dispatch/log."""
+    limit = max(1, min(int(limit or 50), 500))
+    with get_connection() as conn:
+        rows = conn.execute("SELECT * FROM dispatch_log ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+        return [dict(r) for r in rows]
 
 WARROOM_ROLE_SESSIONS = {
     "backend": "gw-backend-agy",
@@ -3288,6 +3381,17 @@ def dispatch_warroom_to_agent(project_id, channel_id, session_id, message, timeo
         print(f"[dispatch] Không ghi được báo cáo: {e}")
         report_path = ""
 
+    task_id = ""
+    try:
+        with get_connection() as conn:
+            r = conn.execute("SELECT current_task_id FROM tmux_sessions WHERE id = ?", (session_id,)).fetchone()
+            task_id = (r["current_task_id"] or "") if r else ""
+    except Exception:
+        pass
+    viec_ref = get_task_viec_ref(task_id, project_id)
+    webhook_sent = send_event_webhook("dispatch_finished", project_id=project_id, viec_ref=viec_ref, task_id=task_id,
+                                      session_id=session_id, exit_code=exit_code, report_path=report_path)
+
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
@@ -3295,11 +3399,12 @@ def dispatch_warroom_to_agent(project_id, channel_id, session_id, message, timeo
         VALUES (?, ?, ?, ?, ?, ?, ?)
         """, (project_id, channel_id, session_id, time.strftime("%H:%M:%S"), "Report", body, json.dumps(["🤖 agy thật"], ensure_ascii=False)))
         cursor.execute("""
-        INSERT INTO dispatch_log (session_id, command, exit_code, report_path, started_at, finished_at)
-        VALUES (?, ?, ?, ?, ?, ?)
-        """, (session_id, " ".join(cmd), exit_code, report_path, started_at, finished_at))
+        INSERT INTO dispatch_log (session_id, command, exit_code, report_path, started_at, finished_at, task_id, viec_ref, channel_id, webhook_sent)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (session_id, " ".join(cmd), exit_code, report_path, started_at, finished_at, task_id, viec_ref, channel_id, 1 if webhook_sent else 0))
         conn.commit()
-    return {"session_id": session_id, "exit_code": exit_code, "report_path": report_path, "cwd": cwd, "elapsed_sec": round(time.time() - t0, 1)}
+    return {"session_id": session_id, "exit_code": exit_code, "report_path": report_path, "cwd": cwd, "elapsed_sec": round(time.time() - t0, 1),
+            "task_id": task_id, "viec_ref": viec_ref, "webhook_sent": webhook_sent}
 
 def post_warroom_message(project_id="PRJ-GEN-WORKPLACE", channel_id="war_room", author="Ryan (Owner)", message="", tag="Directive", wait=False):
     """Lưu tin nhắn; tin có @backend|@frontend|@devops|@qa|@security|@lead → chạy agy thật của vai đó ở thread nền (wait=True chạy đồng bộ, dùng cho test). Không có @vai → chỉ lưu (#3)."""
@@ -4594,14 +4699,35 @@ def get_gen_session_todos(conv_id, project_id="PRJ-GEN-WORKPLACE"):
             todos.append(d)
         return todos
 
-def save_gen_session_todo(conv_id, todo_id=None, title="Nhiệm vụ mới", description="", status="todo", priority="high", assigned_agent="Gen Core", checklist=None, evidence_ref="", order_idx=0, owner_id="owner-ryan"):
+def save_gen_session_todo(conv_id, todo_id=None, title="Nhiệm vụ mới", description="", status="todo", priority="high", assigned_agent="Gen Core", checklist=None, evidence_ref="", order_idx=0, owner_id="owner-ryan", viec_ref=""):
+    """
+    Tạo mới / cập nhật task Kanban của phiên. TẠO MỚI bắt buộc viec_ref khớp ^VIEC-[0-9]+$ (mã việc Kho Ryan),
+    thiếu/sai → {"error": "Thiếu viec_ref (mã việc trong Kho Ryan, vd VIEC-12)"}. Cập nhật: viec_ref rỗng → giữ giá trị cũ.
+    """
     checklist = checklist or []
+    viec_ok, viec_ref = validate_viec_ref(viec_ref)
     with get_connection() as conn:
         cursor = conn.cursor()
+        is_new = True
+        if todo_id:
+            cursor.execute("SELECT viec_ref FROM gen_session_todos WHERE id = ? AND conversation_id = ?", (todo_id, conv_id))
+            existing = cursor.fetchone()
+            if existing:
+                is_new = False
+                if not viec_ref:
+                    viec_ref = existing["viec_ref"] or ""
+                    viec_ok = True
+        if is_new and not viec_ok:
+            return {"error": VIEC_REF_ERROR, "viec_ref": viec_ref, "id": todo_id}
+        if not is_new and viec_ref and not viec_ok:
+            return {"error": f"viec_ref '{viec_ref}' sai định dạng (vd VIEC-12)", "viec_ref": viec_ref, "id": todo_id}
         if not todo_id:
             cursor.execute("SELECT count(*) FROM gen_session_todos WHERE conversation_id = ?", (conv_id,))
             num = cursor.fetchone()[0] + 1
             todo_id = f"TSK-{num:02d}"
+            while cursor.execute("SELECT 1 FROM gen_session_todos WHERE id = ?", (todo_id,)).fetchone():
+                num += 1
+                todo_id = f"TSK-{num:02d}"
 
         normalized_chk = []
         for idx, item in enumerate(checklist, 1):
@@ -4615,8 +4741,8 @@ def save_gen_session_todo(conv_id, todo_id=None, title="Nhiệm vụ mới", des
                 })
 
         cursor.execute("""
-        INSERT INTO gen_session_todos (id, conversation_id, project_id, title, description, status, priority, assigned_agent, checklist_json, evidence_ref, order_idx, owner_id)
-        VALUES (?, ?, 'PRJ-GEN-WORKPLACE', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO gen_session_todos (id, conversation_id, project_id, title, description, status, priority, assigned_agent, checklist_json, evidence_ref, order_idx, owner_id, viec_ref)
+        VALUES (?, ?, 'PRJ-GEN-WORKPLACE', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
             title = excluded.title,
             description = excluded.description,
@@ -4627,10 +4753,11 @@ def save_gen_session_todo(conv_id, todo_id=None, title="Nhiệm vụ mới", des
             evidence_ref = excluded.evidence_ref,
             order_idx = excluded.order_idx,
             owner_id = excluded.owner_id,
+            viec_ref = CASE WHEN excluded.viec_ref != '' THEN excluded.viec_ref ELSE gen_session_todos.viec_ref END,
             updated_at = CURRENT_TIMESTAMP
-        """, (todo_id, conv_id, title, description, status, priority, assigned_agent, json.dumps(normalized_chk, ensure_ascii=False), evidence_ref, order_idx, owner_id))
+        """, (todo_id, conv_id, title, description, status, priority, assigned_agent, json.dumps(normalized_chk, ensure_ascii=False), evidence_ref, order_idx, owner_id, viec_ref))
         conn.commit()
-    return {"status": "saved", "id": todo_id, "title": title}
+    return {"status": "saved", "id": todo_id, "title": title, "viec_ref": viec_ref, "created": is_new}
 
 def toggle_gen_session_todo_checklist_item(conv_id, todo_id, item_id, done_status=None):
     with get_connection() as conn:

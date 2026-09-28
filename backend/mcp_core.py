@@ -242,7 +242,7 @@ TOOLS = [
     # ---------------- Kanban & Task Governance ----------------
     {
         "name": "list_kanban_tasks",
-        "description": "Liệt kê danh sách nhiệm vụ Kanban trong phiên làm việc, kèm trạng thái (todo, in_progress, review, done), độ ưu tiên, danh sách checklist con, agent được giao và bằng chứng nghiệm thu.",
+        "description": "Liệt kê danh sách nhiệm vụ Kanban trong phiên làm việc, kèm trạng thái (todo, in_progress, review, done), độ ưu tiên, danh sách checklist con, agent được giao, viec_ref (mã việc Kho Ryan) và bằng chứng nghiệm thu.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -256,7 +256,7 @@ TOOLS = [
     },
     {
         "name": "create_kanban_task",
-        "description": "Tạo nhiệm vụ mới trên bảng Kanban của phiên với checklist con và độ ưu tiên.",
+        "description": "Tạo nhiệm vụ mới trên bảng Kanban của phiên với checklist con và độ ưu tiên. BẮT BUỘC viec_ref = mã việc trong Kho Ryan (dạng VIEC-<số>, vd VIEC-12).",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -268,6 +268,10 @@ TOOLS = [
                 "title": {
                     "type": "string",
                     "description": "Tiêu đề nhiệm vụ."
+                },
+                "viec_ref": {
+                    "type": "string",
+                    "description": "Mã việc trong Kho Ryan, bắt buộc, khớp ^VIEC-[0-9]+$ (vd 'VIEC-12')."
                 },
                 "description": {
                     "type": "string",
@@ -289,7 +293,7 @@ TOOLS = [
                     "description": "Danh sách các đầu việc con (checklist items) dạng text."
                 }
             },
-            "required": ["title"]
+            "required": ["title", "viec_ref"]
         }
     },
     {
@@ -810,12 +814,13 @@ def execute_tool(name: str, args: dict) -> dict:
             priority = args.get("priority", "high")
             assigned = args.get("assigned_agent", "Gen Core")
             raw_checklist = args.get("checklist") or []
+            viec_ref = (args.get("viec_ref") or "").strip()
             # Chuyển checklist strings thành dạng object nếu cần
             checklist_items = []
             for idx, c in enumerate(raw_checklist):
                 checklist_items.append({"id": f"chk-{int(time.time()*1000)}-{idx}", "text": str(c), "done": False})
-            res = db.save_gen_session_todo(conv_id, None, title, desc, "todo", priority, assigned, checklist_items, "", 0, "owner-ryan")
-            return {"content": [{"type": "text", "text": json.dumps(res, ensure_ascii=False, indent=2)}], "isError": False}
+            res = db.save_gen_session_todo(conv_id, None, title, desc, "todo", priority, assigned, checklist_items, "", 0, "owner-ryan", viec_ref=viec_ref)
+            return {"content": [{"type": "text", "text": json.dumps(res, ensure_ascii=False, indent=2)}], "isError": "error" in res}
 
         # 13. claim_task
         if name == "claim_task":
