@@ -1,7 +1,6 @@
 # 🏛️ KIẾN TRÚC KỸ THUẬT & LUỒNG DỮ LIỆU (ARCHITECTURE & STATE FLOW)
 > **Dự án:** `GEN-WORKPLACE`  
-> **Phiên:** `Gen_workplace Builder` (`conv-gen-builder`)  
-> **Tài liệu tham chiếu:** [`PROJECT_HANDOFF_SSOT.md`](file:///workspace/sessions/conv-gen-builder/docs/PROJECT_HANDOFF_SSOT.md)
+> **Tài liệu tham chiếu:** [`PROJECT_HANDOFF_SSOT.md`](PROJECT_HANDOFF_SSOT.md) · hợp đồng API Issue #12: [`OPERATIONAL_GUIDE.md`](OPERATIONAL_GUIDE.md) mục 3.8
 
 ---
 
@@ -18,7 +17,7 @@
        │  (2) Xác thực & Tra cứu thông tin phiên
        ▼
  [Database Engine: backend/db.py]
-       ├───► [SQLite 3 WAL: /app/data/gen-workplace.db] (Ghi nhận tin nhắn user, status)
+       ├───► [SQLite 3 WAL: $DATA_DIR/gen-workplace.db, mặc định <repo>/data/] (Ghi nhận tin nhắn user, status)
        │
        │  (3) Kích hoạt Core Agent CLI Process
        ▼
@@ -51,22 +50,11 @@
 Mỗi phiên chat ở Cột 1 sở hữu một không gian làm việc độc lập tại `/workspace/sessions/<conv_id>/`:
 
 ```
-/workspace/sessions/
-├── conv-gen-core-01/          <-- Phiên Điều Phối Tối Cao
-│   ├── docs/
-│   ├── src/
-│   └── README.md
-├── conv-gen-builder/          <-- Phiên Gen_workplace Builder (Phiên hiện tại)
-│   ├── docs/
-│   │   ├── PROJECT_HANDOFF_SSOT.md
-│   │   ├── ARCHITECTURE_STATE.md
-│   │   ├── OPERATIONAL_GUIDE.md
-│   │   └── SSOT_ORIGINAL_SPEC.md
-│   ├── src/
-│   │   └── handoff_summary.json
-│   └── README.md
-└── conv-2bec3f7f/             <-- Các phiên làm việc chuyên đề khác
+<repo>/workspace/sessions/        (hoặc /workspace/sessions nếu thư mục đó tồn tại)
+├── conv-orchestrator/         <-- Phiên agy của Orchestrator chat (/api/orch/chat), tự tạo khi cần
+└── conv-2bec3f7f/             <-- Các phiên làm việc do người dùng tạo (id ngẫu nhiên conv-<8 hex>)
 ```
+> Từ Issue #12 không còn phiên mẫu `conv-gen-core-01` / `conv-gen-builder`, không còn tin nhắn, ghi chú hay TSK mẫu; DB mới chỉ có project, 6 vai, cấu hình tmux, hồ sơ owner và token MCP.
 
 Khi Sếp chọn một phiên ở Cột 1:
 - Cột 2 tự động tải danh sách tệp thuộc thư mục của phiên đó.

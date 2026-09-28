@@ -192,7 +192,7 @@ TOOLS = [
     },
     {
         "name": "post_warroom_message",
-        "description": "Đăng tin nhắn / chỉ thị vào phòng họp chung War Room. Tin có @backend, @frontend, @devops, @qa, @security hoặc @lead sẽ được chuyển cho agy thật của vai đó chạy nền (--mode plan --sandbox) và trả lời thật xuất hiện trong kênh; không có @vai thì chỉ lưu.",
+        "description": "Đăng tin nhắn / chỉ thị vào phòng họp chung War Room. Tin có @backend, @frontend, @devops, @qa, @security hoặc @lead sẽ được chuyển cho agy thật của vai đó chạy nền (--mode plan, trong worktree riêng của vai) và trả lời thật xuất hiện trong kênh; không có @vai thì chỉ lưu.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -596,7 +596,7 @@ TOOLS = [
     },
     {
         "name": "get_system_status",
-        "description": "Lấy tổng thể trạng thái hệ thống: container runtime, kết nối SQLite, trạng thái SSOT, số lượng agent và thông tin dự án.",
+        "description": "Lấy tổng thể trạng thái hệ thống: tiến trình control plane trên host, kết nối SQLite, số lượng vai/runtime và thông tin dự án.",
         "inputSchema": {
             "type": "object",
             "properties": {}

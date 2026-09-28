@@ -627,130 +627,19 @@ def seed_real_project():
         conn.commit()
 
 # ---------------------------------------------------------------------------
-# Issue #12: bản ghi seed giả của các phiên bản trước (liệt kê tường minh theo ID + tiêu đề/nội dung đúng như code seed cũ).
-# purge_seed_data() chạy cuối init_db(), idempotent, chỉ xóa đúng các bản ghi này.
+# Issue #12: bản ghi seed giả của các phiên bản trước — danh sách tường minh (ID + tiêu đề/nội dung đúng như code seed cũ)
+# nằm trong backend/seed_purge_list.json. purge_seed_data() chạy cuối init_db(), idempotent, chỉ xóa đúng các bản ghi này.
 # ---------------------------------------------------------------------------
-SEED_ROADMAPS = {
-    'RM-01': 'Core Architecture & SSOT Spec',
-    'RM-02': 'Docker Engine & Live Mount',
-    'RM-03': 'One-Command TUI Installer',
-    'RM-04': 'SQLite Database & CLI Connectors',
-    'RM-05': 'GitHub Publication & Release',
-}
-SEED_TODOS = {
-    'TODO-01': 'Khởi tạo Git repo và lưu cấu trúc dự án',
-    'TODO-02': 'Lưu đặc tả gốc vào docs/SSOT_ORIGINAL_SPEC.md',
-    'TODO-03': 'Chuyển đổi giao diện sang phong cách Gen-workplace v1.1',
-    'TODO-04': 'Viết Dockerfile container hóa Python backend + WebApp',
-    'TODO-05': 'Cấu hình docker-compose live mount với cờ SELinux :z',
-    'TODO-06': 'Xây dựng installer_tui.py với thanh loading % đồ họa',
-    'TODO-07': 'Kịch bản install.sh tự động kiểm tra Git & Docker daemon',
-    'TODO-08': 'Tạo shortcut Desktop Gen-workplace.desktop tự động',
-    'TODO-09': 'Khởi tạo SQLite WAL DB & FTS5 virtual table',
-    'TODO-10': 'Kết nối API /api/state và /api/catalog với SQLite',
-    'TODO-11': 'Tích hợp Process Runner gọi agy CLI thời gian thực',
-    'TODO-12': 'Kiểm thử cross-platform trên macOS và Windows WSL2',
-    'TODO-13': 'Publish repository lên GitHub và gắn release v1.0',
-}
-SEED_WORKFLOW_NODES = {
-    'NODE-01': 'Spec Ingestion', 'NODE-02': 'Container & Live Mount', 'NODE-03': 'TUI Installer & Icon',
-    'NODE-04': 'Database & Catalog Engine', 'NODE-05': 'Cross-Platform QA', 'NODE-06': 'GitHub Release & Freeze',
-}
-SEED_RUNTIMES = {
-    'runtime-01': 'Lead Architect', 'runtime-02': 'Backend & DB Specialist', 'runtime-03': 'Frontend Specialist',
-    'runtime-04': 'DevOps & Packaging', 'runtime-05': 'QA Tester', 'runtime-06': 'Security Auditor',
-}
-SEED_MASTER_SSOT = {
-    'SSOT-SPEC-01': 'Đặc Tả Gốc Bất Biến Của Owner (Ryan)',
-    'SSOT-INSTALL-02': 'Tiêu Chuẩn Cài Đặt 1 Lệnh TUI & Desktop Shortcut',
-    'SSOT-DOCKER-03': 'Môi Trường Container Hóa Khép Kín Đa Nền Tảng',
-    'SSOT-LIVE-MOUNT-04': 'Cơ Chế Live Mount Hot-Reload (:z SELinux)',
-    'SSOT-TASK-MUTEX-05': 'Kỷ Luật Thép Task Mutex Khóa Độc Quyền (Anti-Chaos)',
-    'SSOT-EVIDENCE-06': 'Tiêu Chuẩn Nghiệm Thu Kép (Dual-Gate Verification)',
-    'SSOT-FTS5-CATALOG-07': 'Catalog Tra Nhanh Sub-Millisecond (Zero-Audit Tokens)',
-    'SSOT-ORCH-SWARM-08': 'Cơ Chế Phân Cấp Mệnh Lệnh 3 Tầng Kỷ Luật',
-}
-SEED_CATALOG = {
-    '#FILE-01': 'docs/SSOT_ORIGINAL_SPEC.md', '#FILE-02': 'frontend/index.html', '#FILE-03': 'backend/main.py',
-    '#FILE-04': 'installer_tui.py', '#FILE-05': 'docker-compose.yml', '#FILE-06': 'Gen-workplace.desktop',
-    '#SEC-01': 'Docker Container Sandbox Boundary', '#SEC-02': 'Master Prompt Instruction Lock',
-    '#MCP-01': 'google-drive MCP Server', '#MCP-02': 'git-ops CLI Integration',
-    '#TOOL-01': 'Gemini CLI (agy)', '#TOOL-02': 'Claude Code CLI', '#TOOL-03': 'Codex Security CLI',
-    '#DB-01': 'SQLite 3 WAL Database',
-    '#EVT-01': 'Khởi tạo repo và commit đầu tiên 5f91e1e',
-    '#EVT-02': 'Cấu hình Live Mount Hot-Reload commit ae4e196',
-    '#EVT-03': 'Xóa sạch mock data, bind dữ liệu thật commit a4f63be',
-}
-SEED_SSOT_EVENTS = {
-    'EVT-01': 'Khởi động container gen-workplace-app với live bind mount :z',
-    'EVT-02': 'Kiểm thử kịch bản installer_tui.py và tạo Desktop icon',
-    'EVT-03': 'Lưu trữ đặc tả gốc của Owner thành SSOT bất biến',
-    'EVT-04': 'Triển khai SQLite WAL mode và FTS5 Full-Text Catalog',
-    'EVT-05': 'Kiểm thử chu kỳ Auto-Wake 68ms và API Regression Suite',
-}
-SEED_ROLE_MEMORIES = [
-    ('Lead Architect', 'Bảo tồn đặc tả SSOT gốc (docs/SSOT_ORIGINAL_SPEC.md), quản lý chuỗi Todo DAG, kiểm soát ranh giới Whitelist và duyệt bằng chứng nghiệm thu commit hash.'),
-    ('Backend & DB Specialist', 'Cấu hình SQLite với chế độ WAL (Write-Ahead Logging) và FTS5 để tối ưu hóa truy vấn catalog dưới 1ms. Triển khai API Task Mutex /api/task/claim.'),
-    ('Frontend Specialist', 'Áp dụng bảng màu Nocturne Slate v1.2, xây dựng Bàn Làm Việc Live Workbench 3 cột, stream terminal console và engine đồng bộ realtime 2.5s.'),
-    ('DevOps & Packaging', 'Ghi chú SELinux: Docker volume trên Fedora/RHEL bắt buộc có hậu tố :z để tự động gán nhãn container_file_t. Xây dựng installer_tui.py và Desktop icon.'),
-    ('QA Tester', 'Thiết lập test suite tự động cho chu kỳ Auto-Wake 68ms, kiểm tra toàn bộ REST API endpoint và chứng thực bằng chứng commit hash trước khi bàn giao.'),
-    ('Security Auditor', 'Kiểm toán Token Vault OAuth 2.0 PKCE và phân quyền thư mục. Đảm bảo zero-secret-leak, ngăn chặn rò rỉ credential ra log hoặc commit git.'),
-]
-# Tin chat_messages seed (nguyên văn) của seed_real_project (kênh runtime-0x) và get_warroom_messages cũ (war_room/standup/handoff)
-SEED_CHAT_BODIES = [
-    'Đã khởi tạo repo và lưu đặc tả gốc vào <code>docs/SSOT_ORIGINAL_SPEC.md</code>.',
-    'Đã cấu hình Live Mount với cờ SELinux <code>:z</code>. Mọi chỉnh sửa trên host sẽ tự động phản ánh tức thì vào container!',
-    'Đã xây dựng xong bộ cài đặt <code>installer_tui.py</code> có thanh loading progress bar % và kiểm tra môi trường.',
-    'Đang triển khai SQLite WAL Core Database và FTS5 Virtual Table cho Catalog tra nhanh ID.',
-    'Đã chuyển đổi toàn bộ layout sang phong cách Gen-workplace v1.1 tinh tế, không rối mắt.',
-    'Container <code>gen-workplace-app</code> đã khởi động thành công trên cổng 8888.',
-    'Đã xác thực shortcut Desktop tồn tại và mở được WebApp.',
-    'Đã kiểm tra SELinux Enforcing trên host và gán nhãn <code>:z</code> an toàn cho Docker mounts.',
-    'Chào Core Agent (Gen) và toàn thể Đội Ngũ Swarm. Mục tiêu hôm nay: Hoàn thiện hệ thống điều hành Gen-workplace v1.2, đảm bảo 0 xung đột, tuân thủ nghiêm ngặt 5 giai đoạn SOP.',
-    'Rõ mệnh lệnh của Ryan! Tôi (Gen - Core Orchestrator) đã phổ biến chỉ thị tới toàn thể 6 chuyên gia. Hệ thống đang chạy ở chế độ kỷ luật thép: 1 Profile = 1 Identity, Task Mutex độc quyền và nghiệm thu 100% bằng chứng vật lý.',
-    'Báo cáo Ryan và Gen: Đặc tả SSOT đã khóa bất biến tại <code>docs/SSOT_ORIGINAL_SPEC.md</code>. Tất cả 6 chuyên gia đã được cấp phát nhiệm vụ cụ thể trên Live Workbench.',
-    'Giao ban kỹ thuật hôm nay: @Backend tập trung hoàn thiện API Mutex Lock (/api/task/claim); @Frontend tối ưu Bàn Làm Việc Live Workbench 3 cột; @DevOps kiểm tra Live Mount :z; @QA chuẩn bị test suite; @Security rà soát token OAuth. Tất cả báo cáo tiến độ qua kênh này.',
-    'Đã nhận việc từ Leader! Tôi đang triển khai TODO-14 trong <code>backend/db.py</code>. Cam kết response time < 5ms và nộp commit hash trước 10h.',
-    'Đã nhận việc! Giao diện Live Workbench 3 cột x 2 hàng đang hoàn thiện trên <code>frontend/index.html</code>, tích hợp terminal console realtime.',
-    'Bàn giao Hợp đồng I/O cho @Frontend: Endpoint <code>POST /api/task/claim</code> và <code>POST /api/task/complete</code> đã sẵn sàng, trả về JSON chuẩn theo tài liệu <code>docs/STANDARD_SQUAD_AND_WORKFLOW.md</code>.',
-    'Xác nhận đã nhận spec từ @Backend. Đã bind dữ liệu vào các nút Claim/Complete trên Command Deck và cập nhật trạng thái realtime.',
-]
-# Câu mẫu do post_warroom_message / process_orch_instruction cũ tự sinh (khớp theo phần đầu nội dung)
-SEED_CHAT_BODY_PREFIXES = [
-    'Đã rõ chỉ thị của ',
-    'Chỉ huy tối cao ghi nhận mệnh lệnh',
-    'Chỉ huy tối cao đã ghi nhận chỉ thị',
-    'Rõ mệnh lệnh của Ryan',
-    'Báo cáo Ryan và Gen',
-    'Xin chào Ryan! Tôi là Genesis Orchestrator',
-    'Đã chấp hành mệnh lệnh tối cao',
-    'Đã chấp hành chỉ thị!',
-    'Đã tiếp nhận yêu cầu từ Leader (@Lead)!',
-    'Lead Architect đã ghi nhận báo cáo của ',
-    'Xác nhận đã nhận Hợp đồng I/O từ @Backend',
-    'Xác nhận đã nhận artifact bàn giao từ ',
-    'Báo cáo tiến độ Swarm: Đã hoàn tất',
-    'Tôi (Gen - Core Orchestrator) đã thiết lập và ban hành',
-    'Toàn bộ Swarm đang được neo vững chắc vào branch',
-]
-SEED_CHAT_BODY_CONTAINS = [
-    'Tôi (Lead Architect) đang giám sát chặt chẽ chuỗi Todo DAG',
-]
-# Tác giả giả của các câu mẫu cũ — khớp prefix/contains CHỈ áp dụng cho các tác giả này (tin của người dùng
-# hoặc trả lời agy thật có tác giả gw-*-agy / 'Orchestrator (agy)' không bao giờ bị xóa theo mẫu)
-SEED_CHAT_BOT_AUTHORS = ['Genesis Orchestrator', 'Lead Architect', 'Backend Specialist', 'Backend & DB Specialist',
-                         'Frontend Specialist', 'DevOps & Packaging', 'DevOps Engineer', 'QA Tester', 'Security Auditor']
-SEED_GEN_CONVERSATIONS = ['conv-gen-core-01', 'conv-gen-builder']
-SEED_GEN_GREETING = 'Sẵn sàng phục vụ Owner Ryan! Bạn muốn giao nhiệm vụ hoặc thảo luận kiến trúc nào hôm nay?'
-SEED_SESSION_TODO_TITLES = [
-    'Thiết lập hạ tầng Swarm & Cách ly Workspace phiên',
-    'Khóa quyền sở hữu độc quyền cho Owner Ryan (owner_profiles)',
-    'Xây dựng phân hệ Kanban & Checklist chuyên dụng theo phiên',
-    'Tự động hóa kiểm thử regression & Thẩm định bằng chứng',
-    'Tiếp nhận chỉ thị từ Owner Ryan & Phân tích nhiệm vụ',
-    'Thực thi tác vụ & Cập nhật tiến độ theo từng checklist',
-    'Báo cáo nghiệm thu kết quả cho Owner Ryan',
-]
+SEED_PURGE_LIST_PATH = Path(__file__).resolve().parent / "seed_purge_list.json"
+
+def load_seed_purge_list():
+    """Đọc danh sách bản ghi seed cũ cần xóa (backend/seed_purge_list.json). Thiếu/hỏng file → {} (không xóa gì)."""
+    try:
+        with open(SEED_PURGE_LIST_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"[purge] Không đọc được {SEED_PURGE_LIST_PATH}: {e}")
+        return {}
 
 def purge_seed_data():
     """
@@ -758,6 +647,11 @@ def purge_seed_data():
     không đụng bản ghi khác. Idempotent. In log '[purge] xóa N bản ghi seed (bảng: ...)' khi có xóa.
     """
     counts = {}
+    S = load_seed_purge_list()
+    if not S:
+        return {"total": 0, "tables": counts}
+    SEED_TODOS = S.get("seed_todos", {})
+    SEED_CHAT_BOT_AUTHORS = S.get("seed_chat_bot_authors", [])
 
     def bump(table, n):
         if n:
@@ -770,55 +664,56 @@ def purge_seed_data():
             for tid, title in SEED_TODOS.items():
                 cur.execute("DELETE FROM todos WHERE id = ? AND title = ?", (tid, title))
                 bump("todos", cur.rowcount)
-            for rid, title in SEED_ROADMAPS.items():
+            for rid, title in S.get("seed_roadmaps", {}).items():
                 cur.execute("DELETE FROM roadmaps WHERE id = ? AND title = ? AND NOT EXISTS (SELECT 1 FROM todos t WHERE t.roadmap_id = roadmaps.id)", (rid, title))
                 bump("roadmaps", cur.rowcount)
-            for nid, title in SEED_WORKFLOW_NODES.items():
+            for nid, title in S.get("seed_workflow_nodes", {}).items():
                 cur.execute("DELETE FROM workflow_nodes WHERE id = ? AND title = ?", (nid, title))
                 bump("workflow_nodes", cur.rowcount)
-            for rid, role in SEED_RUNTIMES.items():
+            for rid, role in S.get("seed_runtimes", {}).items():
                 cur.execute("DELETE FROM agent_runtimes WHERE id = ? AND role_name = ?", (rid, role))
                 bump("agent_runtimes", cur.rowcount)
-            for sid, title in SEED_MASTER_SSOT.items():
+            for sid, title in S.get("seed_master_ssot", {}).items():
                 cur.execute("DELETE FROM master_ssot WHERE id = ? AND title = ?", (sid, title))
                 bump("master_ssot", cur.rowcount)
-            for cid, title in SEED_CATALOG.items():
+            for cid, title in S.get("seed_catalog", {}).items():
                 cur.execute("DELETE FROM catalog_references WHERE id = ? AND title = ?", (cid, title))
                 bump("catalog_references", cur.rowcount)
-            for eid, req in SEED_SSOT_EVENTS.items():
+            for eid, req in S.get("seed_ssot_events", {}).items():
                 cur.execute("DELETE FROM ssot_events WHERE id = ? AND request = ?", (eid, req))
                 bump("ssot_events", cur.rowcount)
-            for role, body in SEED_ROLE_MEMORIES:
+            for role, body in S.get("seed_role_memories", []):
                 cur.execute("DELETE FROM role_memories WHERE role_name = ? AND body = ?", (role, body))
                 bump("role_memories", cur.rowcount)
-            for body in SEED_CHAT_BODIES:
+            for body in S.get("seed_chat_bodies", []):
                 cur.execute("DELETE FROM chat_messages WHERE body = ?", (body,))
                 bump("chat_messages", cur.rowcount)
             bot_in = ",".join("?" * len(SEED_CHAT_BOT_AUTHORS))
-            for prefix in SEED_CHAT_BODY_PREFIXES:
+            for prefix in S.get("seed_chat_body_prefixes", []):
                 cur.execute(f"DELETE FROM chat_messages WHERE substr(body, 1, ?) = ? AND author IN ({bot_in})",
                             [len(prefix), prefix] + SEED_CHAT_BOT_AUTHORS)
                 bump("chat_messages", cur.rowcount)
-            for frag in SEED_CHAT_BODY_CONTAINS:
+            for frag in S.get("seed_chat_body_contains", []):
                 cur.execute(f"DELETE FROM chat_messages WHERE instr(body, ?) > 0 AND author IN ({bot_in})",
                             [frag] + SEED_CHAT_BOT_AUTHORS)
                 bump("chat_messages", cur.rowcount)
-            for conv_id in SEED_GEN_CONVERSATIONS:
+            for conv_id in S.get("seed_gen_conversations", []):
                 for tbl in ("gen_messages", "gen_compact_snapshots", "gen_session_files", "gen_session_todos", "gen_scratchpad_notes"):
                     cur.execute(f"DELETE FROM {tbl} WHERE conversation_id = ?", (conv_id,))
                     bump(tbl, cur.rowcount)
                 cur.execute("DELETE FROM gen_conversations WHERE id = ?", (conv_id,))
                 bump("gen_conversations", cur.rowcount)
-            cur.execute("DELETE FROM gen_messages WHERE role = 'assistant' AND author = 'Gen Core' AND content = ?", (SEED_GEN_GREETING,))
+            cur.execute("DELETE FROM gen_messages WHERE role = 'assistant' AND author = 'Gen Core' AND content = ?", (S.get("seed_gen_greeting", ""),))
             bump("gen_messages", cur.rowcount)
-            for title in SEED_SESSION_TODO_TITLES:
+            for title in S.get("seed_session_todo_titles", []):
                 cur.execute("DELETE FROM gen_session_todos WHERE id LIKE 'TSK-%' AND title = ?", (title,))
                 bump("gen_session_todos", cur.rowcount)
             # Worker đang trỏ tới task seed đã bị xóa → bỏ gán
             seed_ids = list(SEED_TODOS.keys())
-            cur.execute(f"UPDATE tmux_sessions SET current_task_id = '' WHERE current_task_id IN ({','.join('?' * len(seed_ids))}) "
-                        "AND NOT EXISTS (SELECT 1 FROM todos t WHERE t.id = tmux_sessions.current_task_id)", seed_ids)
-            bump("tmux_sessions.current_task_id", cur.rowcount)
+            if seed_ids:
+                cur.execute(f"UPDATE tmux_sessions SET current_task_id = '' WHERE current_task_id IN ({','.join('?' * len(seed_ids))}) "
+                            "AND NOT EXISTS (SELECT 1 FROM todos t WHERE t.id = tmux_sessions.current_task_id)", seed_ids)
+                bump("tmux_sessions.current_task_id", cur.rowcount)
             conn.commit()
     except Exception as e:
         print(f"[purge] Lỗi khi xóa dữ liệu seed: {e}")
@@ -1769,7 +1664,7 @@ SWARM_DEFAULT_CONFIG = [
         "blocked_paths": ["backend/**", "data/**", "Dockerfile"],
         "current_task_id": "",
         "scope": "Web console UI, CSS Gen-workplace v1.1, real-time sync",
-        "mission": "Duy trì phong cách thiết kế Nocturne Slate v1.1, bố cục 2 cột List+Detail & Tabs, bind dữ liệu thật từ backend."
+        "mission": "Duy trì giao diện console (frontend/index.html), bố cục 2 cột List+Detail & Tabs, bind dữ liệu thật từ backend."
     },
     {
         "id": "gw-devops-agy",
@@ -1869,7 +1764,7 @@ def generate_role_spec_file(sid, role_name, scope="", mission="", conv_id="", al
 
 def ensure_real_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
     """
-    Đảm bảo 6 phiên tmux thật sự đang chạy nền bên trong container.
+    Đảm bảo 6 phiên tmux thật sự đang chạy nền trên host (app chạy bằng python3 backend/main.py, không dùng Docker).
     Mỗi phiên là 1 tiến trình bash tương tác độc lập, được inject sẵn SSOT context,
     conversation ID continuity, profile xác thực và alias gọi agy CLI trực tiếp.
     """
