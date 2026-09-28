@@ -29,6 +29,32 @@ MCP_SERVER_INFO = {
 
 MCP_PROTOCOL_VERSION = "2024-11-05"
 
+# Hướng dẫn "bootstrap" trả trong initialize.instructions (#19): sửa ở backend/mcp_instructions.md,
+# đọc 1 lần lúc khởi động; thiếu file / file rỗng → dùng DEFAULT_MCP_INSTRUCTIONS.
+MCP_INSTRUCTIONS_FILE = Path(__file__).resolve().parent / "mcp_instructions.md"
+
+DEFAULT_MCP_INSTRUCTIONS = (
+    "BẮT BUỘC cho mọi agent dùng gen-workplace: ghi công việc lên app để Boss theo dõi được trong chatroom và Kanban.\n"
+    "1. Mỗi việc = 1 phiên: list_conversations, đã có phiên \"VIEC-<n>: <tên việc>\" thì dùng lại; chưa có thì create_conversation(title=\"VIEC-<n>: <tên việc>\", reuse_existing=true).\n"
+    "2. Chia bước thành task Kanban: create_kanban_task(conv_id, viec_ref=\"VIEC-<n>\" bắt buộc); claim_task trước khi làm, update_task_checklist khi tiến triển.\n"
+    "3. Ghi tiến độ vào chatroom của phiên: log_session_message(conv_id, content, author) ở mỗi mốc (bắt đầu, giao việc, kết quả, bị chặn, xong), tin ngắn kèm link Issue/PR/commit. Chỉ lưu tin, không gọi AI (đừng dùng gen_chat để ghi log).\n"
+    "4. Giao việc cho agy: post_warroom_message với @<vai>, rồi wait_worker_result(dispatch_id).\n"
+    "5. Đóng việc: complete_task với evidence thật (commit SHA, URL PR có thật, dispatch:<id>, file trong ~/gw-reports/).\n"
+    "6. Quy trình đầy đủ: repo Genesis-ryan-84-0567536339/Brain → skills/work-style/subskills/gen-workplace-dispatch/SKILL.md."
+)
+
+
+def load_mcp_instructions(path=None) -> str:
+    """Đọc nội dung instructions từ file; lỗi đọc / rỗng → DEFAULT_MCP_INSTRUCTIONS (không bao giờ trả chuỗi rỗng)."""
+    try:
+        text = Path(path or MCP_INSTRUCTIONS_FILE).read_text(encoding="utf-8").strip()
+    except Exception:
+        text = ""
+    return text or DEFAULT_MCP_INSTRUCTIONS
+
+
+MCP_INSTRUCTIONS = load_mcp_instructions()
+
 # ==========================================
 # 1. MCP TOOLS REGISTRY
 # ==========================================
@@ -463,13 +489,18 @@ TOOLS = [
     },
     {
         "name": "create_conversation",
-        "description": "Tạo một cuộc trò chuyện / phiên làm việc mới trong Gen Workplace.",
+        "description": "Tạo một phiên làm việc (conversation) mới trong Gen Workplace; phiên hiện ngay ở danh sách phiên trên UI. Quy ước: 1 việc = 1 phiên, tiêu đề 'VIEC-<n>: <tên việc>'. reuse_existing=true → nếu đã có phiên cùng tiêu đề thì trả phiên đó (reused=true) thay vì tạo trùng.",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "title": {
                     "type": "string",
-                    "description": "Tiêu đề cuộc trò chuyện mới."
+                    "description": "Tiêu đề phiên, vd 'VIEC-12: Sửa lỗi đăng nhập'."
+                },
+                "reuse_existing": {
+                    "type": "boolean",
+                    "description": "true → dùng lại phiên đã có đúng tiêu đề này (mặc định false = luôn tạo mới).",
+                    "default": False
                 },
                 "model": {
                     "type": "string",
@@ -483,6 +514,34 @@ TOOLS = [
                 }
             },
             "required": ["title"]
+        }
+    },
+    {
+        "name": "log_session_message",
+        "description": "Ghi 1 tin tiến độ vào chatroom của phiên (bắt đầu, giao việc, kết quả, bị chặn, xong; kèm link Issue/PR/commit). CHỈ LƯU TIN, không gọi agy/AI trả lời (khác gen_chat). Phiên phải tồn tại (tạo bằng create_conversation).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "conv_id": {
+                    "type": "string",
+                    "description": "ID phiên (conversation) cần ghi tin."
+                },
+                "content": {
+                    "type": "string",
+                    "description": "Nội dung tin, ngắn gọn, kèm link Issue/PR/commit nếu có."
+                },
+                "role": {
+                    "type": "string",
+                    "description": "'assistant' (mặc định, tin của agent) hoặc 'user'.",
+                    "default": "assistant"
+                },
+                "author": {
+                    "type": "string",
+                    "description": "Tên agent ghi tin (mặc định 'AI Agent').",
+                    "default": "AI Agent"
+                }
+            },
+            "required": ["conv_id", "content"]
         }
     },
     {
@@ -921,11 +980,22 @@ def execute_tool(name: str, args: dict) -> dict:
 
         # 18. create_conversation
         if name == "create_conversation":
-            title = args.get("title", "Cuộc trò chuyện mới")
             model = args.get("model", "Gemini 3.1 Pro (High)")
             account = args.get("account", "owner_default")
-            res = db.create_gen_conversation("PRJ-GEN-WORKPLACE", title, model, account, "owner-ryan")
+            title = (args.get("title") or "").strip() or "Cuộc trò chuyện mới"
+            reuse = args.get("reuse_existing") in (True, 1, "1", "true", "True")
+            existing = db.find_gen_conversation_by_title("PRJ-GEN-WORKPLACE", title) if reuse else None
+            if existing:
+                res = dict(existing, reused=True)
+            else:
+                res = dict(db.create_gen_conversation("PRJ-GEN-WORKPLACE", title, model, account, "owner-ryan"), reused=False)
             return {"content": [{"type": "text", "text": json.dumps(res, ensure_ascii=False, indent=2)}], "isError": False}
+
+        # 18b. log_session_message (#19): chỉ lưu tin vào phiên, không gọi agy
+        if name == "log_session_message":
+            res = db.log_gen_message(args.get("conv_id", ""), args.get("content", ""),
+                                     args.get("role") or "assistant", args.get("author") or "AI Agent")
+            return {"content": [{"type": "text", "text": json.dumps(res, ensure_ascii=False, indent=2)}], "isError": "error" in res}
 
         # 19. get_conversation_messages
         if name == "get_conversation_messages":
@@ -1043,7 +1113,8 @@ def handle_jsonrpc_request(req: dict) -> dict:
                     "resources": {"subscribe": False, "listChanged": False},
                     "prompts": {"listChanged": False}
                 },
-                "serverInfo": MCP_SERVER_INFO
+                "serverInfo": MCP_SERVER_INFO,
+                "instructions": MCP_INSTRUCTIONS
             }
         }
 

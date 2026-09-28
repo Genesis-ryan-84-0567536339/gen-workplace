@@ -166,6 +166,7 @@ python3 scripts/test_purge_seed.py         # #12: bỏ seed + migration purge_se
 python3 scripts/test_viec_ref.py           # #12: viec_ref bắt buộc + webhook + /api/dispatch/log
 python3 scripts/test_wait_worker_result.py # #9: wait_worker_result, auto-denied → failed, reply_to, N tin mới nhất, tmux thật + webhook
 python3 scripts/test_agy_permissions.py    # #7: alias không skip-permissions, worktree cho tmux, quy tắc chỉ đọc
+python3 scripts/test_mcp_instructions.py   # #19: initialize.instructions (HTTP + stdio), log_session_message chỉ lưu, create_conversation reuse
 ```
 
 ### 3.8. Issue #12 — gỡ toàn bộ dữ liệu / phản hồi giả (hợp đồng API cho frontend)
@@ -204,3 +205,27 @@ python3 scripts/test_agy_permissions.py    # #7: alias không skip-permissions, 
 `task_completed` bắn khi `complete_task` thành công (`exit_code` = `null`); `dispatch_finished` bắn khi agy của chatroom chạy xong (`task_id`/`viec_ref` = task đang gán cho worker, có thể rỗng), và khi lệnh giao qua `/api/swarm/dispatch` in dòng `=== XONG exit=N ===` (thread nền theo dõi pane, #9). `status` = `failed` cả khi `exit_code` = 0 nhưng agy bị auto-denied / không ra kết quả; `status` rỗng với `task_completed`.
 
 **Migration dữ liệu seed cũ:** `purge_seed_data()` chạy cuối `init_db()` (mỗi lần app khởi động), xóa đúng các bản ghi seed liệt kê trong `backend/seed_purge_list.json` (RM-01…05, TODO-01…13, NODE-01…06, runtime-01…06, SSOT-*-01…08, 17 mã catalog, EVT-01…05, 6 role memory, tin chat seed và các câu mẫu cũ của tác giả bot, phiên `conv-gen-core-01`/`conv-gen-builder` và dữ liệu con, TSK-* tiêu đề mẫu). Idempotent; log `[purge] xóa N bản ghi seed (bảng: ...)`. Bản ghi do người dùng tạo (kể cả trùng ID nhưng khác tiêu đề, hoặc tin người dùng trùng đầu câu mẫu) không bị xóa. Task `TODO-14…17` (nếu có trên máy chủ) không có trong code seed nào nên không nằm trong danh sách — xem `/api/state` sau khi cập nhật và xóa tay nếu là dữ liệu giả.
+
+### 3.9. Issue #19: bootstrap cho agent qua MCP `initialize.instructions`
+
+Agent kết nối MCP gen-workplace (HTTP `POST /mcp` hoặc stdio `backend/mcp_server.py`) nhận quy trình bắt buộc trong `result.instructions` của `initialize`. Nhờ vậy việc agent làm hiện trong chatroom và Kanban cho Boss xem.
+
+- **Sửa nội dung:** file `backend/mcp_instructions.md`. File được đọc 1 lần lúc app hoặc stdio khởi động, nên sửa xong phải restart (auto-update sẽ tự restart khi merge vào main). Nếu thiếu file hoặc file rỗng thì dùng `mcp_core.DEFAULT_MCP_INSTRUCTIONS`. Chuỗi hiện hành xem ở `GET /api/mcp/status` → `instructions`.
+- **Nội dung (tóm tắt):** (1) mỗi việc là 1 phiên `VIEC-<n>: <tên việc>`, phiên đã có thì dùng lại; (2) chia bước thành `create_kanban_task` có `viec_ref` và `conv_id`, rồi `claim_task` và `update_task_checklist`; (3) ghi tiến độ bằng `log_session_message` ở mỗi mốc, kèm link; (4) giao việc bằng `post_warroom_message @<vai>` rồi `wait_worker_result`; (5) đóng việc bằng `complete_task` có evidence thật; (6) skill đầy đủ ở `Genesis-ryan-84-0567536339/Brain` → `skills/work-style/subskills/gen-workplace-dispatch/SKILL.md`.
+
+| API / tool | Hợp đồng |
+|---|---|
+| MCP `log_session_message(conv_id, content, role="assistant", author="AI Agent")` | Chỉ INSERT 1 dòng vào `gen_messages` (`model = ''`) và cập nhật `updated_at` của phiên để phiên nổi lên đầu danh sách. **Không gọi agy/AI** (khác `gen_chat`). `role` ∈ `assistant\|user`; `content` ≤ 8000 ký tự. Trả `{status: "logged", message_id, conv_id, role, author, created_at}`. Phiên không có, content rỗng, role lạ hoặc content quá dài → `isError: true` kèm `error`. Token MCP có quyền domain `chat` được gọi tool này. |
+| `POST /api/gen/conversations/log {conv_id, content, role?, author?}` | Như trên, dành cho client không dùng MCP. Trả 200, 400 (tham số sai) hoặc 404 (phiên không có). |
+| MCP `create_conversation(title, reuse_existing=false, model?, account?)` | `title` được trim; rỗng thì thành "Cuộc trò chuyện mới". `reuse_existing=true` thì trả phiên mới nhất có đúng tiêu đề (`reused: true`) thay vì tạo trùng. Response luôn có `reused`. Phiên tạo qua MCP có `owner_id = owner-ryan`, nên hiện trong `list_conversations` và `GET /api/gen/conversations` (danh sách phiên trên UI). |
+| `GET /api/mcp/status` | Thêm trường `instructions`. |
+
+**UI:** màn Gen Workplace poll `/api/gen/conversations` mỗi 5 giây (khi đang mở màn đó và không có tin đang gửi). Phiên mới do agent tạo hiện ngay trong danh sách. Nếu phiên đang mở có thêm tin (`msg_count` đổi) thì UI tải lại tin và Kanban của phiên. Tin có `model` rỗng (tin log) hiển thị tên `author` thay cho "Gen Core (model)".
+
+Kiểm thử thật trên cổng phụ (không đụng app chính):
+```bash
+PORT=18899 DATA_DIR=$(mktemp -d) GW_AUTO_UPDATE=0 python3 backend/main.py &   # tắt: kill $!  (KHÔNG dùng pkill -f)
+curl -s localhost:18899/mcp -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}'
+curl -s localhost:18899/mcp -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"create_conversation","arguments":{"title":"VIEC-1: Thử","reuse_existing":true}}}'
+curl -s localhost:18899/mcp -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"log_session_message","arguments":{"conv_id":"<id>","content":"Bắt đầu — Issue #1","author":"Claude Code"}}}'
+```

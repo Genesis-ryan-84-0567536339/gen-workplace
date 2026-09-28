@@ -197,6 +197,7 @@ class SwarmHandler(SimpleHTTPRequestHandler):
                 "status": "online",
                 "serverInfo": mcp_core.MCP_SERVER_INFO,
                 "protocolVersion": mcp_core.MCP_PROTOCOL_VERSION,
+                "instructions": mcp_core.MCP_INSTRUCTIONS,
                 "tools_count": len(mcp_core.TOOLS),
                 "auth": auth_st,
                 "tools": mcp_core.TOOLS,
@@ -1020,6 +1021,16 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             owner_id = data.get("owner_id", "owner-ryan")
             res = db.create_gen_conversation(project_id, title, model, account, owner_id)
             self._send_json(200, res)
+            return
+
+        # 25b. Ghi 1 tin tiến độ vào phiên, CHỈ lưu (không gọi agy) — cùng logic MCP log_session_message (#19)
+        if path == "/api/gen/conversations/log":
+            res = db.log_gen_message(data.get("conv_id", ""), data.get("content", ""),
+                                     data.get("role") or "assistant", data.get("author") or "AI Agent")
+            if "error" in res:
+                self._send_json(404 if res["error"].startswith("Không tìm thấy phiên") else 400, res)
+            else:
+                self._send_json(200, res)
             return
 
         if path == "/api/gen/conversations/update":
