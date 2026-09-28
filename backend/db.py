@@ -572,9 +572,18 @@ def init_db():
             finished_at TEXT DEFAULT ''
         );
         """)
-        for col, col_type in [("task_id", "TEXT DEFAULT ''"), ("viec_ref", "TEXT DEFAULT ''"), ("channel_id", "TEXT DEFAULT ''"), ("webhook_sent", "INTEGER DEFAULT 0")]:
+        # status: running | done | failed ('' = dòng cũ, suy ra từ exit_code); kind: warroom | tmux; summary: kết quả rút gọn (#9)
+        for col, col_type in [("task_id", "TEXT DEFAULT ''"), ("viec_ref", "TEXT DEFAULT ''"), ("channel_id", "TEXT DEFAULT ''"), ("webhook_sent", "INTEGER DEFAULT 0"),
+                              ("status", "TEXT DEFAULT ''"), ("kind", "TEXT DEFAULT ''"), ("summary", "TEXT DEFAULT ''"),
+                              ("request_msg_id", "INTEGER"), ("reply_msg_id", "INTEGER")]:
             try:
                 cursor.execute(f"ALTER TABLE dispatch_log ADD COLUMN {col} {col_type};")
+            except Exception:
+                pass
+        # Tin trả lời nối về tin yêu cầu (reply_to) + thời điểm đủ ngày giờ (created_at, ISO) cho War Room
+        for col, col_type in [("reply_to", "INTEGER"), ("created_at", "TEXT DEFAULT ''")]:
+            try:
+                cursor.execute(f"ALTER TABLE chat_messages ADD COLUMN {col} {col_type};")
             except Exception:
                 pass
 
@@ -1778,7 +1787,6 @@ def ensure_real_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
         pass
 
     oauth_map = {p["id"]: p for p in get_oauth_profiles()}
-    workspace_dir = "/workspace" if os.path.exists("/workspace") else str(BASE_DIR)
 
     # Đảm bảo symlink docs trong /workspace để agent luôn đọc được SSOT spec
     try:
@@ -1820,30 +1828,22 @@ def ensure_real_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
                 init_script_path = f"/tmp/tmux_init_{sid}.sh"
                 try:
                     p_dir_clean = profile_dir or os.path.join(HOME_DIR, ".gemini")
+                    role_cwd = tmux_role_cwd(sid)  # worktree riêng của vai, không mở thẳng trong repo app (#7)
                     with open(init_script_path, "w") as f:
                         f.write(f"""clear
 echo "================================================================================"
 echo "🤖 GENESIS AGENT RUNTIME: {role_name} ({sid})"
 echo "💎 CLI Engine: agy v1.2.10 | Target Conv: {conv_id}"
 echo "🔑 Account: {email} ({'Đã xác thực Google OAuth' if is_auth else 'Chưa đăng nhập'})"
-echo "📂 Profile: {p_dir_clean} | Workspace: {workspace_dir}"
+echo "📂 Profile: {p_dir_clean} | Workspace: {role_cwd}"
 echo "📋 Role Spec: {role_spec_file} (gõ 'gw-role' để tra cứu)"
 echo "📜 SSOT Ref: docs/SSOT_ORIGINAL_SPEC.md (Single Source of Truth locked)"
 echo "--------------------------------------------------------------------------------"
 echo "💡 Sẵn sàng chấp hành chỉ thị! Gõ 'agy-run' để tiếp tục luồng hội thoại,"
 echo "   hoặc 'gw-role' để xem phạm vi role, hoặc 'gw-status' để kiểm tra context."
 echo "================================================================================"
-export PS1='[\\033[38;5;39m{sid}\\033[0m:\\033[38;5;48m\\w\\033[0m]$ '
-export GEN_ROLE='{role_name}'
-export GEN_CONV_ID='{conv_id}'
-export GEMINI_DIR='{p_dir_clean}'
-export GEN_ROLE_SPEC='{role_spec_file}'
-alias agy="agy --gemini_dir='{p_dir_clean}' --dangerously-skip-permissions"
-alias agy-run="agy --gemini_dir='{p_dir_clean}' --dangerously-skip-permissions --conversation '{conv_id}'"
-alias gw-role="cat '{role_spec_file}'"
-alias gw-status="echo '=== SWARM ROLE: {role_name} ===' && echo 'Session: {sid}' && echo 'Account: {email}' && echo 'ConvID: {conv_id}' && echo 'Role Spec: {role_spec_file}' && echo 'SSOT: docs/SSOT_ORIGINAL_SPEC.md'"
-""")
-                    subprocess.run(["tmux", "new-session", "-d", "-s", sid, "-x", "200", "-y", "40", "-c", workspace_dir, f"bash --init-file {init_script_path}"], capture_output=True, timeout=3.0)
+""" + tmux_role_env_block(sid, role_name, conv_id, p_dir_clean, role_spec_file, email, role_cwd))
+                    subprocess.run(["tmux", "new-session", "-d", "-s", sid, "-x", "200", "-y", "40", "-c", role_cwd, f"bash --init-file {init_script_path}"], capture_output=True, timeout=3.0)
                     time.sleep(0.15)
                 except Exception as e:
                     print(f"Error starting real tmux session {sid}: {e}")
@@ -2045,7 +2045,23 @@ def update_tmux_account(session_id, account_type, account_label="", profile_dir=
         p_dir = profile_dir or (os.path.join(HOME_DIR, ".gemini") if account_type == "owner_default" else os.path.join(HOME_DIR, ".agy-profiles", account_type))
         if p_dir.startswith("~"):
             p_dir = os.path.expanduser(p_dir)
-        cmd = f"export GEMINI_DIR='{p_dir}'; alias agy=\"agy --gemini_dir='{p_dir}' --dangerously-skip-permissions\"; echo '[AUTH] Đã kích hoạt tài khoản: {account_label}'"
+        conv_id = f"conv-{session_id}"
+        try:
+            with get_connection() as conn:
+                r = conn.execute("SELECT conversation_id FROM tmux_sessions WHERE id = ?", (session_id,)).fetchone()
+                if r and r["conversation_id"]:
+                    conv_id = r["conversation_id"]
+        except Exception:
+            pass
+        # Alias dựng lại theo cwd hiện tại của phiên (worktree) — không tự thêm --dangerously-skip-permissions (#7)
+        cur_cwd = ""
+        try:
+            pr = subprocess.run(["tmux", "display-message", "-p", "-t", session_id, "#{pane_current_path}"], capture_output=True, text=True, timeout=2.0)
+            cur_cwd = pr.stdout.strip() if pr.returncode == 0 else ""
+        except Exception:
+            pass
+        aliases, _ = build_agy_aliases(session_id, p_dir, conv_id, cur_cwd)
+        cmd = f"export GEMINI_DIR='{p_dir}'; {'; '.join(aliases)}; echo '[AUTH] Đã kích hoạt tài khoản: {account_label}'"
         subprocess.run(["tmux", "send-keys", "-t", session_id, cmd, "Enter"], capture_output=True, timeout=2.0)
     except Exception:
         pass
@@ -2226,8 +2242,8 @@ def wake_tmux_session(session_id):
     """
     Đánh thức / Gọi lại đúng phiên làm việc đã ngủ đông.
     Khởi tạo lại tmux session, phục hồi đúng Conversation ID, profile, workspace và SSOT.
+    Phiên mở trong worktree riêng của vai (#7).
     """
-    workspace_dir = "/workspace" if os.path.exists("/workspace") else str(BASE_DIR)
     oauth_map = {p["id"]: p for p in get_oauth_profiles()}
 
     with get_connection() as conn:
@@ -2250,6 +2266,7 @@ def wake_tmux_session(session_id):
 
         init_script_path = f"/tmp/tmux_init_{session_id}.sh"
         try:
+            role_cwd = tmux_role_cwd(session_id)  # worktree riêng của vai (#7)
             with open(init_script_path, "w") as f:
                 f.write(f"""clear
 echo "================================================================================"
@@ -2262,18 +2279,9 @@ echo "--------------------------------------------------------------------------
 echo "💡 Toàn bộ trí nhớ phiên và Conversation ID đã phục hồi. Nhập lệnh để tiếp tục."
 echo "   hoặc 'gw-role' để xem phạm vi role, hoặc 'gw-status' để kiểm tra context."
 echo "================================================================================"
-export PS1='[\\033[38;5;39m{session_id}\\033[0m:\\033[38;5;48m\\w\\033[0m]$ '
-export GEN_ROLE='{role_name}'
-export GEN_CONV_ID='{conv_id}'
-export GEMINI_DIR='{p_dir_clean}'
-export GEN_ROLE_SPEC='{role_spec_file}'
-alias agy="agy --gemini_dir='{p_dir_clean}' --dangerously-skip-permissions"
-alias agy-run="agy --gemini_dir='{p_dir_clean}' --dangerously-skip-permissions --conversation '{conv_id}'"
-alias gw-role="cat '{role_spec_file}'"
-alias gw-status="echo '=== SWARM ROLE: {role_name} ===' && echo 'Session: {session_id}' && echo 'Account: {email}' && echo 'ConvID: {conv_id}' && echo 'Role Spec: {role_spec_file}' && echo 'SSOT: docs/SSOT_ORIGINAL_SPEC.md'"
-""")
+""" + tmux_role_env_block(session_id, role_name, conv_id, p_dir_clean, role_spec_file, email, role_cwd))
             subprocess.run(["tmux", "kill-session", "-t", session_id], capture_output=True)
-            subprocess.run(["tmux", "new-session", "-d", "-s", session_id, "-c", workspace_dir, f"bash --init-file {init_script_path}"], capture_output=True, timeout=3.0)
+            subprocess.run(["tmux", "new-session", "-d", "-s", session_id, "-c", role_cwd, f"bash --init-file {init_script_path}"], capture_output=True, timeout=3.0)
             time.sleep(0.15)
         except Exception as e:
             print(f"Error waking tmux session {session_id}: {e}")
@@ -2871,7 +2879,16 @@ def dispatch_swarm_workflow(project_id="PRJ-GEN-WORKPLACE", session_id=None):
             append_tmux_output(sid, cmd, "Đã gửi vào tmux qua send-keys." if tmux_real else "tmux không nhận lệnh (phiên chưa mở?), đã ghi nhận vào runtime.")
         except Exception:
             pass
-        r.update({"status": "dispatched", "tmux_real": tmux_real})
+        r.update({"status": "dispatched", "tmux_real": tmux_real, "dispatch_id": None})
+        if tmux_real:
+            # dispatch_log running + watcher đọc dòng '=== XONG exit=N ===' trong pane → chốt + webhook; id cho wait_worker_result (#9)
+            try:
+                did = start_dispatch_log(sid, kind="tmux", channel_id="tmux", task_id=r["task_id"], command=cmd,
+                                         report_path=os.path.expanduser(r["report_path"]), viec_ref=r.get("viec_ref", ""))
+                r["dispatch_id"] = did
+                start_tmux_dispatch_watcher(did)
+            except Exception as e:
+                print(f"[dispatch] Không ghi được dispatch_log cho {sid}: {e}")
     return results
 
 ORCH_CONV_ID = "conv-orchestrator"
@@ -3088,12 +3105,15 @@ def get_warroom_messages(channel_id="war_room", project_id="PRJ-GEN-WORKPLACE", 
     project_id = normalize_project_id(project_id)
     with get_connection() as conn:
         cursor = conn.cursor()
+        # N tin MỚI NHẤT (ORDER BY id DESC LIMIT) rồi đảo lại để hiển thị cũ → mới
         cursor.execute("""
-        SELECT id, project_id, runtime_id, author, created_time, tag, body, react_json
-        FROM chat_messages
-        WHERE project_id = ? AND runtime_id = ?
-        ORDER BY id ASC
-        LIMIT ?
+        SELECT * FROM (
+            SELECT id, project_id, runtime_id, author, created_time, tag, body, react_json, reply_to, created_at
+            FROM chat_messages
+            WHERE project_id = ? AND runtime_id = ?
+            ORDER BY id DESC
+            LIMIT ?
+        ) ORDER BY id ASC
         """, (project_id, channel_id, limit))
         rows = cursor.fetchall()
 
@@ -3114,7 +3134,9 @@ def get_warroom_messages(channel_id="war_room", project_id="PRJ-GEN-WORKPLACE", 
             "created_time": r["created_time"],
             "tag": r["tag"],
             "body": r["body"],
-            "reacts": reacts
+            "reacts": reacts,
+            "reply_to": r["reply_to"],
+            "created_at": r["created_at"] or ""
         })
     return results
 
@@ -3145,10 +3167,11 @@ def get_task_viec_ref(task_id, project_id="PRJ-GEN-WORKPLACE"):
     return ""
 
 def send_event_webhook(event, project_id="PRJ-GEN-WORKPLACE", viec_ref="", task_id="", session_id="", exit_code=None,
-                       report_path="", evidence_ref="", verified_by=""):
+                       report_path="", evidence_ref="", verified_by="", status=""):
     """
     POST JSON tới GW_EVENT_WEBHOOK_URL (env; rỗng = tắt) khi task hoàn tất / dispatch kết thúc.
-    Payload: {event, project_id, viec_ref, task_id, session_id, exit_code, report_path, evidence_ref, verified_by, at}.
+    Payload: {event, project_id, viec_ref, task_id, session_id, exit_code, status, report_path, evidence_ref, verified_by, at}.
+    status (dispatch_finished): done | failed — exit_code 0 vẫn có thể failed khi agy bị auto-denied (#9).
     Timeout 5s; lỗi chỉ log, không ném. Trả True khi gửi được (HTTP 2xx).
     """
     url = (os.environ.get("GW_EVENT_WEBHOOK_URL") or "").strip()
@@ -3161,6 +3184,7 @@ def send_event_webhook(event, project_id="PRJ-GEN-WORKPLACE", viec_ref="", task_
         "task_id": task_id or "",
         "session_id": session_id or "",
         "exit_code": exit_code,
+        "status": status or "",
         "report_path": report_path or "",
         "evidence_ref": evidence_ref or "",
         "verified_by": verified_by or "",
@@ -3185,6 +3209,292 @@ def get_dispatch_log(limit=50):
     with get_connection() as conn:
         rows = conn.execute("SELECT * FROM dispatch_log ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
         return [dict(r) for r in rows]
+
+# ---------------------------------------------------------------------------
+# Chờ kết quả worker phía server (Issue #9): wait_worker_result
+# ---------------------------------------------------------------------------
+# Chỗ ghi kết quả dispatch (dispatch_warroom_to_agent, watcher tmux) gọi _notify_dispatch_change();
+# wait_worker_result chờ trên Condition này, kèm poll DB mỗi giây (tiến trình MCP stdio riêng không nhận được notify).
+_DISPATCH_COND = threading.Condition()
+WAIT_WORKER_DEFAULT_SEC = 60
+WAIT_WORKER_MAX_SEC = 120          # không vượt timeout HTTP của MCP
+WAIT_WORKER_POLL_SEC = 1.0
+DISPATCH_SUMMARY_MAX = 2000
+XONG_RE = re.compile(r"=== XONG exit=(\d+) ===")
+# agy -p thoát 0 nhưng tool bị từ chối quyền / không in kết quả (vd "jetski: no output produced — a tool required
+# the "command" permission … auto-denied") → coi là failed. Chỉ xét output ngắn để câu trả lời thật (dài) có nhắc
+# tới các cụm này không bị đánh nhầm là lỗi.
+AGY_DENIED_RE = re.compile(r"no output produced|auto-denied", re.IGNORECASE)
+AGY_DENIED_MAX_LEN = 2000
+
+def agy_output_denied(output):
+    """Cụm khớp nếu output agy (ngắn) cho thấy bị từ chối quyền / không có kết quả; rỗng output cũng tính; ngược lại ''."""
+    out = (output or "").strip()
+    if not out:
+        return "empty output"
+    if len(out) > AGY_DENIED_MAX_LEN:
+        return ""
+    m = AGY_DENIED_RE.search(out)
+    return m.group(0) if m else ""
+
+def _notify_dispatch_change():
+    with _DISPATCH_COND:
+        _DISPATCH_COND.notify_all()
+
+def _current_task_of(session_id):
+    """current_task_id của worker ('' nếu không có)."""
+    try:
+        with get_connection() as conn:
+            r = conn.execute("SELECT current_task_id FROM tmux_sessions WHERE id = ?", (session_id,)).fetchone()
+            return (r["current_task_id"] or "") if r else ""
+    except Exception:
+        return ""
+
+def _shorten_output(text, limit=DISPATCH_SUMMARY_MAX):
+    """Rút gọn output: giữ nguyên nếu ngắn, không thì nửa đầu + nửa cuối."""
+    text = (text or "").strip()
+    if len(text) <= limit:
+        return text
+    half = limit // 2
+    return f"{text[:half]}\n…(lược {len(text) - 2 * half} ký tự)…\n{text[-half:]}"
+
+def _now_iso():
+    return datetime.now().astimezone().isoformat(timespec="seconds")
+
+def start_dispatch_log(session_id, kind="warroom", channel_id="", task_id="", command="", report_path="", viec_ref="", request_msg_id=None):
+    """Ghi 1 dòng dispatch_log status=running lúc bắt đầu giao việc; trả id (= dispatch_id cho wait_worker_result)."""
+    with get_connection() as conn:
+        cur = conn.execute("""
+        INSERT INTO dispatch_log (session_id, command, exit_code, report_path, started_at, finished_at, task_id, viec_ref, channel_id, webhook_sent, status, kind, summary, request_msg_id)
+        VALUES (?, ?, NULL, ?, ?, '', ?, ?, ?, 0, 'running', ?, '', ?)
+        """, (session_id, command, report_path, time.strftime("%Y-%m-%d %H:%M:%S"), task_id or "", viec_ref or "", channel_id, kind, request_msg_id))
+        conn.commit()
+        return cur.lastrowid
+
+def _get_dispatch_row(dispatch_id):
+    with get_connection() as conn:
+        r = conn.execute("SELECT * FROM dispatch_log WHERE id = ?", (dispatch_id,)).fetchone()
+        return dict(r) if r else None
+
+def _row_status(row):
+    """status của dòng dispatch_log; dòng cũ (trước #9) không có status → suy từ finished_at/exit_code."""
+    st = (row.get("status") or "").strip()
+    if st:
+        return st
+    if row.get("finished_at"):
+        return "done" if row.get("exit_code") == 0 else "failed"
+    return "running"
+
+def _read_report_tail(report_path):
+    try:
+        path = os.path.expanduser(report_path or "")
+        if path and os.path.isfile(path):
+            with open(path, "r", encoding="utf-8", errors="replace") as f:
+                return f.read()
+    except Exception:
+        pass
+    return ""
+
+def _finish_tmux_dispatch(row, exit_code, output, project_id="PRJ-GEN-WORKPLACE", fail_reason=""):
+    """Chốt dòng tmux đang running → done/failed (chỉ 1 lần, UPDATE ... WHERE status='running'), rồi bắn webhook dispatch_finished."""
+    status = "done" if exit_code == 0 and not fail_reason else "failed"
+    summary = _shorten_output(f"[{fail_reason}]\n{output}" if fail_reason else output)
+    with get_connection() as conn:
+        cur = conn.execute("""
+        UPDATE dispatch_log SET status = ?, exit_code = ?, finished_at = ?, summary = ?
+        WHERE id = ? AND status = 'running'
+        """, (status, exit_code, time.strftime("%Y-%m-%d %H:%M:%S"), summary, row["id"]))
+        conn.commit()
+        claimed = cur.rowcount == 1
+    if claimed:
+        viec_ref = row.get("viec_ref") or get_task_viec_ref(row.get("task_id"), project_id)
+        sent = send_event_webhook("dispatch_finished", project_id=project_id, viec_ref=viec_ref, task_id=row.get("task_id") or "",
+                                  session_id=row["session_id"], exit_code=exit_code, report_path=row.get("report_path") or "", status=status)
+        if sent:
+            with get_connection() as conn:
+                conn.execute("UPDATE dispatch_log SET webhook_sent = 1 WHERE id = ?", (row["id"],))
+                conn.commit()
+        _notify_dispatch_change()
+    return claimed
+
+def poll_tmux_dispatch(dispatch_id):
+    """
+    Kiểm lệnh giao việc qua tmux (kind=tmux) đã xong chưa: tìm tên file báo cáo (duy nhất theo thời điểm) trong
+    toàn bộ lịch sử pane, rồi dòng `=== XONG exit=N ===` phía sau nó. Thấy → chốt done/failed. Trả status hiện tại.
+    """
+    row = _get_dispatch_row(dispatch_id)
+    if not row or row.get("kind") != "tmux" or _row_status(row) != "running":
+        return _row_status(row) if row else "not_found"
+    anchor = os.path.basename(os.path.expanduser(row.get("report_path") or ""))
+    if not anchor:
+        return "running"
+    try:
+        res = subprocess.run(["tmux", "capture-pane", "-p", "-J", "-S", "-", "-t", row["session_id"]],
+                             capture_output=True, text=True, timeout=3.0)
+    except Exception:
+        return "running"
+    if res.returncode != 0:
+        return "running"
+    pane = res.stdout or ""
+    idx = pane.rfind(anchor)
+    if idx < 0:
+        return "running"
+    m = XONG_RE.search(pane, idx)
+    if not m:
+        return "running"
+    exit_code = int(m.group(1))
+    output = _read_report_tail(row.get("report_path")) or pane[idx:m.start()]
+    denied = agy_output_denied(output) if exit_code == 0 else ""
+    _finish_tmux_dispatch(row, exit_code, output, fail_reason=f"agy bị từ chối quyền / không ra kết quả ({denied})" if denied else "")
+    return "done" if exit_code == 0 and not denied else "failed"
+
+TMUX_WATCH_MAX_SEC = int(os.environ.get("GW_TMUX_WATCH_MAX_SEC", str(2 * 3600)))
+TMUX_WATCH_INTERVAL_SEC = 2.0
+
+def start_tmux_dispatch_watcher(dispatch_id, max_sec=None):
+    """Thread nền theo dõi lệnh tmux tới khi có dòng XONG (→ chốt + webhook, không cần ai poll) hoặc hết max_sec."""
+    max_sec = TMUX_WATCH_MAX_SEC if max_sec is None else max_sec
+
+    def _loop():
+        deadline = time.time() + max_sec
+        while time.time() < deadline:
+            try:
+                if poll_tmux_dispatch(dispatch_id) != "running":
+                    return
+            except Exception as e:
+                print(f"[dispatch-watch] #{dispatch_id}: {e}")
+            time.sleep(TMUX_WATCH_INTERVAL_SEC)
+
+    t = threading.Thread(target=_loop, daemon=True, name=f"tmux-dispatch-watch-{dispatch_id}")
+    t.start()
+    return t
+
+def _mark_stale_warroom(row):
+    """Dòng warroom running quá timeout agy + 2 phút → thread đã mất (app khởi động lại) → failed."""
+    try:
+        started = time.mktime(time.strptime(row.get("started_at") or "", "%Y-%m-%d %H:%M:%S"))
+    except Exception:
+        return False
+    if time.time() - started < WARROOM_DISPATCH_TIMEOUT_SEC + 120:
+        return False
+    with get_connection() as conn:
+        cur = conn.execute("""
+        UPDATE dispatch_log SET status = 'failed', finished_at = ?, summary = ?
+        WHERE id = ? AND status = 'running'
+        """, (time.strftime("%Y-%m-%d %H:%M:%S"), "Quá hạn mà không có kết quả (app có thể đã khởi động lại khi agy đang chạy).", row["id"]))
+        conn.commit()
+        return cur.rowcount == 1
+
+def _resolve_dispatch_id(dispatch_id=None, task_id="", session_id=""):
+    """dispatch_id trực tiếp, hoặc lần giao việc mới nhất của task_id / session_id."""
+    if dispatch_id not in (None, ""):
+        try:
+            return int(dispatch_id)
+        except (TypeError, ValueError):
+            return None
+    with get_connection() as conn:
+        if task_id:
+            r = conn.execute("SELECT id FROM dispatch_log WHERE task_id = ? ORDER BY id DESC LIMIT 1", (task_id,)).fetchone()
+        elif session_id:
+            r = conn.execute("SELECT id FROM dispatch_log WHERE session_id = ? ORDER BY id DESC LIMIT 1", (session_id,)).fetchone()
+        else:
+            return None
+        return r["id"] if r else None
+
+def _task_info(task_id, project_id="PRJ-GEN-WORKPLACE"):
+    if not task_id:
+        return {}
+    try:
+        with get_connection() as conn:
+            for tbl in ("todos", "gen_session_todos"):
+                r = conn.execute(f"SELECT status, evidence_ref, viec_ref FROM {tbl} WHERE id = ? AND project_id = ?", (task_id, project_id)).fetchone()
+                if r:
+                    return {"task_status": r["status"] or "", "evidence": r["evidence_ref"] or "", "viec_ref": r["viec_ref"] or ""}
+    except Exception:
+        pass
+    return {}
+
+def wait_worker_result(dispatch_id=None, task_id="", session_id="", timeout_sec=WAIT_WORKER_DEFAULT_SEC, project_id="PRJ-GEN-WORKPLACE"):
+    """
+    Chờ phía server tới khi lần giao việc kết thúc hoặc hết timeout_sec (mặc định 60, tối đa 120) (#9).
+    Chọn lần giao việc theo dispatch_id, hoặc lần mới nhất của task_id / session_id.
+    Trả {status: done|failed|running|not_found, dispatch_id, session_id, kind, exit_code, summary, report_path,
+         task_id, viec_ref, task_status, evidence, started_at, finished_at, webhook_sent, waited_sec, timeout_sec}.
+    running = hết giờ mà chưa xong → gọi lại với cùng dispatch_id.
+    """
+    project_id = normalize_project_id(project_id)
+    try:
+        timeout_sec = float(timeout_sec if timeout_sec not in (None, "") else WAIT_WORKER_DEFAULT_SEC)
+    except (TypeError, ValueError):
+        timeout_sec = WAIT_WORKER_DEFAULT_SEC
+    timeout_sec = max(0.0, min(timeout_sec, float(WAIT_WORKER_MAX_SEC)))
+    if timeout_sec == int(timeout_sec):
+        timeout_sec = int(timeout_sec)
+    task_id = (task_id or "").strip()
+    session_id = (session_id or "").strip()
+    if dispatch_id in (None, "") and not task_id and not session_id:
+        return {"status": "error", "error": "Cần dispatch_id, task_id hoặc session_id"}
+
+    did = _resolve_dispatch_id(dispatch_id, task_id, session_id)
+    row = _get_dispatch_row(did) if did is not None else None
+    if not row:
+        info = _task_info(task_id, project_id)
+        if info.get("task_status") == "done":
+            # Task đã nghiệm thu (complete_task) mà không qua dispatch: coi là xong, trả bằng chứng
+            return {"status": "done", "dispatch_id": None, "kind": "task", "task_id": task_id, "session_id": session_id,
+                    "exit_code": None, "summary": "", "report_path": "", **info, "waited_sec": 0.0, "timeout_sec": timeout_sec}
+        res = {"status": "not_found", "error": "Không tìm thấy lần giao việc (dispatch_log) khớp tham số",
+               "dispatch_id": dispatch_id, "task_id": task_id, "session_id": session_id}
+        res.update(info)
+        return res
+
+    t0 = time.time()
+    deadline = t0 + timeout_sec
+    while True:
+        status = _row_status(row)
+        if status == "running":
+            if row.get("kind") == "tmux":
+                status = poll_tmux_dispatch(did)
+            elif _mark_stale_warroom(row):
+                status = "failed"
+            if status != "running":
+                row = _get_dispatch_row(did) or row
+        if status != "running":
+            break
+        remaining = deadline - time.time()
+        if remaining <= 0:
+            break
+        with _DISPATCH_COND:
+            _DISPATCH_COND.wait(timeout=min(WAIT_WORKER_POLL_SEC, remaining))
+        row = _get_dispatch_row(did) or row
+
+    status = _row_status(row)
+    res = {
+        "status": status,
+        "dispatch_id": row["id"],
+        "session_id": row["session_id"],
+        "kind": row.get("kind") or "warroom",
+        "exit_code": row.get("exit_code") if status != "running" else None,
+        "summary": row.get("summary") or "",
+        "report_path": row.get("report_path") or "",
+        "task_id": row.get("task_id") or "",
+        "viec_ref": row.get("viec_ref") or "",
+        "started_at": row.get("started_at") or "",
+        "finished_at": row.get("finished_at") or "",
+        "webhook_sent": bool(row.get("webhook_sent")),
+        "request_msg_id": row.get("request_msg_id"),
+        "reply_msg_id": row.get("reply_msg_id"),
+        "waited_sec": round(time.time() - t0, 1),
+        "timeout_sec": timeout_sec,
+    }
+    info = _task_info(res["task_id"], project_id)
+    res["task_status"] = info.get("task_status", "")
+    res["evidence"] = info.get("evidence", "")
+    if not res["viec_ref"]:
+        res["viec_ref"] = info.get("viec_ref", "")
+    if status == "running":
+        res["hint"] = f"Chưa xong sau {timeout_sec:g}s; gọi lại wait_worker_result(dispatch_id={row['id']})."
+    return res
 
 WARROOM_ROLE_SESSIONS = {
     "backend": "gw-backend-agy",
@@ -3221,9 +3531,127 @@ def ensure_role_worktree(session_id):
         print(f"[dispatch] Không tạo được worktree cho {session_id}: {e}")
     return repo
 
-def dispatch_warroom_to_agent(project_id, channel_id, session_id, message, timeout=WARROOM_DISPATCH_TIMEOUT_SEC):
-    """Chạy agy thật (--mode plan -p <tin>) với profile của worker session_id trong worktree riêng; ghi trả lời thật vào chat_messages và dispatch_log (#3)."""
+# ---------------------------------------------------------------------------
+# Quyền của agy (Issue #7 + lỗi auto-denied của war-room)
+# ---------------------------------------------------------------------------
+AGY_SKIP_PERMISSIONS_FLAG = "--dangerously-skip-permissions"
+# Lệnh chỉ đọc mà agy --mode plan được chạy không cần hỏi (permissions.allow của agy, khớp theo tiền tố lệnh)
+AGY_PLAN_READONLY_COMMANDS = ["ls", "cat", "head", "tail", "wc", "grep", "rg", "pwd", "tree",
+                              "git status", "git log", "git diff", "git show", "git branch", "git ls-files", "git grep", "git rev-parse"]
+_AGY_SETTINGS_LOCK = threading.Lock()
+
+def _env_on(name, default=""):
+    return (os.environ.get(name, default) or "").strip().lower() in ("1", "true", "yes", "on")
+
+def agy_write_roles():
+    """Tập vai được bật quyền ghi không hỏi cho agy-run (GW_AGY_WRITE_ROLES="backend,gw-devops-agy"; rỗng = không vai nào)."""
+    raw = os.environ.get("GW_AGY_WRITE_ROLES", "")
+    return {x.strip().lower() for x in re.split(r"[,\s]+", raw) if x.strip()}
+
+def role_may_skip_permissions(session_id):
+    """Vai có trong GW_AGY_WRITE_ROLES (theo session_id 'gw-backend-agy' hoặc tên ngắn 'backend')."""
+    sid = (session_id or "").strip().lower()
+    roles = agy_write_roles()
+    short = sid[3:-4] if sid.startswith("gw-") and sid.endswith("-agy") else sid
+    return bool(sid) and (sid in roles or short in roles)
+
+def is_role_worktree(session_id, cwd):
+    """cwd đúng là worktree riêng <GW_WORKTREE_ROOT>/<session_id> (có .git), không phải repo đang chạy app."""
+    if not cwd or not session_id:
+        return False
+    wt = os.path.realpath(os.path.join(_worktree_root(), session_id))
+    repo = os.path.realpath(os.environ.get("GW_DISPATCH_REPO") or str(BASE_DIR))
+    real = os.path.realpath(cwd)
+    return real == wt and real != repo and os.path.exists(os.path.join(wt, ".git"))
+
+def ensure_agy_plan_permissions(p_dir, cwd):
+    """
+    Thêm quy tắc chỉ đọc vào permissions.allow của hồ sơ agy (<p_dir>/antigravity-cli/settings.json) để agy -p --mode plan
+    đọc được file và chạy lệnh chỉ đọc trong worktree của vai thay vì bị auto-denied:
+      read_file(<cwd>) + command(ls|cat|grep|git status|git log|git diff|...).
+    Giữ nguyên mọi khóa khác; file hỏng / permissions sai kiểu → không đụng. Tắt bằng GW_AGY_PLAN_ALLOW=0. Trả danh sách quy tắc vừa thêm.
+    """
+    if (os.environ.get("GW_AGY_PLAN_ALLOW", "1") or "").strip().lower() in ("0", "false", "no", "off"):
+        return []
+    cli_dir = os.path.join(p_dir or "", "antigravity-cli")
+    # Chỉ ghi vào hồ sơ agy đã có thư mục antigravity-cli: tạo mới sẽ làm _agy_env đổi ANTIGRAVITY_APP_DATA_DIR của hồ sơ
+    if not p_dir or not os.path.isdir(cli_dir) or not cwd:
+        return []
+    rules = [f"read_file({os.path.realpath(cwd)})"] + [f"command({c})" for c in AGY_PLAN_READONLY_COMMANDS]
+    path = os.path.join(cli_dir, "settings.json")
+    with _AGY_SETTINGS_LOCK:
+        try:
+            data = {}
+            if os.path.exists(path):
+                with open(path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            if not isinstance(data, dict):
+                return []
+            perms = data.setdefault("permissions", {})
+            if not isinstance(perms, dict):
+                return []
+            allow = perms.setdefault("allow", [])
+            if not isinstance(allow, list):
+                return []
+            added = [r for r in rules if r not in allow]
+            if not added:
+                return []
+            allow.extend(added)
+            tmp = f"{path}.gw-tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+            os.replace(tmp, path)
+            return added
+        except Exception as e:
+            print(f"[agy-perm] Không cập nhật được {path}: {e}")
+            return []
+
+def build_agy_aliases(session_id, p_dir, conv_id, cwd):
+    """
+    Alias agy/agy-run cho phiên tmux của vai (#7): mặc định KHÔNG có --dangerously-skip-permissions.
+    Chỉ agy-run của vai trong GW_AGY_WRITE_ROLES, và chỉ khi phiên mở trong worktree riêng của vai, mới có cờ này.
+    Trả (danh sách dòng alias, có_bật_quyền_ghi).
+    """
+    write = role_may_skip_permissions(session_id) and is_role_worktree(session_id, cwd)
+    skip = f" {AGY_SKIP_PERMISSIONS_FLAG}" if write else ""
+    return [f"alias agy=\"agy --gemini_dir='{p_dir}'\"",
+            f"alias agy-run=\"agy --gemini_dir='{p_dir}'{skip} --conversation '{conv_id}'\""], write
+
+def tmux_role_cwd(session_id):
+    """Thư mục mở phiên tmux của vai: worktree riêng (như dispatch war-room); chỉ tạo khi có tmux thật (tmux -V chạy được)."""
+    try:
+        if subprocess.run(["tmux", "-V"], capture_output=True, timeout=2.0).returncode != 0:
+            return os.environ.get("GW_DISPATCH_REPO") or str(BASE_DIR)
+    except Exception:
+        return os.environ.get("GW_DISPATCH_REPO") or str(BASE_DIR)
+    return ensure_role_worktree(session_id)
+
+def tmux_role_env_block(session_id, role_name, conv_id, p_dir, role_spec_file, email, cwd):
+    """Phần export/alias chung của script khởi tạo tmux (ensure_real_tmux_sessions + wake_tmux_session)."""
+    aliases, write = build_agy_aliases(session_id, p_dir, conv_id, cwd)
+    perm_note = "BẬT cho agy-run (GW_AGY_WRITE_ROLES)" if write else "tắt (agy hỏi quyền trước khi ghi/chạy lệnh)"
+    lines = [
+        f"export PS1='[\\033[38;5;39m{session_id}\\033[0m:\\033[38;5;48m\\w\\033[0m]$ '",
+        f"export GEN_ROLE='{role_name}'",
+        f"export GEN_CONV_ID='{conv_id}'",
+        f"export GEMINI_DIR='{p_dir}'",
+        f"export GEN_ROLE_SPEC='{role_spec_file}'",
+        *aliases,
+        f"alias gw-role=\"cat '{role_spec_file}'\"",
+        f"_gw_where() {{ echo \"CWD: $PWD\"; echo \"Branch: $(git branch --show-current 2>/dev/null)\"; echo 'Quyền ghi không hỏi: {perm_note}'; }}",
+        f"alias gw-status=\"echo '=== SWARM ROLE: {role_name} ===' && echo 'Session: {session_id}' && echo 'Account: {email}' && echo 'ConvID: {conv_id}' && echo 'Role Spec: {role_spec_file}' && echo 'SSOT: docs/SSOT_ORIGINAL_SPEC.md' && _gw_where\"",
+    ]
+    return "\n".join(lines) + "\n"
+
+def dispatch_warroom_to_agent(project_id, channel_id, session_id, message, timeout=WARROOM_DISPATCH_TIMEOUT_SEC, dispatch_id=None, reply_to=None):
+    """
+    Chạy agy thật (--mode plan -p <tin>) với profile của worker session_id trong worktree riêng; ghi trả lời thật vào chat_messages và dispatch_log (#3).
+    dispatch_id: dòng dispatch_log (status=running) đã tạo sẵn bởi post_warroom_message; None → tự tạo. Khi xong cập nhật
+    status done/failed + exit_code + summary rồi báo hiệu cho wait_worker_result (#9).
+    """
     project_id = normalize_project_id(project_id)
+    if dispatch_id is None:
+        dispatch_id = start_dispatch_log(session_id, kind="warroom", channel_id=channel_id, task_id=_current_task_of(session_id), request_msg_id=reply_to)
     account_type, profile_dir = "owner_default", ""
     try:
         with get_connection() as conn:
@@ -3240,18 +3668,38 @@ def dispatch_warroom_to_agent(project_id, channel_id, session_id, message, timeo
     prompt = (f"{message}\n\n(Bạn là {session_id}, đang ở worktree của repo gen-workplace. "
               "Hãy tự đọc file cần thiết rồi trả lời ĐẦY ĐỦ ngay trong một lượt bằng tiếng Việt; "
               "không hỏi lại, không chỉ nêu kế hoạch.)")
-    cmd = [_agy_bin(), f"--gemini_dir={p_dir}", "--mode", "plan", "-p", prompt]
+    # agy -p không tương tác: tool cần quyền bị auto-denied. Cấp quy tắc chỉ đọc (read_file(worktree), command(ls|grep|git log|...))
+    # trong settings của hồ sơ, KHÔNG bật skip-permissions cho mọi vai. Lối thoát cuối (opt-in GW_WARROOM_SKIP_PERMISSIONS=1):
+    # thêm --dangerously-skip-permissions nhưng chỉ khi cwd đúng là worktree riêng của vai (vẫn --mode plan).
+    in_worktree = is_role_worktree(session_id, cwd)
+    if in_worktree:
+        ensure_agy_plan_permissions(p_dir, cwd)
+    cmd = [_agy_bin(), f"--gemini_dir={p_dir}"]
+    if in_worktree and _env_on("GW_WARROOM_SKIP_PERMISSIONS"):
+        cmd.append(AGY_SKIP_PERMISSIONS_FLAG)
+    cmd += ["--mode", "plan", "-p", prompt]
     started_at = time.strftime("%Y-%m-%d %H:%M:%S")
+    try:
+        with get_connection() as conn:
+            conn.execute("UPDATE dispatch_log SET command = ? WHERE id = ?", (" ".join(cmd), dispatch_id))
+            conn.commit()
+    except Exception:
+        pass
     t0 = time.time()
     exit_code = -1
     output = ""
+    fail_reason = ""
     try:
         res = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, cwd=cwd, env=_agy_env(p_dir))
         exit_code = res.returncode
         output = ((res.stdout or "") + ("\n" + res.stderr if res.stderr else "")).strip()
         status, reset_at = record_quota_probe_from_result(account_type, "default", res)
+        denied = agy_output_denied(output) if exit_code == 0 else ""
         if status == "rate_limited":
             body = f"Lỗi 429 / hết quota khi gọi agy (hồi {reset_at or 'chưa rõ'}):\n{output[-1500:]}"
+        elif denied:
+            fail_reason = f"agy bị từ chối quyền / không ra kết quả ({denied})"
+            body = f"{fail_reason}:\n{output[-3000:]}"
         elif exit_code != 0:
             body = f"agy thoát lỗi:\n{output[-3000:] or '(không có output)'}"
         else:
@@ -3261,14 +3709,14 @@ def dispatch_warroom_to_agent(project_id, channel_id, session_id, message, timeo
         record_quota_probe(account_type, "default", "timeout", "", output)
     except Exception as e:
         output = body = f"Lỗi khi chạy agy ({_agy_bin()}): {e}"
-    body = f"{body}\nexit={exit_code}"
+    body = f"{body}\nexit={exit_code}" + (" (failed: agy bị từ chối quyền, không có kết quả)" if fail_reason else "")
     finished_at = time.strftime("%Y-%m-%d %H:%M:%S")
 
     report_path = ""
     try:
         report_dir = os.path.join(HOME_DIR, "gw-reports")
         os.makedirs(report_dir, exist_ok=True)
-        report_path = os.path.join(report_dir, f"warroom-{session_id}-{time.strftime('%Y%m%d-%H%M%S')}.md")
+        report_path = os.path.join(report_dir, f"warroom-{session_id}-{time.strftime('%Y%m%d-%H%M%S')}-{dispatch_id}.md")
         with open(report_path, "w", encoding="utf-8") as f:
             f.write(f"# {session_id} · {started_at} → {finished_at}\n\n")
             f.write(f"- Kênh: {channel_id}\n- cwd: {cwd}\n- Lệnh: {' '.join(cmd)}\n- exit: {exit_code}\n\n## Tin nhắn\n\n{message}\n\n## Output\n\n{output}\n")
@@ -3283,23 +3731,35 @@ def dispatch_warroom_to_agent(project_id, channel_id, session_id, message, timeo
             task_id = (r["current_task_id"] or "") if r else ""
     except Exception:
         pass
+    # exit=0 nhưng agy báo auto-denied / no output produced → vẫn là failed
+    status = "done" if exit_code == 0 and not fail_reason else "failed"
     viec_ref = get_task_viec_ref(task_id, project_id)
     webhook_sent = send_event_webhook("dispatch_finished", project_id=project_id, viec_ref=viec_ref, task_id=task_id,
-                                      session_id=session_id, exit_code=exit_code, report_path=report_path)
+                                      session_id=session_id, exit_code=exit_code, report_path=report_path, status=status)
+    summary = _shorten_output(f"[{fail_reason}]\n{output}" if fail_reason else output)
 
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("""
-        INSERT INTO chat_messages (project_id, runtime_id, author, created_time, tag, body, react_json)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (project_id, channel_id, session_id, time.strftime("%H:%M:%S"), "Report", body, json.dumps(["🤖 agy thật"], ensure_ascii=False)))
-        cursor.execute("""
-        INSERT INTO dispatch_log (session_id, command, exit_code, report_path, started_at, finished_at, task_id, viec_ref, channel_id, webhook_sent)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (session_id, " ".join(cmd), exit_code, report_path, started_at, finished_at, task_id, viec_ref, channel_id, 1 if webhook_sent else 0))
-        conn.commit()
-    return {"session_id": session_id, "exit_code": exit_code, "report_path": report_path, "cwd": cwd, "elapsed_sec": round(time.time() - t0, 1),
-            "task_id": task_id, "viec_ref": viec_ref, "webhook_sent": webhook_sent}
+    reply_msg_id = None
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            INSERT INTO chat_messages (project_id, runtime_id, author, created_time, tag, body, react_json, reply_to, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (project_id, channel_id, session_id, time.strftime("%H:%M:%S"), "Report", body, json.dumps(["🤖 agy thật"], ensure_ascii=False),
+                  reply_to, _now_iso()))
+            reply_msg_id = cursor.lastrowid
+            cursor.execute("""
+            UPDATE dispatch_log SET command = ?, exit_code = ?, report_path = ?, finished_at = ?, task_id = ?, viec_ref = ?,
+                   channel_id = ?, webhook_sent = ?, status = ?, summary = ?, reply_msg_id = ?
+            WHERE id = ?
+            """, (" ".join(cmd), exit_code, report_path, finished_at, task_id, viec_ref, channel_id, 1 if webhook_sent else 0,
+                  status, summary, reply_msg_id, dispatch_id))
+            conn.commit()
+    finally:
+        _notify_dispatch_change()
+    return {"dispatch_id": dispatch_id, "session_id": session_id, "status": status, "exit_code": exit_code, "report_path": report_path, "cwd": cwd,
+            "elapsed_sec": round(time.time() - t0, 1), "task_id": task_id, "viec_ref": viec_ref, "webhook_sent": webhook_sent,
+            "reply_msg_id": reply_msg_id, "error": fail_reason}
 
 def post_warroom_message(project_id="PRJ-GEN-WORKPLACE", channel_id="war_room", author="Ryan (Owner)", message="", tag="Directive", wait=False):
     """Lưu tin nhắn; tin có @backend|@frontend|@devops|@qa|@security|@lead → chạy agy thật của vai đó ở thread nền (wait=True chạy đồng bộ, dùng cho test). Không có @vai → chỉ lưu (#3)."""
@@ -3308,34 +3768,41 @@ def post_warroom_message(project_id="PRJ-GEN-WORKPLACE", channel_id="war_room", 
         return {"error": "Message is empty"}
 
     now_time = time.strftime("%H:%M:%S")
+    now_iso = _now_iso()
     clean_msg = message.strip()
 
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
-        INSERT INTO chat_messages (project_id, runtime_id, author, created_time, tag, body, react_json)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (project_id, channel_id, author, now_time, tag, clean_msg, json.dumps(["✅ đã ghi nhận"], ensure_ascii=False)))
+        INSERT INTO chat_messages (project_id, runtime_id, author, created_time, tag, body, react_json, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (project_id, channel_id, author, now_time, tag, clean_msg, json.dumps(["✅ đã ghi nhận"], ensure_ascii=False), now_iso))
         user_msg_id = cursor.lastrowid
         conn.commit()
 
     dispatched = []
+    dispatches = []
     for role in dict.fromkeys(m.lower() for m in WARROOM_MENTION_RE.findall(clean_msg)):
         sid = WARROOM_ROLE_SESSIONS[role]
+        # Tạo dòng dispatch_log (running) TRƯỚC khi chạy để bên gọi có dispatch_id truyền cho wait_worker_result (#9)
+        did = start_dispatch_log(sid, kind="warroom", channel_id=channel_id, task_id=_current_task_of(sid), request_msg_id=user_msg_id)
         if wait:
-            dispatch_warroom_to_agent(project_id, channel_id, sid, clean_msg)
+            dispatch_warroom_to_agent(project_id, channel_id, sid, clean_msg, dispatch_id=did, reply_to=user_msg_id)
         else:
             threading.Thread(target=dispatch_warroom_to_agent, args=(project_id, channel_id, sid, clean_msg),
-                             daemon=True, name=f"warroom-dispatch-{sid}").start()
+                             kwargs={"dispatch_id": did, "reply_to": user_msg_id}, daemon=True, name=f"warroom-dispatch-{sid}").start()
         dispatched.append(sid)
+        dispatches.append({"session_id": sid, "dispatch_id": did})
 
     return {
         "status": "sent",
         "channel_id": channel_id,
-        "user_message": {"id": user_msg_id, "author": author, "body": clean_msg, "created_time": now_time, "tag": tag},
+        "user_message": {"id": user_msg_id, "author": author, "body": clean_msg, "created_time": now_time, "created_at": now_iso, "tag": tag},
         "agent_reply": None,
         "dispatched": dispatched,
-        "note": (f"Đã chuyển tới {', '.join(dispatched)}; trả lời thật của agy sẽ xuất hiện trong kênh khi chạy xong (tối đa 15 phút)."
+        "dispatches": dispatches,
+        "note": (f"Đã chuyển tới {', '.join(dispatched)}; trả lời thật của agy sẽ xuất hiện trong kênh khi chạy xong (tối đa 15 phút). "
+                 f"Chờ kết quả: wait_worker_result(dispatch_id=...) với dispatch_id trong 'dispatches'."
                  if dispatched else "Không có @vai nên chỉ lưu tin, không trả lời.")
     }
 
@@ -3644,6 +4111,8 @@ def get_vault_list():
         {"id": "ENV-DATA_DIR", "name": "DATA_DIR", "owner": "Môi trường", "scope": f"Thư mục DB = {DATA_DIR}", "status": "đang dùng"},
         {"id": "ENV-GW_AGY_BIN", "name": "GW_AGY_BIN", "owner": "Môi trường", "scope": f"Lệnh agy = {_agy_bin()}", "status": "đã đặt" if os.environ.get("GW_AGY_BIN") else "mặc định (agy trong PATH)"},
         {"id": "ENV-GW_EVENT_WEBHOOK_URL", "name": "GW_EVENT_WEBHOOK_URL", "owner": "Môi trường", "scope": "Webhook sự kiện task_completed / dispatch_finished", "status": "bật" if os.environ.get("GW_EVENT_WEBHOOK_URL") else "tắt"},
+        {"id": "ENV-GW_AGY_WRITE_ROLES", "name": "GW_AGY_WRITE_ROLES", "owner": "Môi trường", "scope": "Vai được bật --dangerously-skip-permissions cho agy-run (chỉ trong worktree riêng)", "status": ", ".join(sorted(agy_write_roles())) or "không vai nào"},
+        {"id": "ENV-GW_WARROOM_SKIP_PERMISSIONS", "name": "GW_WARROOM_SKIP_PERMISSIONS", "owner": "Môi trường", "scope": "Lối thoát cuối: agy war-room (--mode plan) bỏ hỏi quyền, chỉ trong worktree của vai", "status": "bật" if _env_on("GW_WARROOM_SKIP_PERMISSIONS") else "tắt"},
         {"id": "ENV-GW_AUTO_UPDATE", "name": "GW_AUTO_UPDATE", "owner": "Môi trường", "scope": f"Tự cập nhật từ origin/{os.environ.get('GW_AUTO_UPDATE_BRANCH') or 'main'} mỗi {os.environ.get('GW_AUTO_UPDATE_SEC') or 120}s", "status": "tắt" if os.environ.get("GW_AUTO_UPDATE", "1").strip().lower() in ("0", "false", "no", "off") else "bật"},
         {"id": "ENV-GOOGLE_OAUTH", "name": "GOOGLE_OAUTH_CLIENT_ID/SECRET", "owner": "Môi trường (.env)", "scope": "Đổi code OAuth lấy token Google", "status": "đã cấu hình" if (GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET) else "chưa cấu hình"},
     ]
@@ -5006,7 +5475,7 @@ def verify_mcp_request_auth(headers=None, query=None, tool_name=None):
             domain_allowed = False
             domain_map = {
                 "quota": ["get_live_quota", "list_google_accounts", "switch_google_account", "get_oauth_login_url"],
-                "swarm": ["list_swarm_workers", "send_worker_directive", "manage_worker_lifecycle", "get_worker_terminal_output", "post_warroom_message", "get_warroom_messages"],
+                "swarm": ["list_swarm_workers", "send_worker_directive", "manage_worker_lifecycle", "get_worker_terminal_output", "post_warroom_message", "get_warroom_messages", "wait_worker_result"],
                 "kanban": ["list_kanban_tasks", "create_kanban_task", "claim_task", "complete_task", "update_task_checklist"],
                 "chat": ["gen_chat", "list_conversations", "create_conversation", "get_conversation_messages", "compact_conversation"],
                 "files": ["list_notes", "save_note", "delete_note", "read_workspace_file", "create_workspace_file", "list_workspace_files", "get_system_status"]

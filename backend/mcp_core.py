@@ -192,7 +192,7 @@ TOOLS = [
     },
     {
         "name": "post_warroom_message",
-        "description": "Đăng tin nhắn / chỉ thị vào phòng họp chung War Room. Tin có @backend, @frontend, @devops, @qa, @security hoặc @lead sẽ được chuyển cho agy thật của vai đó chạy nền (--mode plan, trong worktree riêng của vai) và trả lời thật xuất hiện trong kênh; không có @vai thì chỉ lưu.",
+        "description": "Đăng tin nhắn / chỉ thị vào phòng họp chung War Room. Tin có @backend, @frontend, @devops, @qa, @security hoặc @lead sẽ được chuyển cho agy thật của vai đó chạy nền (--mode plan, trong worktree riêng của vai) và trả lời thật xuất hiện trong kênh; không có @vai thì chỉ lưu. Response có 'dispatches': [{session_id, dispatch_id}] — truyền dispatch_id cho wait_worker_result để chờ kết quả.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -234,6 +234,33 @@ TOOLS = [
                     "type": "integer",
                     "description": "Số lượng tin nhắn gần nhất cần lấy (mặc định 30).",
                     "default": 30
+                }
+            }
+        }
+    },
+
+    {
+        "name": "wait_worker_result",
+        "description": "Chờ phía server tới khi worker làm xong một lần giao việc (tin War Room @vai hoặc /api/swarm/dispatch) rồi trả kết quả ngay: status done/failed, exit_code, summary (kết quả rút gọn), report_path, task_id/viec_ref, evidence. Hết timeout_sec mà chưa xong → status 'running', gọi lại với cùng dispatch_id. Không cần poll get_worker_terminal_output.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "dispatch_id": {
+                    "type": "integer",
+                    "description": "ID lần giao việc: 'dispatches[].dispatch_id' do post_warroom_message trả về, hoặc 'results.<sid>.dispatch_id' của POST /api/swarm/dispatch (= dispatch_log.id)."
+                },
+                "task_id": {
+                    "type": "string",
+                    "description": "Thay cho dispatch_id: chờ lần giao việc mới nhất của task này."
+                },
+                "session_id": {
+                    "type": "string",
+                    "description": "Thay cho dispatch_id: chờ lần giao việc mới nhất của worker (vd 'gw-qa-agy')."
+                },
+                "timeout_sec": {
+                    "type": "integer",
+                    "description": "Số giây tối đa chờ (mặc định 60, tối đa 120).",
+                    "default": 60
                 }
             }
         }
@@ -796,6 +823,13 @@ def execute_tool(name: str, args: dict) -> dict:
             limit = int(args.get("limit", 30))
             messages = db.get_warroom_messages(channel, "PRJ-GEN-WORKPLACE", limit)
             return {"content": [{"type": "text", "text": json.dumps({"channel_id": channel, "count": len(messages), "messages": messages}, ensure_ascii=False, indent=2)}], "isError": False}
+
+        # 10b. wait_worker_result (#9)
+        if name == "wait_worker_result":
+            res = db.wait_worker_result(args.get("dispatch_id"), args.get("task_id", ""), args.get("session_id", ""),
+                                        args.get("timeout_sec", db.WAIT_WORKER_DEFAULT_SEC))
+            is_err = res.get("status") in ("error", "not_found")
+            return {"content": [{"type": "text", "text": json.dumps(res, ensure_ascii=False, indent=2)}], "isError": is_err}
 
         # 11. list_kanban_tasks
         if name == "list_kanban_tasks":

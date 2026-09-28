@@ -49,6 +49,8 @@ REJECTED = [
     ("gw-qa-agy", "agy -p 'hi\nrm -rf /'", ""),
     ("gw-qa-agy", "agy -p 'chưa đóng nháy", ""),
     ("gw-qa-agy", "gw-status; ls", ""),
+    ("gw-qa-agy", "agy --dangerously-skip-permissions -p 'x'", ""),  # #7: cờ skip-permissions không đi qua directive
+    ("gw-qa-agy", "agy-run --dangerously-skip-permissions", ""),
     ("gw-qa-agy", "gw-update main; ls", ""),
     ("gw-qa-agy", "gw-update $(id)", ""),
     ("gw-qa-agy", "export GEMINI_DIR=/tmp", ""),
