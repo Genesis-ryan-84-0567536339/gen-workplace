@@ -23,7 +23,7 @@ flowchart TD
 
     subgraph TIER2["TẦNG 2: XÂY DỰNG CỐT LÕI (CORE BUILDERS)"]
         Backend["🗄️ gw-backend-agy (Backend & DB Specialist)<br/>• SQLite WAL & FTS5 Catalog Engine<br/>• RESTful & SSE APIs<br/>• Mutex Task Locking & Background Runners"]
-        Frontend["🎨 gw-frontend-agy (Frontend Specialist)<br/>• Single Page Application (SPA)<br/>• Bảng điều hành Mission Control UI<br/>• Giao diện Nocturne Slate v1.1"]
+        Frontend["🎨 gw-frontend-agy (Frontend Specialist)<br/>• Single Page Application (SPA)<br/>• Bảng điều hành Mission Control UI<br/>• frontend/index.html"]
     end
 
     subgraph TIER3["TẦNG 3: HẠ TẦNG & ĐÓNG GÓI (INFRASTRUCTURE & PACKAGING)"]
@@ -54,9 +54,9 @@ flowchart TD
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **`gw-lead-agy`** | **Lead Architect** | Chỉ huy kiến trúc, duy trì SSOT, thiết kế DAG phụ thuộc, kiểm duyệt bằng chứng và nghiệm thu sản phẩm. | `docs/**`, `workspace/roles/**`, `AGENTS.md`, `README.md`, `ROADMAP.md` | *(Toàn quyền đọc/thẩm định, cấm commit đè code module)* | Mặc định Owner (`owner@genesis.local`) |
 | **`gw-backend-agy`** | **Backend & DB Specialist** | Thiết kế CSDL SQLite WAL, FTS5 catalog, các endpoint API nghiệp vụ, cơ chế task mutex và process runner. | `backend/**`, `data/**`, `migrations/**` | `frontend/**`, `Dockerfile`, `docker-compose.yml` | Profile #1 (`owner@genesis.local`) |
-| **`gw-frontend-agy`** | **Frontend Specialist** | Xây dựng Web UI chuẩn Nocturne Slate, tương tác thời gian thực, Command Deck, thẻ chuyên gia và dashboard. | `frontend/**`, `assets/**` | `backend/**`, `data/**`, `Dockerfile` | Profile #2 (`claude.bot@genesis.local`) |
+| **`gw-frontend-agy`** | **Frontend Specialist** | Xây dựng Web UI (`frontend/index.html`), tương tác thời gian thực, Command Deck, thẻ chuyên gia và dashboard. | `frontend/**`, `assets/**` | `backend/**`, `data/**`, `Dockerfile` | Profile #2 (`claude.bot@genesis.local`) |
 | **`gw-devops-agy`** | **DevOps & Packaging** | Container hóa hệ thống, cấu hình volume live-mount SELinux `:z`, kịch bản cài đặt TUI và desktop shortcut. | `Dockerfile`, `docker-compose.yml`, `install.sh`, `installer_tui.py`, `*.desktop`, `scripts/**` | `backend/main.py`, `frontend/**` | Profile #3 (`shared.bot@genesis.local`) |
-| **`gw-qa-agy`** | **QA Tester** | Kiểm thử chu kỳ tự động, auto-wake 68ms, API regression test, đối soát tiêu chuẩn nghiệm thu của Roadmap. | `tests/**`, `qa_reports/**`, `fixtures/**` | `backend/**`, `frontend/**`, `Dockerfile` | Profile #4 (`shared.bot@genesis.local`) |
+| **`gw-qa-agy`** | **QA Tester** | Kiểm thử tự động bằng `scripts/test_*.py` (không cần agy/tmux), API regression test, đối soát tiêu chuẩn nghiệm thu của Roadmap. | `tests/**`, `qa_reports/**`, `fixtures/**` | `backend/**`, `frontend/**`, `Dockerfile` | Profile #4 (`shared.bot@genesis.local`) |
 | **`gw-security-agy`** | **Security Auditor** | Kiểm toán mã nguồn, bảo vệ bí mật OAuth/API key, phân quyền file, kiểm tra an toàn SELinux và Vault. | `vault/**`, `security_audits/**`, `.env.example` | `backend/**`, `frontend/**` | Mặc định Owner (`owner@genesis.local`) |
 
 ---
@@ -199,7 +199,7 @@ sequenceDiagram
 | :--- | :--- | :--- | :--- |
 | **Lead → Backend** | Yêu cầu nghiệp vụ, mô hình dữ liệu SSOT | Schema SQLite WAL, migration scripts, REST APIs | `data/gen-workplace.db`, API specs, Test curls 200 OK |
 | **Backend → Frontend** | JSON Response schemas, SSE stream events | UI components, data binding, command deck view | Mã HTML/JS không lỗi cú pháp, visual verify |
-| **DevOps → All** | Yêu cầu môi trường, port, thư mục mount | Container `gen-workplace-app`, `docker-compose.yml` (`:z`) | Healthcheck `curl -f /api/status` trả về 200 OK |
+| **DevOps → All** | Yêu cầu môi trường, port, thư mục dữ liệu | Tiến trình `python3 backend/main.py` trên host (systemd --user `gen-workplace.service`), `DATA_DIR` | Healthcheck `curl -f /api/status` trả về 200 OK |
 | **Builders → QA** | Mã nguồn hoàn thiện, commit hash, kịch bản test | Bộ test suite tự động, test logs, bug reports | Test output log, exit code 0 |
 | **QA/Security → Lead** | Kết quả test và audit log bảo mật | Biên bản nghiệm thu (Sign-off Certificate) | Evidence hash lưu trong SQLite `todos.evidence_ref` |
 

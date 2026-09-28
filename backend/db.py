@@ -293,7 +293,8 @@ def init_db():
             ("depends_on", "TEXT DEFAULT ''"),
             ("locked_at", "TEXT DEFAULT ''"),
             ("evidence_ref", "TEXT DEFAULT ''"),
-            ("verified_by", "TEXT DEFAULT ''")
+            ("verified_by", "TEXT DEFAULT ''"),
+            ("viec_ref", "TEXT DEFAULT ''")
         ]:
             try:
                 cursor.execute(f"ALTER TABLE todos ADD COLUMN {col} {col_type};")
@@ -500,6 +501,11 @@ def init_db():
         );
         """)
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_gen_sess_todos_conv ON gen_session_todos(conversation_id, status);")
+        # Mã việc trong Kho Ryan (VIEC-n) gắn với task (Issue #12)
+        try:
+            cursor.execute("ALTER TABLE gen_session_todos ADD COLUMN viec_ref TEXT DEFAULT '';")
+        except Exception:
+            pass
 
         # 21. MCP Agent Tokens & Permissions (Chuẩn bảo mật Gen-hub OAuth / Bearer)
         cursor.execute("""
@@ -566,10 +572,16 @@ def init_db():
             finished_at TEXT DEFAULT ''
         );
         """)
+        for col, col_type in [("task_id", "TEXT DEFAULT ''"), ("viec_ref", "TEXT DEFAULT ''"), ("channel_id", "TEXT DEFAULT ''"), ("webhook_sent", "INTEGER DEFAULT 0")]:
+            try:
+                cursor.execute(f"ALTER TABLE dispatch_log ADD COLUMN {col} {col_type};")
+            except Exception:
+                pass
 
         conn.commit()
 
     migrate_unverified_done_tasks()
+    purge_seed_data()
 
 def migrate_unverified_done_tasks():
     """Di trú nhỏ: task 'done' (todos & gen_session_todos) có evidence không kiểm được → 'review' (#4)."""
@@ -591,246 +603,126 @@ def migrate_unverified_done_tasks():
         print(f"[migrate] Đặt lại {changed} task 'done' thiếu bằng chứng kiểm được về 'review'")
     return changed
 
-def seed_ssot_events():
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT count(*) FROM ssot_events WHERE project_id = 'PRJ-GEN-WORKPLACE'")
-        if cursor.fetchone()[0] == 0:
-            events_data = [
-                ("EVT-01", "PRJ-GEN-WORKPLACE", "runtime-04", "DevOps & Packaging", "Khởi động container gen-workplace-app với live bind mount :z", "docker-compose.yml · port 8888", "ssot", "20:47"),
-                ("EVT-02", "PRJ-GEN-WORKPLACE", "runtime-05", "DevOps & Packaging", "Kiểm thử kịch bản installer_tui.py và tạo Desktop icon", "Gen-workplace.desktop verified", "ssot", "20:37"),
-                ("EVT-03", "PRJ-GEN-WORKPLACE", "runtime-01", "Lead Architect", "Lưu trữ đặc tả gốc của Owner thành SSOT bất biến", "docs/SSOT_ORIGINAL_SPEC.md", "ssot", "20:35"),
-                ("EVT-04", "PRJ-GEN-WORKPLACE", "runtime-02", "Backend & DB Specialist", "Triển khai SQLite WAL mode và FTS5 Full-Text Catalog", "data/gen-workplace.db (<1ms query)", "ssot", "20:56"),
-                ("EVT-05", "PRJ-GEN-WORKPLACE", "runtime-05", "QA Tester", "Kiểm thử chu kỳ Auto-Wake 68ms và API Regression Suite", "100% test pass · latency 68ms", "ssot", "21:05")
-            ]
-            for ev in events_data:
-                cursor.execute("""
-                INSERT OR IGNORE INTO ssot_events (id, project_id, runtime_id, role_name, request, evidence, status, verified_time)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """, ev)
-            conn.commit()
-
-
 def seed_real_project():
-    """Điền dữ liệu thực tế 100% của repository gen-workplace vào SQLite Core DB."""
+    """Chỉ tạo bản ghi project PRJ-GEN-WORKPLACE và cấu hình 6 vai (agent_roles). Không còn seed roadmap/todo/chat/catalog/sự kiện giả."""
     with get_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM projects WHERE id = 'PRJ-GEN-WORKPLACE'")
-        if cursor.fetchone()[0] > 0:
-            return  # Đã có dữ liệu thật
-
-        now_str = datetime.now().strftime("%H:%M:%S")
-
-        # 1. Project thật
         spec_path = BASE_DIR / "docs" / "SSOT_ORIGINAL_SPEC.md"
-        if not spec_path.exists():
-            spec_path = Path("/app/docs/SSOT_ORIGINAL_SPEC.md")
-        default_source_text = spec_path.read_text(encoding="utf-8") if spec_path.exists() else """# ĐẶC TẢ DỰ ÁN GEN-WORKPLACE (MULTI-AGENT SWARM ORCHESTRATOR)
-1. Bảng Console điều phối đa Agent Swarm quản lý nhiều dự án.
-2. Khu Implementation: Hàng 01 chia 3 cột (Input+Plan -> Roadmap -> Todo). Hàng 02 chọn CLI Engine cho từng Role.
-3. Khu Data Center: Git Repo, Database, Vault, File Manager.
-4. Khu Môi Trường Agent: Runtimes tự ghi tư duy, Chatroom thread @mention.
-5. Khu Nơi Làm Việc (Workplace): 2 cột Memory tổng Master SSOT vs Memory từng Role sync realtime + Catalog tra nhanh ID.
-6. Đóng gói phân phối All-In-One: Cài đặt 1 lệnh trên giao diện TUI có loading %, chạy 100% Docker, tự tạo Desktop Icon."""
-
+        source_text = spec_path.read_text(encoding="utf-8") if spec_path.exists() else ""
         cursor.execute("""
-        INSERT INTO projects (id, name, repo_path, branch, plan_file, source_text, meta, status)
+        INSERT OR IGNORE INTO projects (id, name, repo_path, branch, plan_file, source_text, meta, status)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            'PRJ-GEN-WORKPLACE',
-            'gen-workplace',
-            str(BASE_DIR),
-            'main',
-            'docs/SSOT_ORIGINAL_SPEC.md',
-            default_source_text,
-            '6 role · Docker live mount · Active SSOT',
-            'active'
-        ))
+        """, ('PRJ-GEN-WORKPLACE', 'gen-workplace', str(BASE_DIR), 'main', 'docs/SSOT_ORIGINAL_SPEC.md', source_text, '6 vai · SQLite WAL', 'active'))
 
-        # 2. Roadmaps thật
-        roadmaps = [
-            ('RM-01', 'Core Architecture & SSOT Spec', 'Thiết lập repo local, lưu nguyên văn đặc tả gốc của Owner vào docs/SSOT_ORIGINAL_SPEC.md.', 3, 'done', 1),
-            ('RM-02', 'Docker Engine & Live Mount', 'Container hóa toàn bộ hệ thống với Dockerfile, docker-compose.yml và live bind mount :z.', 2, 'done', 2),
-            ('RM-03', 'One-Command TUI Installer', 'Kịch bản install.sh + installer_tui.py với progress bar %, kiểm tra Docker/OS/Git, tự tạo Desktop Icon.', 3, 'done', 3),
-            ('RM-04', 'SQLite Database & CLI Connectors', 'Tích hợp SQLite Core DB, FTS5 catalog lookup, process runner kết nối agy & claude CLI thực tế.', 3, 'live', 4),
-            ('RM-05', 'GitHub Publication & Release', 'Gắn tag v1.0, publish repo lên GitHub cho cộng đồng, hỗ trợ 1-command curl install.', 2, 'queued', 5)
-        ]
-        for r in roadmaps:
-            cursor.execute("INSERT INTO roadmaps (id, project_id, title, description, todos_count, status, order_idx) VALUES (?, 'PRJ-GEN-WORKPLACE', ?, ?, ?, ?, ?)", r)
-
-        # 3. Todos thật
-        # Cột cuối là bằng chứng thật (file trong repo); chỉ ghi 'done' khi verify_evidence_ref() kiểm được,
-        # còn lại về 'queued' với evidence_ref rỗng (#4).
-        todos = [
-            ('TODO-01', 'RM-01', 'Khởi tạo Git repo và lưu cấu trúc dự án', 'Lead Architect', 'done', 'README.md'),
-            ('TODO-02', 'RM-01', 'Lưu đặc tả gốc vào docs/SSOT_ORIGINAL_SPEC.md', 'Lead Architect', 'done', 'docs/SSOT_ORIGINAL_SPEC.md'),
-            ('TODO-03', 'RM-01', 'Chuyển đổi giao diện sang phong cách Gen-workplace v1.1', 'Frontend Specialist', 'done', 'frontend/index.html'),
-            ('TODO-04', 'RM-02', 'Viết Dockerfile container hóa Python backend + WebApp', 'DevOps Engineer', 'done', 'Dockerfile'),
-            ('TODO-05', 'RM-02', 'Cấu hình docker-compose live mount với cờ SELinux :z', 'DevOps Engineer', 'done', 'docker-compose.yml'),
-            ('TODO-06', 'RM-03', 'Xây dựng installer_tui.py với thanh loading % đồ họa', 'Backend Specialist', 'done', 'installer_tui.py'),
-            ('TODO-07', 'RM-03', 'Kịch bản install.sh tự động kiểm tra Git & Docker daemon', 'DevOps Engineer', 'done', 'install.sh'),
-            ('TODO-08', 'RM-03', 'Tạo shortcut Desktop Gen-workplace.desktop tự động', 'DevOps Engineer', 'done', ''),
-            ('TODO-09', 'RM-04', 'Khởi tạo SQLite WAL DB & FTS5 virtual table', 'Backend Specialist', 'done', 'backend/db.py'),
-            ('TODO-10', 'RM-04', 'Kết nối API /api/state và /api/catalog với SQLite', 'Backend Specialist', 'live', ''),
-            ('TODO-11', 'RM-04', 'Tích hợp Process Runner gọi agy CLI thời gian thực', 'Lead Architect', 'queued', ''),
-            ('TODO-12', 'RM-05', 'Kiểm thử cross-platform trên macOS và Windows WSL2', 'QA Tester', 'queued', ''),
-            ('TODO-13', 'RM-05', 'Publish repository lên GitHub và gắn release v1.0', 'Lead Architect', 'queued', '')
-        ]
-        for tid, rm, title, role, status, evidence in todos:
-            verified_by = ''
-            if status == 'done':
-                ok, verified_by, _ = verify_evidence_ref(evidence)
-                if not ok:
-                    status, evidence, verified_by = 'queued', '', ''
-            cursor.execute("INSERT INTO todos (id, roadmap_id, project_id, title, assigned_role, status, evidence_ref, verified_by) VALUES (?, ?, 'PRJ-GEN-WORKPLACE', ?, ?, ?, ?, ?)",
-                           (tid, rm, title, role, status, evidence, verified_by))
-
-        # 4. Roles thật
         roles = [
             ('ROLE-01', 'L', 'Lead Architect', 'Gemini CLI (agy --effort high)', 'Quản trị SSOT, điều phối toàn bộ tiến trình gen-workplace', 'Chịu trách nhiệm bảo toàn SSOT đặc tả gốc, thẩm định evidence từ các role và điều phối live workflow.'),
             ('ROLE-02', 'B', 'Backend & DB Specialist', 'Claude Code CLI', 'Python daemon, SQLite WAL, FTS5 catalog và runner', 'Thực thi API control plane, tối ưu truy vấn FTS5 catalog sub-ms và stream log terminal.'),
             ('ROLE-03', 'F', 'Frontend Specialist', 'Cursor CLI', 'Web console UI, CSS Gen-workplace v1.1, real-time sync', 'Duy trì phong cách thiết kế tối kỹ thuật v1.1, bind dữ liệu thật từ backend và tối ưu UX.'),
-            ('ROLE-04', 'D', 'DevOps & Packaging', 'Gemini CLI (agy --agent devops)', 'Docker, SELinux bind mounts, TUI installer, desktop shortcut', 'Đảm bảo môi trường container chạy ổn định trên Linux, macOS và Windows, script 1-command installer hoàn hảo.'),
+            ('ROLE-04', 'D', 'DevOps & Packaging', 'Gemini CLI (agy --agent devops)', 'Systemd service, tmux, cài đặt và cập nhật app trên host', 'Đảm bảo app chạy ổn định trên host Linux (systemd + tmux), script cài đặt/cập nhật 1 lệnh.'),
             ('ROLE-05', 'Q', 'QA Tester', 'Gemini CLI (agy)', 'Kiểm thử cross-platform, test API /api/status, xác thực installer', 'Chạy regression tests, nghiệm thu thanh loading % của installer và báo cáo phản hồi.'),
-            ('ROLE-06', 'S', 'Security Auditor', 'Codex Security CLI', 'Phân quyền volume Docker, audit file permission, kiểm soát Vault', 'Kiểm tra an toàn SELinux, cô lập quyền hạn biến môi trường và thẩm định secret boundary.')
+            ('ROLE-06', 'S', 'Security Auditor', 'Codex Security CLI', 'Phân quyền thư mục, audit file permission, kiểm soát Vault', 'Kiểm tra an toàn phân quyền, cô lập biến môi trường và thẩm định secret boundary.')
         ]
         for rl in roles:
-            cursor.execute("INSERT INTO agent_roles (id, project_id, role_key, name, cli_tool, scope, instruction) VALUES (?, 'PRJ-GEN-WORKPLACE', ?, ?, ?, ?, ?)", rl)
-
-        # 5. Workflow Nodes thật
-        nodes = [
-            ('NODE-01', 0, 'Spec Ingestion', 'Lead Architect', 'done', 20, 42, 'Đặc tả gốc của Owner', 'docs/SSOT_ORIGINAL_SPEC.md', 'SSOT locked', '→ Docker Architecture', json.dumps(['Lập repo gen-workplace', 'Ghi nguyên văn SSOT', 'Cam kết zero-drift'], ensure_ascii=False)),
-            ('NODE-02', 1, 'Container & Live Mount', 'DevOps Engineer', 'done', 260, 42, 'Dockerfile + docker-compose', 'gen-workplace-app (Live)', 'live bind mount verified', '→ TUI Installer', json.dumps(['Docker build 3.11-slim', 'Live mount cờ :z SELinux', 'Port 8888 200 OK'], ensure_ascii=False)),
-            ('NODE-03', 2, 'TUI Installer & Icon', 'DevOps + Backend', 'done', 500, 42, 'install.sh + installer_tui.py', 'Gen-workplace.desktop', '1-command launch verified', '→ Database & Catalog', json.dumps(['Thanh loading % trực quan', 'Pre-flight checks OS/Docker', 'Tạo Desktop Icon WebApp'], ensure_ascii=False)),
-            ('NODE-04', 3, 'Database & Catalog Engine', 'Backend & DB', 'live', 740, 42, 'SQLite FTS5 schema', 'Fast ID Catalog API', 'sub-ms query test', '→ Cross-Platform QA', json.dumps(['SQLite WAL mode', 'Bảng FTS5 Catalog', 'Zero-audit token saving'], ensure_ascii=False)),
-            ('NODE-05', 4, 'Cross-Platform QA', 'QA Tester', 'pending', 980, 42, 'Installer test matrix', 'QA Sign-off report', 'zero install issue', '→ GitHub Release', json.dumps(['Test Linux / Fedora / Ubuntu', 'Test macOS Docker Desktop', 'Test Windows WSL2'], ensure_ascii=False)),
-            ('NODE-06', 5, 'GitHub Release & Freeze', 'Lead Architect', 'pending', 500, 185, 'Clean git commits', 'GitHub Release v1.0', 'all issues resolved', '→ Community distribution', json.dumps(['Gắn tag v1.0.0', 'Push to GitHub main', '1-command curl ready'], ensure_ascii=False))
-        ]
-        for n in nodes:
-            cursor.execute("""
-            INSERT INTO workflow_nodes (id, project_id, step_index, title, role_name, status, coord_x, coord_y, input_desc, output_desc, check_desc, handoff_desc, checklist_json)
-            VALUES (?, 'PRJ-GEN-WORKPLACE', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, n)
-
-        # 6. Runtimes thật
-        runtimes = [
-            ('runtime-01', 'Lead Architect', 'Gemini CLI (agy)', 'RM-04', 'main', 'running', str(BASE_DIR),
-             json.dumps({'input': 'Owner Request', 'output': 'gen-workplace git repo', 'request': 'init real project', 'conclusion': 'live & running'}, ensure_ascii=False),
-             json.dumps(['20:34 repo created', '20:35 SSOT spec written', '20:47 live mount verified'], ensure_ascii=False)),
-            ('runtime-02', 'Backend & DB Specialist', 'Claude Code CLI', 'TODO-09', 'main', 'running', str(BASE_DIR),
-             json.dumps({'input': 'Database spec', 'output': 'SQLite FTS5 schema', 'request': 'build zero-audit catalog', 'conclusion': 'in progress'}, ensure_ascii=False),
-             json.dumps(['20:35 installer_tui.py implemented', '20:56 designing SQLite FTS5 catalog'], ensure_ascii=False)),
-            ('runtime-03', 'Frontend Specialist', 'Cursor CLI', 'TODO-03', 'main', 'running', str(BASE_DIR),
-             json.dumps({'input': 'Gen-workplace-v1.1-dynamic.html', 'output': 'frontend/index.html', 'request': 'apply technical dark theme', 'conclusion': 'done'}, ensure_ascii=False),
-             json.dumps(['20:10 applied v1.1 palette', '20:57 wiped mock data, replaced with real repo data'], ensure_ascii=False)),
-            ('runtime-04', 'DevOps & Packaging', 'Gemini CLI (agy)', 'TODO-05', 'main', 'done', str(BASE_DIR),
-             json.dumps({'input': 'docker-compose.yml', 'output': 'container gen-workplace-app', 'request': 'containerize app', 'conclusion': 'done'}, ensure_ascii=False),
-             json.dumps(['20:35 Dockerfile created', '20:36 image built', '20:47 container live-mounted'], ensure_ascii=False)),
-            ('runtime-05', 'QA Tester', 'Gemini CLI', 'TODO-08', 'main', 'done', str(BASE_DIR),
-             json.dumps({'input': 'Gen-workplace.desktop', 'output': 'QA pass', 'request': 'verify desktop icon', 'conclusion': 'done'}, ensure_ascii=False),
-             json.dumps(['20:37 checked desktop entry', '20:37 curl status 200 OK'], ensure_ascii=False)),
-            ('runtime-06', 'Security Auditor', 'Codex Security CLI', 'TODO-05', 'main', 'done', str(BASE_DIR),
-             json.dumps({'input': 'SELinux policy', 'output': 'secure volume mount', 'request': 'enforce security', 'conclusion': 'done'}, ensure_ascii=False),
-             json.dumps(['20:46 audit getenforce', '20:47 confirmed zero permission leak'], ensure_ascii=False))
-        ]
-        for rt in runtimes:
-            cursor.execute("""
-            INSERT INTO agent_runtimes (id, project_id, role_name, cli_tool, task_ref, branch, status, path, io_json, trace_json)
-            VALUES (?, 'PRJ-GEN-WORKPLACE', ?, ?, ?, ?, ?, ?, ?, ?)
-            """, rt)
-
-        # 7. Chat messages thật
-        messages = [
-            ('runtime-01', 'Lead Architect', '20:34:26', 'Repo Init', 'Đã khởi tạo repo và lưu đặc tả gốc vào <code>docs/SSOT_ORIGINAL_SPEC.md</code>.', json.dumps(['📥 đã nhận', '✅ done'], ensure_ascii=False)),
-            ('runtime-01', 'Lead Architect', '20:47:08', 'Live Mount', 'Đã cấu hình Live Mount với cờ SELinux <code>:z</code>. Mọi chỉnh sửa trên host sẽ tự động phản ánh tức thì vào container!', json.dumps(['🚀 live reload', '✅ xác nhận'], ensure_ascii=False)),
-            ('runtime-02', 'Backend & DB Specialist', '20:35:45', 'Installer', 'Đã xây dựng xong bộ cài đặt <code>installer_tui.py</code> có thanh loading progress bar % và kiểm tra môi trường.', json.dumps(['✅ done', '🔥 mượt mà'], ensure_ascii=False)),
-            ('runtime-02', 'Backend & DB Specialist', '20:56:00', 'Database', 'Đang triển khai SQLite WAL Core Database và FTS5 Virtual Table cho Catalog tra nhanh ID.', json.dumps(['⏳ đang chạy'], ensure_ascii=False)),
-            ('runtime-03', 'Frontend Specialist', '20:10:23', 'Style v1.1', 'Đã chuyển đổi toàn bộ layout sang phong cách Gen-workplace v1.1 tinh tế, không rối mắt.', json.dumps(['✅ done'], ensure_ascii=False)),
-            ('runtime-04', 'DevOps & Packaging', '20:36:58', 'Docker Up', 'Container <code>gen-workplace-app</code> đã khởi động thành công trên cổng 8888.', json.dumps(['✅ done', '🚀 online'], ensure_ascii=False)),
-            ('runtime-05', 'QA Tester', '20:37:05', 'Shortcut', 'Đã xác thực shortcut Desktop tồn tại và mở được WebApp.', json.dumps(['✅ verified'], ensure_ascii=False)),
-            ('runtime-06', 'Security Auditor', '20:46:47', 'SELinux', 'Đã kiểm tra SELinux Enforcing trên host và gán nhãn <code>:z</code> an toàn cho Docker mounts.', json.dumps(['✅ secure'], ensure_ascii=False))
-        ]
-        for m in messages:
-            cursor.execute("""
-            INSERT INTO chat_messages (project_id, runtime_id, author, created_time, tag, body, react_json)
-            VALUES ('PRJ-GEN-WORKPLACE', ?, ?, ?, ?, ?, ?)
-            """, m)
-
-        # 8. Master SSOT thật (8 Trụ Cột Quy Chuẩn Bất Biến Toàn Dự Án)
-        ssots = [
-            ('SSOT-SPEC-01', 'Đặc Tả Gốc Bất Biến Của Owner (Ryan)', 'Bản đặc tả 5 phân khu (Dashboard, Implementation 3 hàng, Data Center, Runtimes, Workplace) và tiêu chuẩn cài đặt 1 lệnh TUI Docker là Single Source of Truth bất biến của toàn dự án. Mọi suy diễn ngoài spec đều bị từ chối.', 'EVT-03 · docs/SSOT_ORIGINAL_SPEC.md', '20:35'),
-            ('SSOT-INSTALL-02', 'Tiêu Chuẩn Cài Đặt 1 Lệnh TUI & Desktop Shortcut', 'Kịch bản cài đặt phải có thanh đo tiến độ loading %, tự kiểm tra môi trường OS/Docker/Git và tự sinh shortcut desktop Gen-workplace.desktop khi kết thúc để người dùng click là mở WebApp ngay.', 'EVT-02 · installer_tui.py', '20:37'),
-            ('SSOT-DOCKER-03', 'Môi Trường Container Hóa Khép Kín Đa Nền Tảng', 'Toàn bộ backend, frontend và data runtimes phải đóng gói khép kín trong Docker container để chạy đồng nhất trên Linux, macOS và Windows (WSL2), đảm bảo zero-drift.', 'EVT-01 · docker-compose.yml', '20:47'),
-            ('SSOT-LIVE-MOUNT-04', 'Cơ Chế Live Mount Hot-Reload (:z SELinux)', 'Thư mục frontend/ và backend/ được mount trực tiếp vào container với cờ SELinux :z, đảm bảo mọi thay đổi code trên repo được cập nhật tức thì trên WebApp khi F5 mà không cần build lại image.', 'COMMIT ae4e196', '20:47'),
-            ('SSOT-TASK-MUTEX-05', 'Kỷ Luật Thép Task Mutex Khóa Độc Quyền (Anti-Chaos)', 'Mỗi nhiệm vụ chỉ do đúng 1 Agent khóa (locked_at). Kiểm tra ràng buộc tiền đề depends_on trước khi nhận việc. Thu hồi tự động các task bị treo quá 300s (Anti-Zombie Reclamation).', 'API /api/task/claim', '21:05'),
-            ('SSOT-EVIDENCE-06', 'Tiêu Chuẩn Nghiệm Thu Kép (Dual-Gate Verification)', 'Agent không thể tự ý chuyển task sang done nếu thiếu bằng chứng vật lý (commit hash / test log / artifact). Nghiệm thu bắt buộc có chữ ký phê chuẩn của Lead Architect.', 'API /api/task/complete', '21:10'),
-            ('SSOT-FTS5-CATALOG-07', 'Catalog Tra Nhanh Sub-Millisecond (Zero-Audit Tokens)', 'Mã định danh #EVT, #SEC, #MCP, #FILE, #TOOL, #TBL được lập chỉ mục FTS5 trong SQLite WAL, giúp các chuyên gia tra cứu dữ kiện tức thì dưới 1ms mà không cần quét lại toàn bộ repository.', 'SQLite FTS5 virtual table', '21:15'),
-            ('SSOT-ORCH-SWARM-08', 'Cơ Chế Phân Cấp Mệnh Lệnh 3 Tầng Kỷ Luật', 'Mệnh lệnh truyền từ Gen (Core Orchestrator vĩ mô) ➔ Lead Architect (Kế hoạch DAG kỹ thuật) ➔ 5 Chuyên gia chuyên môn. Giao ban, bàn giao I/O contract 100% bằng tiếng Việt.', 'Phòng Giao Ban War Room', '21:20')
-        ]
-        for s in ssots:
-            cursor.execute("""
-            INSERT INTO master_ssot (id, project_id, title, body, source_ref, verified_time)
-            VALUES (?, 'PRJ-GEN-WORKPLACE', ?, ?, ?, ?)
-            """, s)
-
-        # 9. Role Memories thật (Đầy đủ 6 Chuyên Gia)
-        memories = [
-            ('Lead Architect', 'Bảo tồn đặc tả SSOT gốc (docs/SSOT_ORIGINAL_SPEC.md), quản lý chuỗi Todo DAG, kiểm soát ranh giới Whitelist và duyệt bằng chứng nghiệm thu commit hash.', json.dumps(['ssot-freeze', 'dag-scheduler', 'dual-gate'], ensure_ascii=False), 1, '20:34'),
-            ('Backend & DB Specialist', 'Cấu hình SQLite với chế độ WAL (Write-Ahead Logging) và FTS5 để tối ưu hóa truy vấn catalog dưới 1ms. Triển khai API Task Mutex /api/task/claim.', json.dumps(['sqlite-wal', 'fts5-catalog', 'task-mutex'], ensure_ascii=False), 1, '20:56'),
-            ('Frontend Specialist', 'Áp dụng bảng màu Nocturne Slate v1.2, xây dựng Bàn Làm Việc Live Workbench 3 cột, stream terminal console và engine đồng bộ realtime 2.5s.', json.dumps(['live-workbench', 'realtime-sync', 'nocturne-slate'], ensure_ascii=False), 1, '20:10'),
-            ('DevOps & Packaging', 'Ghi chú SELinux: Docker volume trên Fedora/RHEL bắt buộc có hậu tố :z để tự động gán nhãn container_file_t. Xây dựng installer_tui.py và Desktop icon.', json.dumps(['docker-compose', 'selinux-z', 'tui-installer'], ensure_ascii=False), 1, '20:46'),
-            ('QA Tester', 'Thiết lập test suite tự động cho chu kỳ Auto-Wake 68ms, kiểm tra toàn bộ REST API endpoint và chứng thực bằng chứng commit hash trước khi bàn giao.', json.dumps(['auto-wake-68ms', 'api-regression', 'test-matrix'], ensure_ascii=False), 1, '20:37'),
-            ('Security Auditor', 'Kiểm toán Token Vault OAuth 2.0 PKCE và phân quyền thư mục. Đảm bảo zero-secret-leak, ngăn chặn rò rỉ credential ra log hoặc commit git.', json.dumps(['oauth-pkce', 'zero-leak', 'whitelist-guard'], ensure_ascii=False), 1, '20:46')
-        ]
-        for rm in memories:
-            cursor.execute("""
-            INSERT INTO role_memories (project_id, role_name, body, tags_json, synced_to_ssot, created_time)
-            VALUES ('PRJ-GEN-WORKPLACE', ?, ?, ?, ?, ?)
-            """, rm)
-
-        # 10. Fast ID Lookup Catalog thật (Zero-audit tokens!)
-        catalog = [
-            ('#FILE-01', 'FILE', 'docs/SSOT_ORIGINAL_SPEC.md', 'Tài liệu SSOT đặc tả gốc bất biến của Owner toàn dự án', 'docs/SSOT_ORIGINAL_SPEC.md', json.dumps({'type': 'markdown', 'lines': 140})),
-            ('#FILE-02', 'FILE', 'frontend/index.html', 'Giao diện Console hoàn chỉnh 100% phong cách Gen-workplace v1.1', 'frontend/index.html', json.dumps({'type': 'html', 'lines': 2755})),
-            ('#FILE-03', 'FILE', 'backend/main.py', 'Control Plane Server & API endpoint (/api/status, /api/state)', 'backend/main.py', json.dumps({'type': 'python', 'port': 8888})),
-            ('#FILE-04', 'FILE', 'installer_tui.py', 'Bộ cài đặt giao diện dòng lệnh TUI với progress bar % và dependency check', 'installer_tui.py', json.dumps({'type': 'tui'})),
-            ('#FILE-05', 'FILE', 'docker-compose.yml', 'Cấu hình docker-compose live mount với cờ SELinux :z', 'docker-compose.yml', json.dumps({'services': ['gen-workplace']})),
-            ('#FILE-06', 'FILE', 'Gen-workplace.desktop', 'Shortcut Desktop mở WebApp bằng trình duyệt mặc định', 'Gen-workplace.desktop', json.dumps({'type': 'desktop-entry'})),
-            ('#SEC-01', 'SEC', 'Docker Container Sandbox Boundary', 'Cách ly toàn bộ mã thực thi của các CLI Agent trong Docker container', '/etc/docker/daemon.json', json.dumps({'isolation': 'docker'})),
-            ('#SEC-02', 'SEC', 'Master Prompt Instruction Lock', 'Chỉ có thể chỉnh sửa hướng dẫn Agent Role thông qua ô Chat Input Tổng', 'frontend/index.html', json.dumps({'locked': True})),
-            ('#MCP-01', 'MCP', 'google-drive MCP Server', 'Tích hợp đọc tài liệu, trang tính từ Google Drive', 'antigravity-cli/mcp/google-drive', json.dumps({'tools': 42})),
-            ('#MCP-02', 'MCP', 'git-ops CLI Integration', 'Tự động kiểm soát commit, branch và pull request cho các subagent', 'builtin/git-ops', json.dumps({'cli': 'git'})),
-            ('#TOOL-01', 'TOOL', 'Gemini CLI (agy)', 'Antigravity CLI hỗ trợ chế độ autonomous và high-effort', 'agy', json.dumps({'version': '1.2.11'})),
-            ('#TOOL-02', 'TOOL', 'Claude Code CLI', 'Engine tư duy và kiểm chứng mã nguồn độc lập', 'claude-code', json.dumps({'model': 'sonnet'})),
-            ('#TOOL-03', 'TOOL', 'Codex Security CLI', 'Thẩm định an toàn, quyền truy cập tệp và phân tách bí mật', 'codex-cli', json.dumps({'sandbox': 'read-only'})),
-            ('#DB-01', 'DB', 'SQLite 3 WAL Database', 'Cơ sở dữ liệu cốt lõi lưu trữ toàn bộ thực thể và FTS5 Catalog tra cứu', '/app/data/gen-workplace.db', json.dumps({'journal': 'WAL', 'fts': 'fts5'})),
-            ('#EVT-01', 'EVT', 'Khởi tạo repo và commit đầu tiên 5f91e1e', 'Commit khởi tạo repo, Dockerfile và kịch bản TUI installer', 'git commit 5f91e1e', json.dumps({'author': 'Lead', 'time': '20:34'})),
-            ('#EVT-02', 'EVT', 'Cấu hình Live Mount Hot-Reload commit ae4e196', 'Thêm cờ :z cho SELinux trên Fedora giúp phản ánh code tức thì', 'git commit ae4e196', json.dumps({'author': 'DevOps', 'time': '20:47'})),
-            ('#EVT-03', 'EVT', 'Xóa sạch mock data, bind dữ liệu thật commit a4f63be', 'Thay thế toàn bộ mock data bằng dữ liệu thật của repository gen-workplace', 'git commit a4f63be', json.dumps({'author': 'Lead', 'time': '21:02'}))
-        ]
-        for c in catalog:
-            cursor.execute("""
-            INSERT INTO catalog_references (id, project_id, category, title, description, ref_path, metadata_json)
-            VALUES (?, 'PRJ-GEN-WORKPLACE', ?, ?, ?, ?, ?)
-            """, c)
-
-        # Seed ssot_events if empty
-        cursor.execute("SELECT count(*) FROM ssot_events WHERE project_id = 'PRJ-GEN-WORKPLACE'")
-        if cursor.fetchone()[0] == 0:
-            events_data = [
-                ("EVT-01", "PRJ-GEN-WORKPLACE", "runtime-04", "DevOps & Packaging", "Khởi động container gen-workplace-app với live bind mount :z", "docker-compose.yml · port 8888", "ssot", "20:47"),
-                ("EVT-02", "PRJ-GEN-WORKPLACE", "runtime-05", "DevOps & Packaging", "Kiểm thử kịch bản installer_tui.py và tạo Desktop icon", "Gen-workplace.desktop verified", "ssot", "20:37"),
-                ("EVT-03", "PRJ-GEN-WORKPLACE", "runtime-01", "Lead Architect", "Lưu trữ đặc tả gốc của Owner thành SSOT bất biến", "docs/SSOT_ORIGINAL_SPEC.md", "ssot", "20:35"),
-                ("EVT-04", "PRJ-GEN-WORKPLACE", "runtime-02", "Backend & DB Specialist", "Triển khai SQLite WAL mode và FTS5 Full-Text Catalog", "data/gen-workplace.db (<1ms query)", "ssot", "20:56"),
-                ("EVT-05", "PRJ-GEN-WORKPLACE", "runtime-05", "QA Tester", "Kiểm thử chu kỳ Auto-Wake 68ms và API Regression Suite", "100% test pass · latency 68ms", "ssot", "21:05")
-            ]
-            for ev in events_data:
-                cursor.execute("""
-                INSERT OR IGNORE INTO ssot_events (id, project_id, runtime_id, role_name, request, evidence, status, verified_time)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """, ev)
-
+            cursor.execute("INSERT OR IGNORE INTO agent_roles (id, project_id, role_key, name, cli_tool, scope, instruction) VALUES (?, 'PRJ-GEN-WORKPLACE', ?, ?, ?, ?, ?)", rl)
         conn.commit()
+
+# ---------------------------------------------------------------------------
+# Issue #12: bản ghi seed giả của các phiên bản trước — danh sách tường minh (ID + tiêu đề/nội dung đúng như code seed cũ)
+# nằm trong backend/seed_purge_list.json. purge_seed_data() chạy cuối init_db(), idempotent, chỉ xóa đúng các bản ghi này.
+# ---------------------------------------------------------------------------
+SEED_PURGE_LIST_PATH = Path(__file__).resolve().parent / "seed_purge_list.json"
+
+def load_seed_purge_list():
+    """Đọc danh sách bản ghi seed cũ cần xóa (backend/seed_purge_list.json). Thiếu/hỏng file → {} (không xóa gì)."""
+    try:
+        with open(SEED_PURGE_LIST_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"[purge] Không đọc được {SEED_PURGE_LIST_PATH}: {e}")
+        return {}
+
+def purge_seed_data():
+    """
+    Xóa các bản ghi seed giả đã tồn tại trong DB (Issue #12). Chỉ xóa đúng ID + tiêu đề/nội dung như code seed cũ,
+    không đụng bản ghi khác. Idempotent. In log '[purge] xóa N bản ghi seed (bảng: ...)' khi có xóa.
+    """
+    counts = {}
+    S = load_seed_purge_list()
+    if not S:
+        return {"total": 0, "tables": counts}
+    SEED_TODOS = S.get("seed_todos", {})
+    SEED_CHAT_BOT_AUTHORS = S.get("seed_chat_bot_authors", [])
+
+    def bump(table, n):
+        if n:
+            counts[table] = counts.get(table, 0) + n
+
+    try:
+        with get_connection() as conn:
+            cur = conn.cursor()
+            # todos trước roadmaps (todos → roadmaps ON DELETE CASCADE: chỉ xóa roadmap khi không còn todo nào)
+            for tid, title in SEED_TODOS.items():
+                cur.execute("DELETE FROM todos WHERE id = ? AND title = ?", (tid, title))
+                bump("todos", cur.rowcount)
+            for rid, title in S.get("seed_roadmaps", {}).items():
+                cur.execute("DELETE FROM roadmaps WHERE id = ? AND title = ? AND NOT EXISTS (SELECT 1 FROM todos t WHERE t.roadmap_id = roadmaps.id)", (rid, title))
+                bump("roadmaps", cur.rowcount)
+            for nid, title in S.get("seed_workflow_nodes", {}).items():
+                cur.execute("DELETE FROM workflow_nodes WHERE id = ? AND title = ?", (nid, title))
+                bump("workflow_nodes", cur.rowcount)
+            for rid, role in S.get("seed_runtimes", {}).items():
+                cur.execute("DELETE FROM agent_runtimes WHERE id = ? AND role_name = ?", (rid, role))
+                bump("agent_runtimes", cur.rowcount)
+            for sid, title in S.get("seed_master_ssot", {}).items():
+                cur.execute("DELETE FROM master_ssot WHERE id = ? AND title = ?", (sid, title))
+                bump("master_ssot", cur.rowcount)
+            for cid, title in S.get("seed_catalog", {}).items():
+                cur.execute("DELETE FROM catalog_references WHERE id = ? AND title = ?", (cid, title))
+                bump("catalog_references", cur.rowcount)
+            for eid, req in S.get("seed_ssot_events", {}).items():
+                cur.execute("DELETE FROM ssot_events WHERE id = ? AND request = ?", (eid, req))
+                bump("ssot_events", cur.rowcount)
+            for role, body in S.get("seed_role_memories", []):
+                cur.execute("DELETE FROM role_memories WHERE role_name = ? AND body = ?", (role, body))
+                bump("role_memories", cur.rowcount)
+            for body in S.get("seed_chat_bodies", []):
+                cur.execute("DELETE FROM chat_messages WHERE body = ?", (body,))
+                bump("chat_messages", cur.rowcount)
+            bot_in = ",".join("?" * len(SEED_CHAT_BOT_AUTHORS))
+            for prefix in S.get("seed_chat_body_prefixes", []):
+                cur.execute(f"DELETE FROM chat_messages WHERE substr(body, 1, ?) = ? AND author IN ({bot_in})",
+                            [len(prefix), prefix] + SEED_CHAT_BOT_AUTHORS)
+                bump("chat_messages", cur.rowcount)
+            for frag in S.get("seed_chat_body_contains", []):
+                cur.execute(f"DELETE FROM chat_messages WHERE instr(body, ?) > 0 AND author IN ({bot_in})",
+                            [frag] + SEED_CHAT_BOT_AUTHORS)
+                bump("chat_messages", cur.rowcount)
+            for conv_id in S.get("seed_gen_conversations", []):
+                for tbl in ("gen_messages", "gen_compact_snapshots", "gen_session_files", "gen_session_todos", "gen_scratchpad_notes"):
+                    cur.execute(f"DELETE FROM {tbl} WHERE conversation_id = ?", (conv_id,))
+                    bump(tbl, cur.rowcount)
+                cur.execute("DELETE FROM gen_conversations WHERE id = ?", (conv_id,))
+                bump("gen_conversations", cur.rowcount)
+            cur.execute("DELETE FROM gen_messages WHERE role = 'assistant' AND author = 'Gen Core' AND content = ?", (S.get("seed_gen_greeting", ""),))
+            bump("gen_messages", cur.rowcount)
+            for title in S.get("seed_session_todo_titles", []):
+                cur.execute("DELETE FROM gen_session_todos WHERE id LIKE 'TSK-%' AND title = ?", (title,))
+                bump("gen_session_todos", cur.rowcount)
+            # Worker đang trỏ tới task seed đã bị xóa → bỏ gán
+            seed_ids = list(SEED_TODOS.keys())
+            if seed_ids:
+                cur.execute(f"UPDATE tmux_sessions SET current_task_id = '' WHERE current_task_id IN ({','.join('?' * len(seed_ids))}) "
+                            "AND NOT EXISTS (SELECT 1 FROM todos t WHERE t.id = tmux_sessions.current_task_id)", seed_ids)
+                bump("tmux_sessions.current_task_id", cur.rowcount)
+            conn.commit()
+    except Exception as e:
+        print(f"[purge] Lỗi khi xóa dữ liệu seed: {e}")
+        return {"total": 0, "tables": counts, "error": str(e)}
+
+    total = sum(counts.values())
+    if total:
+        print(f"[purge] xóa {total} bản ghi seed (bảng: " + ", ".join(f"{k}={v}" for k, v in counts.items()) + ")")
+    return {"total": total, "tables": counts}
 
 def get_full_state(project_id="PRJ-GEN-WORKPLACE"):
     """Lấy toàn bộ trạng thái hệ thống theo đúng định dạng state của WebApp."""
@@ -846,7 +738,7 @@ def get_full_state(project_id="PRJ-GEN-WORKPLACE"):
 
         live_branch = p_row["branch"]
         try:
-            br_res = subprocess.run(["git", "-C", "/app/repo", "branch", "--show-current"], capture_output=True, text=True, timeout=1.0)
+            br_res = subprocess.run(["git", "-C", find_repo_path(), "branch", "--show-current"], capture_output=True, text=True, timeout=1.0)
             if br_res.returncode == 0 and br_res.stdout.strip():
                 live_branch = br_res.stdout.strip()
         except Exception:
@@ -884,7 +776,9 @@ def get_full_state(project_id="PRJ-GEN-WORKPLACE"):
                     "id": t["id"],
                     "title": t["title"],
                     "role": t["assigned_role"],
-                    "status": t["status"]
+                    "status": t["status"],
+                    "viec_ref": t["viec_ref"] or "",
+                    "evidence_ref": t["evidence_ref"] or ""
                 })
             todos.append(rm_todos)
 
@@ -1009,12 +903,6 @@ def get_full_state(project_id="PRJ-GEN-WORKPLACE"):
                 "status": ev["status"],
                 "time": ev["verified_time"]
             })
-        if not events:
-            events = [
-                {"id": "EVT-01", "runtime": "DevOps / runtime-04", "request": "Khởi động container gen-workplace-app với live bind mount :z", "evidence": "docker-compose.yml · port 8888", "status": "ssot", "time": "20:47"},
-                {"id": "EVT-02", "runtime": "DevOps / runtime-05", "request": "Kiểm thử kịch bản installer_tui.py và tạo Desktop icon", "evidence": "Gen-workplace.desktop verified", "status": "ssot", "time": "20:37"},
-                {"id": "EVT-03", "runtime": "Lead / runtime-01", "request": "Lưu trữ đặc tả gốc của Owner thành SSOT bất biến", "evidence": "docs/SSOT_ORIGINAL_SPEC.md", "status": "ssot", "time": "20:35"}
-            ]
 
         # Kanban (Derived from todos)
         cursor.execute("SELECT * FROM todos WHERE project_id = ?", (project_id,))
@@ -1026,7 +914,7 @@ def get_full_state(project_id="PRJ-GEN-WORKPLACE"):
             "done": []
         }
         for t in all_todos:
-            item = [t["id"], t["title"], t["assigned_role"].split()[0]]
+            item = [t["id"], t["title"], (t["assigned_role"] or "").split()[0] if (t["assigned_role"] or "").strip() else "", t["viec_ref"] or ""]
             st = t["status"]
             if st == "done":
                 kanban["done"].append(item)
@@ -1746,7 +1634,7 @@ SWARM_DEFAULT_CONFIG = [
         "anthropic_model": "Claude Sonnet 4.6 (Thinking)",
         "allowed_paths": ["docs/**", "workspace/roles/**", "AGENTS.md", "README.md", "ROADMAP.md"],
         "blocked_paths": [],
-        "current_task_id": "TODO-01",
+        "current_task_id": "",
         "scope": "Quản trị SSOT, điều phối toàn bộ tiến trình gen-workplace",
         "mission": "Chịu trách nhiệm bảo toàn SSOT đặc tả gốc, thẩm định evidence từ các role và điều phối live workflow."
     },
@@ -1760,7 +1648,7 @@ SWARM_DEFAULT_CONFIG = [
         "anthropic_model": "Claude Sonnet 4.6 (Thinking)",
         "allowed_paths": ["backend/**", "data/**", "migrations/**"],
         "blocked_paths": ["frontend/**", "Dockerfile", "docker-compose.yml"],
-        "current_task_id": "TODO-10",
+        "current_task_id": "",
         "scope": "Python daemon, SQLite WAL, FTS5 catalog và runner",
         "mission": "Thực thi API control plane, tối ưu truy vấn FTS5 catalog sub-ms, quản trị SQLite WAL và lock task."
     },
@@ -1774,9 +1662,9 @@ SWARM_DEFAULT_CONFIG = [
         "anthropic_model": "Claude Sonnet 4.6 (Thinking)",
         "allowed_paths": ["frontend/**", "assets/**"],
         "blocked_paths": ["backend/**", "data/**", "Dockerfile"],
-        "current_task_id": "TODO-03",
+        "current_task_id": "",
         "scope": "Web console UI, CSS Gen-workplace v1.1, real-time sync",
-        "mission": "Duy trì phong cách thiết kế Nocturne Slate v1.1, bố cục 2 cột List+Detail & Tabs, bind dữ liệu thật từ backend."
+        "mission": "Duy trì giao diện console (frontend/index.html), bố cục 2 cột List+Detail & Tabs, bind dữ liệu thật từ backend."
     },
     {
         "id": "gw-devops-agy",
@@ -1788,7 +1676,7 @@ SWARM_DEFAULT_CONFIG = [
         "anthropic_model": "Claude Sonnet 4.6 (Thinking)",
         "allowed_paths": ["Dockerfile", "docker-compose.yml", "install.sh", "installer_tui.py", "*.desktop", "scripts/**"],
         "blocked_paths": ["backend/main.py", "frontend/**"],
-        "current_task_id": "TODO-05",
+        "current_task_id": "",
         "scope": "Docker, SELinux bind mounts, TUI installer, desktop shortcut",
         "mission": "Container hóa dịch vụ, tối ưu hóa SELinux :z mounts và kịch bản cài đặt 1-lệnh đồ họa TUI."
     },
@@ -1802,7 +1690,7 @@ SWARM_DEFAULT_CONFIG = [
         "anthropic_model": "Claude Sonnet 4.6 (Thinking)",
         "allowed_paths": ["tests/**", "qa_reports/**", "fixtures/**"],
         "blocked_paths": ["backend/**", "frontend/**", "Dockerfile"],
-        "current_task_id": "TODO-12",
+        "current_task_id": "",
         "scope": "Kiểm thử cross-platform, test API /api/status, xác thực installer",
         "mission": "Chạy regression tests, kiểm thử đa nền tảng (Linux, macOS, Windows WSL2), xác thực tính liên tục của conversation_id."
     },
@@ -1816,7 +1704,7 @@ SWARM_DEFAULT_CONFIG = [
         "anthropic_model": "Claude Opus 4.6 (Thinking)",
         "allowed_paths": ["vault/**", "security_audits/**", ".env.example"],
         "blocked_paths": ["backend/**", "frontend/**"],
-        "current_task_id": "TODO-05",
+        "current_task_id": "",
         "scope": "Phân quyền volume Docker, audit file permission, kiểm soát Vault",
         "mission": "Kiểm tra an toàn SELinux, cô lập quyền hạn biến môi trường và thẩm định secret boundary RFC 7636 PKCE."
     }
@@ -1876,7 +1764,7 @@ def generate_role_spec_file(sid, role_name, scope="", mission="", conv_id="", al
 
 def ensure_real_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
     """
-    Đảm bảo 6 phiên tmux thật sự đang chạy nền bên trong container.
+    Đảm bảo 6 phiên tmux thật sự đang chạy nền trên host (app chạy bằng python3 backend/main.py, không dùng Docker).
     Mỗi phiên là 1 tiến trình bash tương tác độc lập, được inject sẵn SSOT context,
     conversation ID continuity, profile xác thực và alias gọi agy CLI trực tiếp.
     """
@@ -2077,19 +1965,24 @@ def get_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
             task_status = "idle"
             task_roadmap = ""
             evidence_ref = ""
+            task_viec_ref = ""
             if task_id:
-                cursor.execute("SELECT title, status, roadmap_id, evidence_ref FROM todos WHERE id = ? LIMIT 1", (task_id,))
+                cursor.execute("SELECT title, status, roadmap_id, evidence_ref, viec_ref FROM todos WHERE id = ? LIMIT 1", (task_id,))
                 t_row = cursor.fetchone()
+                if not t_row:
+                    cursor.execute("SELECT title, status, '' AS roadmap_id, evidence_ref, viec_ref FROM gen_session_todos WHERE id = ? LIMIT 1", (task_id,))
+                    t_row = cursor.fetchone()
                 if t_row:
                     task_title = t_row["title"]
                     task_status = t_row["status"]
                     task_roadmap = t_row["roadmap_id"] or ""
                     evidence_ref = t_row["evidence_ref"] or ""
+                    task_viec_ref = t_row["viec_ref"] or ""
             else:
                 # Tìm task gần nhất đã hoàn tất của chuyên gia này để thể hiện bằng chứng nghiệm thu thực tế
                 role_first_word = r["role_name"].split()[0]
                 cursor.execute("""
-                SELECT id, title, status, roadmap_id, evidence_ref 
+                SELECT id, title, status, roadmap_id, evidence_ref, viec_ref
                 FROM todos 
                 WHERE (assigned_role = ? OR assigned_role LIKE ?) AND status = 'done'
                 ORDER BY id DESC LIMIT 1
@@ -2101,6 +1994,7 @@ def get_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
                     task_status = "done"
                     task_roadmap = last_t["roadmap_id"] or ""
                     evidence_ref = last_t["evidence_ref"] or ""
+                    task_viec_ref = last_t["viec_ref"] or ""
 
             results.append({
                 "id": r["id"],
@@ -2125,8 +2019,9 @@ def get_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
                 "task_title": task_title,
                 "task_status": task_status,
                 "task_roadmap": task_roadmap,
+                "task_viec_ref": task_viec_ref,
                 "evidence_ref": evidence_ref,
-                "attach_cmd": f"docker exec -it gen-workplace-app tmux a -t {r['id']}",
+                "attach_cmd": f"tmux attach -t {r['id']}",
                 "updated_at": r["updated_at"]
             })
 
@@ -2902,128 +2797,127 @@ def spawn_worker(role_name, project_id="PRJ-GEN-WORKPLACE", account_type="owner_
         "created_at": now_time
     }
 
-def dispatch_swarm_workflow(project_id="PRJ-GEN-WORKPLACE"):
+SWARM_SESSION_IDS = ["gw-lead-agy", "gw-backend-agy", "gw-frontend-agy", "gw-devops-agy", "gw-qa-agy", "gw-security-agy"]
+_TASK_TITLE_UNSAFE_RE = re.compile(r"[\'\"`$\\\n\r;|&<>(){}]")
+
+def build_task_directive(session_id, task_id, task_title, profile_dir=""):
     """
-    Truyền lệnh và kích hoạt tiến trình làm việc thật trong 6 phiên tmux Swarm.
-    Mỗi vai trò nhận đúng nhiệm vụ theo phạm vi và thẩm quyền quy định trong SSOT.
+    Lệnh giao task thật cho worker (gõ vào tmux, phải qua allowlist directive_guard):
+      agy --gemini_dir='<hồ sơ>' --mode plan -p 'Thực hiện task <id>: <tiêu đề>' 2>&1 | tee ~/gw-reports/task-<id>-<ts>.md; echo "=== XONG exit=${PIPESTATUS[0]} ==="
+    Tiêu đề được lọc ký tự shell (nháy, $, `, ;, |, ...) để không thoát khỏi nháy đơn.
+    """
+    safe_id = re.sub(r"[^A-Za-z0-9_\-]", "-", str(task_id or ""))[:40]
+    safe_title = re.sub(r"\s+", " ", _TASK_TITLE_UNSAFE_RE.sub(" ", str(task_title or ""))).strip()[:200]
+    p_dir = profile_dir or _profile_dir("owner_default")
+    p_dir = _TASK_TITLE_UNSAFE_RE.sub("", p_dir)
+    report_path = f"~/gw-reports/task-{safe_id}-{time.strftime('%Y%m%d-%H%M%S')}.md"
+    cmd = (f"agy --gemini_dir='{p_dir}' --mode plan -p 'Thực hiện task {safe_id}: {safe_title}' 2>&1 "
+           f"| tee {report_path}; echo \"=== XONG exit=${{PIPESTATUS[0]}} ===\"")
+    return cmd, report_path
+
+def dispatch_swarm_workflow(project_id="PRJ-GEN-WORKPLACE", session_id=None):
+    """
+    "Chạy Task này" (session_id) / "Chạy Toàn Bộ Swarm" (session_id=None → 6 worker):
+    mỗi worker nhận lệnh agy THẬT cho task đang gán (tmux_sessions.current_task_id → todos).
+    Worker không có task hoặc task đã done → {"status": "error", "reason": ...}; KHÔNG gửi echo giả.
+    Mọi lệnh đi qua directive_guard.guard và ghi directive_audit. Trả {sid: {...}}.
     """
     project_id = normalize_project_id(project_id)
-    ensure_real_tmux_sessions(project_id)
-    
-    tasks = {
-        "gw-lead-agy": 'echo "👑 [LEAD ARCHITECT] Nhận chỉ thị từ Ryan SSOT. Khóa docs/SSOT_ORIGINAL_SPEC.md & phân rã DAG..." && gw-status && echo "[LEAD ARCHITECT] SSOT Locked 100%. Đã giao task cho Backend, Frontend, DevOps, QA, Security."',
-        "gw-backend-agy": 'echo "🗄️ [BACKEND] Tiếp nhận Schema từ Lead. Kiểm tra CSDL SQLite 3 WAL & FTS5 Virtual Table..." && python3 -c "import sqlite3; conn = sqlite3.connect(\'/app/data/gen-workplace.db\'); print(\'[SQLite WAL] Mode:\', conn.execute(\'PRAGMA journal_mode;\').fetchone()[0], \'| Total Todos:\', conn.execute(\'SELECT count(*) FROM todos;\').fetchone()[0])" && echo "[BACKEND] API Control Plane & Task Mutex sẵn sàng."',
-        "gw-frontend-agy": 'echo "🎨 [FRONTEND] Đồng bộ giao diện Mission Control SPA (Nocturne Slate). Render 2 cột List+Detail..." && echo "[FRONTEND] Terminal buffer expanded. Stream và Quota sync hoàn tất 0-error."',
-        "gw-devops-agy": 'echo "🚢 [DEVOPS] Kiểm tra container Docker Compose mounts :z & Healthcheck Daemon..." && curl -s http://localhost:8888/api/status | head -c 160 && echo "" && echo "[DEVOPS] Port 8888 live. Container vận hành ổn định."',
-        "gw-qa-agy": 'echo "🧪 [QA TESTER] Khởi chạy kiểm thử tự động Auto-Wake & API regression..." && echo "[TEST 1] /api/status -> PASS (200 OK)" && echo "[TEST 2] /api/tmux/sessions -> PASS (6 Active)" && echo "[QA TESTER] Sign-off evidence: Tất cả kịch bản kiểm thử PASS."',
-        "gw-security-agy": 'echo "🛡️ [SECURITY AUDITOR] Quét mã nguồn, thẩm định Vault & cô lập token RFC 7636 PKCE..." && echo "[SECURITY AUDITOR] Zero-Secret-Leak: PASS. Ranh giới an toàn tuyệt đối."'
-    }
-    
+    try:
+        from backend import directive_guard as _guard
+    except ImportError:
+        import directive_guard as _guard
+    targets = [session_id] if session_id else list(SWARM_SESSION_IDS)
     results = {}
-    for sid, cmd in tasks.items():
+    with get_connection() as conn:
+        for sid in targets:
+            row = conn.execute("SELECT id, current_task_id, profile_dir, account_type FROM tmux_sessions WHERE id = ? AND project_id = ?", (sid, project_id)).fetchone()
+            if not row:
+                results[sid] = {"status": "error", "reason": f"Không có phiên worker '{sid}' trong tmux_sessions"}
+                continue
+            task_id = (row["current_task_id"] or "").strip()
+            if not task_id:
+                results[sid] = {"status": "error", "reason": f"Worker {sid} không có task đang gán (current_task_id rỗng). Hãy claim task trước."}
+                continue
+            t = conn.execute("SELECT id, title, status, viec_ref FROM todos WHERE id = ? AND project_id = ?", (task_id, project_id)).fetchone()
+            if not t:
+                t = conn.execute("SELECT id, title, status, viec_ref FROM gen_session_todos WHERE id = ? AND project_id = ?", (task_id, project_id)).fetchone()
+            if not t:
+                results[sid] = {"status": "error", "reason": f"Task {task_id} gán cho {sid} không tồn tại trong todos/gen_session_todos", "task_id": task_id}
+                continue
+            if t["status"] == "done":
+                results[sid] = {"status": "error", "reason": f"Task {task_id} đã done, không chạy lại", "task_id": task_id}
+                continue
+            p_dir = os.path.expanduser(row["profile_dir"]) if row["profile_dir"] else _profile_dir(row["account_type"] or "owner_default")
+            cmd, report_path = build_task_directive(sid, task_id, t["title"], p_dir)
+            results[sid] = {"status": "pending", "task_id": task_id, "task_title": t["title"], "viec_ref": t["viec_ref"] or "", "command": cmd, "report_path": report_path}
+
+    for sid, r in results.items():
+        if r["status"] != "pending":
+            continue
+        cmd = r["command"]
+        allowed, reason = _guard.guard(sid, cmd)
+        log_directive_audit(sid, "dispatch_swarm", cmd, allowed, reason)
+        if not allowed:
+            r.update({"status": "error", "reason": f"directive_guard từ chối: {reason}"})
+            continue
+        tmux_real = False
         try:
-            subprocess.run(["tmux", "send-keys", "-t", sid, cmd, "Enter"], capture_output=True, timeout=2.0)
-            results[sid] = "dispatched"
+            res = subprocess.run(["tmux", "send-keys", "-t", sid, cmd, "Enter"], capture_output=True, text=True, timeout=2.0)
+            tmux_real = (res.returncode == 0)
         except Exception as e:
-            results[sid] = f"error: {e}"
-            
+            r["tmux_error"] = str(e)
+        try:
+            append_tmux_output(sid, cmd, "Đã gửi vào tmux qua send-keys." if tmux_real else "tmux không nhận lệnh (phiên chưa mở?), đã ghi nhận vào runtime.")
+        except Exception:
+            pass
+        r.update({"status": "dispatched", "tmux_real": tmux_real})
     return results
 
-def process_orch_instruction(user_message, project_id="PRJ-GEN-WORKPLACE"):
+ORCH_CONV_ID = "conv-orchestrator"
+ORCH_DEFAULT_MODEL = os.environ.get("GW_ORCH_MODEL", "")
+
+def _html_escape_lines(text):
+    """Escape HTML và đổi xuống dòng thành <br> (kênh orch được frontend hiển thị bằng innerHTML)."""
+    t = (text or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    return t.replace("\r\n", "\n").replace("\n", "<br>")
+
+def process_orch_instruction(user_message, project_id="PRJ-GEN-WORKPLACE", model=None, account="owner_default"):
     """
-    Xử lý chỉ thị từ Owner (Ryan) gửi cho Orchestrator:
-    - Lưu tin nhắn người dùng.
-    - Phân tích ý định: spawn worker, truy vấn tiến độ, đồng bộ SSOT, bàn giao nhiệm vụ.
-    - Sinh câu trả lời thông minh kèm hành động thực tế.
-    - Lưu câu trả lời của Orchestrator.
+    Chỉ thị Owner → Orchestrator: lưu tin người dùng, gọi agy THẬT (conv-orchestrator, giữ ngữ cảnh agy_conv_id),
+    lưu trả lời thật với tác giả 'Orchestrator (agy)'; agy lỗi → 'Orchestrator (lỗi)' + lý do thật.
+    Không còn câu mẫu, không phân tích ý định giả.
     """
     project_id = normalize_project_id(project_id)
     user_time = save_orch_chat_message("Owner (Ryan)", user_message, tag="Instruction", project_id=project_id)
-    lower = user_message.lower().strip()
-    action_taken = None
-    reply = ""
-
-    # 0. Ý định Truyền lệnh / Giao task / Điều phối Swarm chạy thực tế
-    if any(k in lower for k in ["truyền lệnh", "giao task", "điều phối", "chạy swarm", "thực thi", "mệnh lệnh", "dispatch", "chạy task", "hoạt động"]):
-        disp_res = dispatch_swarm_workflow(project_id)
-        action_taken = "dispatch_swarm"
-        reply = (
-            "Đã chấp hành mệnh lệnh tối cao từ Ryan! Orchestrator đã truyền lệnh đồng loạt tới toàn bộ 6 vị trí Swarm trong các phiên tmux tương tác thật:<br>"
-            "• 👑 <strong>Lead Architect:</strong> Khóa SSOT <code>docs/SSOT_ORIGINAL_SPEC.md</code> & phân rã DAG.<br>"
-            "• 🗄️ <strong>Backend Specialist:</strong> Kiểm tra SQLite WAL & FTS5 Virtual Table.<br>"
-            "• 🎨 <strong>Frontend Specialist:</strong> Đồng bộ SPA UI, mở rộng Live Terminal buffer.<br>"
-            "• 🚢 <strong>DevOps Specialist:</strong> Kiểm tra container runtime & Docker Compose cờ <code>:z</code>.<br>"
-            "• 🧪 <strong>QA Tester:</strong> Khởi chạy bộ kiểm thử tự động Auto-Wake & API status.<br>"
-            "• 🛡️ <strong>Security Auditor:</strong> Quét an ninh mã nguồn & cô lập RFC 7636 PKCE.<br>"
-            "<em>Mời Ryan mở tab <strong>Bàn Làm Việc & Live Console</strong> của từng vai trò để giám sát luồng thực thi thời gian thực!</em>"
-        )
-
-    # 1. Ý định Spawn Worker
-    if any(k in lower for k in ["spawn", "tạo worker", "thêm worker", "đẻ worker", "tạo nhân viên"]):
-        parts = user_message.replace(":", " ").replace("-", " ").split()
-        role_guess = "Specialist Worker"
-        for i, p in enumerate(parts):
-            if p.lower() in ["worker", "nhân", "viên", "role", "spawn"] and i + 1 < len(parts):
-                candidate = " ".join(parts[i+1:]).strip()
-                if candidate:
-                    role_guess = candidate.title()
-                    break
-        spawn_res = spawn_worker(role_guess, project_id=project_id, mission=user_message)
-        action_taken = "spawn_worker"
-        reply = f"Đã chấp hành chỉ thị! Tôi đã cấp phát tài nguyên và khởi tạo thành công Worker <strong>{role_guess}</strong> (Session: <code>{spawn_res['session_id']}</code>). Ngữ cảnh và hồ sơ role đã được cô lập an toàn tại <code>{spawn_res['role_spec']}</code>."
-
-    # 2. Ý định Truy vấn Tiến độ / Roadmap / Todos
-    elif any(k in lower for k in ["tiến độ", "roadmap", "todo", "kế hoạch", "plan", "báo cáo"]):
+    model = model or ORCH_DEFAULT_MODEL or None
+    try:
         with get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT status, count(*) FROM todos WHERE project_id = ? GROUP BY status", (project_id,))
-            counts = dict(cursor.fetchall())
-            done_cnt = counts.get("done", 0)
-            pending_cnt = counts.get("pending", 0) + counts.get("live", 0) + counts.get("queued", 0)
-            
-            cursor.execute("SELECT id, title, status FROM roadmaps WHERE project_id = ? ORDER BY order_idx ASC", (project_id,))
-            rms = cursor.fetchall()
-            rm_text = " | ".join([f"{r['id']}: {r['title']} ({r['status']})" for r in rms])
+            conn.execute("""
+            INSERT OR IGNORE INTO gen_conversations (id, project_id, title, model, account_profile, is_pinned, active_tab, active_file, open_tabs_json, active_evidence_id, owner_id)
+            VALUES (?, 'PRJ-GEN-WORKPLACE', 'Orchestrator (agy)', ?, ?, 0, 'files_repo', '', '[]', '', 'owner-ryan')
+            """, (ORCH_CONV_ID, model or "", account))
+            conn.commit()
+    except Exception as e:
+        print(f"[orch] Không tạo được {ORCH_CONV_ID}: {e}")
 
-        reply = f"Báo cáo tiến độ Swarm: Đã hoàn tất <strong>{done_cnt}</strong> tác vụ, còn <strong>{pending_cnt}</strong> tác vụ đang triển khai hoặc chờ xử lý.<br>Roadmap hiện tại: <em>{rm_text}</em>.<br>Tất cả worker đều tuân thủ chặt chẽ đặc tả SSOT gốc."
-
-    # 3. Ý định về Quy Chuẩn Xây Dự Án, Đội Ngũ Chuẩn & Quy Trình Công Việc
-    elif any(k in lower for k in ["lập đội", "đội ngũ", "quy trình", "qui trình", "squad", "workflow", "công việc", "xây dự án", "quy chuẩn", "nhân sự", "qui cách", "quản trị", "raci", "sop"]):
-        reply = """Tôi (Gen - Core Orchestrator) đã thiết lập và ban hành <strong>Cơ Cấu Đội Ngũ Chuẩn & Quy Trình Công Việc Swarm (Standard Squad & Workflow Charter)</strong>:
-<br><br>
-<strong>🏛️ CƠ CẤU ĐỘI NGŨ CHUẨN 5 TẦNG PHÂN LẬP (6 VỊ TRÍ TINH NHUỆ):</strong><br>
-• <strong>Tầng 0 (Chiến Lược Toàn Cục):</strong> 👑 <strong>Gen</strong> (Core Orchestrator - Chief of Staff) · Quản trị tài nguyên, cấp phát & vòng đời Swarm.<br>
-• <strong>Tầng 1 (Chỉ Huy Kỹ Thuật):</strong> 👑 <code>gw-lead-agy</code> (Lead Architect) · Bảo tồn SSOT, phân rã DAG & ký duyệt nghiệm thu.<br>
-• <strong>Tầng 2 (Xây Dựng Cốt Lõi):</strong><br>
-&nbsp;&nbsp;- 🗄️ <code>gw-backend-agy</code> (Backend & DB Specialist) · SQLite WAL, FTS5 catalog, REST API, Task Mutex.<br>
-&nbsp;&nbsp;- 🎨 <code>gw-frontend-agy</code> (Frontend Specialist) · Mission Control SPA UI, CSS Nocturne Slate, State sync.<br>
-• <strong>Tầng 3 (Hạ Tầng & Đóng Gói):</strong> 🚢 <code>gw-devops-agy</code> (DevOps & Packaging) · Docker Compose cờ <code>:z</code>, TUI installer, Desktop shortcut.<br>
-• <strong>Tầng 4 (Kiểm Thẩm & Bảo Vệ):</strong><br>
-&nbsp;&nbsp;- 🧪 <code>gw-qa-agy</code> (QA Tester) · Test tự động, auto-wake 68ms, stress test, nghiệm thu kỹ thuật.<br>
-&nbsp;&nbsp;- 🛡️ <code>gw-security-agy</code> (Security Auditor) · Kiểm toán mã nguồn, bảo vệ Vault, cô lập token OAuth PKCE.<br>
-<br>
-<strong>🔄 QUY TRÌNH CÔNG VIỆC CHUẨN 5 GIAI ĐOẠN KHÉP KÍN (5-STAGE SOP):</strong><br>
-1. <strong>Giai đoạn 1: Tiếp nhận Đề bài & Khóa Bất Biến SSOT:</strong> Ghi nguyên văn yêu cầu của Ryan vào <code>docs/SSOT_ORIGINAL_SPEC.md</code> và bảng <code>master_ssot</code>. Cam kết 0% drift.<br>
-2. <strong>Giai đoạn 2: Phân Rã Kiến Trúc & Ký Kết Hợp Đồng I/O:</strong> Tạo Roadmap và Todo DAG với mã phụ thuộc <code>depends_on</code>. Khóa hợp đồng giao diện giữa các bên.<br>
-3. <strong>Giai đoạn 3: Thực Thi Song Song 0-Xung Đột (0-Conflict):</strong> Worker gọi <code>POST /api/task/claim</code> để khóa Task Mutex. Chỉ sửa file trong Whitelist (Allowed Paths).<br>
-4. <strong>Giai đoạn 4: Kiểm Thẩm Hai Lớp & Nghiệm Thu Bằng Chứng:</strong> Security quét bí mật, QA chạy test suite. Worker gọi <code>POST /api/task/complete</code> nộp commit hash hoặc artifact.<br>
-5. <strong>Giai đoạn 5: Đóng Gói Phân Phối & Ngủ Đông Tiết Kiệm:</strong> DevOps build bản release, hệ thống tự động đưa worker về ngủ đông (0% CPU, 0MB RAM) và báo cáo Ryan.<br>
-<br>
-<em>Tài liệu SSOT đầy đủ đã được lưu trữ bất biến tại: <code>docs/STANDARD_SQUAD_AND_WORKFLOW.md</code>.</em>
-"""
-
-    # 4. Ý định Truy vấn SSOT / Brain / Memory
-    elif any(k in lower for k in ["brain", "ssot", "trí nhớ", "memory", "nguồn chuẩn"]):
-        reply = "Toàn bộ Swarm đang được neo vững chắc vào branch <code>main</code> của repository <code>Genesis-ryan-84-0567536339/Brain</code> (file <code>BOOTSTRAP.md</code>). Master SSOT <code>docs/SSOT_ORIGINAL_SPEC.md</code> được khóa bất biến. Mọi thay đổi dữ liệu đều ghi nhận tức thì vào SQLite WAL với chỉ mục FTS5."
-
-    # 4. Chỉ thị chung
+    reply, _, usage = call_agy_cli_turn(ORCH_CONV_ID, user_message, model=model, account=account)
+    usage = usage if isinstance(usage, dict) else {}
+    if reply:
+        author, tag, engine, is_error = "Orchestrator (agy)", "Reply", "agy-cli", False
+        body = reply
     else:
-        reply = f"Chỉ huy tối cao đã ghi nhận chỉ thị: <em>\"{user_message}\"</em>. Tôi đang điều phối yêu cầu này tới Swarm theo chính sách <strong>Autonomous Execution & Full Bypass Policy</strong> (tự động thực thi, không block). Kết quả sẽ được cập nhật liên tục trên Command Deck."
-
-    agent_time = save_orch_chat_message("Genesis Orchestrator", reply, tag="Reply", project_id=project_id)
+        author, tag, engine, is_error = "Orchestrator (lỗi)", "Error", "error", True
+        body = f"agy không trả lời: {describe_agy_error(usage)}. Không có phản hồi tự sinh."
+    agent_time = save_orch_chat_message(author, _html_escape_lines(body), tag=tag, project_id=project_id)
     return {
-        "reply": reply,
-        "action_taken": action_taken,
+        "reply": body,
+        "author": author,
+        "action_taken": None,
+        "engine": engine,
+        "error": is_error,
+        "error_code": usage.get("error", "") if is_error else "",
+        "usage": usage,
         "user_time": user_time,
         "agent_time": agent_time
     }
@@ -3161,7 +3055,12 @@ def complete_task(session_id, todo_id, evidence_ref, verified_by="Lead Architect
         """, (session_id,))
 
         conn.commit()
-        return {"status": "completed", "task_id": todo_id, "evidence_ref": evidence_ref, "verified_by": verified_by, "verify_message": msg}
+
+    viec_ref = get_task_viec_ref(todo_id, project_id)
+    webhook_sent = send_event_webhook("task_completed", project_id=project_id, viec_ref=viec_ref, task_id=todo_id,
+                                      session_id=session_id, exit_code=None, report_path="", evidence_ref=evidence_ref, verified_by=verified_by)
+    return {"status": "completed", "task_id": todo_id, "viec_ref": viec_ref, "evidence_ref": evidence_ref, "verified_by": verified_by,
+            "verify_message": msg, "webhook_sent": webhook_sent}
 
 def reclaim_stalled_tasks(timeout_seconds=300, project_id="PRJ-GEN-WORKPLACE"):
     """
@@ -3198,35 +3097,6 @@ def get_warroom_messages(channel_id="war_room", project_id="PRJ-GEN-WORKPLACE", 
         """, (project_id, channel_id, limit))
         rows = cursor.fetchall()
 
-    if not rows:
-        # Tự động khởi tạo tin nhắn mở màn cho từng kênh nếu chưa có
-        seeds = {
-            "war_room": [
-                ("Ryan (Owner)", "08:00:00", "Directive", "Chào Core Agent (Gen) và toàn thể Đội Ngũ Swarm. Mục tiêu hôm nay: Hoàn thiện hệ thống điều hành Gen-workplace v1.2, đảm bảo 0 xung đột, tuân thủ nghiêm ngặt 5 giai đoạn SOP.", ["🚀 Quyết tâm", "👍 Nhất trí"]),
-                ("Genesis Orchestrator", "08:00:05", "Reply", "Rõ mệnh lệnh của Ryan! Tôi (Gen - Core Orchestrator) đã phổ biến chỉ thị tới toàn thể 6 chuyên gia. Hệ thống đang chạy ở chế độ kỷ luật thép: 1 Profile = 1 Identity, Task Mutex độc quyền và nghiệm thu 100% bằng chứng vật lý.", ["✅ Tiếp nhận"]),
-                ("Lead Architect", "08:00:10", "Report", "Báo cáo Ryan và Gen: Đặc tả SSOT đã khóa bất biến tại <code>docs/SSOT_ORIGINAL_SPEC.md</code>. Tất cả 6 chuyên gia đã được cấp phát nhiệm vụ cụ thể trên Live Workbench.", ["📋 Đã duyệt"])
-            ],
-            "standup": [
-                ("Lead Architect", "08:15:00", "Directive", "Giao ban kỹ thuật hôm nay: @Backend tập trung hoàn thiện API Mutex Lock (/api/task/claim); @Frontend tối ưu Bàn Làm Việc Live Workbench 3 cột; @DevOps kiểm tra Live Mount :z; @QA chuẩn bị test suite; @Security rà soát token OAuth. Tất cả báo cáo tiến độ qua kênh này.", ["🎯 Đã rõ"]),
-                ("Backend Specialist", "08:15:20", "Report", "Đã nhận việc từ Leader! Tôi đang triển khai TODO-14 trong <code>backend/db.py</code>. Cam kết response time < 5ms và nộp commit hash trước 10h.", ["⚙️ Đang làm"]),
-                ("Frontend Specialist", "08:15:35", "Report", "Đã nhận việc! Giao diện Live Workbench 3 cột x 2 hàng đang hoàn thiện trên <code>frontend/index.html</code>, tích hợp terminal console realtime.", ["🎨 Giao diện đẹp"])
-            ],
-            "handoff": [
-                ("Backend Specialist", "09:00:00", "IO", "Bàn giao Hợp đồng I/O cho @Frontend: Endpoint <code>POST /api/task/claim</code> và <code>POST /api/task/complete</code> đã sẵn sàng, trả về JSON chuẩn theo tài liệu <code>docs/STANDARD_SQUAD_AND_WORKFLOW.md</code>.", ["🤝 Đã nhận"]),
-                ("Frontend Specialist", "09:00:15", "IO", "Xác nhận đã nhận spec từ @Backend. Đã bind dữ liệu vào các nút Claim/Complete trên Command Deck và cập nhật trạng thái realtime.", ["✅ Đã kết nối"])
-            ]
-        }
-        channel_seeds = seeds.get(channel_id, seeds["war_room"])
-        with get_connection() as conn:
-            cursor = conn.cursor()
-            for author, ctime, tag, body, reacts in channel_seeds:
-                cursor.execute("""
-                INSERT INTO chat_messages (project_id, runtime_id, author, created_time, tag, body, react_json)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                """, (project_id, channel_id, author, ctime, tag, body, json.dumps(reacts, ensure_ascii=False)))
-            conn.commit()
-
-        return get_warroom_messages(channel_id, project_id, limit)
 
     results = []
     for r in rows:
@@ -3247,6 +3117,74 @@ def get_warroom_messages(channel_id="war_room", project_id="PRJ-GEN-WORKPLACE", 
             "reacts": reacts
         })
     return results
+
+# ---------------------------------------------------------------------------
+# Việc gắn VIEC-n (Kho Ryan) + webhook sự kiện (Issue #12)
+# ---------------------------------------------------------------------------
+VIEC_REF_RE = re.compile(r"^VIEC-[0-9]+$")
+VIEC_REF_ERROR = "Thiếu viec_ref (mã việc trong Kho Ryan, vd VIEC-12)"
+EVENT_WEBHOOK_TIMEOUT_SEC = 5
+
+def validate_viec_ref(viec_ref):
+    """(ok, giá trị đã chuẩn hóa). Hợp lệ khi khớp ^VIEC-[0-9]+$."""
+    v = (viec_ref or "").strip().upper()
+    return (bool(VIEC_REF_RE.match(v)), v)
+
+def get_task_viec_ref(task_id, project_id="PRJ-GEN-WORKPLACE"):
+    """viec_ref của task trong todos hoặc gen_session_todos ('' nếu không có)."""
+    if not task_id:
+        return ""
+    try:
+        with get_connection() as conn:
+            for tbl in ("todos", "gen_session_todos"):
+                r = conn.execute(f"SELECT viec_ref FROM {tbl} WHERE id = ? AND project_id = ?", (task_id, project_id)).fetchone()
+                if r:
+                    return r["viec_ref"] or ""
+    except Exception:
+        pass
+    return ""
+
+def send_event_webhook(event, project_id="PRJ-GEN-WORKPLACE", viec_ref="", task_id="", session_id="", exit_code=None,
+                       report_path="", evidence_ref="", verified_by=""):
+    """
+    POST JSON tới GW_EVENT_WEBHOOK_URL (env; rỗng = tắt) khi task hoàn tất / dispatch kết thúc.
+    Payload: {event, project_id, viec_ref, task_id, session_id, exit_code, report_path, evidence_ref, verified_by, at}.
+    Timeout 5s; lỗi chỉ log, không ném. Trả True khi gửi được (HTTP 2xx).
+    """
+    url = (os.environ.get("GW_EVENT_WEBHOOK_URL") or "").strip()
+    if not url:
+        return False
+    payload = {
+        "event": event,
+        "project_id": normalize_project_id(project_id),
+        "viec_ref": viec_ref or "",
+        "task_id": task_id or "",
+        "session_id": session_id or "",
+        "exit_code": exit_code,
+        "report_path": report_path or "",
+        "evidence_ref": evidence_ref or "",
+        "verified_by": verified_by or "",
+        "at": datetime.now().astimezone().isoformat(timespec="seconds"),
+    }
+    try:
+        import urllib.request
+        req = urllib.request.Request(url, data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+                                     headers={"Content-Type": "application/json", "User-Agent": "gen-workplace-webhook"}, method="POST")
+        with urllib.request.urlopen(req, timeout=EVENT_WEBHOOK_TIMEOUT_SEC) as resp:
+            ok = 200 <= resp.status < 300
+            if not ok:
+                print(f"[webhook] {event} → HTTP {resp.status}")
+            return ok
+    except Exception as e:
+        print(f"[webhook] Không gửi được {event} tới {url}: {e}")
+        return False
+
+def get_dispatch_log(limit=50):
+    """Nhật ký dispatch_log (mới nhất trước) cho GET /api/dispatch/log."""
+    limit = max(1, min(int(limit or 50), 500))
+    with get_connection() as conn:
+        rows = conn.execute("SELECT * FROM dispatch_log ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+        return [dict(r) for r in rows]
 
 WARROOM_ROLE_SESSIONS = {
     "backend": "gw-backend-agy",
@@ -3338,6 +3276,17 @@ def dispatch_warroom_to_agent(project_id, channel_id, session_id, message, timeo
         print(f"[dispatch] Không ghi được báo cáo: {e}")
         report_path = ""
 
+    task_id = ""
+    try:
+        with get_connection() as conn:
+            r = conn.execute("SELECT current_task_id FROM tmux_sessions WHERE id = ?", (session_id,)).fetchone()
+            task_id = (r["current_task_id"] or "") if r else ""
+    except Exception:
+        pass
+    viec_ref = get_task_viec_ref(task_id, project_id)
+    webhook_sent = send_event_webhook("dispatch_finished", project_id=project_id, viec_ref=viec_ref, task_id=task_id,
+                                      session_id=session_id, exit_code=exit_code, report_path=report_path)
+
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
@@ -3345,11 +3294,12 @@ def dispatch_warroom_to_agent(project_id, channel_id, session_id, message, timeo
         VALUES (?, ?, ?, ?, ?, ?, ?)
         """, (project_id, channel_id, session_id, time.strftime("%H:%M:%S"), "Report", body, json.dumps(["🤖 agy thật"], ensure_ascii=False)))
         cursor.execute("""
-        INSERT INTO dispatch_log (session_id, command, exit_code, report_path, started_at, finished_at)
-        VALUES (?, ?, ?, ?, ?, ?)
-        """, (session_id, " ".join(cmd), exit_code, report_path, started_at, finished_at))
+        INSERT INTO dispatch_log (session_id, command, exit_code, report_path, started_at, finished_at, task_id, viec_ref, channel_id, webhook_sent)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (session_id, " ".join(cmd), exit_code, report_path, started_at, finished_at, task_id, viec_ref, channel_id, 1 if webhook_sent else 0))
         conn.commit()
-    return {"session_id": session_id, "exit_code": exit_code, "report_path": report_path, "cwd": cwd, "elapsed_sec": round(time.time() - t0, 1)}
+    return {"session_id": session_id, "exit_code": exit_code, "report_path": report_path, "cwd": cwd, "elapsed_sec": round(time.time() - t0, 1),
+            "task_id": task_id, "viec_ref": viec_ref, "webhook_sent": webhook_sent}
 
 def post_warroom_message(project_id="PRJ-GEN-WORKPLACE", channel_id="war_room", author="Ryan (Owner)", message="", tag="Directive", wait=False):
     """Lưu tin nhắn; tin có @backend|@frontend|@devops|@qa|@security|@lead → chạy agy thật của vai đó ở thread nền (wait=True chạy đồng bộ, dùng cho test). Không có @vai → chỉ lưu (#3)."""
@@ -3683,13 +3633,27 @@ def get_roles_sop():
     return sop_data
 
 def get_vault_list():
-    return [
-        {"id": "SEC-01", "name": "PORT", "owner": "Docker Env", "scope": f"Container Web Port = {os.environ.get('PORT', 8888)}", "status": "sẵn sàng"},
-        {"id": "SEC-02", "name": "DATA_DIR", "owner": "Docker Env", "scope": f"Path lưu volume = {os.environ.get('DATA_DIR', '/app/data')}", "status": "sẵn sàng"},
-        {"id": "SEC-03", "name": "DOCKER_CONTAINER", "owner": "Runtime Guard", "scope": f"Cờ phát hiện môi trường = {os.environ.get('DOCKER_CONTAINER', '0')}", "status": "sẵn sàng"},
-        {"id": "SEC-04", "name": "GOOGLE_OAUTH_TOKEN", "owner": "OAuth Pool", "scope": "Token xác thực ~/.gemini & ~/.agy-profiles", "status": "đã mã hóa"},
-        {"id": "CRD-01", "name": "GitHub Token", "owner": "Owner (Ryan)", "scope": "Phục vụ publish repo lên GitHub", "status": "sẵn sàng gắn"}
+    """Cấu hình/bí mật THẬT đang có hiệu lực: biến môi trường và trạng thái đăng nhập từng OAuth profile (không lộ giá trị)."""
+    items = [
+        {"id": "ENV-PORT", "name": "PORT", "owner": "Môi trường", "scope": f"Cổng web = {os.environ.get('PORT', 8888)}", "status": "đang dùng"},
+        {"id": "ENV-DATA_DIR", "name": "DATA_DIR", "owner": "Môi trường", "scope": f"Thư mục DB = {DATA_DIR}", "status": "đang dùng"},
+        {"id": "ENV-GW_AGY_BIN", "name": "GW_AGY_BIN", "owner": "Môi trường", "scope": f"Lệnh agy = {_agy_bin()}", "status": "đã đặt" if os.environ.get("GW_AGY_BIN") else "mặc định (agy trong PATH)"},
+        {"id": "ENV-GW_EVENT_WEBHOOK_URL", "name": "GW_EVENT_WEBHOOK_URL", "owner": "Môi trường", "scope": "Webhook sự kiện task_completed / dispatch_finished", "status": "bật" if os.environ.get("GW_EVENT_WEBHOOK_URL") else "tắt"},
+        {"id": "ENV-GOOGLE_OAUTH", "name": "GOOGLE_OAUTH_CLIENT_ID/SECRET", "owner": "Môi trường (.env)", "scope": "Đổi code OAuth lấy token Google", "status": "đã cấu hình" if (GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET) else "chưa cấu hình"},
     ]
+    try:
+        for prof in get_oauth_profiles():
+            email = prof.get("email") or ""
+            items.append({
+                "id": f"OAUTH-{prof.get('id')}",
+                "name": prof.get("name") or prof.get("id"),
+                "owner": "OAuth profile",
+                "scope": prof.get("path") or "",
+                "status": (f"đã đăng nhập ({email})" if email else "đã đăng nhập") if prof.get("is_auth") else "chưa đăng nhập"
+            })
+    except Exception as e:
+        items.append({"id": "OAUTH-ERR", "name": "OAuth profiles", "owner": "OAuth profile", "scope": str(e), "status": "lỗi đọc"})
+    return items
 
 def get_ssot_events(project_id="PRJ-GEN-WORKPLACE"):
     project_id = normalize_project_id(project_id)
@@ -3759,6 +3723,7 @@ def create_new_project(name, repo_path, plan_text=""):
 
 def get_role_thinking_trace(session_id, project_id="PRJ-GEN-WORKPLACE"):
     buffer_len = 0
+    t0 = time.time()
     try:
         res = subprocess.run(["tmux", "capture-pane", "-t", session_id, "-p", "-S", "-100"],
                              capture_output=True, text=True, timeout=1.5)
@@ -3767,18 +3732,15 @@ def get_role_thinking_trace(session_id, project_id="PRJ-GEN-WORKPLACE"):
     except Exception:
         pass
     
-    est_tokens = max(120, buffer_len // 4)
-    t0 = time.time()
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT model_name, role_key FROM agent_roles WHERE id = ? OR name = ?", (session_id, session_id))
-    latency_ms = max(8, int((time.time() - t0) * 1000) + 12)
+    est_tokens = buffer_len // 4  # ước lượng ~4 ký tự/token từ buffer tmux thật; 0 khi không có phiên
+    latency_ms = int((time.time() - t0) * 1000)
 
     return {
         "session_id": session_id,
         "latency_ms": f"{latency_ms}ms",
         "tokens": f"{est_tokens:,}",
-        "buffer_chars": buffer_len
+        "buffer_chars": buffer_len,
+        "note": "latency = thời gian tmux capture-pane thật; tokens = ước lượng buffer/4"
     }
 
 def get_system_skills():
@@ -3811,14 +3773,7 @@ def get_system_skills():
                         "tag": "Installed",
                         "desc": desc or f"Kỹ năng {item} tích hợp hệ thống"
                     })
-    if not skills:
-        skills = [
-            {"name": "chief-of-staff", "tag": "C-Suite", "desc": "Điều phối toàn cục, định tuyến bài toán đến chuyên gia phù hợp."},
-            {"name": "multi-agent-dispatch", "tag": "Execution", "desc": "Điều phối tác vụ nặng xuống agent CLI chạy nền trong phiên tmux."},
-            {"name": "code-review", "tag": "Quality", "desc": "Rà soát lỗi, thẩm định bảo mật, tối ưu hiệu năng và phong cách code."},
-            {"name": "deep-research", "tag": "Research", "desc": "Nghiên cứu đa kênh chuyên sâu, đối chiếu chéo ≥3 nguồn độc lập."}
-        ]
-    return skills
+    return skills  # không có skill cài trên máy → danh sách rỗng, không bịa
 
 def get_system_mcps():
     mcp_path = os.path.join(HOME_DIR, ".gemini", "antigravity-cli", "mcp")
@@ -3834,66 +3789,11 @@ def get_system_mcps():
                     "tools": f"{tools_count} tools",
                     "status": "active"
                 })
-    if not mcps:
-        mcps = [
-            {"name": "google-drive", "desc": "Đọc ghi Google Docs, Sheets, Forms, Drive", "tools": "42 tools", "status": "active"},
-            {"name": "git-ops", "desc": "Quản trị Git repository, branch, PR và commits", "tools": "8 tools", "status": "active"}
-        ]
-    return mcps
+    return mcps  # không có MCP cài trên máy → danh sách rỗng, không bịa
 
 # =========================================================================
 # GEN WORKPLACE IDE: OWNER ↔ GEN CORE ENGINE (3-COLUMN STUDIO)
 # =========================================================================
-
-def seed_gen_workplace():
-    """Khởi tạo phiên làm việc mặc định và sổ tay tạm thời giữa Owner Ryan & Gen."""
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT count(*) FROM gen_conversations WHERE id = 'conv-gen-core-01'")
-        if cursor.fetchone()[0] == 0:
-            conv_id = "conv-gen-core-01"
-            cursor.execute("""
-            INSERT OR IGNORE INTO gen_conversations (id, project_id, title, model, account_profile, is_pinned, active_tab, active_file, open_tabs_json, active_evidence_id, owner_id)
-            VALUES (?, 'PRJ-GEN-WORKPLACE', 'Kiến Trúc & Điều Phối Swarm Tối Cao', 'Gemini 3.8 Flash (High)', 'owner_default', 1, 'files_repo', 'backend/main.py', '["backend/main.py"]', 'NOTE-01', 'owner-ryan')
-            """, (conv_id,))
-
-            # Initial messages
-            initial_msgs = [
-                ("Ryan", "user", "Chào Gen! Tôi cần rà soát lại toàn bộ kiến trúc đa tác nhân Swarm và đảm bảo mọi chuyên gia tuân thủ chặt chẽ đặc tả gốc SSOT.", "Gemini 3.8 Flash (High)", "[]"),
-                ("Gen Core", "assistant", "Chào Ryan! Tôi (Gen - Core Orchestrator) đã sẵn sàng. Toàn bộ 6 Agent trong Swarm đang vận hành trên các phiên Tmux độc lập với ranh giới Whitelist rõ ràng. Mọi chỉ thị kiến trúc của bạn sẽ được tôi ghi nhận vào Sổ tay tạm thời với mã #NOTE-01 và đối soát trực tiếp với #EVT-03 (SSOT Spec gốc).", "Gemini 3.8 Flash (High)", '["#NOTE-01", "#EVT-03"]'),
-                ("Ryan", "user", "Tuyệt vời. Nhớ lưu ý kiểm soát dung lượng token quota khi gọi model nặng và tự động compact ngữ cảnh khi đổi sang Claude hoặc Gemini Flash.", "Gemini 3.8 Flash (High)", "[]"),
-                ("Gen Core", "assistant", "Rõ chỉ thị! Cơ chế Progressive Context Compaction đã được kích hoạt. Bất cứ khi nào bạn đổi Model hoặc phiên làm việc, tôi sẽ tự động cô đọng các quyết định và gắn kèm các Note ID dữ liệu (#NOTE-01, #NOTE-02...) để làm chứng cứ nghiệm thu vững chắc mà không hao tổn quota.", "Gemini 3.8 Flash (High)", '["#NOTE-01", "#NOTE-02"]')
-            ]
-            for author, role, content, model, notes in initial_msgs:
-                cursor.execute("""
-                INSERT INTO gen_messages (conversation_id, author, role, content, model, note_ids_json, owner_id)
-                VALUES (?, ?, ?, ?, ?, ?, 'owner-ryan')
-                """, (conv_id, author, role, content, model, notes))
-
-            initial_notes = [
-                ("NOTE-01", "PRJ-GEN-WORKPLACE", conv_id, "Nguyên Tắc SSOT Tuyệt Đối", "Ryan là Single Source of Truth tối cao. Mọi thay đổi kiến trúc phải được tham chiếu từ docs/SSOT_ORIGINAL_SPEC.md.", '["SSOT", "Architecture", "Priority-1"]', "docs/SSOT_ORIGINAL_SPEC.md", "Ryan"),
-                ("NOTE-02", "PRJ-GEN-WORKPLACE", conv_id, "Ranh Giới Bảo Mật Docker Volume :z", "Container hóa toàn bộ ứng dụng trên port 8888 với cờ SELinux :z, phân tách hoàn toàn Host và Container.", '["DevOps", "Docker", "Security"]', "docker-compose.yml · git commit a4f63be", "Ryan"),
-                ("NOTE-03", "PRJ-GEN-WORKPLACE", conv_id, "Hợp Đồng Bàn Giao I/O Giữa Các Role", "Mọi handoff giữa Backend, Frontend, QA và Security phải có bằng chứng commit hash hoặc test log trước khi ký nghiệm thu.", '["SOP", "Handoff", "Verification"]', "git commit 5f91e1e (Mutex API pass)", "Gen Core")
-            ]
-            for n in initial_notes:
-                cursor.execute("""
-                INSERT OR IGNORE INTO gen_scratchpad_notes (id, project_id, conversation_id, title, content, tags_json, evidence_ref, author, owner_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'owner-ryan')
-                """, n)
-
-        # Khởi tạo phiên Gen_workplace Builder chuyên dụng nếu chưa có
-        cursor.execute("""
-        INSERT OR IGNORE INTO gen_conversations (id, project_id, title, model, account_profile, is_pinned, active_tab, active_file, open_tabs_json, active_evidence_id, owner_id)
-        VALUES ('conv-gen-builder', 'PRJ-GEN-WORKPLACE', 'Gen_workplace Builder', 'Gemini 3.8 Flash (High)', 'owner_default', 1, 'kanban_todo', 'backend/db.py', '["backend/db.py"]', 'NOTE-BUILDER-01', 'owner-ryan')
-        """)
-
-        # Đảm bảo thư mục workspace cho phiên conv-gen-builder tồn tại
-        builder_sess_dir = Path("/workspace/sessions/conv-gen-builder")
-        if not builder_sess_dir.exists():
-            builder_sess_dir = BASE_DIR / "workspace" / "sessions" / "conv-gen-builder"
-        builder_sess_dir.mkdir(parents=True, exist_ok=True)
-
-        conn.commit()
 
 def get_owner_profile(owner_id="owner-ryan"):
     """Truy xuất hồ sơ Owner Ryan cùng số liệu thống kê toàn bộ tài sản dữ liệu thuộc quyền sở hữu."""
@@ -4025,12 +3925,6 @@ def create_gen_conversation(project_id="PRJ-GEN-WORKPLACE", title="Cuộc trò c
         INSERT INTO gen_conversations (id, project_id, title, model, account_profile, is_pinned, active_tab, active_file, open_tabs_json, active_evidence_id, owner_id)
         VALUES (?, ?, ?, ?, ?, 0, 'files_repo', 'backend/main.py', '["backend/main.py"]', 'NOTE-01', ?)
         """, (conv_id, project_id, title, model, account, owner_id))
-        
-        # Initial greeting
-        cursor.execute("""
-        INSERT INTO gen_messages (conversation_id, author, role, content, model, note_ids_json, owner_id)
-        VALUES (?, 'Gen Core', 'assistant', 'Sẵn sàng phục vụ Owner Ryan! Bạn muốn giao nhiệm vụ hoặc thảo luận kiến trúc nào hôm nay?', ?, '[]', ?)
-        """, (conv_id, model, owner_id))
         conn.commit()
     return {"id": conv_id, "title": title, "model": model, "account": account, "active_tab": "files_repo", "active_file": "backend/main.py", "open_tabs": ["backend/main.py"], "active_evidence_id": "NOTE-01", "owner_id": owner_id}
 
@@ -4107,195 +4001,6 @@ def get_gen_messages(conv_id):
             })
         return msgs
 
-def generate_gen_smart_reply(conv_id, user_message, model, account="owner_default"):
-    """
-    Sinh phản hồi tự nhiên, sắc sảo chuẩn Trợ lý Điều hành Cấp cao (Human Executive Persona):
-    - Xưng 'Em' — Gọi 'Sếp' hoặc 'Sếp Ryan'.
-    - Triệt tiêu 100% văn phong AI sáo rỗng, máy móc, rập khuôn.
-    - Đi thẳng vào trọng tâm, giải pháp kỹ thuật và số liệu thực từ hệ thống.
-    """
-    msg_raw = user_message.strip()
-    lower = msg_raw.lower()
-    cited_notes = []
-
-    # 1. Truy xuất thông tin thực tế từ DB & hệ thống
-    conv_title = conv_id
-    try:
-        with get_connection() as conn:
-            c = conn.cursor()
-            c.execute("SELECT title FROM gen_conversations WHERE id = ?", (conv_id,))
-            row = c.fetchone()
-            if row and row["title"]:
-                conv_title = row["title"]
-    except Exception:
-        pass
-
-    notes = get_gen_notes("PRJ-GEN-WORKPLACE", conv_id)
-    sess_data = get_gen_session_files(conv_id)
-    session_files = [f["path"] for f in sess_data.get("files", []) if not f.get("is_dir")]
-    git_stat = get_git_status()
-
-    all_todos = []
-    try:
-        with get_connection() as conn:
-            c = conn.cursor()
-            c.execute("SELECT id, title, status, assigned_to FROM todos WHERE project_id = 'PRJ-GEN-WORKPLACE'")
-            all_todos = [dict(r) for r in c.fetchall()]
-    except Exception:
-        pass
-
-    # 2. Xử lý các nhóm hội thoại thông minh
-
-    # Nhóm 1: Phản hồi / Phê bình về câu trả lời máy móc / thắc mắc phản hồi
-    if any(k in lower for k in ["kỳ vậy", "kỳ thế", "vớ vẩn", "robot", "máy móc", "trả lời cái gì", "quái gì", "nói gì kỳ", "tào lao", "nhảm", "buồn cười"]):
-        reply = (
-            f"Dạ em xin nhận phản hồi từ Sếp! Vừa rồi câu trả lời mặc định còn thô cứng và máy móc, em đã lập tức cập nhật lại phong thái chuẩn trợ lý con người:\n\n"
-            f"1. **Tác phong chuẩn trợ lý điều hành:** Giao tiếp tự nhiên, sắc bén, xưng Em gọi Sếp, đi thẳng vào bản chất công việc thực tế.\n"
-            f"2. **Cập nhật tính năng đổi tiêu đề:** Em đã kích hoạt nút ✏️ đổi tên phiên ở cả Cột 1 và Cột 3.\n"
-            f"3. **Tương tác dữ liệu sống:** Mọi câu hỏi của Sếp sẽ được đối soát trực tiếp với tệp phiên, trạng thái Git và bảng tiến độ thực.\n\n"
-            f"Sếp đang cần em rà soát hoặc xử lý hạng mục nào trước, em thực thi ngay cho Sếp ạ."
-        )
-
-    # Nhóm 2: Tiêu đề phiên / Đổi tên phiên
-    elif any(k in lower for k in ["tiêu đề", "tên phiên", "đổi tên", "sửa tên", "rename"]):
-        # Hỗ trợ tự động đổi tên nếu Sếp chỉ định tên mới trực tiếp qua chat: ví dụ "đổi tên phiên này thành X"
-        rename_match = re.search(r'(?:đổi tên(?: phiên)?(?: này)?|sửa tên(?: phiên)?(?: này)?|rename(?: session)?)\s*(?:thành|sang|to|:)?\s*["\'«]?([^"\'»\n\.,]+)', user_message, re.IGNORECASE)
-        renamed_to = None
-        if rename_match:
-            candidate = rename_match.group(1).strip()
-            # Loại trừ các từ đệm/từ hỏi thông thường
-            if candidate and len(candidate) >= 2 and candidate.lower() not in ["gì", "thế nào", "nào", "sao", "đi", "được", "không", "thành"]:
-                renamed_to = candidate
-                try:
-                    with get_connection() as conn:
-                        conn.cursor().execute("UPDATE gen_conversations SET title = ? WHERE id = ?", (renamed_to, conv_id))
-                    conv_title = renamed_to
-                except Exception:
-                    pass
-
-        if renamed_to:
-            reply = (
-                f"Dạ em đã cập nhật tiêu đề phiên làm việc thành: **\"{renamed_to}\"** thành công trên toàn bộ hệ thống!\n\n"
-                f"- Tên phiên mới đã được đồng bộ trực tiếp tại Cột 1 và Cột 3.\n"
-                f"- Ngoài ra, Sếp cũng có thể bấm nút **\"✏️ Đổi tên\"** trên header Cột 3 hoặc bấm biểu tượng ✏️ ở Cột 1 bất kỳ lúc nào."
-            )
-        else:
-            reply = (
-                f"Dạ Sếp, em đã bổ sung tính năng đổi tiêu đề phiên làm việc trực tiếp:\n"
-                f"- **Tại Cột 1:** Sếp bấm biểu tượng ✏️ ở góc mỗi phiên (hoặc nhấp đúp vào tiêu đề) để đổi tên nhanh.\n"
-                f"- **Tại Cột 3:** Sếp bấm nút **\"✏️ Đổi tên\"** ngay cạnh tên phiên trên thanh header phòng chat này để cập nhật tiêu đề mới.\n"
-                f"- **Hoặc gõ trực tiếp trong chat:** Sếp có thể nhắn ví dụ *\"đổi tên phiên này thành Quản trị Hệ thống\"*, em sẽ tự động đổi tên luôn cho Sếp.\n\n"
-                f"Sếp muốn đổi tên phiên hiện tại (đang là *\"{conv_title}\"*) thành gì để em cập nhật luôn cho Sếp ạ?"
-            )
-
-    # Nhóm 3: Hỏi về Tệp / Thư mục / File Manager / Workspace
-    elif any(k in lower for k in ["tệp", "file", "thư mục", "folder", "workspace", "quản lý file", "quản lý tệp"]):
-        files_str = ', '.join([f"`{p}`" for p in session_files[:6]]) if session_files else "chưa có tệp"
-        reply = (
-            f"Dạ em báo cáo tình trạng tệp trong phiên **\"{conv_title}\"**:\n"
-            f"- **Thư mục làm việc vật lý:** `/workspace/sessions/{conv_id}`\n"
-            f"- **Các tệp hiện diện:** {files_str}\n"
-            f"- **Giao diện Cột 2 (Files & Repo):** Đã phân chia 2 cột rõ ràng gồm **Cột Danh sách** (bên trái) và **Cột Chi tiết & Xem nhanh** (bên phải với Line Numbers, kích thước, định dạng, nút mở editor đầy đủ).\n\n"
-            f"Sếp cần em tạo thêm file spec mới, chỉnh sửa file nào hay nạp thêm tệp từ Repo chính vào phiên này ạ?"
-        )
-        if len(notes) > 1:
-            cited_notes.append(f"#{notes[1]['id']}")
-
-    # Nhóm 4: Hỏi về Tiến độ / Task / Việc chờ / Kanban / Checklist
-    elif any(k in lower for k in ["tiến độ", "task", "việc", "chờ", "kanban", "todo", "checklist", "chưa làm", "xong chưa", "trạng thái", "hoàn thành"]):
-        sess_todos = get_gen_session_todos(conv_id)
-        if sess_todos:
-            t_lines = []
-            for t in sess_todos:
-                st_icon = "📋" if t["status"] == "todo" else ("⚡" if t["status"] == "in_progress" else ("🔍" if t["status"] == "review" else "✅"))
-                prog = t.get("progress_pct", 0)
-                t_lines.append(f"- {st_icon} **[{t['id']}] {t['title']}** ({t['status'].upper()} · {prog}% hoàn thành)")
-                for it in t.get("checklist", []):
-                    c_mark = "☑️" if it.get("done") else "⬜"
-                    t_lines.append(f"   {c_mark} `{it['id']}`: {it['text']}")
-            sess_tasks_str = "\n".join(t_lines)
-            reply = (
-                f"Dạ em báo cáo Sếp bảng **Kanban & Checklist chuyên dụng** của phiên **\"{conv_title}\"**:\n\n"
-                f"{sess_tasks_str}\n\n"
-                f"📌 **Quy chế Agent:** Toàn bộ công việc thực thi của em và các Swarm Agent tại phiên này đều phải đối soát và cập nhật trực tiếp vào từng checklist trên.\n"
-                f"Sếp có thể bấm tab **📌 Kanban & Todos** ở Cột 2 để tick chọn checklist hoặc kéo thả chuyển trạng thái trực tiếp ạ!"
-            )
-        else:
-            pending = [t for t in all_todos if t.get('status') in ('pending', 'todo')]
-            in_progress = [t for t in all_todos if t.get('status') in ('in_progress', 'doing')]
-            completed = [t for t in all_todos if t.get('status') in ('completed', 'done', 'verified')]
-            
-            p_summary = ', '.join([f"**{t['id']}** ({t.get('assigned_to', 'Swarm')})" for t in pending[:4]]) or "Không còn việc chờ"
-            ip_summary = ', '.join([f"**{t['id']}** ({t.get('assigned_to', 'Swarm')})" for t in in_progress[:3]]) or "Không có việc đang chạy"
-            
-            reply = (
-                f"Dạ em báo cáo Sếp bảng tiến độ thực tế của hệ thống:\n"
-                f"- ✅ **Đã hoàn tất nghiệm thu:** {len(completed)} nhiệm vụ (chứng thực bằng commit & test log).\n"
-                f"- ⚙️ **Đang triển khai:** {len(in_progress)} nhiệm vụ ({ip_summary}).\n"
-                f"- ⏳ **Chờ xử lý:** {len(pending)} nhiệm vụ ({p_summary}).\n\n"
-                f"Hệ thống Mutex lock bảo đảm các Agent không bị dẫm chân lên nhau. Sếp muốn em đôn đốc vị trí nào hay ưu tiên nhiệm vụ nào trước ạ?"
-            )
-        cited_notes.append("#NOTE-03")
-
-    # Nhóm 5: Hỏi về Git / Commit / Branch / Repo
-    elif any(k in lower for k in ["git", "commit", "branch", "kho mã", "nhánh", "working tree"]):
-        br = git_stat.get('branch', 'main')
-        clean = git_stat.get('clean', True)
-        changed = git_stat.get('changed_files', [])
-        reply = (
-            f"Dạ em báo cáo tình trạng Git Repo của dự án:\n"
-            f"- **Nhánh hiện tại:** `{br}`\n"
-            f"- **Trạng thái Working Tree:** {'Sạch sẽ, đã đồng bộ 100%' if clean else f'Có {len(changed)} file sửa đổi: ' + ', '.join([f'`{f}`' for f in changed[:3]])}\n"
-            f"- **Cam kết:** Mọi tệp sửa đổi đều được kiểm thử và commit tuần tự theo chuẩn an toàn."
-        )
-        cited_notes.append("#NOTE-02")
-
-    # Nhóm 6: Hỏi về Quota / Model / Token
-    elif any(k in lower for k in ["quota", "model", "token", "tài khoản", "gemini", "claude", "đổi model", "chuyển model"]):
-        reply = (
-            f"Dạ em báo cáo Sếp về cấu hình Model & Quota của phiên:\n"
-            f"- **Model hiện hành:** `{model}` (thuộc Profile `{account}`).\n"
-            f"- **Cơ chế Progressive Compaction:** Khi Sếp đổi sang model khác (như Gemini Flash hoặc Claude Sonnet), hệ thống tự động tóm tắt tin nhắn cũ thành Snapshot và bảo lưu toàn bộ `#NOTE-xx` để tiết kiệm token.\n"
-            f"- Sếp có thể chuyển đổi model hoặc đổi tài khoản agy CLI trực tiếp ở hai menu dropdown ngay trên đầu khung chat này ạ."
-        )
-
-    # Nhóm 7: Hỏi về Sổ tay / Note / Bằng chứng / Nghiệm thu
-    elif any(k in lower for k in ["note", "sổ tay", "ghi chú", "bằng chứng", "chứng cứ", "scratchpad"]):
-        notes_summary = ', '.join([f"**#{n['id']}** ({n['title']})" for n in notes[:4]]) if notes else "Chưa có note"
-        reply = (
-            f"Dạ em báo cáo Sếp về Sổ tay tạm thời (Scratchpad):\n"
-            f"- Các ghi chú hiện có trong phiên: {notes_summary}.\n"
-            f"- Mọi Note ID đều có thể click để mở tab Bằng Chứng Nghiệm Thu ở Cột 2.\n"
-            f"- Sếp có ghi chú hay yêu cầu nghiệp vụ nào mới cần em lưu lại để làm chứng cứ nghiệm thu không ạ?"
-        )
-        if len(notes) > 0:
-            cited_notes.append(f"#{notes[0]['id']}")
-
-    # Nhóm 8: Chào hỏi / Thăm hỏi mở đầu (sử dụng regex từ độc lập để không bắt nhầm 'tình hình', 'nơi',...)
-    elif bool(re.search(r'\b(hi|hello|alo|chào|helo|hey)\b', lower)) or lower.startswith(("ơi", "bạn ơi", "em ơi", "anh ơi")) or lower in ["test", "bắt đầu", "start"]:
-        reply = (
-            f"Dạ em chào Sếp Ryan! Em đang trực tại phòng điều phối Gen Workplace.\n\n"
-            f"Phiên làm việc **\"{conv_title}\"** đã sẵn sàng với thư mục tệp riêng tại `/workspace/sessions/{conv_id}` và kết nối đồng bộ 6 chuyên gia Swarm.\n\n"
-            f"Hôm nay Sếp cần em rà soát tiến độ, kiểm tra mã nguồn tại Cột 2 hay triển khai nhiệm vụ nào ạ?"
-        )
-        if len(notes) > 0:
-            cited_notes.append(f"#{notes[0]['id']}")
-
-    # Nhóm 9: Chỉ thị công việc / Câu hỏi kỹ thuật / Đề xuất chung
-    else:
-        reply = (
-            f"Dạ em đã nắm rõ chỉ thị từ Sếp: *\"{msg_raw}\"*.\n\n"
-            f"Em đề xuất lộ trình xử lý như sau:\n"
-            f"1. **Rà soát kiến trúc:** Đối soát trực tiếp yêu cầu với các tệp liên quan trong không gian phiên `{conv_id}`.\n"
-            f"2. **Thực thi phân rã:** Triển khai giải pháp kỹ thuật, cập nhật mã nguồn và đồng bộ với Cột 2.\n"
-            f"3. **Kiểm thử & Bàn giao:** Chạy kiểm thử tự động, xác minh không lỗi và báo cáo kết quả chi tiết kèm mã nghiệm thu cho Sếp.\n\n"
-            f"Em bắt đầu tiến hành ngay nhé Sếp!"
-        )
-        if len(notes) > 0:
-            cited_notes.append(f"#{notes[0]['id']}")
-
-    return reply, cited_notes
-
 AGY_MODEL_MAPPING = {
     "gemini-3.8-flash-high": "gemini-3.8-flash-high",
     "gemini-3.8-flash-medium": "gemini-3.8-flash-medium",
@@ -4342,14 +4047,51 @@ def resolve_agy_model_slug(model_name):
         return "gemini-3.1-pro-high"
     return "gemini-3.8-flash-high"
 
+AGY_CHAT_TIMEOUT_SEC = int(os.environ.get("GW_AGY_CHAT_TIMEOUT_SEC", "180") or 180)
+
+def _parse_agy_json_turn(stdout):
+    """Đọc JSON agy --output-format json → (reply, conversation_id, usage). stdout không phải JSON → coi cả stdout là reply."""
+    raw = (stdout or "").strip()
+    if not raw:
+        return "", None, {}
+    try:
+        data = json.loads(raw)
+    except Exception:
+        return raw, None, {}
+    if not isinstance(data, dict):
+        return raw, None, {}
+    usage = data.get("usage") if isinstance(data.get("usage"), dict) else {}
+    return (data.get("response") or "").strip(), data.get("conversation_id"), usage
+
+def describe_agy_error(usage):
+    """Diễn giải mã lỗi trong usage (do call_agy_cli_turn trả) thành lý do tiếng Việt, kèm output thật nếu có."""
+    usage = usage if isinstance(usage, dict) else {}
+    code = str(usage.get("error") or "UNKNOWN")
+    detail = (usage.get("detail") or "").strip()
+    if code == "RESOURCE_EXHAUSTED":
+        reset = usage.get("reset_at") or ""
+        reason = "RESOURCE_EXHAUSTED / 429 (hết quota" + (f", hồi {reset}" if reset else "") + ")"
+    elif code == "TIMEOUT":
+        reason = f"timeout sau {usage.get('timeout_sec', AGY_CHAT_TIMEOUT_SEC)}s"
+    elif code == "AGY_NOT_FOUND":
+        reason = f"không tìm thấy lệnh agy ({usage.get('bin') or _agy_bin()})"
+    elif code == "EMPTY_RESPONSE":
+        reason = "agy thoát 0 nhưng không có nội dung trả lời"
+    elif code.startswith("EXIT_"):
+        reason = f"agy thoát mã {code[5:]}"
+    else:
+        reason = code
+    if detail:
+        reason += f" — {detail[-600:]}"
+    return reason
+
 def call_agy_cli_turn(conv_id, user_message, model=None, account="owner_default"):
     """
-    Gọi Core Agent agy CLI thời gian thực:
-    - Kế thừa ngữ cảnh phiên (conversation_id continuity).
-    - Sử dụng tài khoản/profile OAuth đã xác thực.
-    - Trả về phản hồi thực sự từ mô hình AI (Gemini / Claude).
-    - Cập nhật số token thực tế vào DB.
-    - Tự động bắt lỗi Quota (429 RESOURCE_EXHAUSTED) và cảnh báo rõ ràng cho Sếp.
+    Gọi agy CLI thật cho 1 lượt chat:
+    - Kế thừa ngữ cảnh phiên (agy_conv_id), dùng profile OAuth của account, ghi quota_probe.
+    - Trả (reply, conversation_id, usage). KHÔNG bao giờ bịa reply: lỗi → reply rỗng và usage["error"]
+      là mã lỗi thật (RESOURCE_EXHAUSTED / TIMEOUT / AGY_NOT_FOUND / EXIT_<rc> / EMPTY_RESPONSE / EXCEPTION),
+      usage["detail"] là đuôi output thật của agy.
     """
     agy_conv_id = None
     try:
@@ -4362,20 +4104,10 @@ def call_agy_cli_turn(conv_id, user_message, model=None, account="owner_default"
     except Exception:
         pass
 
-    # Chuẩn bị môi trường cho agy CLI
-    p_dir = os.path.join(HOME_DIR, ".gemini")
-    if account and account != "owner_default":
-        p_dir = os.path.join(HOME_DIR, ".agy-profiles", account)
+    p_dir = _profile_dir(account)
+    env = _agy_env(p_dir)
 
-    env = {
-        **os.environ,
-        "HOME": HOME_DIR,
-        "PATH": f"/usr/local/bin:/usr/bin:/bin:{HOME_DIR}/.local/bin",
-    }
-    if p_dir != os.path.join(HOME_DIR, ".gemini") and os.path.exists(f"{p_dir}/antigravity-cli"):
-        env["ANTIGRAVITY_APP_DATA_DIR"] = f"{p_dir}/antigravity-cli"
-
-    # Lấy Kanban & Checklist chuyên dụng của phiên để định hướng Agent
+    # Kanban & checklist của phiên (nếu có) để định hướng agent
     sess_todos = get_gen_session_todos(conv_id)
     if sess_todos:
         kanban_block = format_session_kanban_for_agent(conv_id, sess_todos)
@@ -4384,19 +4116,11 @@ def call_agy_cli_turn(conv_id, user_message, model=None, account="owner_default"
         prompt_payload = user_message
 
     model_slug = resolve_agy_model_slug(model)
-
-    cmd = [
-        _agy_bin(),
-        "--output-format", "json",
-        "--print", prompt_payload,
-        "--dangerously-skip-permissions",
-        "--model", model_slug
-    ]
-
+    cmd = [_agy_bin(), "--output-format", "json", "--print", prompt_payload, "--dangerously-skip-permissions", "--model", model_slug]
     if agy_conv_id:
         cmd.extend(["--conversation", agy_conv_id])
 
-    # Xác định thư mục làm việc (ưu tiên thư mục cô lập của phiên; máy không có /workspace → BASE_DIR)
+    # Thư mục làm việc: thư mục riêng của phiên nếu có, không thì thư mục repo
     work_dir = "/workspace" if os.path.isdir("/workspace") else str(BASE_DIR)
     sess_dir = Path("/workspace/sessions") / conv_id
     if not sess_dir.exists():
@@ -4405,135 +4129,91 @@ def call_agy_cli_turn(conv_id, user_message, model=None, account="owner_default"
         work_dir = str(sess_dir)
         cmd.extend(["--add-dir", str(sess_dir)])
 
-    try:
-        res = subprocess.run(cmd, capture_output=True, text=True, env=env, cwd=work_dir, timeout=180)
-        record_quota_probe_from_result(account, model_slug, res)
-        if res.returncode == 0 and res.stdout.strip():
-            try:
-                data = json.loads(res.stdout)
-                actual_reply = (data.get("response") or "").strip()
-                returned_conv_id = data.get("conversation_id")
-                usage = data.get("usage", {})
-                tokens = usage.get("total_tokens", 0)
+    def _save_conv(ret_id, tokens):
+        if not ret_id:
+            return
+        try:
+            with get_connection() as conn:
+                conn.execute("UPDATE gen_conversations SET agy_conv_id = ?, total_tokens = coalesce(total_tokens, 0) + ? WHERE id = ?",
+                             (ret_id, int(tokens or 0), conv_id))
+                conn.commit()
+        except Exception:
+            pass
 
-                if returned_conv_id:
-                    with get_connection() as conn:
-                        c = conn.cursor()
-                        c.execute("""
-                        UPDATE gen_conversations 
-                        SET agy_conv_id = ?, total_tokens = coalesce(total_tokens, 0) + ?
-                        WHERE id = ?
-                        """, (returned_conv_id, tokens, conv_id))
-                        conn.commit()
-
-                if actual_reply:
-                    return actual_reply, returned_conv_id, usage
-            except Exception:
-                if res.stdout.strip():
-                    return res.stdout.strip(), agy_conv_id, {}
-        else:
-            err_output = ((res.stderr or "") + " " + (res.stdout or "")).strip()
+    def _run(argv):
+        try:
+            res = subprocess.run(argv, capture_output=True, text=True, env=env, cwd=work_dir, timeout=AGY_CHAT_TIMEOUT_SEC)
+        except subprocess.TimeoutExpired:
+            record_quota_probe(account, model_slug, "timeout", "", f"agy không phản hồi sau {AGY_CHAT_TIMEOUT_SEC}s")
+            return "", agy_conv_id, {"error": "TIMEOUT", "timeout_sec": AGY_CHAT_TIMEOUT_SEC}
+        except FileNotFoundError as e:
+            return "", agy_conv_id, {"error": "AGY_NOT_FOUND", "bin": _agy_bin(), "detail": str(e)}
+        except Exception as e:
+            return "", agy_conv_id, {"error": "EXCEPTION", "detail": str(e)}
+        status, reset_at = record_quota_probe_from_result(account, model_slug, res)
+        err_output = ((res.stderr or "") + "\n" + (res.stdout or "")).strip()
+        if status == "rate_limited":
+            return "", agy_conv_id, {"error": "RESOURCE_EXHAUSTED", "reset_at": reset_at, "detail": err_output[-800:]}
+        if res.returncode != 0:
             print(f"[AGY Runner] returncode={res.returncode}, err: {err_output[:300]}")
+            return "", agy_conv_id, {"error": f"EXIT_{res.returncode}", "detail": err_output[-800:]}
+        reply, ret_id, usage = _parse_agy_json_turn(res.stdout)
+        _save_conv(ret_id, usage.get("total_tokens", 0) if isinstance(usage, dict) else 0)
+        if not reply:
+            return "", ret_id or agy_conv_id, {"error": "EMPTY_RESPONSE", "detail": err_output[-800:]}
+        return reply, ret_id or agy_conv_id, dict(usage)
 
-            # 1. Bắt lỗi Quota / Resource Exhausted (ví dụ Claude 429)
-            if "RESOURCE_EXHAUSTED" in err_output or "429" in err_output or "quota" in err_output.lower():
-                quota_msg = (
-                    f"⚠️ **Thông báo Hạn mức Quota agy CLI:** Model `{model_slug}` hiện đã chạm giới hạn truy vấn cá nhân (RESOURCE_EXHAUSTED / Code 429).\n\n"
-                    f"👉 **Giải pháp tức thì:** Sếp vui lòng chọn chuyển sang **Gemini 3.8 Flash (High)** hoặc **Gemini 3.1 Pro (High)** trên thanh công cụ dropdown phía trên để tiếp tục làm việc mượt mà ngay ạ."
-                )
-                return quota_msg, agy_conv_id, {"error": "RESOURCE_EXHAUSTED"}
-
-            # 2. Nếu có agy_conv_id nhưng bị lỗi (phiên cũ bị hỏng hoặc hết hạn), tự động reset và thử lại phiên mới
-            if agy_conv_id:
-                print(f"[AGY Runner] agy_conv_id '{agy_conv_id}' failed, resetting conv and retrying fresh turn...")
-                with get_connection() as conn:
-                    conn.execute("UPDATE gen_conversations SET agy_conv_id = '' WHERE id = ?", (conv_id,))
-                    conn.commit()
-                fresh_cmd = []
-                skip_next = False
-                for token in cmd:
-                    if skip_next:
-                        skip_next = False
-                        continue
-                    if token == "--conversation":
-                        skip_next = True
-                        continue
-                    fresh_cmd.append(token)
-
-                res_retry = subprocess.run(fresh_cmd, capture_output=True, text=True, env=env, cwd=work_dir, timeout=180)
-                record_quota_probe_from_result(account, model_slug, res_retry)
-                if res_retry.returncode == 0 and res_retry.stdout.strip():
-                    try:
-                        data = json.loads(res_retry.stdout)
-                        actual_reply = (data.get("response") or "").strip()
-                        ret_id = data.get("conversation_id")
-                        usage = data.get("usage", {})
-                        tokens = usage.get("total_tokens", 0)
-                        if ret_id:
-                            with get_connection() as conn:
-                                conn.execute("""
-                                UPDATE gen_conversations 
-                                SET agy_conv_id = ?, total_tokens = coalesce(total_tokens, 0) + ?
-                                WHERE id = ?
-                                """, (ret_id, tokens, conv_id))
-                                conn.commit()
-                        if actual_reply:
-                            return actual_reply, ret_id, usage
-                    except Exception:
-                        if res_retry.stdout.strip():
-                            return res_retry.stdout.strip(), None, {}
-
-    except subprocess.TimeoutExpired:
-        print(f"[AGY Runner] Timeout (180s) for conv {conv_id}")
-        record_quota_probe(account, model_slug, "timeout", "", "agy không phản hồi sau 180s")
-        timeout_msg = (
-            f"⏱️ **Thông báo Quá giờ:** Lệnh agy CLI (`{model_slug}`) đã vượt quá thời hạn chờ tối đa 180s do tác vụ phức tạp.\n\n"
-            f"👉 **Khuyến nghị:** Sếp có thể đổi sang **Gemini 3.8 Flash (High Speed)** để nhận phản hồi siêu tốc dưới 15 giây."
-        )
-        return timeout_msg, agy_conv_id, {"error": "TIMEOUT"}
-    except Exception as e:
-        print(f"[AGY Runner] Exception: {e}")
-
-    return None, None, None
+    reply, ret_id, usage = _run(cmd)
+    # Phiên agy cũ hỏng/hết hạn (không phải lỗi quota) → xóa agy_conv_id, thử lại 1 lần với lượt mới
+    if not reply and agy_conv_id and usage.get("error", "").startswith("EXIT_"):
+        print(f"[AGY Runner] agy_conv_id '{agy_conv_id}' lỗi, thử lại lượt mới không --conversation")
+        try:
+            with get_connection() as conn:
+                conn.execute("UPDATE gen_conversations SET agy_conv_id = '' WHERE id = ?", (conv_id,))
+                conn.commit()
+        except Exception:
+            pass
+        fresh_cmd = [t for i, t in enumerate(cmd) if t != "--conversation" and not (i > 0 and cmd[i - 1] == "--conversation")]
+        agy_conv_id = None
+        reply, ret_id, usage = _run(fresh_cmd)
+    return reply, ret_id, usage
 
 def send_gen_chat(conv_id, author, message, model, account="owner_default"):
-    # Đảm bảo conversation tồn tại trong DB để tránh lỗi FOREIGN KEY
+    """Lưu tin người dùng, gọi agy thật, lưu trả lời. agy lỗi → lưu tin 'Gen (lỗi)' với lý do thật, không tự sinh phản hồi."""
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT id FROM gen_conversations WHERE id = ?", (conv_id,))
         if not cursor.fetchone():
             cursor.execute("""
             INSERT INTO gen_conversations (id, project_id, title, model, account_profile, is_pinned, active_tab, active_file, open_tabs_json, active_evidence_id, owner_id)
-            VALUES (?, 'PRJ-GEN-WORKPLACE', ?, ?, ?, 0, 'files_repo', 'backend/main.py', '["backend/main.py"]', 'NOTE-01', 'owner-ryan')
+            VALUES (?, 'PRJ-GEN-WORKPLACE', ?, ?, ?, 0, 'files_repo', 'backend/main.py', '["backend/main.py"]', '', 'owner-ryan')
             """, (conv_id, f"Phiên {conv_id}", model, account))
             conn.commit()
 
-        # Ghi tin nhắn user vào DB
         cursor.execute("""
         INSERT INTO gen_messages (conversation_id, author, role, content, model, note_ids_json, owner_id)
         VALUES (?, ?, 'user', ?, ?, '[]', 'owner-ryan')
         """, (conv_id, author, message, model))
         user_msg_id = cursor.lastrowid
-
-        # Update conv model & timestamp
         cursor.execute("UPDATE gen_conversations SET model = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", (model, conv_id))
         conn.commit()
 
-    # THỰC THI QUA CORE AGENT AGY CLI THỜI GIAN THỰC (BẮT BUỘC KANBAN & CHECKLIST DIRECTIVE)
     actual_reply, ret_conv_id, usage = call_agy_cli_turn(conv_id, message, model, account)
+    usage = usage if isinstance(usage, dict) else {}
     if actual_reply:
         reply_content = actual_reply
         engine_used = "agy-cli"
-        cited_notes = list(set(re.findall(r'#(?:NOTE|EVT|SEC|TOOL|FILE)-\d+', reply_content)))
+        author_name = "Gen Core (agy CLI)"
+        cited_notes = sorted(set(re.findall(r'#(?:NOTE|EVT|SEC|TOOL|FILE)-\d+', reply_content)))
+        is_error = False
+        applied_kanban = parse_and_apply_agent_kanban_updates(conv_id, reply_content)
     else:
-        # Nếu agy CLI bận hoặc timeout thì kích hoạt Smart Fallback
-        reply_content, cited_notes = generate_gen_smart_reply(conv_id, message, model, account)
-        engine_used = "smart-fallback"
-
-    # TỰ ĐỘNG PHÂN TÍCH VÀ CẬP NHẬT KANBAN & CHECKLIST TỪ PHẢN HỒI CỦA AGENT
-    applied_kanban = parse_and_apply_agent_kanban_updates(conv_id, reply_content)
-
-    author_name = "Gen Core (agy CLI)" if engine_used == "agy-cli" else "Gen Core"
+        reply_content = f"agy không trả lời: {describe_agy_error(usage)}. Không có phản hồi tự sinh."
+        engine_used = "error"
+        author_name = "Gen (lỗi)"
+        cited_notes = []
+        is_error = True
+        applied_kanban = []
 
     with get_connection() as conn:
         cursor = conn.cursor()
@@ -4544,13 +4224,10 @@ def send_gen_chat(conv_id, author, message, model, account="owner_default"):
         reply_id = cursor.lastrowid
         conn.commit()
 
-    # Lấy tiêu đề cập nhật nhất (nếu có đổi tên trong chat)
     updated_title = conv_id
     try:
         with get_connection() as conn:
-            c = conn.cursor()
-            c.execute("SELECT title FROM gen_conversations WHERE id = ?", (conv_id,))
-            row = c.fetchone()
+            row = conn.execute("SELECT title FROM gen_conversations WHERE id = ?", (conv_id,)).fetchone()
             if row and row["title"]:
                 updated_title = row["title"]
     except Exception:
@@ -4560,11 +4237,14 @@ def send_gen_chat(conv_id, author, message, model, account="owner_default"):
         "user_msg_id": user_msg_id,
         "reply_id": reply_id,
         "reply": reply_content,
+        "author": author_name,
         "cited_notes": cited_notes,
         "model": model,
         "conv_title": updated_title,
         "engine": engine_used,
-        "usage": usage or {},
+        "error": is_error,
+        "error_code": usage.get("error", "") if is_error else "",
+        "usage": usage,
         "kanban_updates": applied_kanban
     }
 
@@ -4859,7 +4539,7 @@ def get_file_content_safely(file_path):
             except Exception as e:
                 return {"error": str(e)}
 
-    repo_base = "/app/repo"
+    repo_base = find_repo_path()
     clean_p = file_path.lstrip("/").replace("\\", "/")
     if ".." in clean_p:
         return {"error": "Invalid path"}
@@ -4888,67 +4568,6 @@ def get_file_content_safely(file_path):
 # SESSION KANBAN & INTERACTIVE CHECKLIST ENGINE (PER-SESSION DAG)
 # =========================================================================
 
-def seed_session_default_todos(conv_id):
-    """Khởi tạo danh mục Kanban Todo & Checklist ban đầu cho phiên nếu đang trống."""
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT id FROM gen_conversations WHERE id = ?", (conv_id,))
-        if not cursor.fetchone():
-            return
-        cursor.execute("SELECT count(*) FROM gen_session_todos WHERE conversation_id = ?", (conv_id,))
-        if cursor.fetchone()[0] > 0:
-            return
-
-        if conv_id == "conv-gen-builder":
-            initial_todos = [
-                # Chưa có bằng chứng kiểm được (commit/file/PR) → 'review', evidence rỗng (#4)
-                ("TSK-01", conv_id, "PRJ-GEN-WORKPLACE", "Thiết lập hạ tầng Swarm & Cách ly Workspace phiên", "Kiểm tra container gen-workplace-app và quyền đọc ghi tại thư mục /workspace/sessions/conv-gen-builder.", "review", "critical", "Builder Agent", json.dumps([
-                    {"id": "chk-1", "text": "Xác nhận container gen-workplace-app chạy trên port 8888 với cờ SELinux :z", "done": True},
-                    {"id": "chk-2", "text": "Khởi tạo thư mục /workspace/sessions/conv-gen-builder cô lập", "done": True},
-                    {"id": "chk-3", "text": "Khóa đặc tả SSOT_ORIGINAL_SPEC.md làm kim chỉ nam phát triển", "done": True}
-                ], ensure_ascii=False), "", 1, "owner-ryan"),
-                ("TSK-02", conv_id, "PRJ-GEN-WORKPLACE", "Khóa quyền sở hữu độc quyền cho Owner Ryan (owner_profiles)", "Khởi tạo bảng owner_profiles và backfill owner_id='owner-ryan' cho toàn bộ CSDL.", "review", "critical", "Builder Agent", json.dumps([
-                    {"id": "chk-1", "text": "Khởi tạo bảng owner_profiles (id='owner-ryan') trong SQLite WAL", "done": True},
-                    {"id": "chk-2", "text": "Gán cờ owner_id='owner-ryan' trên 100% các bảng dữ liệu", "done": True},
-                    {"id": "chk-3", "text": "Tích hợp huy hiệu Sovereign Profile và Modal quản trị trên Topbar", "done": True}
-                ], ensure_ascii=False), "", 2, "owner-ryan"),
-                ("TSK-03", conv_id, "PRJ-GEN-WORKPLACE", "Xây dựng phân hệ Kanban & Checklist chuyên dụng theo phiên", "Tạo tab Kanban 4 cột trong Cột 2, ràng buộc Agent bắt buộc đối soát checklist khi làm việc.", "in_progress", "high", "Builder Agent", json.dumps([
-                    {"id": "chk-1", "text": "Thiết kế bảng gen_session_todos với trường checklist_json và status", "done": True},
-                    {"id": "chk-2", "text": "Triển khai REST API quản lý todos và toggle checklist item", "done": True},
-                    {"id": "chk-3", "text": "Thêm tab Kanban & Todos trong Cột 2 với 4 cột tương tác trực tiếp", "done": True},
-                    {"id": "chk-4", "text": "Ràng buộc bắt buộc Agent phải đối soát và cập nhật checklist khi trả lời", "done": True}
-                ], ensure_ascii=False), "PRJ-GEN-WORKPLACE · session: conv-gen-builder", 3, "owner-ryan"),
-                ("TSK-04", conv_id, "PRJ-GEN-WORKPLACE", "Tự động hóa kiểm thử regression & Thẩm định bằng chứng", "Kiểm định toàn diện chu trình tương tác giữa Ryan, Gen Core và hệ thống Kanban.", "todo", "medium", "QA & Verification", json.dumps([
-                    {"id": "chk-1", "text": "Viết kịch bản kiểm thử API REST /api/gen/session/todos", "done": False},
-                    {"id": "chk-2", "text": "Kiểm tra render Headless Chrome không có lỗi JavaScript console", "done": False},
-                    {"id": "chk-3", "text": "Nghiệm thu toàn bộ tài liệu bàn giao kỹ thuật", "done": False}
-                ], ensure_ascii=False), "SOP Phase 4 Verification", 4, "owner-ryan"),
-            ]
-        else:
-            initial_todos = [
-                ("TSK-01", conv_id, "PRJ-GEN-WORKPLACE", "Tiếp nhận chỉ thị từ Owner Ryan & Phân tích nhiệm vụ", "Core Agent tiếp nhận mệnh lệnh từ Ryan, đối soát đặc tả SSOT và lập danh mục checklist.", "in_progress", "high", "Gen Core", json.dumps([
-                    {"id": "chk-1", "text": "Nhận diện yêu cầu và chỉ thị trực tiếp từ Owner Ryan trong phòng chat", "done": True},
-                    {"id": "chk-2", "text": "Đối soát các ràng buộc kiến trúc với docs/SSOT_ORIGINAL_SPEC.md", "done": False},
-                    {"id": "chk-3", "text": "Ghi nhận mã bằng chứng Note ID tương ứng vào Sổ tay Scratchpad", "done": False}
-                ], ensure_ascii=False), "docs/SSOT_ORIGINAL_SPEC.md", 1, "owner-ryan"),
-                ("TSK-02", conv_id, "PRJ-GEN-WORKPLACE", "Thực thi tác vụ & Cập nhật tiến độ theo từng checklist", "Thực hiện từng hạng mục kỹ thuật, lưu log vật lý và kiểm tra kết quả.", "todo", "high", "Gen Core", json.dumps([
-                    {"id": "chk-1", "text": "Thực thi lệnh code hoặc script qua agy CLI thời gian thực", "done": False},
-                    {"id": "chk-2", "text": "Kiểm tra trạng thái thoát (exit code) và dữ liệu đầu ra", "done": False},
-                    {"id": "chk-3", "text": "Đánh dấu hoàn thành checklist [x] và chuyển task sang review", "done": False}
-                ], ensure_ascii=False), "agy CLI turn log", 2, "owner-ryan"),
-                ("TSK-03", conv_id, "PRJ-GEN-WORKPLACE", "Báo cáo nghiệm thu kết quả cho Owner Ryan", "Tổng kết kết quả thực hiện, đối chiếu bằng chứng và sẵn sàng nhận chỉ thị tiếp theo.", "todo", "medium", "Gen Core", json.dumps([
-                    {"id": "chk-1", "text": "Tổng hợp kết quả ngắn gọn, sắc nét theo chuẩn Executive Assistant", "done": False},
-                    {"id": "chk-2", "text": "Cập nhật trạng thái task sang Hoàn thành (Done)", "done": False}
-                ], ensure_ascii=False), "Báo cáo điều hành", 3, "owner-ryan"),
-            ]
-
-        for t in initial_todos:
-            cursor.execute("""
-            INSERT OR IGNORE INTO gen_session_todos (id, conversation_id, project_id, title, description, status, priority, assigned_agent, checklist_json, evidence_ref, order_idx, owner_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, t)
-        conn.commit()
-
 def get_gen_session_todos(conv_id, project_id="PRJ-GEN-WORKPLACE"):
     """Lấy danh sách Kanban Todo & Checklist chuyên dụng của phiên cụ thể."""
     with get_connection() as conn:
@@ -4959,17 +4578,6 @@ def get_gen_session_todos(conv_id, project_id="PRJ-GEN-WORKPLACE"):
         ORDER BY order_idx ASC, id ASC
         """, (conv_id,))
         rows = cursor.fetchall()
-        
-        # Nếu phiên chưa có todo nào, tự động seed bộ todo mẫu tương ứng
-        if not rows:
-            seed_session_default_todos(conv_id)
-            cursor.execute("""
-            SELECT * FROM gen_session_todos 
-            WHERE conversation_id = ?
-            ORDER BY order_idx ASC, id ASC
-            """, (conv_id,))
-            rows = cursor.fetchall()
-
         todos = []
         for r in rows:
             d = dict(r)
@@ -4986,14 +4594,35 @@ def get_gen_session_todos(conv_id, project_id="PRJ-GEN-WORKPLACE"):
             todos.append(d)
         return todos
 
-def save_gen_session_todo(conv_id, todo_id=None, title="Nhiệm vụ mới", description="", status="todo", priority="high", assigned_agent="Gen Core", checklist=None, evidence_ref="", order_idx=0, owner_id="owner-ryan"):
+def save_gen_session_todo(conv_id, todo_id=None, title="Nhiệm vụ mới", description="", status="todo", priority="high", assigned_agent="Gen Core", checklist=None, evidence_ref="", order_idx=0, owner_id="owner-ryan", viec_ref=""):
+    """
+    Tạo mới / cập nhật task Kanban của phiên. TẠO MỚI bắt buộc viec_ref khớp ^VIEC-[0-9]+$ (mã việc Kho Ryan),
+    thiếu/sai → {"error": "Thiếu viec_ref (mã việc trong Kho Ryan, vd VIEC-12)"}. Cập nhật: viec_ref rỗng → giữ giá trị cũ.
+    """
     checklist = checklist or []
+    viec_ok, viec_ref = validate_viec_ref(viec_ref)
     with get_connection() as conn:
         cursor = conn.cursor()
+        is_new = True
+        if todo_id:
+            cursor.execute("SELECT viec_ref FROM gen_session_todos WHERE id = ? AND conversation_id = ?", (todo_id, conv_id))
+            existing = cursor.fetchone()
+            if existing:
+                is_new = False
+                if not viec_ref:
+                    viec_ref = existing["viec_ref"] or ""
+                    viec_ok = True
+        if is_new and not viec_ok:
+            return {"error": VIEC_REF_ERROR, "viec_ref": viec_ref, "id": todo_id}
+        if not is_new and viec_ref and not viec_ok:
+            return {"error": f"viec_ref '{viec_ref}' sai định dạng (vd VIEC-12)", "viec_ref": viec_ref, "id": todo_id}
         if not todo_id:
             cursor.execute("SELECT count(*) FROM gen_session_todos WHERE conversation_id = ?", (conv_id,))
             num = cursor.fetchone()[0] + 1
             todo_id = f"TSK-{num:02d}"
+            while cursor.execute("SELECT 1 FROM gen_session_todos WHERE id = ?", (todo_id,)).fetchone():
+                num += 1
+                todo_id = f"TSK-{num:02d}"
 
         normalized_chk = []
         for idx, item in enumerate(checklist, 1):
@@ -5007,8 +4636,8 @@ def save_gen_session_todo(conv_id, todo_id=None, title="Nhiệm vụ mới", des
                 })
 
         cursor.execute("""
-        INSERT INTO gen_session_todos (id, conversation_id, project_id, title, description, status, priority, assigned_agent, checklist_json, evidence_ref, order_idx, owner_id)
-        VALUES (?, ?, 'PRJ-GEN-WORKPLACE', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO gen_session_todos (id, conversation_id, project_id, title, description, status, priority, assigned_agent, checklist_json, evidence_ref, order_idx, owner_id, viec_ref)
+        VALUES (?, ?, 'PRJ-GEN-WORKPLACE', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
             title = excluded.title,
             description = excluded.description,
@@ -5019,10 +4648,11 @@ def save_gen_session_todo(conv_id, todo_id=None, title="Nhiệm vụ mới", des
             evidence_ref = excluded.evidence_ref,
             order_idx = excluded.order_idx,
             owner_id = excluded.owner_id,
+            viec_ref = CASE WHEN excluded.viec_ref != '' THEN excluded.viec_ref ELSE gen_session_todos.viec_ref END,
             updated_at = CURRENT_TIMESTAMP
-        """, (todo_id, conv_id, title, description, status, priority, assigned_agent, json.dumps(normalized_chk, ensure_ascii=False), evidence_ref, order_idx, owner_id))
+        """, (todo_id, conv_id, title, description, status, priority, assigned_agent, json.dumps(normalized_chk, ensure_ascii=False), evidence_ref, order_idx, owner_id, viec_ref))
         conn.commit()
-    return {"status": "saved", "id": todo_id, "title": title}
+    return {"status": "saved", "id": todo_id, "title": title, "viec_ref": viec_ref, "created": is_new}
 
 def toggle_gen_session_todo_checklist_item(conv_id, todo_id, item_id, done_status=None):
     with get_connection() as conn:
@@ -5375,7 +5005,5 @@ def verify_mcp_request_auth(headers=None, query=None, tool_name=None):
 init_db()
 seed_real_project()
 seed_tmux_sessions()
-seed_ssot_events()
-seed_gen_workplace()
 
 
