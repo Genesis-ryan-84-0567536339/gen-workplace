@@ -3166,7 +3166,8 @@ def complete_task(session_id, todo_id, evidence_ref, verified_by="Lead Architect
 def reclaim_stalled_tasks(timeout_seconds=300, project_id="PRJ-GEN-WORKPLACE"):
     """
     Thu hồi nhiệm vụ bị treo từ Agent bóng ma / crash (Anti-Zombie Reclamation):
-    - Quét các task 'in_progress' bị giữ quá timeout mà session không gửi heartbeat.
+    - Quét các task 'in_progress' bị giữ quá timeout mà session không gửi heartbeat
+      (kể cả task seed/không có locked_at — không ai thật sự đang giữ).
     - Nhả task về lại trạng thái 'queued' để worker khác nhận việc.
     """
     project_id = normalize_project_id(project_id)
@@ -3175,8 +3176,9 @@ def reclaim_stalled_tasks(timeout_seconds=300, project_id="PRJ-GEN-WORKPLACE"):
         cursor.execute("""
         UPDATE todos
         SET status = 'queued', assigned_session_id = '', locked_at = NULL
-        WHERE project_id = ? AND status = 'in_progress' 
-          AND strftime('%s', 'now') - strftime('%s', locked_at) > ?
+        WHERE project_id = ? AND status = 'in_progress'
+          AND (locked_at IS NULL OR locked_at = ''
+               OR strftime('%s', 'now') - strftime('%s', locked_at) > ?)
         """, (project_id, timeout_seconds))
         reclaimed = cursor.rowcount
         conn.commit()
