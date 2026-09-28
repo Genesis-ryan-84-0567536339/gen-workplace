@@ -3644,6 +3644,7 @@ def get_vault_list():
         {"id": "ENV-DATA_DIR", "name": "DATA_DIR", "owner": "Môi trường", "scope": f"Thư mục DB = {DATA_DIR}", "status": "đang dùng"},
         {"id": "ENV-GW_AGY_BIN", "name": "GW_AGY_BIN", "owner": "Môi trường", "scope": f"Lệnh agy = {_agy_bin()}", "status": "đã đặt" if os.environ.get("GW_AGY_BIN") else "mặc định (agy trong PATH)"},
         {"id": "ENV-GW_EVENT_WEBHOOK_URL", "name": "GW_EVENT_WEBHOOK_URL", "owner": "Môi trường", "scope": "Webhook sự kiện task_completed / dispatch_finished", "status": "bật" if os.environ.get("GW_EVENT_WEBHOOK_URL") else "tắt"},
+        {"id": "ENV-GW_AUTO_UPDATE", "name": "GW_AUTO_UPDATE", "owner": "Môi trường", "scope": f"Tự cập nhật từ origin/{os.environ.get('GW_AUTO_UPDATE_BRANCH') or 'main'} mỗi {os.environ.get('GW_AUTO_UPDATE_SEC') or 120}s", "status": "tắt" if os.environ.get("GW_AUTO_UPDATE", "1").strip().lower() in ("0", "false", "no", "off") else "bật"},
         {"id": "ENV-GOOGLE_OAUTH", "name": "GOOGLE_OAUTH_CLIENT_ID/SECRET", "owner": "Môi trường (.env)", "scope": "Đổi code OAuth lấy token Google", "status": "đã cấu hình" if (GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET) else "chưa cấu hình"},
     ]
     try:
