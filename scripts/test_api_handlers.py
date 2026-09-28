@@ -144,6 +144,56 @@ db.create_new_project, db.get_vault_list = _orig_create_project, _orig_vault
 st, js, _ = call("GET", "/api/vault/list")
 check("sau lỗi server vẫn phục vụ bình thường", st == 200 and js and "vault" in js, f"{st} {js}")
 
+print("[5] GET /api/roles/sop: inputFrom/outputTo đọc từ ROLE.md, không có mục → ''")
+ROLES_DIR = os.path.join(TMP, "roles")
+os.makedirs(ROLES_DIR)
+with open(os.path.join(ROLES_DIR, "gw-a-agy_ROLE.md"), "w", encoding="utf-8") as f:
+    f.write("# Genesis Swarm Role Specification: Vai A\n- **Session Identifier**: `gw-a-agy`\n- **Assigned Scope**: `Backend`\n"
+            "- **Active Mission**: Làm API.\n- **Nhận từ**: Lead Architect (schema CSDL)\n- **Bàn giao cho**: Frontend (endpoint API)\n")
+with open(os.path.join(ROLES_DIR, "gw-b-agy_ROLE.md"), "w", encoding="utf-8") as f:
+    f.write("# Genesis Swarm Role Specification: Vai B\n- **Session Identifier**: `gw-b-agy`\n- **Active Mission**: Làm UI.\n"
+            "- **Input from**: Backend (REST API)\n- **Output to**: QA (bản build)\n")
+with open(os.path.join(ROLES_DIR, "gw-c-agy_ROLE.md"), "w", encoding="utf-8") as f:
+    f.write("# Genesis Swarm Role Specification: Vai C\n- **Session Identifier**: `gw-c-agy`\n- **Active Mission**: Kiểm thử.\n")
+os.environ["GW_ROLES_DIR"] = ROLES_DIR
+st, js, _ = call("GET", "/api/roles/sop")
+roles = (js or {}).get("roles", {})
+check("200 + 3 vai", st == 200 and set(roles) == {"gw-a-agy", "gw-b-agy", "gw-c-agy"}, f"{st} {list(roles)}")
+a, b, c = roles.get("gw-a-agy", {}), roles.get("gw-b-agy", {}), roles.get("gw-c-agy", {})
+check("tiếng Việt: Nhận từ / Bàn giao cho", a.get("inputFrom") == "Lead Architect (schema CSDL)" and a.get("outputTo") == "Frontend (endpoint API)", str(a))
+check("tiếng Anh: Input from / Output to", b.get("inputFrom") == "Backend (REST API)" and b.get("outputTo") == "QA (bản build)", str(b))
+check("không có mục → chuỗi rỗng, không bịa", c.get("inputFrom") == "" and c.get("outputTo") == "", str(c))
+check("các key cũ vẫn còn", all(k in a for k in ("id", "title", "mission", "scope", "allowed", "blocked", "checklist")), str(list(a)))
+os.environ.pop("GW_ROLES_DIR", None)
+
+print("[6] POST /api/ssot/generate: chỉ lưu đặc tả, không sinh roadmap/todo, không tin War Room mẫu")
+
+
+def _counts():
+    with db.get_connection() as conn:
+        return (conn.execute("SELECT count(*) FROM roadmaps").fetchone()[0],
+                conn.execute("SELECT count(*) FROM todos").fetchone()[0],
+                conn.execute("SELECT count(*) FROM chat_messages WHERE runtime_id = 'war_room'").fetchone()[0])
+
+
+before = _counts()
+st, js, _ = call("POST", "/api/ssot/generate", {"content": "Đặc tả thật:\nxây API kanban\n" + "chi tiết " * 60, "project_id": "PRJ-GEN-WORKPLACE"})
+after = _counts()
+check("200 status=saved", st == 200 and js and js.get("status") == "saved", f"{st} {js and js.get('status')}")
+check("generated = {roadmaps: 0, todos: 0}", js and js.get("generated") == {"roadmaps": 0, "todos": 0}, str(js and js.get("generated")))
+check("note nói thật", js and js.get("note") == "Chỉ lưu đặc tả làm nguồn cho các vai; roadmap/todo chưa được sinh tự động", str(js and js.get("note")))
+check("có key state cho frontend", js and isinstance(js.get("state"), dict), str(type(js and js.get("state"))))
+check("roadmaps/todos/war_room không đổi", before == after, f"{before} → {after}")
+with db.get_connection() as conn:
+    insts = [r[0] for r in conn.execute("SELECT instruction FROM agent_roles WHERE project_id = 'PRJ-GEN-WORKPLACE'").fetchall()]
+    ssot = conn.execute("SELECT body FROM master_ssot WHERE id = 'SSOT-ACTIVE-PLAN'").fetchone()
+check("roles_updated = số role thật", js and js.get("roles_updated") == len(insts), f"{js and js.get('roles_updated')} vs {len(insts)}")
+check("instruction chỉ chứa trích đặc tả thật", insts and all("Đặc tả thật: xây API kanban" in i and "Chỉ huy kiến trúc toàn cục" not in i for i in insts), str(insts[:1]))
+check("master_ssot lưu trích đoạn thật", ssot and ssot["body"].startswith("Đặc tả thật: xây API kanban"), str(ssot and ssot["body"][:60]))
+check("summary không còn câu 'Đặc tả SSOT gốc từ Ryan'", js and js.get("ssot_summary", "").startswith("Đặc tả thật"), str(js and js.get("ssot_summary")))
+st, js, _ = call("POST", "/api/ssot/generate", {"content": "  "})
+check("content rỗng → 400, không ghi mặc định bịa", st == 400 and js and "error" in js and _counts() == after, f"{st} {js}")
+
 shutil.rmtree(TMP, ignore_errors=True)
 server.shutdown()
 print(f"\n{PASSED}/{PASSED + FAILED} test pass")

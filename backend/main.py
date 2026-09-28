@@ -867,13 +867,17 @@ class SwarmHandler(SimpleHTTPRequestHandler):
                 self._send_json(500, {"error": str(e)})
             return
 
-        # 19. AI Phân rã cấu trúc từ nguồn SSOT (Generate Roadmap, Todos, Roles from Source)
+        # 19. Lưu đặc tả SSOT làm nguồn cho các vai. KHÔNG sinh roadmap/todo (generated = 0), không tin War Room mẫu.
+        #     Frontend (generateFromSource) chỉ đọc key "state"; các key status/generated/note nói đúng việc đã làm.
         if path == "/api/ssot/generate":
             content = data.get("content", "")
             prj_id = data.get("project_id", "PRJ-GEN-WORKPLACE")
             res = db.generate_structure_from_ssot(content, prj_id)
+            if "error" in res:
+                self._send_json(400, res)
+                return
             state = db.get_full_state(prj_id)
-            self._send_json(200, {"status": "generated", "summary": res, "state": state})
+            self._send_json(200, {**res, "state": state})
             return
 
         # 20. Thẩm định sự kiện SSOT Event

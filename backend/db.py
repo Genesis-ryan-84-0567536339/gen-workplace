@@ -3341,30 +3341,26 @@ def post_warroom_message(project_id="PRJ-GEN-WORKPLACE", channel_id="war_room", 
 
 def generate_structure_from_ssot(content, project_id="PRJ-GEN-WORKPLACE"):
     """
-    Phân tích chỉ thị từ Input chat tổng / File Plan và đồng bộ cấu trúc:
-    - Cập nhật instruction cho từng role trong agent_roles (khóa theo Input tổng).
-    - Cập nhật master_ssot.
-    - Gửi tin nhắn thông báo vào War Room.
+    Lưu đặc tả từ Input chat tổng / File Plan làm nguồn cho các vai (chỉ lưu, không phân rã):
+    - Ghi trích đoạn đặc tả vào instruction của mọi role trong agent_roles của dự án.
+    - Cập nhật master_ssot (SSOT-ACTIVE-PLAN).
+    KHÔNG sinh roadmap/todo, KHÔNG ghi tin War Room; response nói rõ generated = 0.
     """
     project_id = normalize_project_id(project_id)
-    spec_summary = content[:250].replace("\n", " ").strip() if content else "Đặc tả SSOT gốc từ Ryan"
-    
-    role_updates = {
-        "ROLE-01": f"Chỉ huy kiến trúc toàn cục theo SSOT: {spec_summary}. Duy trì tính nhất quán 0 xung đột, phê duyệt bằng chứng commit hash.",
-        "ROLE-02": f"Thiết kế CSDL SQLite WAL, FTS5 catalog và REST APIs phục vụ: {spec_summary}. Tuân thủ Task Mutex, kiểm soát bộ nhớ.",
-        "ROLE-03": f"Xây dựng WebApp Mission Control SPA chuẩn 3-Tier Layout, Visual Pipeline Circuit 5 trạm ngang theo: {spec_summary}.",
-        "ROLE-04": f"Container hóa Docker (:z SELinux), TUI Installer và Desktop Icon phục vụ triển khai All-in-One theo: {spec_summary}.",
-        "ROLE-05": f"Kiểm thử tự động chu kỳ, Auto-Wake < 70ms, E2E test suite và nghiệm thu kỹ thuật theo: {spec_summary}.",
-        "ROLE-06": f"Kiểm toán bảo mật ranh giới Whitelist, cô lập OAuth PKCE RFC 7636 và bảo vệ Vault theo: {spec_summary}."
-    }
+    content = (content or "").strip()
+    if not content:
+        return {"error": "Thiếu nội dung đặc tả", "generated": {"roadmaps": 0, "todos": 0}}
+    spec_summary = " ".join(content[:250].split())
+    now_stamp = time.strftime("%Y-%m-%d %H:%M:%S")
+    role_instruction = f"Nguồn đặc tả SSOT (cập nhật {now_stamp}): {spec_summary}"
 
     with get_connection() as conn:
         cursor = conn.cursor()
-        
-        # 1. Cập nhật instruction các Role
-        for rid, inst in role_updates.items():
-            cursor.execute("UPDATE agent_roles SET instruction = ? WHERE id = ? AND project_id = ?", (inst, rid, project_id))
-            
+
+        # 1. Ghi trích đoạn đặc tả vào instruction của các role thật trong dự án (không câu chữ mẫu)
+        cursor.execute("UPDATE agent_roles SET instruction = ? WHERE project_id = ?", (role_instruction, project_id))
+        roles_updated = cursor.rowcount
+
         # 2. Cập nhật Master SSOT
         now_time = time.strftime("%H:%M")
         cursor.execute("""
@@ -3375,23 +3371,17 @@ def generate_structure_from_ssot(content, project_id="PRJ-GEN-WORKPLACE"):
             project_id, 
             "Bản Kế Hoạch Đang Chấp Hành (Active SSOT)", 
             spec_summary, 
-            "Input Chat Tổng & File Plan", 
+            "Input Chat Tổng & File Plan",
             now_time
         ))
-        
-        # 3. Ghi thông báo điều hành vào War Room
-        wr_body = f"👑 <strong>Genesis Orchestrator</strong>: Đã phân rã và đồng bộ thành công cấu trúc Roadmap, Todo DAG và Khóa Instruction cho toàn bộ 6 chuyên gia từ Nguồn SSOT của Ryan."
-        cursor.execute("""
-        INSERT INTO chat_messages (project_id, runtime_id, author, created_time, tag, body, react_json)
-        VALUES (?, 'war_room', 'Genesis Orchestrator', ?, 'Directive', ?, ?)
-        """, (project_id, time.strftime("%H:%M:%S"), wr_body, json.dumps(["🚀 Khởi động", "✅ Đồng bộ"], ensure_ascii=False)))
-        
         conn.commit()
 
     return {
-        "status": "success",
-        "roles_updated": len(role_updates),
-        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "status": "saved",
+        "generated": {"roadmaps": 0, "todos": 0},
+        "note": "Chỉ lưu đặc tả làm nguồn cho các vai; roadmap/todo chưa được sinh tự động",
+        "roles_updated": roles_updated,
+        "timestamp": now_stamp,
         "ssot_summary": spec_summary
     }
 
@@ -3569,11 +3559,20 @@ def get_workspace_files():
                 pass
     return sorted(file_list, key=lambda x: x["path"])
 
+def _sop_line_field(content, labels):
+    """Lấy giá trị dòng '- **<nhãn>**: ...' đầu tiên khớp 1 trong labels trong ROLE.md; không có → '' (không bịa)."""
+    import re
+    for label in labels:
+        m = re.search(r"-\s*\*\*" + label + r"\*\*\s*:\s*([^\n]+)", content, re.I)
+        if m:
+            return m.group(1).strip()
+    return ""
+
 def get_roles_sop():
     import re
     roles_dir = None
-    for p in ["/workspace/roles", "/app/repo/workspace/roles", "/app/repo/roles", "workspace/roles", "roles"]:
-        if os.path.isdir(p):
+    for p in [os.environ.get("GW_ROLES_DIR", ""), "/workspace/roles", "/app/repo/workspace/roles", "/app/repo/roles", "workspace/roles", "roles"]:
+        if p and os.path.isdir(p):
             roles_dir = p
             break
     
@@ -3596,6 +3595,10 @@ def get_roles_sop():
 
                 scope_match = re.search(r"-\s*\*\*Assigned\s*Scope\*\*:\s*`?([^`\n]+)`?", content, re.I)
                 scope = scope_match.group(1).strip() if scope_match else ""
+
+                # Luồng bàn giao: chỉ lấy từ ROLE.md ("Nhận từ"/"Input from", "Bàn giao cho"/"Output to"), không có → ""
+                input_from = _sop_line_field(content, [r"Nhận\s*từ", r"Input\s*from"])
+                output_to = _sop_line_field(content, [r"Bàn\s*giao\s*cho", r"Output\s*to"])
 
                 allowed = []
                 m_allow = re.search(r"\*\*Được\s*phép\s*chỉnh\s*sửa[^\n]*\*\*:\s*\n(.*?)(?=\n- \*\*|\n###|\Z)", content, re.I | re.DOTALL)
@@ -3624,6 +3627,8 @@ def get_roles_sop():
                     "title": title,
                     "mission": mission,
                     "scope": scope,
+                    "inputFrom": input_from,
+                    "outputTo": output_to,
                     "allowed": allowed if allowed else ["* (Toàn quyền)"],
                     "blocked": blocked if blocked else ["None"],
                     "checklist": checklist
