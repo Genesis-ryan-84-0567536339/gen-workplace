@@ -1,0 +1,18 @@
+# systemd --user unit cho gen-workplace (chạy từ thư mục repo đã checkout đúng commit).
+# Cài: mkdir -p ~/.config/systemd/user && cp scripts/gen-workplace.service ~/.config/systemd/user/
+#      systemctl --user daemon-reload && systemctl --user enable --now gen-workplace
+# Sửa WorkingDirectory nếu repo không nằm ở %h/LinuxDataA/gen-workplace.
+[Unit]
+Description=Gen-workplace control plane (python3 backend/main.py)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/LinuxDataA/gen-workplace
+ExecStart=/usr/bin/python3 backend/main.py
+Restart=on-failure
+RestartSec=3
+Environment=PORT=8888
+
+[Install]
+WantedBy=default.target

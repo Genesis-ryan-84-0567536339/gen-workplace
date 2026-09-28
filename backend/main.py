@@ -11,9 +11,12 @@ import json
 import time
 import subprocess
 import urllib.parse
+import re
+import traceback
 from pathlib import Path
 from http.server import SimpleHTTPRequestHandler, HTTPServer
 from socketserver import ThreadingMixIn
+import threading
 
 PORT = int(os.environ.get("PORT", 8888))
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -25,10 +28,92 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 # Tự động nạp SQLite DB Module & MCP Core
 sys.path.insert(0, str(BASE_DIR))
 try:
-    from backend import db, mcp_core
+    from backend import db, mcp_core, directive_guard
 except ImportError:
     import db
     import mcp_core
+    import directive_guard
+
+def render_oauth_callback_html(status_code, title, desc, profile_id, email=None):
+    is_success = (status_code == 200)
+    color = "#3ad18b" if is_success else "#f85149"
+    icon = "🎉" if is_success else "⚠️"
+    email_html = f'<div style="font-family:monospace;font-size:15px;background:#0d1117;padding:10px 14px;border-radius:6px;border:1px solid #30363d;margin:16px 0;color:#58a6ff;">{email}</div>' if email else ""
+
+    return f"""<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <title>{title} - Genesis Workplace</title>
+  <style>
+    body {{ background: #0b0f19; color: #e6edf3; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }}
+    .card {{ background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 32px; max-width: 480px; text-align: center; box-shadow: 0 12px 32px rgba(0,0,0,0.6); }}
+    .icon {{ font-size: 48px; margin-bottom: 12px; }}
+    h2 {{ color: {color}; margin-top: 0; font-size: 22px; }}
+    p {{ color: #8b949e; font-size: 14px; line-height: 1.6; margin: 12px 0; }}
+    .btn {{ display: inline-block; background: #238636; color: #fff; padding: 10px 24px; border-radius: 6px; text-decoration: none; font-weight: 600; margin-top: 18px; border: none; cursor: pointer; font-size: 14px; }}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">{icon}</div>
+    <h2>{title}</h2>
+    <p>{desc}</p>
+    {email_html}
+    <p style="font-size:12px;color:#6e7681">Mission Control OS đã tự động lưu trữ và đồng bộ token vào hồ sơ {profile_id}. Bạn có thể đóng tab này.</p>
+    <button class="btn" onclick="window.close()">Đóng Cửa Sổ Này</button>
+  </div>
+  <script>
+    if ({str(is_success).lower()}) {{
+      setTimeout(() => {{ try {{ window.close(); }} catch(e) {{}} }}, 3500);
+    }}
+  </script>
+</body>
+</html>"""
+
+OAUTH_STATE_RE = re.compile(r"^(owner_default|profile[0-9]{1,2})$")
+
+def handle_oauth_callback(handler, query):
+    """Xử lý chung callback Google OAuth (cổng 8085 và route dự phòng /oauth2callback): kiểm state, đổi code lấy token, trả HTML."""
+    code = query.get("code", [None])[0]
+    error = query.get("error", [None])[0]
+    state = query.get("state", [""])[0] or ""
+
+    if not OAUTH_STATE_RE.match(state):
+        html = render_oauth_callback_html(400, "Tham số state không hợp lệ", "Hồ sơ đích (state) phải là owner_default hoặc profileN.", "?")
+        status = 400
+    elif error:
+        html = render_oauth_callback_html(400, "Xác thực bị từ chối", f"Google thông báo lỗi: {error}", state)
+        status = 400
+    elif not code:
+        html = render_oauth_callback_html(400, "Thiếu Authorization Code", "Không nhận được mã ủy quyền từ Google OAuth.", state)
+        status = 400
+    else:
+        ok, msg, email = db.exchange_google_code_for_token(code, state)
+        if ok:
+            html = render_oauth_callback_html(200, "Xác thực Google thành công!", f"Hồ sơ <b>{state}</b> đã được kết nối với tài khoản:", state, email=email)
+            status = 200
+        else:
+            html = render_oauth_callback_html(500, "Lỗi trao đổi token Google", f"Không thể lưu token: {msg}", state)
+            status = 500
+    handler.send_response(status)
+    handler.send_header("Content-Type", "text/html; charset=utf-8")
+    handler.end_headers()
+    handler.wfile.write(html.encode("utf-8"))
+
+class OAuthCallbackHandler(SimpleHTTPRequestHandler):
+    def log_message(self, format, *args):
+        pass
+
+    def do_GET(self):
+        parsed = urllib.parse.urlparse(self.path)
+        if parsed.path == "/oauth2callback":
+            query = urllib.parse.parse_qs(parsed.query)
+            handle_oauth_callback(self, query)
+            return
+
+        self.send_response(404)
+        self.end_headers()
 
 class SwarmHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
@@ -50,7 +135,26 @@ class SwarmHandler(SimpleHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.end_headers()
 
+    def _guarded(self, handler):
+        """Chạy handler; exception chưa bắt → log traceback ra stderr và trả 500 JSON {"error": "<tên lỗi>"} thay vì ngắt kết nối."""
+        try:
+            handler()
+        except (BrokenPipeError, ConnectionResetError):
+            pass  # client đã đóng kết nối, không còn gì để trả
+        except Exception as e:
+            traceback.print_exc(file=sys.stderr)
+            try:
+                self._send_json(500, {"error": type(e).__name__, "detail": str(e)})
+            except Exception:
+                pass
+
     def do_GET(self):
+        self._guarded(self._handle_get)
+
+    def do_POST(self):
+        self._guarded(self._handle_post)
+
+    def _handle_get(self):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
         query = urllib.parse.parse_qs(parsed.query)
@@ -98,6 +202,31 @@ class SwarmHandler(SimpleHTTPRequestHandler):
 
         if path == "/api/mcp/auth/status":
             self._send_json(200, db.get_mcp_auth_status())
+            return
+
+        # 0.8. Nhật ký dispatch (agy thật chạy từ chatroom): GET /api/dispatch/log?limit=50 → {"items": [...], "count": n}
+        if path == "/api/dispatch/log":
+            limit = query.get("limit", ["50"])[0]
+            try:
+                items = db.get_dispatch_log(limit)
+                self._send_json(200, {"items": items, "count": len(items), "webhook_enabled": bool(os.environ.get("GW_EVENT_WEBHOOK_URL"))})
+            except Exception as e:
+                self._send_json(500, {"error": str(e)})
+            return
+
+        # 0.9. Nhật ký allowlist lệnh gửi vào tmux (audit)
+        if path == "/api/directive/audit":
+            limit = query.get("limit", ["100"])[0]
+            only_rejected = query.get("rejected", ["0"])[0] in ("1", "true")
+            try:
+                self._send_json(200, {"items": db.get_directive_audit(limit, only_rejected), "allow_all": directive_guard.allow_all_enabled()})
+            except Exception as e:
+                self._send_json(500, {"error": str(e)})
+            return
+
+        # OAuth Callback (Dự phòng cho cổng 8888 nếu redirect trỏ về cổng chính)
+        if path == "/oauth2callback":
+            handle_oauth_callback(self, query)
             return
 
         # 1. API Status
@@ -180,7 +309,7 @@ class SwarmHandler(SimpleHTTPRequestHandler):
                 g_q, a_q = db.get_quota_telemetry(profile_id)
                 self._send_json(200, {
                     "ok": True,
-                    "source": "log_telemetry_fallback",
+                    "source": "agy_probe_or_unknown",
                     "gemini": g_q,
                     "claude": a_q
                 })
@@ -308,7 +437,7 @@ class SwarmHandler(SimpleHTTPRequestHandler):
 
         # 19. API Gen Workplace Messages
         if path == "/api/gen/messages":
-            conv_id = query.get("conv_id", ["conv-gen-core-01"])[0]
+            conv_id = query.get("conv_id", [""])[0] or db.default_conv_id()
             msgs = db.get_gen_messages(conv_id)
             self._send_json(200, {"messages": msgs})
             return
@@ -330,21 +459,21 @@ class SwarmHandler(SimpleHTTPRequestHandler):
 
         # 22. API Gen Session Workspace Files (Quản lý File & Folder theo từng phiên)
         if path == "/api/gen/session/files":
-            conv_id = query.get("conv_id", ["conv-gen-core-01"])[0]
+            conv_id = query.get("conv_id", [""])[0] or db.default_conv_id()
             sess_files = db.get_gen_session_files(conv_id)
             self._send_json(200, sess_files)
             return
 
         # 23. API Gen Session Todos & Interactive Checklists (Kanban DAG chuyên dụng theo phiên)
         if path == "/api/gen/session/todos":
-            conv_id = query.get("conv_id", [query.get("conversation_id", ["conv-gen-core-01"])[0]])[0]
+            conv_id = query.get("conv_id", [query.get("conversation_id", [""])[0]])[0] or db.default_conv_id()
             todos = db.get_gen_session_todos(conv_id)
             self._send_json(200, {"todos": todos, "count": len(todos), "conversation_id": conv_id})
             return
 
         return super().do_GET()
 
-    def do_POST(self):
+    def _handle_post(self):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
         content_length = int(self.headers.get("Content-Length", 0))
@@ -439,6 +568,9 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             project_id = data.get("project_id", "PRJ-GEN-WORKPLACE")
             if todo_id and new_status:
                 success = db.update_todo_status(todo_id, new_status, project_id)
+                if not success:
+                    self._send_json(404, {"error": "Task not found", "id": todo_id})
+                    return
                 self._send_json(200, {"status": "updated", "id": todo_id, "new_status": new_status, "success": success})
             else:
                 self._send_json(400, {"error": "Missing id or status"})
@@ -487,10 +619,10 @@ class SwarmHandler(SimpleHTTPRequestHandler):
         if path == "/api/tmux/account":
             session_id = data.get("session_id")
             account_type = data.get("account_type", "owner_default")
-            account_label = data.get("account_label", "Mặc định (Owner Gmail)")
+            account_label = data.get("account_label", "")
             profile_dir = data.get("profile_dir", "")
             if session_id:
-                db.update_tmux_account(session_id, account_type, account_label, profile_dir)
+                account_label = db.update_tmux_account(session_id, account_type, account_label, profile_dir)
                 db.append_tmux_output(session_id, f"auth switch --account='{account_label}'", f"Đã chuyển cấu hình phiên sang: {account_label}")
                 self._send_json(200, {"status": "account_updated", "session_id": session_id, "account_label": account_label})
             else:
@@ -514,6 +646,12 @@ class SwarmHandler(SimpleHTTPRequestHandler):
                     elif s_row and s_row["status"] == "paused":
                         db.resume_tmux_session(session_id)
                         time.sleep(0.1)
+
+                allowed, reason = directive_guard.guard(session_id, command, key)
+                db.log_directive_audit(session_id, "http:/api/tmux/send", key or command, allowed, reason)
+                if not allowed:
+                    self._send_json(403, {"status": "rejected", "session_id": session_id, "reason": reason})
+                    return
 
                 tmux_success = False
                 payload = key if key else command
@@ -553,16 +691,29 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             })
             return
 
-        # 6.2. Truyền lệnh / Điều phối luồng làm việc đồng loạt cho 6 Agent Swarm
+        # 6.2. "Chạy Task này" (session_id) / "Chạy Toàn Bộ Swarm" (không session_id): lệnh agy thật cho task đang gán,
+        #      qua allowlist directive_guard. results = {sid: {status: dispatched|error, task_id, command, reason, ...}}
         if path == "/api/swarm/dispatch":
             project_id = data.get("project_id", "PRJ-GEN-WORKPLACE")
-            results = db.dispatch_swarm_workflow(project_id)
+            session_id = (data.get("session_id") or "").strip() or None
+            results = db.dispatch_swarm_workflow(project_id, session_id)
+            n_ok = sum(1 for r in results.values() if r.get("status") == "dispatched")
             self._send_json(200, {
-                "status": "dispatched",
+                "status": "dispatched" if n_ok else "error",
                 "project_id": project_id,
+                "session_id": session_id,
+                "dispatched_count": n_ok,
+                "error_count": len(results) - n_ok,
                 "results": results,
                 "time": time.strftime("%H:%M:%S")
             })
+            return
+
+        # 6.3. Kiểm tra quota bằng 1 lệnh agy thật (ghi quota_probe) (#6)
+        if path == "/api/quota/probe":
+            profile_id = (data.get("profile_id") or data.get("profile") or "owner_default").strip()
+            res = db.probe_quota(profile_id)
+            self._send_json(200, res)
             return
 
         # 7. Bắt đầu luồng đăng nhập OAuth cho Profile
@@ -589,6 +740,17 @@ class SwarmHandler(SimpleHTTPRequestHandler):
                 self._send_json(200, res)
             else:
                 self._send_json(400, {"error": "Missing profile_id or token_data"})
+            return
+
+        # 9.1. Kế thừa / Sao chép token OAuth từ Profile nguồn sang Profile đích
+        if path == "/api/oauth/clone":
+            src = data.get("source_id") or data.get("source_profile")
+            dst = data.get("target_id") or data.get("profile_id")
+            if src and dst:
+                res = db.clone_oauth_profile(src, dst)
+                self._send_json(200 if res.get("ok") else 400, res)
+            else:
+                self._send_json(400, {"error": "Missing source_id or target_id"})
             return
 
         # 10. Gán Profile OAuth cho Swarm Role
@@ -673,7 +835,7 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             self._send_json(200, res)
             return
 
-        # 17. Gửi tin nhắn vào War Room / Phòng Giao Ban Swarm (tự động phản hồi AI theo vai trò)
+        # 17. Gửi tin nhắn vào War Room / Phòng Giao Ban Swarm (@vai → agy thật chạy nền, xem db.post_warroom_message)
         if path == "/api/warroom/send":
             channel_id = data.get("channel_id", "war_room")
             prj_id = data.get("project_id", "PRJ-GEN-WORKPLACE")
@@ -705,13 +867,17 @@ class SwarmHandler(SimpleHTTPRequestHandler):
                 self._send_json(500, {"error": str(e)})
             return
 
-        # 19. AI Phân rã cấu trúc từ nguồn SSOT (Generate Roadmap, Todos, Roles from Source)
+        # 19. Lưu đặc tả SSOT làm nguồn cho các vai. KHÔNG sinh roadmap/todo (generated = 0), không tin War Room mẫu.
+        #     Frontend (generateFromSource) chỉ đọc key "state"; các key status/generated/note nói đúng việc đã làm.
         if path == "/api/ssot/generate":
             content = data.get("content", "")
             prj_id = data.get("project_id", "PRJ-GEN-WORKPLACE")
             res = db.generate_structure_from_ssot(content, prj_id)
+            if "error" in res:
+                self._send_json(400, res)
+                return
             state = db.get_full_state(prj_id)
-            self._send_json(200, {"status": "generated", "summary": res, "state": state})
+            self._send_json(200, {**res, "state": state})
             return
 
         # 20. Thẩm định sự kiện SSOT Event
@@ -735,7 +901,9 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             self._send_json(200, res)
             return
 
-        # 22. Trao đổi chỉ thị với Runtime Chuyên gia (Ghi DB + Chuyển Tmux)
+        # 22. Trao đổi chỉ thị với Runtime Chuyên gia: CHỈ lưu tin vào chat_messages theo runtime_id.
+        #     Không gửi gì vào tmux ở đây (trước đây echo tin qua send-keys không qua directive_guard → chạy được
+        #     $(...)/backtick trong shell worker). Muốn gõ vào tmux phải dùng /api/tmux/send (có allowlist + audit).
         if path == "/api/runtime/chat":
             message = data.get("message", "").strip()
             session_id = data.get("session_id", "gw-lead-agy")
@@ -750,12 +918,6 @@ class SwarmHandler(SimpleHTTPRequestHandler):
                     VALUES (?, ?, ?, ?, 'Directive', ?, '["✅ đã nhận"]')
                     """, (project_id, session_id, author, now_time, message))
                     conn.commit()
-                # Gửi lệnh vào tmux tương tác nếu phiên đang mở
-                try:
-                    escaped_msg = message.replace('"', '\\"')
-                    subprocess.run(["tmux", "send-keys", "-t", session_id, f'echo -e "\\033[1;36m[Ryan DIRECTIVE]\\033[0m: {escaped_msg}"', "C-m"], timeout=1.5)
-                except Exception:
-                    pass
                 self._send_json(200, {"status": "sent", "session_id": session_id, "time": now_time})
             else:
                 self._send_json(400, {"error": "Missing message"})
@@ -763,7 +925,7 @@ class SwarmHandler(SimpleHTTPRequestHandler):
 
         # 23. API Gen Workplace Chat
         if path == "/api/gen/chat":
-            conv_id = data.get("conv_id", "conv-gen-core-01")
+            conv_id = data.get("conv_id") or db.default_conv_id()
             author = data.get("author", "Ryan (Owner)")
             message = data.get("message", "").strip()
             model = data.get("model", "Gemini 3.1 Pro (High)")
@@ -788,7 +950,7 @@ class SwarmHandler(SimpleHTTPRequestHandler):
 
         # 24. API Gen Workplace Progressive Compaction
         if path == "/api/gen/compact":
-            conv_id = data.get("conv_id", "conv-gen-core-01")
+            conv_id = data.get("conv_id") or db.default_conv_id()
             model_from = data.get("model_from", "")
             model_to = data.get("model_to", "")
             manual = bool(data.get("manual", False))
@@ -912,9 +1074,20 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             checklist = data.get("checklist", [])
             evidence_ref = data.get("evidence_ref", "")
             owner_id = data.get("owner_id", "owner-ryan")
+            viec_ref = (data.get("viec_ref") or "").strip()
+            try:
+                order_idx = int(data.get("order_idx", 0) or 0)
+            except (TypeError, ValueError):
+                order_idx = 0
             if conv_id and title:
-                res = db.save_gen_session_todo(conv_id, todo_id, title, description, status, priority, assigned_agent, checklist, evidence_ref, owner_id)
-                self._send_json(200, res)
+                # Phiên không tồn tại → 400 (trước đây sqlite3.IntegrityError FOREIGN KEY không bắt → ngắt kết nối)
+                if not db.gen_conversation_exists(conv_id):
+                    self._send_json(400, {"error": f"Phiên chat không tồn tại: {conv_id}"})
+                    return
+                # Tạo mới (không có id / id chưa tồn tại) bắt buộc viec_ref khớp ^VIEC-[0-9]+$ → thiếu/sai trả 400
+                res = db.save_gen_session_todo(conv_id, todo_id, title, description, status, priority, assigned_agent, checklist,
+                                               evidence_ref, order_idx=order_idx, owner_id=owner_id, viec_ref=viec_ref)
+                self._send_json(400 if "error" in res else 200, res)
             else:
                 self._send_json(400, {"error": "Missing conv_id or title"})
             return
@@ -959,6 +1132,43 @@ class SwarmHandler(SimpleHTTPRequestHandler):
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
     daemon_threads = True
 
+def start_oauth_callback_server(port=8085):
+    """Khởi chạy server lắng nghe callback Google OAuth tại localhost:8085 trong background daemon thread."""
+    try:
+        cb_server = ThreadedHTTPServer(("127.0.0.1", port), OAuthCallbackHandler)
+        t = threading.Thread(target=cb_server.serve_forever, daemon=True, name="OAuthCallbackServer-8085")
+        t.start()
+        print(f"  Google OAuth Callback: http://127.0.0.1:{port}/oauth2callback (Active)")
+        return cb_server
+    except Exception as e:
+        print(f"  [Warning] Không thể mở cổng OAuth Callback {port}: {e}")
+        return None
+
+def start_reclaim_worker():
+    """Thread daemon gọi db.reclaim_stalled_tasks() mỗi GW_RECLAIM_INTERVAL_SEC giây (mặc định 300) để thu hồi task treo (#4)."""
+    try:
+        interval = max(5, int(os.environ.get("GW_RECLAIM_INTERVAL_SEC", "300")))
+    except ValueError:
+        interval = 300
+    try:
+        timeout = int(os.environ.get("GW_RECLAIM_TIMEOUT_SEC", str(interval)))
+    except ValueError:
+        timeout = interval
+
+    def _loop():
+        while True:
+            time.sleep(interval)
+            try:
+                res = db.reclaim_stalled_tasks(timeout)
+                print(f"[reclaim] thu hồi {res.get('reclaimed_count', 0)} task")
+            except Exception as e:
+                print(f"[reclaim] lỗi: {e}")
+
+    t = threading.Thread(target=_loop, daemon=True, name="TaskReclaimWorker")
+    t.start()
+    print(f"  Reclaim task treo: mỗi {interval}s (timeout {timeout}s)")
+    return t
+
 def main():
     print(f"==================================================")
     print(f"  GENESIS SWARM WORKPLACE - CONTROL PLANE DAEMON  ")
@@ -966,6 +1176,8 @@ def main():
     print(f"  Frontend: {FRONTEND_DIR}")
     print(f"  Data: {DATA_DIR}")
     print(f"  Database: SQLite 3 WAL + FTS5 Ready")
+    start_oauth_callback_server(8085)
+    start_reclaim_worker()
     print(f"==================================================")
     server = ThreadedHTTPServer(("0.0.0.0", PORT), SwarmHandler)
     try:

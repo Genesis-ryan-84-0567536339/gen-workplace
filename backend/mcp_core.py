@@ -17,8 +17,10 @@ sys.path.insert(0, str(BASE_DIR))
 
 try:
     from backend import db
+    from backend import directive_guard
 except ImportError:
     import db
+    import directive_guard
 
 MCP_SERVER_INFO = {
     "name": "gen-workplace",
@@ -53,6 +55,20 @@ TOOLS = [
         }
     },
     {
+        "name": "probe_quota",
+        "description": "Chạy 1 lệnh agy tối thiểu (--mode plan -p 'ping') với profile chỉ định để cập nhật quota từ kết quả gọi THẬT (ok / 429 rate_limited + giờ hồi). Kết quả được ghi vào bảng quota_probe và dùng cho get_live_quota.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "profile_id": {
+                    "type": "string",
+                    "description": "ID tài khoản / profile OAuth (mặc định 'owner_default').",
+                    "default": "owner_default"
+                }
+            }
+        }
+    },
+    {
         "name": "list_google_accounts",
         "description": "Liệt kê toàn bộ các tài khoản Google / OAuth profiles có trong hệ thống và trạng thái đăng nhập/hiệu lực của token.",
         "inputSchema": {
@@ -73,12 +89,7 @@ TOOLS = [
                 },
                 "account_id": {
                     "type": "string",
-                    "description": "ID profile tài khoản (vd: 'owner_default', 'profile1')."
-                },
-                "account_label": {
-                    "type": "string",
-                    "description": "Tên hiển thị nhãn tài khoản (vd: 'Ryan (Default)', 'Workspace Backup').",
-                    "default": ""
+                    "description": "ID profile tài khoản (vd: 'owner_default', 'profile1'). Nhãn hiển thị được tính tự động từ email thật của profile."
                 }
             },
             "required": ["account_id"]
@@ -181,7 +192,7 @@ TOOLS = [
     },
     {
         "name": "post_warroom_message",
-        "description": "Đăng tin nhắn hoặc chỉ thị vào phòng họp chung War Room Swarm All-Hands để toàn bộ các agent phối hợp.",
+        "description": "Đăng tin nhắn / chỉ thị vào phòng họp chung War Room. Tin có @backend, @frontend, @devops, @qa, @security hoặc @lead sẽ được chuyển cho agy thật của vai đó chạy nền (--mode plan, trong worktree riêng của vai) và trả lời thật xuất hiện trong kênh; không có @vai thì chỉ lưu.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -231,32 +242,34 @@ TOOLS = [
     # ---------------- Kanban & Task Governance ----------------
     {
         "name": "list_kanban_tasks",
-        "description": "Liệt kê danh sách nhiệm vụ Kanban trong phiên làm việc, kèm trạng thái (todo, in_progress, review, done), độ ưu tiên, danh sách checklist con, agent được giao và bằng chứng nghiệm thu.",
+        "description": "Liệt kê danh sách nhiệm vụ Kanban trong phiên làm việc, kèm trạng thái (todo, in_progress, review, done), độ ưu tiên, danh sách checklist con, agent được giao, viec_ref (mã việc Kho Ryan) và bằng chứng nghiệm thu.",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "conv_id": {
                     "type": "string",
-                    "description": "ID cuộc trò chuyện / phiên làm việc (mặc định 'conv-gen-core-01').",
-                    "default": "conv-gen-core-01"
+                    "description": "ID cuộc trò chuyện / phiên làm việc (bỏ trống = phiên gần nhất)."
                 }
             }
         }
     },
     {
         "name": "create_kanban_task",
-        "description": "Tạo nhiệm vụ mới trên bảng Kanban của phiên với checklist con và độ ưu tiên.",
+        "description": "Tạo nhiệm vụ mới trên bảng Kanban của phiên với checklist con và độ ưu tiên. BẮT BUỘC viec_ref = mã việc trong Kho Ryan (dạng VIEC-<số>, vd VIEC-12).",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "conv_id": {
                     "type": "string",
-                    "description": "ID phiên làm việc (mặc định 'conv-gen-core-01').",
-                    "default": "conv-gen-core-01"
+                    "description": "ID phiên làm việc (bỏ trống = phiên gần nhất)."
                 },
                 "title": {
                     "type": "string",
                     "description": "Tiêu đề nhiệm vụ."
+                },
+                "viec_ref": {
+                    "type": "string",
+                    "description": "Mã việc trong Kho Ryan, bắt buộc, khớp ^VIEC-[0-9]+$ (vd 'VIEC-12')."
                 },
                 "description": {
                     "type": "string",
@@ -278,7 +291,7 @@ TOOLS = [
                     "description": "Danh sách các đầu việc con (checklist items) dạng text."
                 }
             },
-            "required": ["title"]
+            "required": ["title", "viec_ref"]
         }
     },
     {
@@ -306,7 +319,7 @@ TOOLS = [
     },
     {
         "name": "complete_task",
-        "description": "Nghiệm thu hoàn tất nhiệm vụ với bằng chứng bắt buộc (evidence_ref như file log, commit hash, file path).",
+        "description": "Nghiệm thu hoàn tất nhiệm vụ với bằng chứng KIỂM ĐƯỢC: commit SHA có trong repo, đường dẫn file tồn tại, hoặc URL PR GitHub. Bằng chứng không kiểm được → lỗi, trạng thái không đổi.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -320,12 +333,12 @@ TOOLS = [
                 },
                 "evidence_ref": {
                     "type": "string",
-                    "description": "Bằng chứng nghiệm thu (đường dẫn file kết quả, commit hash, hoặc log tóm tắt)."
+                    "description": "Commit SHA (7-40 hex, có trong repo), đường dẫn file tồn tại (tuyệt đối / tương đối repo / ~/gw-reports/...), hoặc https://github.com/<owner>/<repo>/pull/<n>."
                 },
                 "verified_by": {
                     "type": "string",
-                    "description": "Người hoặc vai trò thẩm định nghiệm thu.",
-                    "default": "Lead Architect"
+                    "description": "Không còn dùng: hệ thống tự đặt 'git:commit' / 'file' / 'github:pr' theo loại bằng chứng.",
+                    "default": ""
                 }
             },
             "required": ["session_id", "task_id", "evidence_ref"]
@@ -339,8 +352,7 @@ TOOLS = [
             "properties": {
                 "conv_id": {
                     "type": "string",
-                    "description": "ID phiên làm việc (mặc định 'conv-gen-core-01').",
-                    "default": "conv-gen-core-01"
+                    "description": "ID phiên làm việc (bỏ trống = phiên gần nhất)."
                 },
                 "task_id": {
                     "type": "string",
@@ -372,8 +384,7 @@ TOOLS = [
                 },
                 "conv_id": {
                     "type": "string",
-                    "description": "ID phiên làm việc (mặc định 'conv-gen-core-01').",
-                    "default": "conv-gen-core-01"
+                    "description": "ID phiên làm việc (bỏ trống = phiên gần nhất)."
                 },
                 "model": {
                     "type": "string",
@@ -551,8 +562,7 @@ TOOLS = [
             "properties": {
                 "conv_id": {
                     "type": "string",
-                    "description": "ID phiên làm việc (mặc định 'conv-gen-core-01').",
-                    "default": "conv-gen-core-01"
+                    "description": "ID phiên làm việc (bỏ trống = phiên gần nhất)."
                 },
                 "path": {
                     "type": "string",
@@ -581,7 +591,7 @@ TOOLS = [
     },
     {
         "name": "get_system_status",
-        "description": "Lấy tổng thể trạng thái hệ thống: container runtime, kết nối SQLite, trạng thái SSOT, số lượng agent và thông tin dự án.",
+        "description": "Lấy tổng thể trạng thái hệ thống: tiến trình control plane trên host, kết nối SQLite, số lượng vai/runtime và thông tin dự án.",
         "inputSchema": {
             "type": "object",
             "properties": {}
@@ -676,11 +686,17 @@ def execute_tool(name: str, args: dict) -> dict:
                 g_q, a_q = db.get_quota_telemetry(profile_id)
                 data = {
                     "ok": True,
-                    "source": "log_telemetry_fallback",
+                    "source": "agy_probe_or_unknown",
                     "gemini": g_q,
                     "claude": a_q
                 }
             return {"content": [{"type": "text", "text": json.dumps(data, ensure_ascii=False, indent=2)}], "isError": False}
+
+        # 1b. probe_quota
+        if name == "probe_quota":
+            profile_id = args.get("profile_id", "owner_default")
+            res = db.probe_quota(profile_id)
+            return {"content": [{"type": "text", "text": json.dumps(res, ensure_ascii=False, indent=2)}], "isError": False}
 
         # 2. list_google_accounts
         if name == "list_google_accounts":
@@ -691,8 +707,7 @@ def execute_tool(name: str, args: dict) -> dict:
         if name == "switch_google_account":
             account_id = args.get("account_id")
             session_id = args.get("session_id", "gw-lead-agy")
-            account_label = args.get("account_label") or ("Mặc định (Owner Gmail)" if account_id == "owner_default" else f"Tài khoản {account_id}")
-            db.update_tmux_account(session_id, account_id, account_label)
+            account_label = db.update_tmux_account(session_id, account_id)
             db.append_tmux_output(session_id, f"auth switch --account='{account_label}'", f"Đã chuyển cấu hình phiên sang: {account_label}")
             return {"content": [{"type": "text", "text": json.dumps({"status": "account_updated", "session_id": session_id, "account_label": account_label}, ensure_ascii=False, indent=2)}], "isError": False}
 
@@ -716,6 +731,11 @@ def execute_tool(name: str, args: dict) -> dict:
             key = (args.get("key") or "").strip()
             if not session_id or not (command or key):
                 return {"content": [{"type": "text", "text": "Thiếu session_id hoặc (command/key)"}], "isError": True}
+
+            allowed, reason = directive_guard.guard(session_id, command, key)
+            db.log_directive_audit(session_id, "mcp:send_worker_directive", key or command, allowed, reason)
+            if not allowed:
+                return {"content": [{"type": "text", "text": json.dumps({"status": "rejected", "session_id": session_id, "reason": reason}, ensure_ascii=False, indent=2)}], "isError": True}
 
             payload = key if key else command
             tmux_success = False
@@ -742,7 +762,9 @@ def execute_tool(name: str, args: dict) -> dict:
 
         # 8. get_worker_terminal_output
         if name == "get_worker_terminal_output":
-            session_id = args.get("session_id")
+            session_id = (args.get("session_id") or "").strip()
+            if not session_id:
+                return {"content": [{"type": "text", "text": json.dumps({"error": "Thiếu session_id (vd gw-qa-agy)"}, ensure_ascii=False)}], "isError": True}
             lines = int(args.get("lines", 60))
             try:
                 res = subprocess.run(["tmux", "capture-pane", "-t", session_id, "-p", "-S", f"-{lines}"],
@@ -777,24 +799,29 @@ def execute_tool(name: str, args: dict) -> dict:
 
         # 11. list_kanban_tasks
         if name == "list_kanban_tasks":
-            conv_id = args.get("conv_id", "conv-gen-core-01")
+            conv_id = args.get("conv_id") or db.default_conv_id()
+            if not conv_id:
+                return {"content": [{"type": "text", "text": json.dumps({"error": "Chưa có phiên chat nào; truyền conv_id hoặc tạo phiên bằng create_conversation"}, ensure_ascii=False)}], "isError": True}
             todos = db.get_gen_session_todos(conv_id)
             return {"content": [{"type": "text", "text": json.dumps({"conversation_id": conv_id, "count": len(todos), "tasks": todos}, ensure_ascii=False, indent=2)}], "isError": False}
 
         # 12. create_kanban_task
         if name == "create_kanban_task":
-            conv_id = args.get("conv_id", "conv-gen-core-01")
+            conv_id = args.get("conv_id") or db.default_conv_id()
+            if not conv_id:
+                return {"content": [{"type": "text", "text": json.dumps({"error": "Chưa có phiên chat nào; truyền conv_id hoặc tạo phiên bằng create_conversation"}, ensure_ascii=False)}], "isError": True}
             title = args.get("title", "")
             desc = args.get("description", "")
             priority = args.get("priority", "high")
             assigned = args.get("assigned_agent", "Gen Core")
             raw_checklist = args.get("checklist") or []
+            viec_ref = (args.get("viec_ref") or "").strip()
             # Chuyển checklist strings thành dạng object nếu cần
             checklist_items = []
             for idx, c in enumerate(raw_checklist):
                 checklist_items.append({"id": f"chk-{int(time.time()*1000)}-{idx}", "text": str(c), "done": False})
-            res = db.save_gen_session_todo(conv_id, None, title, desc, "todo", priority, assigned, checklist_items, "", 0, "owner-ryan")
-            return {"content": [{"type": "text", "text": json.dumps(res, ensure_ascii=False, indent=2)}], "isError": False}
+            res = db.save_gen_session_todo(conv_id, None, title, desc, "todo", priority, assigned, checklist_items, "", 0, "owner-ryan", viec_ref=viec_ref)
+            return {"content": [{"type": "text", "text": json.dumps(res, ensure_ascii=False, indent=2)}], "isError": "error" in res}
 
         # 13. claim_task
         if name == "claim_task":
@@ -809,13 +836,14 @@ def execute_tool(name: str, args: dict) -> dict:
             session_id = args.get("session_id")
             task_id = args.get("task_id")
             evidence = args.get("evidence_ref")
-            verified_by = args.get("verified_by", "Lead Architect")
-            res = db.complete_task(session_id, task_id, evidence, verified_by, "PRJ-GEN-WORKPLACE")
+            res = db.complete_task(session_id, task_id, evidence, "", "PRJ-GEN-WORKPLACE")
             return {"content": [{"type": "text", "text": json.dumps(res, ensure_ascii=False, indent=2)}], "isError": "error" in res}
 
         # 15. update_task_checklist
         if name == "update_task_checklist":
-            conv_id = args.get("conv_id", "conv-gen-core-01")
+            conv_id = args.get("conv_id") or db.default_conv_id()
+            if not conv_id:
+                return {"content": [{"type": "text", "text": json.dumps({"error": "Chưa có phiên chat nào; truyền conv_id hoặc tạo phiên bằng create_conversation"}, ensure_ascii=False)}], "isError": True}
             task_id = args.get("task_id")
             item_id = args.get("item_id")
             done = bool(args.get("done"))
@@ -825,7 +853,9 @@ def execute_tool(name: str, args: dict) -> dict:
         # 16. gen_chat
         if name == "gen_chat":
             msg = args.get("message", "")
-            conv_id = args.get("conv_id", "conv-gen-core-01")
+            conv_id = args.get("conv_id") or db.default_conv_id()
+            if not conv_id:
+                return {"content": [{"type": "text", "text": json.dumps({"error": "Chưa có phiên chat nào; truyền conv_id hoặc tạo phiên bằng create_conversation"}, ensure_ascii=False)}], "isError": True}
             model = args.get("model", "Gemini 3.1 Pro (High)")
             author = args.get("author", "AI Agent")
             account = args.get("account", "owner_default")
@@ -890,8 +920,12 @@ def execute_tool(name: str, args: dict) -> dict:
 
         # 25. create_workspace_file
         if name == "create_workspace_file":
-            conv_id = args.get("conv_id", "conv-gen-core-01")
-            rel_path = args.get("path", "")
+            conv_id = args.get("conv_id") or db.default_conv_id()
+            if not conv_id:
+                return {"content": [{"type": "text", "text": json.dumps({"error": "Chưa có phiên chat nào; truyền conv_id hoặc tạo phiên bằng create_conversation"}, ensure_ascii=False)}], "isError": True}
+            rel_path = (args.get("path") or "").strip()
+            if not rel_path:
+                return {"content": [{"type": "text", "text": json.dumps({"error": "Thiếu path (đường dẫn tương đối trong phiên, vd docs/ghi-chu.md)"}, ensure_ascii=False)}], "isError": True}
             is_dir = bool(args.get("is_dir", False))
             content = args.get("content", "")
             res = db.create_gen_session_file(conv_id, rel_path, is_dir, content)
@@ -1009,7 +1043,7 @@ def handle_jsonrpc_request(req: dict) -> dict:
             sessions = db.get_tmux_sessions("PRJ-GEN-WORKPLACE")
             content_text = json.dumps(sessions, ensure_ascii=False)
         elif uri == "gen-workplace://kanban/tasks":
-            todos = db.get_gen_session_todos("conv-gen-core-01")
+            todos = db.get_gen_session_todos(db.default_conv_id())
             content_text = json.dumps(todos, ensure_ascii=False)
         else:
             return {

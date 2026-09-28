@@ -102,7 +102,9 @@ Không gian làm việc chính của Owner và Gen Core (`#gen_workplace`) đư�
 
 ## 4. HẠ TẦNG CONTAINER, PROCESS RUNNER & BẢO MẬT OAUTH
 
-### 4.1. Cấu Hình Docker Compose (`docker-compose.yml`)
+### 4.1. Cấu Hình Docker Compose (`docker-compose.yml`) — tham khảo, KHÔNG phải cách chạy hiện hành
+> Hiện tại app chạy trực tiếp trên host: `python3 backend/main.py` (systemd --user unit `scripts/gen-workplace.service`, cập nhật bằng `scripts/gw-update.sh`, DB tại `DATA_DIR`, mặc định `<repo>/data/gen-workplace.db`). Phiên tmux của các vai cũng chạy trên host (`tmux attach -t gw-<vai>-agy`). Phần dưới mô tả cấu hình Docker cũ để tham khảo.
+
 - **Dịch vụ:** `gen-workplace-app` chạy trên port `8888:8888`.
 - **Mounts quan trọng (tuân thủ cờ SELinux `:z`):**
   - `gen-workplace-data:/app/data:z`: Lưu trữ bền vững cơ sở dữ liệu SQLite.
@@ -125,7 +127,7 @@ def call_agy_cli_turn(conv_id, user_message, model=None, account="owner_default"
     # 5. Lưu conversation_id và cộng dồn token vào gen_conversations
 ```
 - Khi `call_agy_cli_turn` thành công: Tin nhắn trả về từ AI thật 100%, có đính kèm số token thực tế.
-- Nếu CLI bị timeout (>50s) hoặc bận: Tự động kích hoạt cơ chế Smart Fallback để bảo đảm trải nghiệm không bị gián đoạn.
+- Khi agy lỗi (429/quota, timeout `GW_AGY_CHAT_TIMEOUT_SEC`, không tìm thấy agy, thoát mã ≠ 0, response rỗng): KHÔNG tự sinh phản hồi. Tin lưu với tác giả `Gen (lỗi)`, nội dung `agy không trả lời: <lý do thật>. Không có phản hồi tự sinh.`, response `engine = "error"`, `error = true`, `error_code` (Issue #12). Orchestrator chat (`/api/orch/chat`) cũng gọi agy thật qua `conv-orchestrator` — không còn câu mẫu.
 
 ---
 
@@ -154,9 +156,9 @@ Mỗi vai trò vận hành trong một phiên Tmux riêng biệt bên trong cont
 |---|---|---|---|
 | `gw-lead-agy` | **Lead Architect** | `Gemini CLI (agy --effort high)` | Bảo tồn SSOT, phân rã DAG Roadmap/Todos, thẩm định bằng chứng, ký duyệt nghiệm thu. |
 | `gw-backend-agy` | **Backend & DB Specialist** | `Gemini CLI (agy --mode accept-edits)` | Quản trị SQLite WAL, REST API Control Plane, Task Mutex Lock, Process Runner kết nối CLI. |
-| `gw-frontend-agy` | **Frontend Specialist** | `Gemini CLI (agy)` | Giao diện Mission Control SPA (Nocturne Slate), quản trị trạng thái 3 cột, stream terminal. |
-| `gw-devops-agy` | **DevOps & Packaging** | `Gemini CLI (agy --agent devops)` | Docker Compose cờ `:z`, TUI installer, bash scripts, desktop icon launcher. |
-| `gw-qa-agy` | **QA Tester** | `Gemini CLI (agy)` | Tự động hóa kiểm thử cross-platform, test API /api/status, stress test, bảo đảm 0-error. |
+| `gw-frontend-agy` | **Frontend Specialist** | `Gemini CLI (agy)` | Giao diện console SPA (`frontend/index.html`), quản trị trạng thái 3 cột, stream terminal. |
+| `gw-devops-agy` | **DevOps & Packaging** | `Gemini CLI (agy --agent devops)` | Systemd unit, tmux, `scripts/gw-update.sh`, TUI installer, desktop icon launcher. |
+| `gw-qa-agy` | **QA Tester** | `Gemini CLI (agy)` | Kiểm thử bằng `scripts/test_*.py` (chạy không cần agy/tmux), test API /api/status, nghiệm thu có bằng chứng kiểm được. |
 | `gw-security-agy` | **Security Auditor** | `Codex Security CLI / agy` | Quét mã nguồn, bảo vệ Vault, cô lập token OAuth PKCE, kiểm toán lỗ hổng bảo mật. |
 
 ---
@@ -193,4 +195,9 @@ Mỗi vai trò vận hành trong một phiên Tmux riêng biệt bên trong cont
 - `GET /api/file/content?path=...`: Đọc nội dung tệp tin với bộ đếm dòng và định dạng code.
 - `POST /api/tmux/send`: Gửi lệnh hoặc phím điều khiển vào phiên chuyên gia Tmux.
 - `GET /api/tmux/sessions`: Lấy trạng thái và dòng output mới nhất của 6 chuyên gia Swarm.
-- `POST /api/task/claim` & `POST /api/task/complete`: Nhận và nghiệm thu nhiệm vụ kèm bằng chứng (Evidence Hash).
+- `POST /api/task/claim` & `POST /api/task/complete`: Nhận và nghiệm thu nhiệm vụ kèm bằng chứng kiểm được; `complete` trả thêm `viec_ref`, `webhook_sent` và bắn webhook `task_completed` (nếu `GW_EVENT_WEBHOOK_URL`).
+- `POST /api/gen/session/todos/save`: Tạo/sửa task Kanban của phiên; tạo mới bắt buộc `viec_ref` (`VIEC-<số>`, mã việc Kho Ryan) → thiếu/sai trả 400.
+- `POST /api/orch/chat`: Chỉ thị cho Orchestrator → agy thật (`conv-orchestrator`); lỗi → `Orchestrator (lỗi)` + lý do.
+- `POST /api/swarm/dispatch {project_id, session_id?}`: Chạy task đang gán của 1 hoặc 6 worker bằng lệnh `agy --mode plan -p 'Thực hiện task ...'` qua allowlist; worker không có task → lỗi rõ.
+- `GET /api/dispatch/log?limit=`: Nhật ký các lần agy chạy từ chatroom (`dispatch_log`).
+- Chi tiết hợp đồng API Issue #12: `docs/OPERATIONAL_GUIDE.md` mục 3.8.
