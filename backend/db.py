@@ -4660,6 +4660,48 @@ def create_gen_conversation(project_id="PRJ-GEN-WORKPLACE", title="Cuộc trò c
         conn.commit()
     return {"id": conv_id, "title": title, "model": model, "account": account, "active_tab": "files_repo", "active_file": "backend/main.py", "open_tabs": ["backend/main.py"], "active_evidence_id": "NOTE-01", "owner_id": owner_id}
 
+def find_gen_conversation_by_title(project_id, title, owner_id="owner-ryan"):
+    """Phiên mới nhất có đúng tiêu đề title (dùng lại phiên 'VIEC-<n>: ...' thay vì tạo trùng); không có → None."""
+    with get_connection() as conn:
+        row = conn.execute("""
+        SELECT id, title, model, account_profile, owner_id FROM gen_conversations
+        WHERE project_id = ? AND title = ? AND (owner_id = ? OR owner_id IS NULL)
+        ORDER BY updated_at DESC, id DESC LIMIT 1
+        """, (normalize_project_id(project_id), title, owner_id)).fetchone()
+    if not row:
+        return None
+    return {"id": row["id"], "title": row["title"], "model": row["model"], "account": row["account_profile"], "owner_id": row["owner_id"] or owner_id}
+
+LOG_MESSAGE_ROLES = ("assistant", "user")
+LOG_MESSAGE_MAX_LEN = 8000
+
+def log_gen_message(conv_id, content, role="assistant", author="AI Agent"):
+    """Ghi 1 tin tiến độ vào phiên (#19): CHỈ INSERT gen_messages + đẩy phiên lên đầu danh sách, không gọi agy/AI."""
+    conv_id = (conv_id or "").strip()
+    content = (content or "").strip()
+    role = (role or "assistant").strip().lower()
+    author = (author or "AI Agent").strip()[:120] or "AI Agent"
+    if not conv_id:
+        return {"error": "Thiếu conv_id (tạo phiên bằng create_conversation)"}
+    if not content:
+        return {"error": "Thiếu content"}
+    if len(content) > LOG_MESSAGE_MAX_LEN:
+        return {"error": f"content quá dài ({len(content)} > {LOG_MESSAGE_MAX_LEN} ký tự); ghi tóm tắt kèm link"}
+    if role not in LOG_MESSAGE_ROLES:
+        return {"error": f"role không hợp lệ '{role}' (chỉ nhận: {', '.join(LOG_MESSAGE_ROLES)})"}
+    with get_connection() as conn:
+        if not conn.execute("SELECT 1 FROM gen_conversations WHERE id = ?", (conv_id,)).fetchone():
+            return {"error": f"Không tìm thấy phiên '{conv_id}'"}
+        cur = conn.execute("""
+        INSERT INTO gen_messages (conversation_id, author, role, content, model, note_ids_json, owner_id)
+        VALUES (?, ?, ?, ?, '', '[]', 'owner-ryan')
+        """, (conv_id, author, role, content))
+        msg_id = cur.lastrowid
+        conn.execute("UPDATE gen_conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = ?", (conv_id,))
+        conn.commit()
+        created_at = conn.execute("SELECT created_at FROM gen_messages WHERE id = ?", (msg_id,)).fetchone()["created_at"]
+    return {"status": "logged", "message_id": msg_id, "conv_id": conv_id, "role": role, "author": author, "created_at": created_at}
+
 def update_gen_conversation_context(conv_id, active_tab=None, active_file=None, open_tabs=None, active_evidence_id=None):
     with get_connection() as conn:
         cursor = conn.cursor()
@@ -5718,7 +5760,7 @@ def verify_mcp_request_auth(headers=None, query=None, tool_name=None):
                 "quota": ["get_live_quota", "list_google_accounts", "switch_google_account", "get_oauth_login_url"],
                 "swarm": ["list_swarm_workers", "send_worker_directive", "manage_worker_lifecycle", "get_worker_terminal_output", "post_warroom_message", "get_warroom_messages", "wait_worker_result"],
                 "kanban": ["list_kanban_tasks", "create_kanban_task", "claim_task", "complete_task", "update_task_checklist"],
-                "chat": ["gen_chat", "list_conversations", "create_conversation", "get_conversation_messages", "compact_conversation"],
+                "chat": ["gen_chat", "list_conversations", "create_conversation", "log_session_message", "get_conversation_messages", "compact_conversation"],
                 "files": ["list_notes", "save_note", "delete_note", "read_workspace_file", "create_workspace_file", "list_workspace_files", "get_system_status"]
             }
             for p in perms:
