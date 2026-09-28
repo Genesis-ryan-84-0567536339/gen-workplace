@@ -13,6 +13,8 @@ Cho phép:
     có thể nối thêm đúng mẫu giao việc chuẩn:
         ... 2>&1 | tee ~/gw-reports/<file>.md; echo "=== XONG exit=${PIPESTATUS[0]} ==="
   - Alias tra cứu: gw-role, gw-status; gw-update [nhánh] (cập nhật app từ GitHub, scripts/gw-update.sh).
+  - Không nhận cờ --dangerously-skip-permissions trong lệnh agy (Issue #7): quyền ghi không hỏi chỉ có ở alias
+    agy-run của vai trong GW_AGY_WRITE_ROLES, và chỉ khi phiên tmux mở trong worktree riêng của vai.
   - Riêng phiên gw-oauth-login: chuỗi văn bản thuần (không ký tự điều khiển shell) để
     trả lời màn hình đăng nhập của agy.
 
@@ -31,6 +33,8 @@ OAUTH_LOGIN_SESSION = "gw-oauth-login"
 _PLAIN_TEXT_RE = re.compile(r"^[A-Za-z0-9 _./:?=&%@~+\-]+$")
 _REPORT_DIR_RE = re.compile(r"^(?:~|\$HOME|/home/[A-Za-z0-9_\-]+)/gw-reports/[A-Za-z0-9_\-.]+$")
 _ALLOWED_EXPANSIONS = {"$?", "${PIPESTATUS[0]}"}
+# Cờ bỏ qua hỏi quyền của agy: không bao giờ nhận qua directive (Issue #7)
+FORBIDDEN_AGY_FLAGS = {"--dangerously-skip-permissions"}
 _EXPANSION_RE = re.compile(r"\$\{[^}]*\}|\$[A-Za-z_?][A-Za-z0-9_]*")
 
 
@@ -128,6 +132,9 @@ def check_directive(session_id, command="", key=""):
     for tok in body:
         if tok in ("<", ">", ">>", "<<", ">&", "<&", "(", ")"):
             return False, f"Chuyển hướng/nhóm lệnh '{tok}' không được phép trong đoạn agy"
+        if tok.strip("'\"").split("=", 1)[0] in FORBIDDEN_AGY_FLAGS:
+            return False, (f"Cờ '{tok}' không được gửi qua directive; quyền ghi không hỏi chỉ bật qua GW_AGY_WRITE_ROLES "
+                           "(alias agy-run của vai đó, trong worktree riêng)")
 
     # Các đoạn nối tiếp: chỉ chấp nhận '| tee <~/gw-reports/...>' rồi '; echo "..."'
     rest = segments[1:]

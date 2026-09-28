@@ -151,6 +151,13 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             except Exception:
                 pass
 
+    def _handle_dispatch_wait(self, params):
+        """Chờ lần giao việc xong (tối đa 120s). 200 = done/failed/running; 400 = thiếu tham số; 404 = không tìm thấy."""
+        res = db.wait_worker_result(params.get("dispatch_id"), params.get("task_id", ""), params.get("session_id", ""),
+                                    params.get("timeout_sec", db.WAIT_WORKER_DEFAULT_SEC), params.get("project_id", "PRJ-GEN-WORKPLACE"))
+        code = {"error": 400, "not_found": 404}.get(res.get("status"), 200)
+        self._send_json(code, res)
+
     def do_GET(self):
         self._guarded(self._handle_get)
 
@@ -215,6 +222,11 @@ class SwarmHandler(SimpleHTTPRequestHandler):
                 self._send_json(200, {"items": items, "count": len(items), "webhook_enabled": bool(os.environ.get("GW_EVENT_WEBHOOK_URL"))})
             except Exception as e:
                 self._send_json(500, {"error": str(e)})
+            return
+
+        # 0.85. Chờ kết quả worker (#9): GET /api/dispatch/wait?dispatch_id=12&timeout_sec=60 (hoặc task_id= / session_id=)
+        if path == "/api/dispatch/wait":
+            self._handle_dispatch_wait({k: v[0] for k, v in query.items() if v})
             return
 
         # 0.9. Nhật ký allowlist lệnh gửi vào tmux (audit)
@@ -716,6 +728,11 @@ class SwarmHandler(SimpleHTTPRequestHandler):
                 "results": results,
                 "time": time.strftime("%H:%M:%S")
             })
+            return
+
+        # 6.25. Chờ kết quả worker (#9): POST /api/dispatch/wait {dispatch_id | task_id | session_id, timeout_sec}
+        if path == "/api/dispatch/wait":
+            self._handle_dispatch_wait(data if isinstance(data, dict) else {})
             return
 
         # 6.3. Kiểm tra quota bằng 1 lệnh agy thật (ghi quota_probe) (#6)

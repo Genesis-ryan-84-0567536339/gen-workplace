@@ -100,6 +100,10 @@ google-chrome --headless=new --virtual-time-budget=3000 --dump-dom http://localh
 | `GW_EVENT_WEBHOOK_URL` | (rỗng = tắt) | URL nhận POST JSON sự kiện `task_completed` / `dispatch_finished` (Issue #12, xem 3.8). |
 | `GW_ORCH_MODEL` | (rỗng → model mặc định của agy) | Model dùng cho Orchestrator chat (`/api/orch/chat`). |
 | `GW_AGY_CHAT_TIMEOUT_SEC` | `180` | Timeout một lượt agy cho chat Gen / Orchestrator. |
+| `GW_AGY_WRITE_ROLES` | (rỗng = không vai nào) | Vai được bật `--dangerously-skip-permissions` cho **alias `agy-run`** trong tmux, vd `backend,gw-devops-agy`. Chỉ có hiệu lực khi phiên tmux mở trong worktree riêng của vai; alias `agy` thường không bao giờ có cờ (Issue #7). |
+| `GW_AGY_PLAN_ALLOW` | `1` | War-room tự thêm quy tắc chỉ đọc vào `permissions.allow` của hồ sơ agy (xem 3.6). `0` = không đụng settings. |
+| `GW_WARROOM_SKIP_PERMISSIONS` | `0` | Lối thoát cuối nếu agy thật vẫn auto-denied dù đã có quy tắc: thêm `--dangerously-skip-permissions` cho lệnh war-room (`--mode plan`), **chỉ khi cwd là worktree riêng của vai**. Đánh đổi: lệnh shell agy chạy không bị hỏi. |
+| `GW_TMUX_WATCH_MAX_SEC` | `7200` | Thời gian tối đa thread nền theo dõi 1 lệnh giao qua tmux chờ dòng `=== XONG exit=N ===`. |
 
 ### 3.2. OAuth callback
 - Server callback cổng 8085 chỉ bind `127.0.0.1`; route dự phòng `/oauth2callback` trên cổng chính dùng chung `handle_oauth_callback()`.
@@ -124,7 +128,26 @@ Không đạt → `{"error": ...}` và trạng thái giữ nguyên. Lúc `init_d
 ### 3.6. Chatroom gọi agy thật (#3)
 Tin trong War Room có `@backend|@frontend|@devops|@qa|@security|@lead` → thread nền chạy
 `agy --gemini_dir=<profile của worker> --mode plan -p "<tin>"` (không `--sandbox`; timeout 15 phút) trong worktree riêng của vai; trả lời thật
-(tác giả = `gw-<vai>-agy`, body = output cắt 4000 ký tự + `exit=<code>`) được ghi vào `chat_messages`, kèm `dispatch_log` và báo cáo `~/gw-reports/warroom-<sid>-<ts>.md`. Tin không có `@vai` chỉ được lưu.
+(tác giả = `gw-<vai>-agy`, body = output cắt 4000 ký tự + `exit=<code>`) được ghi vào `chat_messages`, kèm `dispatch_log` và báo cáo `~/gw-reports/warroom-<sid>-<ts>-<dispatch_id>.md`. Tin không có `@vai` chỉ được lưu.
+
+- Tin trả lời có `reply_to` = id tin yêu cầu và `created_at` (ISO, đủ ngày giờ). `dispatch_log` có `request_msg_id` / `reply_msg_id`.
+- **Quyền agy trong `-p`** (không tương tác → tool cần quyền bị auto-denied): trước khi chạy, app thêm vào
+  `<hồ sơ>/antigravity-cli/settings.json` → `permissions.allow` các quy tắc chỉ đọc: `read_file(<worktree của vai>)` và
+  `command(ls|cat|head|tail|wc|grep|rg|pwd|tree|git status|git log|git diff|git show|git branch|git ls-files|git grep|git rev-parse)`.
+  Giữ nguyên các khóa khác; file hỏng thì không đụng; chạy lại không nhân đôi. Không cấp lệnh ghi/xóa. Nếu agy thật vẫn
+  auto-denied → bật `GW_WARROOM_SKIP_PERMISSIONS=1` (chỉ áp dụng trong worktree của vai).
+- agy thoát 0 nhưng output ngắn có `no output produced` / `auto-denied` (hoặc rỗng) → **failed** (tin trả lời ghi
+  `exit=0 (failed: agy bị từ chối quyền, không có kết quả)`).
+
+### 3.6b. Phiên tmux của vai (Issue #7)
+- `ensure_real_tmux_sessions` / `wake_tmux_session` mở phiên `gw-<vai>-agy` trong worktree riêng `<GW_WORKTREE_ROOT>/<session_id>`
+  (nhánh `wt/<session_id>`, cùng hàm `ensure_role_worktree` với war-room), không mở trong repo app. Chỉ tạo worktree khi `tmux -V` chạy được.
+- Alias `agy` = `agy --gemini_dir='<hồ sơ>'` (không skip-permissions). `agy-run` chỉ thêm cờ khi vai có trong `GW_AGY_WRITE_ROLES`
+  **và** cwd là worktree của vai. `update_tmux_account` dựng lại alias theo cùng luật.
+- `gw-status` in thêm `CWD`, `Branch` và trạng thái quyền ghi.
+- `directive_guard` từ chối mọi lệnh agy gửi qua directive có `--dangerously-skip-permissions`.
+- Phiên tmux đang chạy từ trước **không tự chuyển**: cần hibernate → wake (hoặc kill phiên để app mở lại) để vào worktree + alias mới.
+- Chat Gen / Orchestrator (`call_agy_cli_turn`, `agy --print`) vẫn dùng `--dangerously-skip-permissions` như cũ (không phải tmux, chạy trong thư mục phiên chat).
 
 ### 3.7. Kiểm thử không cần server / agy / tmux
 ```bash
@@ -136,6 +159,8 @@ python3 scripts/test_warroom_dispatch.py   # #3
 python3 scripts/test_no_fake_reply.py      # #12: không bịa câu trả lời, dispatch task thật, attach_cmd
 python3 scripts/test_purge_seed.py         # #12: bỏ seed + migration purge_seed_data()
 python3 scripts/test_viec_ref.py           # #12: viec_ref bắt buộc + webhook + /api/dispatch/log
+python3 scripts/test_wait_worker_result.py # #9: wait_worker_result, auto-denied → failed, reply_to, N tin mới nhất, tmux thật + webhook
+python3 scripts/test_agy_permissions.py    # #7: alias không skip-permissions, worktree cho tmux, quy tắc chỉ đọc
 ```
 
 ### 3.8. Issue #12 — gỡ toàn bộ dữ liệu / phản hồi giả (hợp đồng API cho frontend)
@@ -153,15 +178,20 @@ python3 scripts/test_viec_ref.py           # #12: viec_ref bắt buộc + webhoo
 | `POST /api/gen/session/todos/save` | Tạo mới (không `id` hoặc `id` chưa có) **bắt buộc `viec_ref`** khớp `^VIEC-[0-9]+$` (mã việc trong Kho Ryan). Thiếu/sai → **400** `{"error": "Thiếu viec_ref (mã việc trong Kho Ryan, vd VIEC-12)"}`. Sửa task: không gửi `viec_ref` thì giữ mã cũ. Nhận thêm `order_idx`. Response `{status, id, title, viec_ref, created}`. |
 | MCP `create_kanban_task` | Thêm tham số bắt buộc `viec_ref`; thiếu → `isError: true` cùng câu báo trên. `list_kanban_tasks` / `GET /api/gen/session/todos` trả `viec_ref` trong mỗi todo. |
 | `POST /api/task/complete` / MCP `complete_task` | Response thêm `viec_ref`, `webhook_sent`. |
-| `GET /api/dispatch/log?limit=50` | `{items: [{id, session_id, command, exit_code, report_path, started_at, finished_at, task_id, viec_ref, channel_id, webhook_sent}], count, webhook_enabled}` (mới nhất trước). |
+| `GET /api/dispatch/log?limit=50` | `{items: [{id, session_id, command, exit_code, report_path, started_at, finished_at, task_id, viec_ref, channel_id, webhook_sent, status, kind, summary, request_msg_id, reply_msg_id}], count, webhook_enabled}` (mới nhất trước). `id` = `dispatch_id`. `status` ∈ `running\|done\|failed` (dòng cũ trước #9: `''`), `kind` ∈ `warroom\|tmux`. Dòng được ghi `running` ngay lúc giao việc. |
+| MCP `post_warroom_message` / `POST /api/warroom/send` | Response thêm `dispatches: [{session_id, dispatch_id}]` (mỗi `@vai` một lần giao) và `user_message.created_at`. |
+| `POST /api/swarm/dispatch` (bổ sung #9) | Mỗi `results[sid]` thêm `dispatch_id` (int khi `tmux_real`, `null` khi tmux không nhận lệnh). Thread nền đọc pane tmux tới dòng `=== XONG exit=N ===` sau tên file báo cáo → chốt `done/failed` và bắn webhook `dispatch_finished` (không cần ai poll). |
+| MCP `wait_worker_result` | Tham số: `dispatch_id` (int) **hoặc** `task_id` **hoặc** `session_id` (lần giao mới nhất), `timeout_sec` (mặc định 60, tối đa 120). Chờ phía server (`threading.Condition` do chỗ ghi kết quả báo hiệu + đọc DB mỗi giây). Trả JSON: `{status: done\|failed\|running\|not_found\|error, dispatch_id, session_id, kind, exit_code, summary (≤2000 ký tự), report_path, task_id, viec_ref, task_status, evidence, started_at, finished_at, webhook_sent, request_msg_id, reply_msg_id, waited_sec, timeout_sec, hint?}`. Hết giờ → `running` + `hint` (gọi lại cùng `dispatch_id`). `not_found`/`error` → `isError: true`. Task đã `done` (qua `complete_task`) mà không có dispatch → `status: done, kind: task`. |
+| `GET /api/dispatch/wait?dispatch_id=12&timeout_sec=60` / `POST /api/dispatch/wait {dispatch_id\|task_id\|session_id, timeout_sec}` | Như MCP `wait_worker_result`. HTTP 200 (done/failed/running), 404 (`not_found`), 400 (thiếu tham số). |
+| `GET /api/warroom/messages` / MCP `get_warroom_messages` | Trả **N tin mới nhất** (trước đây là N tin cũ nhất), vẫn theo thứ tự tăng dần. Mỗi tin thêm `reply_to`, `created_at`. |
 | `GET /api/skills`, `/api/mcps`, `/api/vault/list` | Không còn danh sách giả; `/api/vault/list` liệt kê biến môi trường đang có hiệu lực + trạng thái đăng nhập từng OAuth profile (không lộ giá trị). |
 
 **Webhook sự kiện** (`GW_EVENT_WEBHOOK_URL`): POST JSON, timeout 5s, lỗi chỉ ghi log.
 ```json
 {"event": "task_completed | dispatch_finished", "project_id": "PRJ-GEN-WORKPLACE", "viec_ref": "VIEC-12",
- "task_id": "TSK-03", "session_id": "gw-backend-agy", "exit_code": 0, "report_path": "~/gw-reports/warroom-....md",
+ "task_id": "TSK-03", "session_id": "gw-backend-agy", "exit_code": 0, "status": "done | failed", "report_path": "~/gw-reports/warroom-....md",
  "evidence_ref": "<sha|file|PR url>", "verified_by": "git:commit", "at": "2026-09-28T09:00:00+07:00"}
 ```
-`task_completed` bắn khi `complete_task` thành công (`exit_code` = `null`); `dispatch_finished` bắn khi agy của chatroom chạy xong (`task_id`/`viec_ref` = task đang gán cho worker, có thể rỗng).
+`task_completed` bắn khi `complete_task` thành công (`exit_code` = `null`); `dispatch_finished` bắn khi agy của chatroom chạy xong (`task_id`/`viec_ref` = task đang gán cho worker, có thể rỗng), và khi lệnh giao qua `/api/swarm/dispatch` in dòng `=== XONG exit=N ===` (thread nền theo dõi pane, #9). `status` = `failed` cả khi `exit_code` = 0 nhưng agy bị auto-denied / không ra kết quả; `status` rỗng với `task_completed`.
 
 **Migration dữ liệu seed cũ:** `purge_seed_data()` chạy cuối `init_db()` (mỗi lần app khởi động), xóa đúng các bản ghi seed liệt kê trong `backend/seed_purge_list.json` (RM-01…05, TODO-01…13, NODE-01…06, runtime-01…06, SSOT-*-01…08, 17 mã catalog, EVT-01…05, 6 role memory, tin chat seed và các câu mẫu cũ của tác giả bot, phiên `conv-gen-core-01`/`conv-gen-builder` và dữ liệu con, TSK-* tiêu đề mẫu). Idempotent; log `[purge] xóa N bản ghi seed (bảng: ...)`. Bản ghi do người dùng tạo (kể cả trùng ID nhưng khác tiêu đề, hoặc tin người dùng trùng đầu câu mẫu) không bị xóa. Task `TODO-14…17` (nếu có trên máy chủ) không có trong code seed nào nên không nằm trong danh sách — xem `/api/state` sau khi cập nhật và xóa tay nếu là dữ liệu giả.
