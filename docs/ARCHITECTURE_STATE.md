@@ -54,7 +54,7 @@ Mỗi phiên chat ở Cột 1 sở hữu một không gian làm việc độc l�
 ├── conv-orchestrator/         <-- Phiên agy của Orchestrator chat (/api/orch/chat), tự tạo khi cần
 └── conv-2bec3f7f/             <-- Các phiên làm việc do người dùng tạo (id ngẫu nhiên conv-<8 hex>)
 ```
-> Từ Issue #12 không còn phiên mẫu `conv-gen-core-01` / `conv-gen-builder`, không còn tin nhắn, ghi chú hay TSK mẫu; DB mới chỉ có project, 6 vai, cấu hình tmux, hồ sơ owner và token MCP.
+> Từ Issue #12 không còn phiên mẫu `conv-gen-core-01` / `conv-gen-builder`, không còn tin nhắn, ghi chú hay TSK mẫu; DB mới chỉ có project, các vai đang dùng (4 vai từ 29/09), cấu hình tmux, hồ sơ owner và token MCP.
 
 Khi Sếp chọn một phiên ở Cột 1:
 - Cột 2 tự động tải danh sách tệp thuộc thư mục của phiên đó.

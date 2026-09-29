@@ -48,13 +48,13 @@ def count(table, where="1=1", params=()):
         return conn.execute(f"SELECT count(*) FROM {table} WHERE {where}", params).fetchone()[0]
 
 
-print("[1] DB mới: không còn seed giả, chỉ giữ project + 5 vai (security đã bỏ) + tmux_sessions + owner + mcp")
+print("[1] DB mới: không còn seed giả, chỉ giữ project + 4 vai (security, frontend đã bỏ) + tmux_sessions + owner + mcp")
 for tbl in ("roadmaps", "todos", "workflow_nodes", "agent_runtimes", "master_ssot", "catalog_references", "ssot_events",
             "role_memories", "chat_messages", "gen_conversations", "gen_messages", "gen_scratchpad_notes", "gen_session_todos"):
     check(f"{tbl} trống", count(tbl) == 0, f"{tbl}={count(tbl)}")
 check("projects có PRJ-GEN-WORKPLACE", count("projects", "id='PRJ-GEN-WORKPLACE'") == 1)
-check("agent_roles có 5 vai", count("agent_roles") == 5, str(count("agent_roles")))
-check("tmux_sessions có 5 phiên, không gán task seed", count("tmux_sessions") == 5 and count("tmux_sessions", "current_task_id != ''") == 0)
+check("agent_roles có 4 vai", count("agent_roles") == 4, str(count("agent_roles")))
+check("tmux_sessions có 4 phiên, không gán task seed", count("tmux_sessions") == 4 and count("tmux_sessions", "current_task_id != ''") == 0)
 check("owner_profiles có owner-ryan", count("owner_profiles", "id='owner-ryan'") == 1)
 check("mcp token master + setting", count("mcp_agent_tokens") == 1 and count("mcp_auth_settings") == 1)
 check("không còn hàm seed cũ", not any(hasattr(db, n) for n in ("seed_ssot_events", "seed_gen_workplace", "seed_session_default_todos")))
@@ -67,7 +67,7 @@ check("không còn khóa roadmap/todos/nodes/runtimes/kanban/ssot/roleMemory/cat
       not any(k in st for k in ("roadmap", "todos", "nodes", "runtimes", "kanban", "ssot", "roleMemory", "catalog", "refs", "events", "sourceText")),
       str(sorted(st.keys())))
 check("chỉ còn project/projects/roles/gen_session_todos", sorted(st.keys()) == ["gen_session_todos", "project", "projects", "roles"], str(sorted(st.keys())))
-check("roles 5", len(st["roles"]) == 5)
+check("roles 4", len(st["roles"]) == 4)
 check("get_gen_conversations rỗng", db.get_gen_conversations() == [])
 check("get_warroom_messages rỗng (không tự seed)", db.get_warroom_messages("war_room") == [] and db.get_warroom_messages("standup") == [] and count("chat_messages") == 0)
 check("get_orch_chat_messages rỗng", db.get_orch_chat_messages() == [])

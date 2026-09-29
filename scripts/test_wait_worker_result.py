@@ -161,8 +161,8 @@ check("tin trả lời ghi failed, không chỉ exit=0", "failed" in body and "t
 check("agy_output_denied bỏ qua câu trả lời dài có nhắc 'auto-denied'", db.agy_output_denied("x" * 3000 + " auto-denied") == "")
 os.environ["GW_AGY_BIN"] = AGY_OK
 os.environ["FAKE_AGY_EXIT"] = "3"
-res = db.post_warroom_message(message="@frontend build", author="Ryan (Owner)", wait=True)
-w = db.wait_worker_result(dispatch_id=did_of(res, "gw-frontend-agy"), timeout_sec=5)
+res = db.post_warroom_message(message="@qa build", author="Ryan (Owner)", wait=True)
+w = db.wait_worker_result(dispatch_id=did_of(res, "gw-qa-agy"), timeout_sec=5)
 check("exit 3 → failed, exit_code 3", w["status"] == "failed" and w["exit_code"] == 3, str(w)[:200])
 os.environ["FAKE_AGY_EXIT"] = "0"
 

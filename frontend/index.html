@@ -4986,7 +4986,7 @@ body.resizing-active, body.resizing-active * {
         <div class="pageHead">
           <div>
             <h1>Phòng giao ban</h1>
-            <p>Giao việc bằng @backend, @frontend, @devops, @qa, @lead; tin có @vai được chạy thật bằng agy và trả kết quả về đây. Mã TSK-n / VIEC-n trong tin bấm được để mở thẻ task.</p>
+            <p>Giao việc bằng @backend, @devops, @qa, @lead; tin có @vai được chạy thật bằng agy và trả kết quả về đây. Mã TSK-n / VIEC-n trong tin bấm được để mở thẻ task.</p>
           </div>
           <div class="actions">
             <button class="btn" onclick="loadWarRoomMessages(true)">↻ Làm mới kênh</button>
@@ -5047,21 +5047,10 @@ body.resizing-active, body.resizing-active * {
                   <div class="wrMemberAvatar">BE</div>
                   <div>
                     <strong style="color:var(--text)">Backend Specialist</strong>
-                    <div style="font-size:10px;color:var(--muted)">SQLite WAL & REST API</div>
+                    <div style="font-size:10px;color:var(--muted)">SQLite WAL, REST API & giao diện</div>
                   </div>
                 </div>
                 <button class="wrMentionBtn" onclick="insertWarRoomAt('@Backend ')">@Backend</button>
-              </div>
-
-              <div class="wrMemberCard">
-                <div class="wrMemberInfo">
-                  <div class="wrMemberAvatar">FE</div>
-                  <div>
-                    <strong style="color:var(--text)">Frontend Specialist</strong>
-                    <div style="font-size:10px;color:var(--muted)">Giao Diện & Live Workbench</div>
-                  </div>
-                </div>
-                <button class="wrMentionBtn" onclick="insertWarRoomAt('@Frontend ')">@Frontend</button>
               </div>
 
               <div class="wrMemberCard">
@@ -5139,7 +5128,7 @@ body.resizing-active, body.resizing-active * {
 
               <div id="wrDispatchStrip" class="wrDispatchStrip" style="display:none"></div>
               <div class="wrInputBox">
-                <textarea id="wrMessageInput" class="wrTextarea" placeholder="Gõ @backend, @frontend, @devops, @qa hoặc @lead rồi nêu việc; nhắc TSK-n để gắn tin vào task đó. Enter để gửi, Shift+Enter xuống dòng." onkeydown="handleWarRoomKeydown(event)"></textarea>
+                <textarea id="wrMessageInput" class="wrTextarea" placeholder="Gõ @backend, @devops, @qa hoặc @lead rồi nêu việc; nhắc TSK-n để gắn tin vào task đó. Enter để gửi, Shift+Enter xuống dòng." onkeydown="handleWarRoomKeydown(event)"></textarea>
                 <button class="wrSendBtn" id="wrSendBtn" onclick="sendWarRoomMessage()">Gửi</button>
               </div>
             </div>
@@ -5778,7 +5767,7 @@ body.resizing-active, body.resizing-active * {
                     <tr><td class="ref">FILE-02</td><td>install.sh</td><td>script</td><td>DevOps</td></tr>
                     <tr><td class="ref">FILE-03</td><td>installer_tui.py</td><td>script</td><td>DevOps + Backend</td></tr>
                     <tr><td class="ref">FILE-04</td><td>backend/main.py</td><td>code</td><td>Backend</td></tr>
-                    <tr><td class="ref">FILE-05</td><td>frontend/index.html</td><td>code</td><td>Frontend</td></tr>
+                    <tr><td class="ref">FILE-05</td><td>frontend/index.html</td><td>code</td><td>Backend</td></tr>
                     <tr><td class="ref">FILE-06</td><td>docker-compose.yml</td><td>config</td><td>DevOps</td></tr>
                     <tr><td class="ref">FILE-07</td><td>Dockerfile</td><td>config</td><td>DevOps</td></tr>
                     <tr><td class="ref">FILE-08</td><td>assets/icon.svg</td><td>asset</td><td>Design</td></tr>
@@ -6212,7 +6201,6 @@ body.resizing-active, body.resizing-active * {
             <option value="Gen Core" selected>Gen Core (Tổng Trợ Lý)</option>
             <option value="Lead Architect">Lead Architect (Agy CLI)</option>
             <option value="Backend & DB">Backend & DB Specialist (Claude Code)</option>
-            <option value="Frontend">Frontend Specialist (Cursor)</option>
             <option value="DevOps">DevOps & Packaging</option>
             <option value="QA Tester">QA Tester</option>
           </select>
@@ -6891,7 +6879,6 @@ function qTxt(v) { return (v === null || v === undefined || Number.isNaN(v)) ? '
 const ROLE_AVATARS = {
   'gw-lead-agy': 'LD',
   'gw-backend-agy': 'BE',
-  'gw-frontend-agy': 'FE',
   'gw-devops-agy': 'DO',
   'gw-qa-agy': 'QA'
 };
@@ -6914,7 +6901,7 @@ const ROLE_DETAILS = {
     title: 'Lead Architect (Chỉ Huy Kỹ Thuật)',
     mission: 'Điều phối, rà soát kế hoạch và kiểm bằng chứng trước khi nghiệm thu.',
     inputFrom: 'Nhận yêu cầu đề bài trực tiếp từ Ryan (Owner)',
-    outputTo: 'Chuyển giao Schema CSDL cho Backend & Khung giao diện cho Frontend',
+    outputTo: 'Chuyển giao Schema CSDL và khung giao diện cho Backend',
     checklist: [
       { text: 'Tiếp nhận đề bài và khóa SSOT (docs/SSOT_ORIGINAL_SPEC.md)', done: false },
       { text: 'Phân rã Roadmap tuần tự và tạo Todo list gắn depends_on', done: false },
@@ -6926,7 +6913,7 @@ const ROLE_DETAILS = {
     title: 'Backend & DB Specialist (Chuyên Gia CSDL & API)',
     mission: 'Thiết kế SQLite WAL, truy vấn FTS5 Catalog sub-ms, xây dựng RESTful APIs và Task Mutex.',
     inputFrom: 'Nhận mô hình dữ liệu & yêu cầu nghiệp vụ từ Lead Architect',
-    outputTo: 'Bàn giao Endpoint API cho Frontend UI & kịch bản kiểm thử cho QA Tester',
+    outputTo: 'Bàn giao Endpoint API, giao diện (frontend/index.html) & kịch bản kiểm thử cho QA Tester',
     checklist: [
       { text: 'Khởi tạo và duy trì SQLite WAL mode (/app/data/gen-workplace.db)', done: false },
       { text: 'Phát triển API Control Plane (/api/state, /api/task/claim, /api/task/complete)', done: false },
@@ -6934,22 +6921,10 @@ const ROLE_DETAILS = {
       { text: 'Nộp bằng chứng Git commit hash và test log cho Lead Architect', done: false }
     ]
   },
-  'gw-frontend-agy': {
-    title: 'Frontend Specialist (Chuyên Gia Giao Diện SPA)',
-    mission: 'Xây dựng giao diện Mission Control, đồng bộ thời gian thực, bảng điều khiển.',
-    inputFrom: 'Nhận REST API & JSON schema từ Backend Specialist',
-    outputTo: 'Bàn giao WebApp hoàn thiện cho QA Tester và Ryan nghiệm thu',
-    checklist: [
-      { text: 'Thiết kế giao diện 2 cột List+Detail & Tabs trực quan chuẩn giao diện chung', done: false },
-      { text: 'Đồng bộ trạng thái Quota song song (Gemini 3.8 + Claude Sonnet 4.6)', done: false },
-      { text: 'Tích hợp bảng điều khiển chuyên gia Live Workbench & Terminal trực tiếp', done: false },
-      { text: 'Kiểm tra cú pháp 0-error trên trình duyệt', done: false }
-    ]
-  },
   'gw-devops-agy': {
     title: 'DevOps & Packaging (Chuyên Gia Hạ Tầng & Đóng Gói)',
     mission: 'Container hóa Dockerfile/Compose với SELinux :z, viết kịch bản installer TUI và Desktop shortcut.',
-    inputFrom: 'Nhận mã nguồn từ Backend & Frontend Specialist',
+    inputFrom: 'Nhận mã nguồn từ Backend Specialist',
     outputTo: 'Bàn giao Container chạy ổn định và bộ cài đặt 1-command cho người dùng',
     checklist: [
       { text: 'Cấu hình Dockerfile & docker-compose.yml với cờ :z live mount', done: false },
@@ -11913,7 +11888,7 @@ const WARROOM_CHANNEL_META = {
   },
   handoff: {
     title: 'Hợp Đồng I/O & Bàn Giao Liên Vai Trò',
-    desc: 'Bàn giao hợp đồng schema API, mock data, artifact và test log giữa Backend, Frontend và QA.',
+    desc: 'Bàn giao hợp đồng schema API, mock data, artifact và test log giữa Lead, Backend và QA.',
     defaultTag: 'IO'
   }
 };
@@ -12166,10 +12141,9 @@ async function sendWarRoomMessage() {
 const HUB_ROLE_TEAMS = [
   { key: 'lead', name: 'Lead Architect', sid: 'gw-lead-agy', match: ['lead'] },
   { key: 'backend', name: 'Backend', sid: 'gw-backend-agy', match: ['backend'] },
-  { key: 'frontend', name: 'Frontend', sid: 'gw-frontend-agy', match: ['frontend'] },
   { key: 'devops', name: 'DevOps', sid: 'gw-devops-agy', match: ['devops', 'docker'] },
   { key: 'qa', name: 'QA', sid: 'gw-qa-agy', match: ['qa', 'test'] }
-  // security đã bỏ (29/09, #34): backend đánh dấu retired, @security trả lỗi rõ ràng
+  // security (#34) và frontend đã bỏ (29/09): backend đánh dấu retired, @security / @frontend trả lỗi rõ ràng; việc giao diện giao cho @backend
 ];
 const HUB_SID_ROLE = Object.fromEntries(HUB_ROLE_TEAMS.map(r => [r.sid, r.key]));
 let hubPendingFocus = null;

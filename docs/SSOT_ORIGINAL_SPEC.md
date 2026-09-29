@@ -41,7 +41,7 @@
   - *Cột 2*: **AI Sinh Ra &rarr; Roadmap**: Phân rã mục tiêu thành các giai đoạn (Milestones/Phases) có điều kiện tiên quyết và trạng thái (*Done, In Progress, Queued*).
   - *Cột 3*: **Todo List theo Roadmap**: Danh sách task chi tiết tương ứng với Phase đang chọn, gán Role phụ trách, phân định CLI và trạng thái.
 - **Hàng 02**: **Bảng Agent Roles & CLI Engine Selector**:
-  - Danh sách các Role chuyên trách: *Lead Architect / Orchestrator*, *Backend Specialist*, *Frontend Specialist*, *DevOps & Infra Engineer*, *QA Tester*, *Security Auditor* (vai Security Auditor đã bỏ từ 29/09 theo quyết định của Boss — VIEC-12, #34; phần đặc tả gốc giữ nguyên để tra cứu).
+  - Danh sách các Role chuyên trách: *Lead Architect / Orchestrator*, *Backend Specialist*, *Frontend Specialist*, *DevOps & Infra Engineer*, *QA Tester*, *Security Auditor* (vai Security Auditor (#34) và Frontend Specialist (#39) đã bỏ từ 29/09 theo quyết định của Boss — VIEC-12; việc giao diện giao cho Backend; phần đặc tả gốc giữ nguyên để tra cứu).
   - Owner trực tiếp lựa chọn loại CLI Engine phù hợp cho từng Role:
     - `Gemini CLI (agy)`
     - `Claude Code CLI`
