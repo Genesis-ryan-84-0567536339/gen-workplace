@@ -588,6 +588,22 @@ def init_db():
         );
         """)
 
+        # Trạng thái quota của từng hồ sơ agy theo nhóm model (gemini / claude) (#22): exhausted + reset_at (ISO tuyệt đối) khi agy trả 429;
+        # last_used_at để chọn hồ sơ dùng ít gần nhất khi tự chuyển tài khoản.
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS profile_quota_state (
+            profile_id TEXT NOT NULL,
+            family TEXT NOT NULL DEFAULT 'gemini',
+            exhausted INTEGER DEFAULT 0,
+            reset_at TEXT DEFAULT '',
+            reset_raw TEXT DEFAULT '',
+            last_status TEXT DEFAULT '',
+            last_used_at TEXT DEFAULT '',
+            updated_at TEXT DEFAULT '',
+            PRIMARY KEY (profile_id, family)
+        );
+        """)
+
         # Nhật ký điều phối tin @vai trong chatroom sang agy thật (#3)
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS dispatch_log (
@@ -603,7 +619,10 @@ def init_db():
         # status: running | done | failed ('' = dòng cũ, suy ra từ exit_code); kind: warroom | tmux; summary: kết quả rút gọn (#9)
         for col, col_type in [("task_id", "TEXT DEFAULT ''"), ("viec_ref", "TEXT DEFAULT ''"), ("channel_id", "TEXT DEFAULT ''"), ("webhook_sent", "INTEGER DEFAULT 0"),
                               ("status", "TEXT DEFAULT ''"), ("kind", "TEXT DEFAULT ''"), ("summary", "TEXT DEFAULT ''"),
-                              ("request_msg_id", "INTEGER"), ("reply_msg_id", "INTEGER")]:
+                              ("request_msg_id", "INTEGER"), ("reply_msg_id", "INTEGER"),
+                              # tự chuyển tài khoản khi hết quota (#22): hồ sơ gán cho vai, hồ sơ chạy thật, lý do, các hồ sơ đã thử (JSON)
+                              ("profile_initial", "TEXT DEFAULT ''"), ("profile_used", "TEXT DEFAULT ''"),
+                              ("fallback_reason", "TEXT DEFAULT ''"), ("profiles_tried", "TEXT DEFAULT ''")]:
             try:
                 cursor.execute(f"ALTER TABLE dispatch_log ADD COLUMN {col} {col_type};")
             except Exception:
@@ -1131,6 +1150,13 @@ def get_oauth_profiles():
             "has_refresh": has_refresh,
             "assigned_roles": assigned_map.get(pid, [])
         })
+    # Trạng thái hết quota từng hồ sơ (#22) cho màn tài khoản / quota
+    for item in results:
+        st = get_profile_quota_state(item["id"], "gemini")
+        st_c = get_profile_quota_state(item["id"], "claude")
+        item.update({"exhausted": st["exhausted"], "reset_at": st["reset_at"], "reset_at_label": st["reset_at_label"],
+                     "quota_last_status": st["last_status"], "last_used_at": st["last_used_at"],
+                     "claude_exhausted": st_c["exhausted"], "claude_reset_at": st_c["reset_at"]})
 
     return results
 
@@ -1497,10 +1523,17 @@ def _agy_env(p_dir):
         env["ANTIGRAVITY_APP_DATA_DIR"] = os.path.join(p_dir, "antigravity-cli")
     return env
 
+AGY_QUOTA_ONLY_MAX_LEN = 600
+
 def classify_agy_result(returncode, output):
     """Phân loại kết quả 1 lần gọi agy: ('ok', ''), ('rate_limited', reset) khi 429/RESOURCE_EXHAUSTED, ('error', '') còn lại."""
     out = output or ""
     if returncode == 0:
+        # agy đôi khi thoát 0 mà chỉ in lỗi hết quota: output ngắn + cụm lỗi rõ ràng → vẫn là hết quota (#22).
+        # Câu trả lời thật (dài) có nhắc tới các cụm này không bị đánh nhầm.
+        if len(out.strip()) <= AGY_QUOTA_ONLY_MAX_LEN and re.search(r"RESOURCE_EXHAUSTED|Individual quota reached", out):
+            m = re.search(r"Resets? (?:in|at) ([^\n\"]{1,40})", out)
+            return "rate_limited", (m.group(1).strip() if m else "")
         return "ok", ""
     if re.search(r"RESOURCE_EXHAUSTED|Individual quota reached|\b429\b|quota (exceeded|reached|exhausted)", out, re.IGNORECASE):
         m = re.search(r"Resets? (?:in|at) ([^\n\"]{1,40})", out)
@@ -1520,9 +1553,251 @@ def record_quota_probe(profile_id, model, status, reset_at="", raw=""):
 def record_quota_probe_from_result(profile_id, model, res):
     """Ghi quota_probe từ CompletedProcess của agy (dùng chung cho runner chat, probe và dispatch)."""
     output = ((res.stdout or "") + "\n" + (res.stderr or "")).strip()
-    status, reset_at = classify_agy_result(res.returncode, output)
+    return record_quota_probe_output(profile_id, model, res.returncode, output)
+
+def record_quota_probe_output(profile_id, model, returncode, output):
+    """Phân loại output agy (returncode + text), ghi quota_probe và trạng thái hồ sơ; trả (status, reset_raw)."""
+    status, reset_at = classify_agy_result(returncode, output)
     record_quota_probe(profile_id, model, status, reset_at, output)
+    # Trạng thái hồ sơ (#22): 429 → exhausted tới reset_at; OK → hết exhausted; mọi lần → last_used_at
+    family = quota_family(model)
+    if status == "rate_limited":
+        mark_profile_exhausted(profile_id, reset_at, family)
+    else:
+        mark_profile_used(profile_id, status, family)
     return status, reset_at
+
+# ---------------------------------------------------------------------------
+# Tự chuyển tài khoản agy khi hồ sơ hết quota (Issue #22)
+# ---------------------------------------------------------------------------
+# Không đọc được giờ hồi ("Resets in …") → coi như hết quota trong khoảng này rồi cho thử lại
+QUOTA_UNKNOWN_RESET_SEC = int(os.environ.get("GW_QUOTA_UNKNOWN_RESET_SEC", "3600") or 3600)
+_RESET_PART_RE = re.compile(r"(\d+)\s*(d(?:ays?)?|h(?:ours?|rs?)?|m(?:in(?:ute)?s?)?|s(?:ec(?:ond)?s?)?)(?![a-z])", re.IGNORECASE)
+
+
+def quota_family(model):
+    """Nhóm quota của model agy: 'claude' (claude/sonnet/opus) hoặc 'gemini' (còn lại, gồm 'default' của dispatch)."""
+    m = (model or "").lower()
+    return "claude" if any(k in m for k in ("claude", "sonnet", "opus")) else "gemini"
+
+
+def parse_quota_reset(reset_raw, now=None):
+    """'76h11m' / '1h5m' / '45m' / '2d3h' / '30s' → datetime tuyệt đối (now + khoảng); chuỗi ISO → datetime đó; không đọc được → None."""
+    raw = (reset_raw or "").strip().rstrip(".")
+    if not raw:
+        return None
+    now = now or datetime.now().astimezone()
+    parts = _RESET_PART_RE.findall(raw)
+    if parts:
+        secs = 0
+        for num, unit in parts:
+            u = unit[0].lower()
+            secs += int(num) * {"d": 86400, "h": 3600, "m": 60, "s": 1}[u]
+        return now + timedelta(seconds=secs)
+    try:
+        dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        return dt if dt.tzinfo else dt.astimezone()
+    except Exception:
+        return None
+
+
+def _parse_iso(value):
+    try:
+        dt = datetime.fromisoformat((value or "").replace("Z", "+00:00"))
+        return dt if dt.tzinfo else dt.astimezone()
+    except Exception:
+        return None
+
+
+def format_reset_time(iso_value):
+    """ISO → 'HH:MM dd/mm/yyyy' giờ máy chủ; rỗng / hỏng → 'chưa rõ'."""
+    dt = _parse_iso(iso_value)
+    return dt.astimezone().strftime("%H:%M %d/%m/%Y") if dt else "chưa rõ"
+
+
+def _upsert_profile_state(profile_id, family="gemini", **fields):
+    profile_id = profile_id or "owner_default"
+    fields["updated_at"] = _now_iso()
+    cols = ", ".join(fields)
+    marks = ", ".join("?" for _ in fields)
+    sets = ", ".join(f"{k} = excluded.{k}" for k in fields)
+    try:
+        with get_connection() as conn:
+            conn.execute(f"INSERT INTO profile_quota_state (profile_id, family, {cols}) VALUES (?, ?, {marks}) "
+                         f"ON CONFLICT(profile_id, family) DO UPDATE SET {sets}", (profile_id, family or "gemini", *fields.values()))
+            conn.commit()
+    except Exception as e:
+        print(f"[quota_state] Không ghi được {profile_id}: {e}")
+
+
+def mark_profile_exhausted(profile_id, reset_raw="", family="gemini"):
+    """Đánh dấu hồ sơ hết quota tới reset_at (tính từ 'Resets in XhYm'; không rõ → +QUOTA_UNKNOWN_RESET_SEC). Trả reset_at ISO."""
+    now = datetime.now().astimezone()
+    reset_dt = parse_quota_reset(reset_raw, now) or (now + timedelta(seconds=QUOTA_UNKNOWN_RESET_SEC))
+    reset_iso = reset_dt.isoformat(timespec="seconds")
+    _upsert_profile_state(profile_id, family, exhausted=1, reset_at=reset_iso, reset_raw=reset_raw or "",
+                          last_status="rate_limited", last_used_at=now.isoformat(timespec="seconds"))
+    return reset_iso
+
+
+def mark_profile_used(profile_id, status, family="gemini"):
+    """Ghi lần dùng hồ sơ; chạy OK → xóa trạng thái exhausted."""
+    now = _now_iso()
+    if status == "ok":
+        _upsert_profile_state(profile_id, family, exhausted=0, reset_at="", reset_raw="", last_status=status, last_used_at=now)
+    else:
+        _upsert_profile_state(profile_id, family, last_status=status or "", last_used_at=now)
+
+
+def get_profile_quota_state(profile_id, family="gemini"):
+    """{profile_id, family, exhausted (đã tính: chỉ true khi chưa tới reset_at), reset_at, reset_at_label, reset_raw, last_status, last_used_at}."""
+    profile_id = profile_id or "owner_default"
+    family = family or "gemini"
+    row = None
+    try:
+        with get_connection() as conn:
+            row = conn.execute("SELECT * FROM profile_quota_state WHERE profile_id = ? AND family = ?", (profile_id, family)).fetchone()
+    except Exception:
+        row = None
+    st = {"profile_id": profile_id, "family": family, "exhausted": False, "reset_at": "", "reset_at_label": "", "reset_raw": "",
+          "last_status": "", "last_used_at": ""}
+    if not row:
+        return st
+    st.update({"reset_raw": row["reset_raw"] or "", "last_status": row["last_status"] or "", "last_used_at": row["last_used_at"] or ""})
+    reset_dt = _parse_iso(row["reset_at"])
+    if row["exhausted"] and reset_dt and reset_dt > datetime.now().astimezone():
+        st.update({"exhausted": True, "reset_at": row["reset_at"], "reset_at_label": format_reset_time(row["reset_at"])})
+    return st
+
+
+def available_agy_profiles(exclude=(), oauth_profiles=None, family="gemini"):
+    """
+    Hồ sơ agy dùng được để chạy thay: đã đăng nhập OAuth, không exhausted (hoặc đã qua reset_at), không nằm trong exclude.
+    Thứ tự: lần gần nhất không lỗi (ok / chưa dùng) trước, rồi dùng ít gần nhất (LRU; chưa dùng lần nào đứng đầu).
+    Trả [(profile_id, p_dir)].
+    """
+    exclude = set(exclude or ())
+    profs = oauth_profiles if oauth_profiles is not None else get_oauth_profiles()
+    ranked = []
+    for p in profs:
+        pid = p.get("id")
+        if not pid or pid in exclude or not p.get("is_auth"):
+            continue
+        st = get_profile_quota_state(pid, family)
+        if st["exhausted"]:
+            continue
+        penalty = 1 if st["last_status"] in ("error", "timeout") else 0
+        ranked.append(((penalty, st["last_used_at"] or "", pid), pid, p.get("path") or _profile_dir(pid)))
+    ranked.sort(key=lambda x: x[0])
+    return [(pid, path) for _, pid, path in ranked]
+
+
+def earliest_quota_reset(profile_ids, family="gemini"):
+    """(reset_at ISO sớm nhất, profile_id) trong các hồ sơ đang exhausted; không có → ('', '')."""
+    best = ("", "")
+    best_dt = None
+    for pid in dict.fromkeys(profile_ids or ()):
+        st = get_profile_quota_state(pid, family)
+        dt = _parse_iso(st["reset_at"]) if st["exhausted"] else None
+        if dt and (best_dt is None or dt < best_dt):
+            best_dt, best = dt, (st["reset_at"], pid)
+    return best
+
+
+def run_agy_with_quota_fallback(primary_id, primary_dir, attempt, family="gemini"):
+    """
+    Chạy 1 lệnh agy với hồ sơ của vai; hết quota → tự chạy lại với hồ sơ khác còn quota (#22). Fallback chỉ cho lần chạy này,
+    không đổi gán tài khoản của vai.
+      attempt(profile_id, p_dir) → (status, reset_raw, payload); status như classify_agy_result ('ok' | 'rate_limited' | 'error' | 'timeout').
+    - Hồ sơ gán cho vai đang exhausted, chưa tới reset_at → bỏ qua luôn (không tốn 1 lần gọi hỏng).
+    - Chỉ chuyển hồ sơ khi hết quota; lỗi khác dừng lại, trả lỗi đó. Tối đa N lần = số hồ sơ khả dụng.
+    Trả {status, payload, profile_initial, profile_used, fallback, all_exhausted, earliest_reset, earliest_profile, attempts, note}.
+    """
+    primary_id = primary_id or "owner_default"
+    attempts = []
+    tried = []
+    last = ("", None, "")          # (status, payload, profile_id)
+
+    def _run(pid, pdir):
+        if pid != primary_id:
+            copy_agy_allow_rules(primary_dir, pdir)   # giữ allow-rule của vai trên hồ sơ mới trước khi chạy
+        status, reset_raw, payload = attempt(pid, pdir)
+        tried.append(pid)
+        st = get_profile_quota_state(pid, family)
+        if status == "rate_limited" and not st["exhausted"]:
+            mark_profile_exhausted(pid, reset_raw, family)
+            st = get_profile_quota_state(pid, family)
+        attempts.append({"profile": pid, "status": status, "reset_at": st["reset_at"] if status == "rate_limited" else ""})
+        return status, payload
+
+    pst = get_profile_quota_state(primary_id, family)
+    if pst["exhausted"]:
+        tried.append(primary_id)
+        attempts.append({"profile": primary_id, "status": "skipped_exhausted", "reset_at": pst["reset_at"]})
+    else:
+        status, payload = _run(primary_id, primary_dir)
+        last = (status, payload, primary_id)
+    oauth = None
+    while last[0] in ("", "rate_limited"):
+        if oauth is None:
+            oauth = get_oauth_profiles()
+        cands = available_agy_profiles(exclude=tried, oauth_profiles=oauth, family=family)
+        if not cands:
+            break
+        pid, pdir = cands[0]
+        status, payload = _run(pid, pdir)
+        last = (status, payload, pid)
+
+    status, payload, used = last
+    all_exhausted = status in ("", "rate_limited")
+    out_of_quota = [a for a in attempts if a["status"] in ("rate_limited", "skipped_exhausted")]
+
+    def _desc(a):
+        return f"{a['profile']} (hết quota, có lại lúc {format_reset_time(a['reset_at'])}" + \
+               ("; bỏ qua, không gọi" if a["status"] == "skipped_exhausted" else "") + ")"
+
+    earliest, earliest_pid = "", ""
+    if all_exhausted:
+        auth_ids = [p["id"] for p in (oauth or get_oauth_profiles()) if p.get("is_auth")]
+        earliest, earliest_pid = earliest_quota_reset(auth_ids + tried, family)
+        note = (f"tất cả tài khoản hết quota, sớm nhất có lại lúc {format_reset_time(earliest)}"
+                + (f" ({earliest_pid})" if earliest_pid else "")
+                + (f"; đã thử: {', '.join(_desc(a) for a in out_of_quota)}" if out_of_quota else ""))
+    elif used != primary_id:
+        first = out_of_quota[0]
+        others = out_of_quota[1:]
+        note = f"đã chuyển từ {_desc(first)} sang {used}" + (f"; cũng hết quota: {', '.join(_desc(a) for a in others)}" if others else "")
+    else:
+        note = ""
+    return {"status": status or "rate_limited", "payload": payload, "profile_initial": primary_id, "profile_used": used or "",
+            "fallback": bool(used) and used != primary_id, "all_exhausted": all_exhausted,
+            "earliest_reset": earliest, "earliest_profile": earliest_pid, "attempts": attempts,
+            "profiles_tried": list(tried), "note": note}
+
+
+def select_agy_profile_for_run(primary_id, primary_dir, tried=(), family="gemini"):
+    """
+    Chọn hồ sơ cho lần chạy không chờ kết quả tại chỗ (giao task qua tmux) (#22): hồ sơ gán cho vai nếu chưa exhausted và chưa thử,
+    không thì hồ sơ khả dụng tốt nhất. Trả {profile_id, p_dir, note, all_exhausted, earliest_reset}; hết hồ sơ → profile_id None.
+    """
+    primary_id = primary_id or "owner_default"
+    tried = list(dict.fromkeys(tried or ()))
+    pst = get_profile_quota_state(primary_id, family)
+    if primary_id not in tried and not pst["exhausted"]:
+        return {"profile_id": primary_id, "p_dir": primary_dir, "note": "", "all_exhausted": False, "earliest_reset": ""}
+    oauth = get_oauth_profiles()
+    exclude = set(tried) | {primary_id}
+    cands = available_agy_profiles(exclude=exclude, oauth_profiles=oauth, family=family)
+    out_of_quota = [pid for pid in dict.fromkeys([primary_id] + tried) if get_profile_quota_state(pid, family)["exhausted"]]
+    desc = ", ".join(f"{pid} (hết quota, có lại lúc {get_profile_quota_state(pid, family)['reset_at_label']}"
+                     + ("" if pid in tried else "; bỏ qua, không gọi") + ")" for pid in out_of_quota)
+    if cands:
+        pid, pdir = cands[0]
+        return {"profile_id": pid, "p_dir": pdir, "note": f"đã chuyển từ {desc or primary_id} sang {pid}",
+                "all_exhausted": False, "earliest_reset": ""}
+    earliest, epid = earliest_quota_reset([p["id"] for p in oauth if p.get("is_auth")] + [primary_id] + tried, family)
+    note = f"tất cả tài khoản hết quota, sớm nhất có lại lúc {format_reset_time(earliest)}" + (f" ({epid})" if epid else "")
+    return {"profile_id": None, "p_dir": None, "note": note, "all_exhausted": True, "earliest_reset": earliest}
 
 def get_latest_quota_probe(profile_id, family="gemini", max_age_sec=QUOTA_PROBE_MAX_AGE_SEC):
     """Dòng quota_probe mới nhất (< max_age_sec giây) của profile; family 'claude' lấy model claude/sonnet/opus, 'gemini' lấy còn lại."""
@@ -1623,6 +1898,10 @@ def get_quota_telemetry(profile_id, email=""):
     }
     gemini_quota = _quota_from_probe(get_latest_quota_probe(profile_id, "gemini"), live_g, base_g)
     anthropic_quota = _quota_from_probe(get_latest_quota_probe(profile_id, "claude"), live_c, base_c)
+    for q, fam in ((gemini_quota, "gemini"), (anthropic_quota, "claude")):
+        st = get_profile_quota_state(profile_id, fam)
+        q.update({"profile_id": profile_id or "owner_default", "exhausted": st["exhausted"],
+                  "reset_at": st["reset_at"], "reset_at_label": st["reset_at_label"]})
     return gemini_quota, anthropic_quota
 
 def probe_quota(profile_id="owner_default", timeout=60):
@@ -1976,6 +2255,12 @@ def get_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
             
             # Luôn tính toán Quota thực tế thời gian thực
             quota_g, quota_a = get_quota_telemetry(acc_type, email or "")
+            # Trạng thái hết quota của hồ sơ gán + hồ sơ đang dùng thực tế ở lần giao việc gần nhất (#22)
+            q_state = get_profile_quota_state(acc_type)
+            last_d = cursor.execute("SELECT id, status, profile_initial, profile_used, fallback_reason FROM dispatch_log "
+                                    "WHERE session_id = ? ORDER BY id DESC LIMIT 1", (r["id"],)).fetchone()
+            profile_in_use = (last_d["profile_used"] if last_d and last_d["profile_used"] else "") or acc_type
+            last_fallback = (last_d["fallback_reason"] or "") if last_d and profile_in_use != acc_type else ""
 
             allowed_p = []
             blocked_p = []
@@ -2042,6 +2327,14 @@ def get_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
                 "account_name": p_info.get("name"),
                 "quota_gemini": quota_g,
                 "quota_anthropic": quota_a,
+                "exhausted": q_state["exhausted"],
+                "reset_at": q_state["reset_at"],
+                "reset_at_label": q_state["reset_at_label"],
+                "profile_in_use": profile_in_use,
+                "profile_in_use_label": compute_account_label(profile_in_use, oauth_map),
+                "last_dispatch_id": last_d["id"] if last_d else None,
+                "last_dispatch_status": (last_d["status"] or "") if last_d else "",
+                "fallback_reason": last_fallback,
                 "allowed_paths": allowed_p,
                 "blocked_paths": blocked_p,
                 "current_task_id": task_id,
@@ -2885,9 +3178,20 @@ def dispatch_swarm_workflow(project_id="PRJ-GEN-WORKPLACE", session_id=None):
             if t["status"] == "done":
                 results[sid] = {"status": "error", "reason": f"Task {task_id} đã done, không chạy lại", "task_id": task_id}
                 continue
-            p_dir = os.path.expanduser(row["profile_dir"]) if row["profile_dir"] else _profile_dir(row["account_type"] or "owner_default")
-            cmd, report_path = build_task_directive(sid, task_id, t["title"], p_dir)
-            results[sid] = {"status": "pending", "task_id": task_id, "task_title": t["title"], "viec_ref": t["viec_ref"] or "", "command": cmd, "report_path": report_path}
+            account = row["account_type"] or "owner_default"
+            p_dir = os.path.expanduser(row["profile_dir"]) if row["profile_dir"] else _profile_dir(account)
+            # Hồ sơ gán cho vai đang hết quota (chưa tới reset_at) → chọn hồ sơ khác ngay, không tốn 1 lần gọi hỏng (#22)
+            sel = select_agy_profile_for_run(account, p_dir)
+            if not sel["profile_id"]:
+                results[sid] = {"status": "error", "reason": sel["note"], "task_id": task_id, "profile_initial": account,
+                                "all_exhausted": True, "earliest_reset": sel["earliest_reset"]}
+                continue
+            if sel["profile_id"] != account:
+                copy_agy_allow_rules(p_dir, sel["p_dir"])
+            cmd, report_path = build_task_directive(sid, task_id, t["title"], sel["p_dir"])
+            results[sid] = {"status": "pending", "task_id": task_id, "task_title": t["title"], "viec_ref": t["viec_ref"] or "", "command": cmd,
+                            "report_path": report_path, "profile_initial": account, "profile_used": sel["profile_id"],
+                            "fallback_reason": sel["note"], "_primary_dir": p_dir}
 
     for sid, r in results.items():
         if r["status"] != "pending":
@@ -2914,10 +3218,16 @@ def dispatch_swarm_workflow(project_id="PRJ-GEN-WORKPLACE", session_id=None):
             try:
                 did = start_dispatch_log(sid, kind="tmux", channel_id="tmux", task_id=r["task_id"], command=cmd,
                                          report_path=os.path.expanduser(r["report_path"]), viec_ref=r.get("viec_ref", ""))
+                with get_connection() as conn:
+                    conn.execute("UPDATE dispatch_log SET profile_initial = ?, profile_used = ?, fallback_reason = ? WHERE id = ?",
+                                 (r["profile_initial"], r["profile_used"], r["fallback_reason"], did))
+                    conn.commit()
                 r["dispatch_id"] = did
                 start_tmux_dispatch_watcher(did)
             except Exception as e:
                 print(f"[dispatch] Không ghi được dispatch_log cho {sid}: {e}")
+    for r in results.values():
+        r.pop("_primary_dir", None)
     return results
 
 ORCH_CONV_ID = "conv-orchestrator"
@@ -3640,6 +3950,8 @@ def _finish_tmux_dispatch(row, exit_code, output, project_id="PRJ-GEN-WORKPLACE"
     """Chốt dòng tmux đang running → done/failed (chỉ 1 lần, UPDATE ... WHERE status='running'), rồi bắn webhook dispatch_finished."""
     status = "done" if exit_code == 0 and not fail_reason else "failed"
     summary = _shorten_output(f"[{fail_reason}]\n{output}" if fail_reason else output)
+    if row.get("fallback_reason") and not fail_reason and (row.get("profile_used") or "") != (row.get("profile_initial") or ""):
+        summary = f"[Tài khoản] {row['fallback_reason']}.\n{summary}"
     with get_connection() as conn:
         cur = conn.execute("""
         UPDATE dispatch_log SET status = ?, exit_code = ?, finished_at = ?, summary = ?
@@ -3685,9 +3997,82 @@ def poll_tmux_dispatch(dispatch_id):
         return "running"
     exit_code = int(m.group(1))
     output = _read_report_tail(row.get("report_path")) or pane[idx:m.start()]
+    if row.get("profile_used"):
+        q_status, q_reset = record_quota_probe_output(row["profile_used"], "default", exit_code, output)
+        if q_status == "rate_limited":
+            nxt = _tmux_quota_fallback(row, output, q_reset)
+            if nxt == "running":
+                return "running"
+            if nxt:
+                _finish_tmux_dispatch(row, exit_code if exit_code else 1, output, fail_reason=nxt)
+                return "failed"
     denied = agy_output_denied(output) if exit_code == 0 else ""
     _finish_tmux_dispatch(row, exit_code, output, fail_reason=f"agy bị từ chối quyền / không ra kết quả ({denied})" if denied else "")
     return "done" if exit_code == 0 and not denied else "failed"
+
+def _tmux_quota_fallback(row, output, reset_raw=""):
+    """
+    Lệnh giao task qua tmux bị hết quota (#22): chọn hồ sơ khác khả dụng, gõ lại đúng lệnh với --gemini_dir mới vào phiên tmux
+    của vai (qua directive_guard), cập nhật dòng dispatch_log (vẫn running). Trả 'running' khi đã gõ lại; chuỗi lý do failed khi
+    hết hồ sơ khả dụng / không gõ lại được.
+    """
+    sid = row["session_id"]
+    used = row.get("profile_used") or ""
+    try:
+        tried = json.loads(row.get("profiles_tried") or "[]")
+        tried = [x for x in tried if isinstance(x, str)]
+    except Exception:
+        tried = []
+    if used and used not in tried:
+        tried.append(used)
+    account, primary_dir, title = row.get("profile_initial") or used, "", ""
+    try:
+        with get_connection() as conn:
+            s_row = conn.execute("SELECT account_type, profile_dir FROM tmux_sessions WHERE id = ?", (sid,)).fetchone()
+            if s_row:
+                account = row.get("profile_initial") or s_row["account_type"] or "owner_default"
+                primary_dir = os.path.expanduser(s_row["profile_dir"]) if s_row["profile_dir"] else _profile_dir(account)
+            for tbl in ("todos", "gen_session_todos"):
+                t = conn.execute(f"SELECT title FROM {tbl} WHERE id = ?", (row.get("task_id") or "",)).fetchone()
+                if t:
+                    title = t["title"]
+                    break
+    except Exception:
+        pass
+    primary_dir = primary_dir or _profile_dir(account)
+    sel = select_agy_profile_for_run(account, primary_dir, tried=tried)
+    if not sel["profile_id"]:
+        return sel["note"]
+    if sel["profile_id"] != account:
+        copy_agy_allow_rules(primary_dir, sel["p_dir"])
+    cmd, report_path = build_task_directive(sid, row.get("task_id") or "", title, sel["p_dir"])
+    try:
+        from backend import directive_guard as _guard
+    except ImportError:
+        import directive_guard as _guard
+    allowed, reason = _guard.guard(sid, cmd)
+    log_directive_audit(sid, "quota_fallback", cmd, allowed, reason)
+    if not allowed:
+        return f"hết quota ở {used}; không gõ lại được lệnh với {sel['profile_id']} (directive_guard: {reason})"
+    try:
+        ok = subprocess.run(["tmux", "send-keys", "-t", sid, cmd, "Enter"], capture_output=True, text=True, timeout=2.0).returncode == 0
+    except Exception:
+        ok = False
+    if not ok:
+        return f"hết quota ở {used}; tmux không nhận lệnh chạy lại với {sel['profile_id']}"
+    note = sel["note"]
+    with get_connection() as conn:
+        conn.execute("""
+        UPDATE dispatch_log SET command = ?, report_path = ?, profile_used = ?, profiles_tried = ?, fallback_reason = ?
+        WHERE id = ? AND status = 'running'
+        """, (cmd, os.path.expanduser(report_path), sel["profile_id"], json.dumps(tried), note, row["id"]))
+        conn.commit()
+    try:
+        append_tmux_output(sid, cmd, f"[Tài khoản] {note}")
+    except Exception:
+        pass
+    _notify_dispatch_change()
+    return "running"
 
 TMUX_WATCH_MAX_SEC = int(os.environ.get("GW_TMUX_WATCH_MAX_SEC", str(2 * 3600)))
 TMUX_WATCH_INTERVAL_SEC = 2.0
@@ -3825,6 +4210,11 @@ def wait_worker_result(dispatch_id=None, task_id="", session_id="", timeout_sec=
         "webhook_sent": bool(row.get("webhook_sent")),
         "request_msg_id": row.get("request_msg_id"),
         "reply_msg_id": row.get("reply_msg_id"),
+        # Tự chuyển tài khoản khi hết quota (#22): hồ sơ gán cho vai, hồ sơ chạy thật, lý do ("đã chuyển từ … sang …")
+        "profile_initial": row.get("profile_initial") or "",
+        "profile_used": row.get("profile_used") or "",
+        "fallback": bool(row.get("profile_used")) and (row.get("profile_used") or "") != (row.get("profile_initial") or ""),
+        "fallback_reason": row.get("fallback_reason") or "",
         "waited_sec": round(time.time() - t0, 1),
         "timeout_sec": timeout_sec,
     }
@@ -3952,6 +4342,52 @@ def ensure_agy_plan_permissions(p_dir, cwd, extra_dirs=()):
             print(f"[agy-perm] Không cập nhật được {path}: {e}")
             return []
 
+def copy_agy_allow_rules(src_dir, dst_dir):
+    """
+    Chép permissions.allow của hồ sơ agy src_dir sang dst_dir (thêm quy tắc còn thiếu, giữ nguyên mọi khóa khác) để lần chạy
+    tự chuyển tài khoản (#22) giữ đúng quyền của vai. Chỉ ghi khi dst_dir đã có antigravity-cli/. Trả danh sách quy tắc vừa thêm.
+    """
+    if not src_dir or not dst_dir or os.path.realpath(src_dir) == os.path.realpath(dst_dir):
+        return []
+    src = os.path.join(src_dir, "antigravity-cli", "settings.json")
+    dst_cli = os.path.join(dst_dir, "antigravity-cli")
+    if not os.path.isfile(src) or not os.path.isdir(dst_cli):
+        return []
+    try:
+        with open(src, "r", encoding="utf-8") as f:
+            src_allow = ((json.load(f) or {}).get("permissions") or {}).get("allow") or []
+    except Exception:
+        return []
+    if not isinstance(src_allow, list) or not src_allow:
+        return []
+    path = os.path.join(dst_cli, "settings.json")
+    with _AGY_SETTINGS_LOCK:
+        try:
+            data = {}
+            if os.path.exists(path):
+                with open(path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            if not isinstance(data, dict):
+                return []
+            perms = data.setdefault("permissions", {})
+            if not isinstance(perms, dict):
+                return []
+            allow = perms.setdefault("allow", [])
+            if not isinstance(allow, list):
+                return []
+            added = [r for r in src_allow if isinstance(r, str) and r not in allow]
+            if not added:
+                return []
+            allow.extend(added)
+            tmp = f"{path}.gw-tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+            os.replace(tmp, path)
+            return added
+        except Exception as e:
+            print(f"[agy-perm] Không chép được allow-rule sang {path}: {e}")
+            return []
+
 def build_agy_aliases(session_id, p_dir, conv_id, cwd):
     """
     Alias agy/agy-run cho phiên tmux của vai (#7): mặc định KHÔNG có --dangerously-skip-permissions.
@@ -4018,31 +4454,59 @@ def dispatch_warroom_to_agent(project_id, channel_id, session_id, message, timeo
     # trong settings của hồ sơ, KHÔNG bật skip-permissions cho mọi vai. Lối thoát cuối (opt-in GW_WARROOM_SKIP_PERMISSIONS=1):
     # thêm --dangerously-skip-permissions nhưng chỉ khi cwd đúng là worktree riêng của vai (vẫn --mode plan).
     in_worktree = is_role_worktree(session_id, cwd)
-    if in_worktree:
-        ensure_agy_plan_permissions(p_dir, cwd)
-    cmd = [_agy_bin(), f"--gemini_dir={p_dir}"]
-    if in_worktree and _env_on("GW_WARROOM_SKIP_PERMISSIONS"):
-        cmd.append(AGY_SKIP_PERMISSIONS_FLAG)
-    cmd += ["--mode", "plan", "-p", prompt]
+
+    def _build_cmd(pdir):
+        c = [_agy_bin(), f"--gemini_dir={pdir}"]
+        if in_worktree and _env_on("GW_WARROOM_SKIP_PERMISSIONS"):
+            c.append(AGY_SKIP_PERMISSIONS_FLAG)
+        return c + ["--mode", "plan", "-p", prompt]
+
+    cmd = _build_cmd(p_dir)
     started_at = time.strftime("%Y-%m-%d %H:%M:%S")
     try:
         with get_connection() as conn:
-            conn.execute("UPDATE dispatch_log SET command = ? WHERE id = ?", (" ".join(cmd), dispatch_id))
+            conn.execute("UPDATE dispatch_log SET command = ?, profile_initial = ? WHERE id = ?", (" ".join(cmd), account_type, dispatch_id))
             conn.commit()
     except Exception:
         pass
     t0 = time.time()
+
+    def _attempt(pid, pdir):
+        """1 lần chạy agy với hồ sơ pid (#22): ghi allow-rule vào settings của hồ sơ đó trước, cùng cwd/worktree và cùng lệnh."""
+        if in_worktree:
+            ensure_agy_plan_permissions(pdir, cwd)
+        c = _build_cmd(pdir)
+        try:
+            with get_connection() as conn:
+                conn.execute("UPDATE dispatch_log SET command = ?, profile_used = ? WHERE id = ?", (" ".join(c), pid, dispatch_id))
+                conn.commit()
+        except Exception:
+            pass
+        try:
+            res = subprocess.run(c, capture_output=True, text=True, timeout=timeout, cwd=cwd, env=_agy_env(pdir))
+            st, reset = record_quota_probe_from_result(pid, "default", res)
+            return st, reset, {"cmd": c, "res": res}
+        except subprocess.TimeoutExpired:
+            msg = f"Lỗi: agy không phản hồi sau {timeout // 60} phút, đã hủy."
+            record_quota_probe(pid, "default", "timeout", "", msg)
+            return "timeout", "", {"cmd": c, "error_output": msg}
+        except Exception as e:
+            return "error", "", {"cmd": c, "error_output": f"Lỗi khi chạy agy ({_agy_bin()}): {e}"}
+
+    fb = run_agy_with_quota_fallback(account_type, p_dir, _attempt)
+    payload = fb["payload"] or {}
+    cmd = payload.get("cmd") or cmd
     exit_code = -1
     output = ""
     fail_reason = ""
-    try:
-        res = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, cwd=cwd, env=_agy_env(p_dir))
+    res = payload.get("res")
+    if res is not None:
         exit_code = res.returncode
         output = ((res.stdout or "") + ("\n" + res.stderr if res.stderr else "")).strip()
-        status, reset_at = record_quota_probe_from_result(account_type, "default", res)
         denied = agy_output_denied(output) if exit_code == 0 else ""
-        if status == "rate_limited":
-            body = f"Lỗi 429 / hết quota khi gọi agy (hồi {reset_at or 'chưa rõ'}):\n{output[-1500:]}"
+        if fb["status"] == "rate_limited":
+            reset_raw = classify_agy_result(exit_code, output)[1]
+            body = f"Lỗi 429 / hết quota khi gọi agy (hồi {reset_raw or 'chưa rõ'}):\n{output[-1500:]}"
         elif denied:
             fail_reason = f"agy bị từ chối quyền / không ra kết quả ({denied})"
             body = f"{fail_reason}:\n{output[-3000:]}"
@@ -4050,12 +4514,19 @@ def dispatch_warroom_to_agent(project_id, channel_id, session_id, message, timeo
             body = f"agy thoát lỗi:\n{output[-3000:] or '(không có output)'}"
         else:
             body = output[:4000] if output else "(agy không trả output)"
-    except subprocess.TimeoutExpired:
-        output = body = f"Lỗi: agy không phản hồi sau {timeout // 60} phút, đã hủy."
-        record_quota_probe(account_type, "default", "timeout", "", output)
-    except Exception as e:
-        output = body = f"Lỗi khi chạy agy ({_agy_bin()}): {e}"
-    body = f"{body}\nexit={exit_code}" + (" (failed: agy bị từ chối quyền, không có kết quả)" if fail_reason else "")
+    elif payload.get("error_output"):
+        output = body = payload["error_output"]
+    else:
+        # Mọi hồ sơ đều exhausted từ trước → không gọi agy lần nào
+        output = body = f"Không gọi agy: {fb['note']}."
+    if fb["all_exhausted"]:
+        fail_reason = fail_reason or fb["note"]
+        if res is not None:
+            body = f"{body}\n⚠ {fb['note']}."
+    elif fb["fallback"]:
+        body = f"[Tài khoản] {fb['note']}.\n{body}"
+    denied_fail = bool(fail_reason) and not fb["all_exhausted"]
+    body = f"{body}\nexit={exit_code}" + (" (failed: agy bị từ chối quyền, không có kết quả)" if denied_fail else "")
     finished_at = time.strftime("%Y-%m-%d %H:%M:%S")
 
     report_path = ""
@@ -4065,7 +4536,9 @@ def dispatch_warroom_to_agent(project_id, channel_id, session_id, message, timeo
         report_path = os.path.join(report_dir, f"warroom-{session_id}-{time.strftime('%Y%m%d-%H%M%S')}-{dispatch_id}.md")
         with open(report_path, "w", encoding="utf-8") as f:
             f.write(f"# {session_id} · {started_at} → {finished_at}\n\n")
-            f.write(f"- Kênh: {channel_id}\n- cwd: {cwd}\n- Lệnh: {' '.join(cmd)}\n- exit: {exit_code}\n\n## Tin nhắn\n\n{message}\n\n## Output\n\n{output}\n")
+            f.write(f"- Kênh: {channel_id}\n- cwd: {cwd}\n- Lệnh: {' '.join(cmd)}\n- exit: {exit_code}\n"
+                    f"- Hồ sơ gán: {account_type} · hồ sơ chạy: {fb['profile_used'] or '(không)'}"
+                    + (f"\n- Tài khoản: {fb['note']}" if fb["note"] else "") + f"\n\n## Tin nhắn\n\n{message}\n\n## Output\n\n{output}\n")
     except Exception as e:
         print(f"[dispatch] Không ghi được báo cáo: {e}")
         report_path = ""
@@ -4083,6 +4556,8 @@ def dispatch_warroom_to_agent(project_id, channel_id, session_id, message, timeo
     webhook_sent = send_event_webhook("dispatch_finished", project_id=project_id, viec_ref=viec_ref, task_id=task_id,
                                       session_id=session_id, exit_code=exit_code, report_path=report_path, status=status)
     summary = _shorten_output(f"[{fail_reason}]\n{output}" if fail_reason else output)
+    if fb["fallback"] and not fb["all_exhausted"]:
+        summary = f"[Tài khoản] {fb['note']}.\n{summary}"
 
     reply_msg_id = None
     try:
@@ -4096,16 +4571,19 @@ def dispatch_warroom_to_agent(project_id, channel_id, session_id, message, timeo
             reply_msg_id = cursor.lastrowid
             cursor.execute("""
             UPDATE dispatch_log SET command = ?, exit_code = ?, report_path = ?, finished_at = ?, task_id = ?, viec_ref = ?,
-                   channel_id = ?, webhook_sent = ?, status = ?, summary = ?, reply_msg_id = ?
+                   channel_id = ?, webhook_sent = ?, status = ?, summary = ?, reply_msg_id = ?,
+                   profile_initial = ?, profile_used = ?, fallback_reason = ?, profiles_tried = ?
             WHERE id = ?
             """, (" ".join(cmd), exit_code, report_path, finished_at, task_id, viec_ref, channel_id, 1 if webhook_sent else 0,
-                  status, summary, reply_msg_id, dispatch_id))
+                  status, summary, reply_msg_id, account_type, fb["profile_used"], fb["note"],
+                  json.dumps(fb["attempts"], ensure_ascii=False), dispatch_id))
             conn.commit()
     finally:
         _notify_dispatch_change()
     return {"dispatch_id": dispatch_id, "session_id": session_id, "status": status, "exit_code": exit_code, "report_path": report_path, "cwd": cwd,
             "elapsed_sec": round(time.time() - t0, 1), "task_id": task_id, "viec_ref": viec_ref, "webhook_sent": webhook_sent,
-            "reply_msg_id": reply_msg_id, "error": fail_reason}
+            "reply_msg_id": reply_msg_id, "error": fail_reason, "profile_initial": account_type,
+            "profile_used": fb["profile_used"], "fallback": fb["fallback"], "fallback_reason": fb["note"], "attempts": fb["attempts"]}
 
 def post_warroom_message(project_id="PRJ-GEN-WORKPLACE", channel_id="war_room", author="Ryan (Owner)", message="", tag="Directive", wait=False):
     """Lưu tin nhắn; tin có @backend|@frontend|@devops|@qa|@security|@lead → chạy agy thật của vai đó ở thread nền (wait=True chạy đồng bộ, dùng cho test). Không có @vai → chỉ lưu (#3)."""
@@ -4969,6 +5447,8 @@ def describe_agy_error(usage):
         reason = f"agy thoát mã {code[5:]}"
     else:
         reason = code
+    if usage.get("all_exhausted") and usage.get("fallback_note"):
+        reason += f"; {usage['fallback_note']}"
     if detail:
         reason += f" — {detail[-600:]}"
     return reason
@@ -5026,36 +5506,43 @@ def call_agy_cli_turn(conv_id, user_message, model=None, account="owner_default"
     cmd = [_agy_bin(), "--output-format", "json", "--print", prompt_payload]
     if skip_permissions:
         cmd.append(AGY_SKIP_PERMISSIONS_FLAG)
-    else:
-        ensure_agy_plan_permissions(p_dir, read_dirs[0], extra_dirs=read_dirs[1:])
     cmd.extend(["--model", model_slug])
-    if agy_conv_id:
-        cmd.extend(["--conversation", agy_conv_id])
-    if has_sess_dir:
-        cmd.extend(["--add-dir", str(sess_dir)])
 
-    def _save_conv(ret_id, tokens):
+    def _cmd_for(with_conv):
+        c = list(cmd)
+        if with_conv and agy_conv_id:
+            c.extend(["--conversation", agy_conv_id])
+        if has_sess_dir:
+            c.extend(["--add-dir", str(sess_dir)])
+        return c
+
+    def _save_conv(ret_id, tokens, save_id=True):
         if not ret_id:
             return
         try:
             with get_connection() as conn:
-                conn.execute("UPDATE gen_conversations SET agy_conv_id = ?, total_tokens = coalesce(total_tokens, 0) + ? WHERE id = ?",
-                             (ret_id, int(tokens or 0), conv_id))
+                if save_id:
+                    conn.execute("UPDATE gen_conversations SET agy_conv_id = ?, total_tokens = coalesce(total_tokens, 0) + ? WHERE id = ?",
+                                 (ret_id, int(tokens or 0), conv_id))
+                else:
+                    conn.execute("UPDATE gen_conversations SET total_tokens = coalesce(total_tokens, 0) + ? WHERE id = ?",
+                                 (int(tokens or 0), conv_id))
                 conn.commit()
         except Exception:
             pass
 
-    def _run(argv):
+    def _run(argv, pid, pdir):
+        own = pid == account
         try:
-            res = subprocess.run(argv, capture_output=True, text=True, env=env, cwd=work_dir, timeout=AGY_CHAT_TIMEOUT_SEC)
+            res = subprocess.run(argv, capture_output=True, text=True, env=_agy_env(pdir), cwd=work_dir, timeout=AGY_CHAT_TIMEOUT_SEC)
         except subprocess.TimeoutExpired:
-            record_quota_probe(account, model_slug, "timeout", "", f"agy không phản hồi sau {AGY_CHAT_TIMEOUT_SEC}s")
+            record_quota_probe(pid, model_slug, "timeout", "", f"agy không phản hồi sau {AGY_CHAT_TIMEOUT_SEC}s")
             return "", agy_conv_id, {"error": "TIMEOUT", "timeout_sec": AGY_CHAT_TIMEOUT_SEC}
         except FileNotFoundError as e:
             return "", agy_conv_id, {"error": "AGY_NOT_FOUND", "bin": _agy_bin(), "detail": str(e)}
         except Exception as e:
             return "", agy_conv_id, {"error": "EXCEPTION", "detail": str(e)}
-        status, reset_at = record_quota_probe_from_result(account, model_slug, res)
+        status, reset_at = record_quota_probe_from_result(pid, model_slug, res)
         err_output = ((res.stderr or "") + "\n" + (res.stdout or "")).strip()
         if status == "rate_limited":
             return "", agy_conv_id, {"error": "RESOURCE_EXHAUSTED", "reset_at": reset_at, "detail": err_output[-800:]}
@@ -5063,7 +5550,8 @@ def call_agy_cli_turn(conv_id, user_message, model=None, account="owner_default"
             print(f"[AGY Runner] returncode={res.returncode}, err: {err_output[:300]}")
             return "", agy_conv_id, {"error": f"EXIT_{res.returncode}", "detail": err_output[-800:]}
         reply, ret_id, usage = _parse_agy_json_turn(res.stdout)
-        _save_conv(ret_id, usage.get("total_tokens", 0) if isinstance(usage, dict) else 0)
+        # Lượt chạy bằng hồ sơ khác (tự chuyển khi hết quota) không ghi đè agy_conv_id: phiên agy thuộc tài khoản khác
+        _save_conv(ret_id, usage.get("total_tokens", 0) if isinstance(usage, dict) else 0, save_id=own)
         # Thoát 0 nhưng bị từ chối quyền ("no output produced", "auto-denied") → lỗi rõ, không coi là trả lời
         if reply:
             denied = agy_output_denied(reply)
@@ -5076,21 +5564,39 @@ def call_agy_cli_turn(conv_id, user_message, model=None, account="owner_default"
                                                "skip_permissions": skip_permissions, "detail": (err_output or reply)[-800:]}
         if not reply:
             return "", ret_id or agy_conv_id, {"error": "EMPTY_RESPONSE", "detail": err_output[-800:]}
-        return reply, ret_id or agy_conv_id, dict(usage)
+        return reply, (ret_id or agy_conv_id) if own else agy_conv_id, dict(usage)
 
-    reply, ret_id, usage = _run(cmd)
-    # Phiên agy cũ hỏng/hết hạn (không phải lỗi quota) → xóa agy_conv_id, thử lại 1 lần với lượt mới
-    if not reply and agy_conv_id and usage.get("error", "").startswith("EXIT_"):
-        print(f"[AGY Runner] agy_conv_id '{agy_conv_id}' lỗi, thử lại lượt mới không --conversation")
-        try:
-            with get_connection() as conn:
-                conn.execute("UPDATE gen_conversations SET agy_conv_id = '' WHERE id = ?", (conv_id,))
-                conn.commit()
-        except Exception:
-            pass
-        fresh_cmd = [t for i, t in enumerate(cmd) if t != "--conversation" and not (i > 0 and cmd[i - 1] == "--conversation")]
-        agy_conv_id = None
-        reply, ret_id, usage = _run(fresh_cmd)
+    def _attempt(pid, pdir):
+        """1 lượt chat với hồ sơ pid; hồ sơ khác hồ sơ của phiên (fallback #22) chạy lượt mới, không --conversation."""
+        nonlocal agy_conv_id
+        if not skip_permissions:
+            ensure_agy_plan_permissions(pdir, read_dirs[0], extra_dirs=read_dirs[1:])
+        own = pid == account
+        reply, ret_id, usage = _run(_cmd_for(own), pid, pdir)
+        # Phiên agy cũ hỏng/hết hạn (không phải lỗi quota) → xóa agy_conv_id, thử lại 1 lần với lượt mới
+        if own and not reply and agy_conv_id and usage.get("error", "").startswith("EXIT_"):
+            print(f"[AGY Runner] agy_conv_id '{agy_conv_id}' lỗi, thử lại lượt mới không --conversation")
+            try:
+                with get_connection() as conn:
+                    conn.execute("UPDATE gen_conversations SET agy_conv_id = '' WHERE id = ?", (conv_id,))
+                    conn.commit()
+            except Exception:
+                pass
+            agy_conv_id = None
+            reply, ret_id, usage = _run(_cmd_for(False), pid, pdir)
+        err = usage.get("error", "") if isinstance(usage, dict) else ""
+        status = "rate_limited" if err == "RESOURCE_EXHAUSTED" else ("ok" if reply else ("timeout" if err == "TIMEOUT" else "error"))
+        return status, usage.get("reset_at", "") if isinstance(usage, dict) else "", (reply, ret_id, usage)
+
+    # Hết quota → tự chạy lại lượt chat với hồ sơ khác còn quota (#22); không đổi tài khoản của phiên chat
+    fb = run_agy_with_quota_fallback(account, p_dir, _attempt, family=quota_family(model_slug))
+    if fb["payload"]:
+        reply, ret_id, usage = fb["payload"]
+    else:
+        reply, ret_id, usage = "", agy_conv_id, {"error": "RESOURCE_EXHAUSTED", "reset_at": "", "detail": ""}
+    usage = dict(usage) if isinstance(usage, dict) else {}
+    usage.update({"profile_initial": fb["profile_initial"], "profile_used": fb["profile_used"], "fallback": fb["fallback"],
+                  "fallback_note": fb["note"], "all_exhausted": fb["all_exhausted"], "earliest_reset": fb["earliest_reset"]})
     return reply, ret_id, usage
 
 def send_gen_chat(conv_id, author, message, model, account="owner_default"):
@@ -5126,6 +5632,8 @@ def send_gen_chat(conv_id, author, message, model, account="owner_default"):
         if refused:
             # Ghi rõ vào tin trả lời để người dùng thấy task KHÔNG được chuyển (không im lặng coi như xong)
             reply_content += "\n\n[Kanban] " + "\n[Kanban] ".join(refused)
+        if usage.get("fallback") and usage.get("fallback_note"):
+            reply_content += f"\n\n[Tài khoản] {usage['fallback_note']}."
     else:
         reply_content = f"agy không trả lời: {describe_agy_error(usage)}. Không có phản hồi tự sinh."
         engine_used = "error"
@@ -5164,6 +5672,8 @@ def send_gen_chat(conv_id, author, message, model, account="owner_default"):
         "error": is_error,
         "error_code": usage.get("error", "") if is_error else "",
         "usage": usage,
+        "account_used": usage.get("profile_used") or account,
+        "fallback_note": usage.get("fallback_note", ""),
         "kanban_updates": applied_kanban
     }
 

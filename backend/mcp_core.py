@@ -781,7 +781,8 @@ def execute_tool(name: str, args: dict) -> dict:
                     "ok": True,
                     "source": "cloudcode_api_live",
                     "gemini": g_q,
-                    "claude": a_q
+                    "claude": a_q,
+                    "quota_state": db.get_profile_quota_state(profile_id)
                 }
             else:
                 g_q, a_q = db.get_quota_telemetry(profile_id)
@@ -789,7 +790,8 @@ def execute_tool(name: str, args: dict) -> dict:
                     "ok": True,
                     "source": "agy_probe_or_unknown",
                     "gemini": g_q,
-                    "claude": a_q
+                    "claude": a_q,
+                    "quota_state": db.get_profile_quota_state(profile_id)
                 }
             return {"content": [{"type": "text", "text": json.dumps(data, ensure_ascii=False, indent=2)}], "isError": False}
 
