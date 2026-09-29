@@ -4571,7 +4571,8 @@ def ensure_agy_plan_permissions(p_dir, cwd, extra_dirs=()):
 # Quyền agy cho chế độ "Làm" (build, Issue #45): agy -p ở chế độ mặc định (không --mode plan) trong worktree riêng của task
 # ---------------------------------------------------------------------------
 # Lệnh thêm cho chế độ Làm (ngoài lệnh chỉ đọc): biên dịch thử, chạy test của repo, git trong worktree (cwd của agy).
-AGY_BUILD_EXTRA_COMMANDS = ["python3 -m py_compile", "git add", "git commit"]
+# echo: agy hay nối "&& echo OK" sau lệnh kiểm (dispatch:13 bị chặn vì thiếu echo, #47)
+AGY_BUILD_EXTRA_COMMANDS = ["python3 -m py_compile", "git add", "git commit", "echo"]
 AGY_BUILD_EXTRA_REGEX = [r"python3 scripts/test_[A-Za-z0-9_]+\.py"]
 # Lệnh cấm hẳn (khớp tiền tố token, Deny > Allow): đẩy / đổi remote, mạng, quyền root, cài gói
 AGY_BUILD_DENY_COMMANDS = [
@@ -4590,8 +4591,9 @@ AGY_BUILD_DENY_FLAGS = [
     ("git commit", r"(-[a-zA-Z]*n[a-zA-Z]*|--no-verify|--amend)"),
     ("git", r"(-C|-c|--git-dir(=.*)?|--work-tree(=.*)?|--exec-path(=.*)?|--namespace(=.*)?)"),
     ("rm", r"(-[a-zA-Z]*[rRf][a-zA-Z]*|--recursive|--force|/.*|~.*|\$.*|.*\.\..*)"),
-    ("cd", r"(/.*|~.*|\$.*|.*\.\..*|-)"),
 ]
+# Không chặn `cd`: agy hay cd tới đường dẫn tuyệt đối của chính worktree (#47); commit / push sai chỗ đã có hook pre-commit /
+# pre-push + kiểm sau khi chạy (detect_violations), ghi file ngoài worktree bị write_file deny.
 # Rule chỉ chế độ Làm ghi (để nhận ra và gỡ khi không còn lần build nào dùng hồ sơ đó)
 _AGY_BUILD_ACTIVE = {}      # settings.json → {rule: số lần build đang dùng}
 _AGY_BUILD_OWNED = {}       # settings.json → {rule} do chế độ Làm thêm vào (không phải rule người dùng có sẵn)
@@ -4631,7 +4633,7 @@ def _agy_build_protected_dirs(worktree, repo="", p_dir=""):
 
 def agy_build_deny_rules(worktree, repo="", p_dir=""):
     """Deny-rule chế độ Làm: cờ ghi của lệnh chỉ đọc + lệnh cấm (push, remote, mạng, sudo, cài gói) + cờ/đích nguy hiểm
-    (checkout main, reset --hard, commit --no-verify, rm -rf / xóa ngoài worktree, cd ra ngoài) + ghi file ngoài worktree."""
+    (checkout main, reset --hard, commit --no-verify, rm -rf / xóa ngoài worktree) + ghi file ngoài worktree."""
     rules = agy_plan_deny_rules() + [f"command({c})" for c in AGY_BUILD_DENY_COMMANDS]
     for cmd, flag in AGY_BUILD_DENY_FLAGS:
         for k in range(AGY_PLAN_DENY_MAX_POS + 1):

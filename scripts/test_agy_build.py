@@ -96,6 +96,8 @@ if mode == "bypass":
 if mode == "nocommit":
     with open("README.md", "a") as fh:
         fh.write("sửa mà không commit\\n")
+    with open("backend/app.py", "a") as fh:
+        fh.write("Y = 2\\n")
 ev({{"event": "result", "result": {{"status": "SUCCESS", "response": "Đã đổi gì: backend/feature.py\\nTest: py_compile pass\\n"
      "Rủi ro: thấp\\n[KANBAN_UPDATE: " + tid + " | CHECK: chk-a]"}}}})
 sys.exit(0)
@@ -260,7 +262,10 @@ OK_CMDS = ["python3 -m py_compile backend/app.py backend/feature.py", "python3 s
            "python3 scripts/test_task_hub.py", "git status", "git status --short", "git diff", "git diff --stat HEAD",
            "git add backend/feature.py", "git add -A", 'git commit -m "TSK-1: thêm tinh_nang"', "git log --oneline -3",
            "grep -rn tinh_nang backend", "cd backend && ls", "sed -n 1,20p backend/app.py", "git show HEAD --stat",
-           "git branch --show-current", "find scripts -name 'test_*.py'"]
+           "git branch --show-current", "find scripts -name 'test_*.py'",
+           # dispatch:13 (#47): agy nối echo sau lệnh kiểm; cd tới đường dẫn tuyệt đối của worktree
+           'python3 -m py_compile backend/db.py && echo "py_compile OK"', "echo xong",
+           f"cd {os.path.realpath(WT_X)} && git status", "cd .. && ls"]
 for c in OK_CMDS:
     check(f"cho phép: {c}", agy_allows(c, ALLOW, DENY))
 BAD_CMDS = ["git push", "git push origin wt/TSK-1", "git push --force origin HEAD:main", "git remote add x http://x",
@@ -273,8 +278,8 @@ BAD_CMDS = ["git push", "git push origin wt/TSK-1", "git push --force origin HEA
             "rm -rf backend", "rm -r backend", "rm -f x.py", "rm -Rf .", "rm /etc/passwd", "rm ../repo/README.md", "rm ~/x",
             "curl http://x", "wget http://x", "ssh host", "scp a b:", "rsync -a . host:", "nc -l 80", "gh pr create",
             "sudo ls", "su root", "pip install x", "pip3 install x", "python3 -m pip install x", "npm i x", "npx x",
-            "apt-get install x", "apt install x", "python3 -c 'print(1)'", "bash -c ls", "cd / && ls", "cd .. && git commit -m x",
-            "cd ~ && ls", "cd $HOME", "python3 scripts/../evil.py", "python3 evil.py", "git status && git push",
+            "apt-get install x", "apt install x", "python3 -c 'print(1)'", "bash -c ls", "echo x && git push",
+            "python3 scripts/../evil.py", "python3 evil.py", "git status && git push",
             "ls | xargs rm", "find . -delete"]
 for c in BAD_CMDS:
     check(f"chặn: {c}", not agy_allows(c, ALLOW, DENY))
@@ -344,6 +349,7 @@ prompt = open(PROMPT_LOG).read()
 check("prompt có SOP build (5 bước) + THÔNG TIN VIỆC + viec_ref + checklist", "SOP chế độ \"Làm\"" in prompt and f"THÔNG TIN VIỆC {T1}" in prompt
       and "VIEC-12" in prompt and "(chk-a) thêm backend/feature.py" in prompt and "Báo cáo ngắn" in prompt, prompt[:400])
 check("prompt nêu worktree + nhánh + cấm push", WT1 in prompt and f"wt/{T1}" in prompt and "KHÔNG push" in prompt)
+check("prompt dặn chạy từng lệnh riêng, không nối && echo", "Chạy TỪNG lệnh riêng" in prompt and "&& echo" in prompt)
 check("lúc agy chạy: settings có write_file(worktree) + deny git push", rl and f"write_file({os.path.realpath(WT1)})" in rl[0]["allow"]
       and "command(git push)" in rl[0]["deny"], str(rl[:1])[:300])
 check("lúc agy chạy: hook chặn qua GIT_CONFIG (core.hooksPath)", rl and rl[0]["env_hooks"].endswith(os.path.join("agy-build-hooks", T1)))
@@ -467,6 +473,7 @@ T6 = new_task("[THỬ] không commit")
 row = drow(db.assign_task_to_role(T6, "backend", wait=True)["dispatch_id"])
 check("không commit → failed, nêu file chưa commit", row["status"] == "failed" and "không tạo commit mới" in row["summary"]
       and "chưa commit" in row["summary"], row["summary"][:300])
+check("tên file chưa commit đủ ký tự (không mất chữ đầu)", ": README.md" in row["summary"] and "backend/app.py" in row["summary"], row["summary"][:400])
 check("không commit → không push", remote_branch(f"wt/{T6}") == "")
 
 PR_CALLS = []
