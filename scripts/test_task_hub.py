@@ -248,7 +248,7 @@ try:
 except Exception as e:
     check("fetch_live_google_quota(None) không lỗi", False, repr(e))
 st, res = call("GET", "/api/tmux/sessions")
-check("/api/tmux/sessions 200", st == 200 and len(res.get("sessions", [])) == 6, f"{st} {str(res)[:200]}")
+check("/api/tmux/sessions 200 (5 vai, security đã bỏ)", st == 200 and len(res.get("sessions", [])) == 5, f"{st} {str(res)[:200]}")
 qa = next((s for s in res.get("sessions", []) if s["id"] == "gw-qa-agy"), {})
 check("worker có account_type NULL hiện owner_default", qa.get("account_type") == "owner_default", str(qa.get("account_type")))
 db.init_db()

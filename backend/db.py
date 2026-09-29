@@ -682,8 +682,8 @@ def seed_real_project():
             ('ROLE-02', 'B', 'Backend & DB Specialist', 'Claude Code CLI', 'Python daemon, SQLite WAL, FTS5 catalog và runner', 'Thực thi API control plane, tối ưu truy vấn FTS5 catalog sub-ms và stream log terminal.'),
             ('ROLE-03', 'F', 'Frontend Specialist', 'Cursor CLI', 'Web console UI, CSS Gen-workplace v1.1, real-time sync', 'Duy trì phong cách thiết kế tối kỹ thuật v1.1, bind dữ liệu thật từ backend và tối ưu UX.'),
             ('ROLE-04', 'D', 'DevOps & Packaging', 'Gemini CLI (agy --agent devops)', 'Systemd service, tmux, cài đặt và cập nhật app trên host', 'Đảm bảo app chạy ổn định trên host Linux (systemd + tmux), script cài đặt/cập nhật 1 lệnh.'),
-            ('ROLE-05', 'Q', 'QA Tester', 'Gemini CLI (agy)', 'Kiểm thử cross-platform, test API /api/status, xác thực installer', 'Chạy regression tests, nghiệm thu thanh loading % của installer và báo cáo phản hồi.'),
-            ('ROLE-06', 'S', 'Security Auditor', 'Codex Security CLI', 'Phân quyền thư mục, audit file permission, kiểm soát Vault', 'Kiểm tra an toàn phân quyền, cô lập biến môi trường và thẩm định secret boundary.')
+            ('ROLE-05', 'Q', 'QA Tester', 'Gemini CLI (agy)', 'Kiểm thử cross-platform, test API /api/status, xác thực installer', 'Chạy regression tests, nghiệm thu thanh loading % của installer và báo cáo phản hồi.')
+            # ROLE-06 Security Auditor đã bỏ (29/09): không seed nữa; DB cũ được retire_roles() đánh dấu 'retired'
         ]
         for rl in roles:
             cursor.execute("INSERT OR IGNORE INTO agent_roles (id, project_id, role_key, name, cli_tool, scope, instruction) VALUES (?, 'PRJ-GEN-WORKPLACE', ?, ?, ?, ?, ?)", rl)
@@ -846,7 +846,7 @@ def get_full_state(project_id="PRJ-GEN-WORKPLACE"):
             todos.append(rm_todos)
 
         # Roles
-        cursor.execute("SELECT * FROM agent_roles WHERE project_id = ? ORDER BY id ASC", (project_id,))
+        cursor.execute("SELECT * FROM agent_roles WHERE project_id = ? AND COALESCE(status, 'active') != 'retired' ORDER BY id ASC", (project_id,))
         roles = []
         for rl in cursor.fetchall():
             m_name = rl["model_name"] if "model_name" in rl.keys() and rl["model_name"] else get_default_model_for_role(rl["name"])
@@ -2041,22 +2041,46 @@ SWARM_DEFAULT_CONFIG = [
         "current_task_id": "",
         "scope": "Kiểm thử cross-platform, test API /api/status, xác thực installer",
         "mission": "Chạy regression tests, kiểm thử đa nền tảng (Linux, macOS, Windows WSL2), xác thực tính liên tục của conversation_id."
-    },
-    {
-        "id": "gw-security-agy",
-        "role_name": "Security Auditor",
-        "cli_tool": "Codex Security CLI / agy",
-        "account_type": "owner_default",
-        "conv_id": "conv-security-audit",
-        "gemini_model": "Gemini 3.1 Pro (High)",
-        "anthropic_model": "Claude Opus 4.6 (Thinking)",
-        "allowed_paths": ["vault/**", "security_audits/**", ".env.example"],
-        "blocked_paths": ["backend/**", "frontend/**"],
-        "current_task_id": "",
-        "scope": "Phân quyền volume Docker, audit file permission, kiểm soát Vault",
-        "mission": "Kiểm tra an toàn SELinux, cô lập quyền hạn biến môi trường và thẩm định secret boundary RFC 7636 PKCE."
     }
 ]
+
+# Vai đã bỏ (Boss chốt 29/09, VIEC-12): KHÔNG xóa dòng DB (giữ lịch sử dispatch_log / chat_messages),
+# chỉ đánh dấu status='retired', tắt tmux, lọc khỏi UI / giao việc; @vai trả lỗi rõ ràng.
+RETIRED_ROLES = {
+    "security": {"session_id": "gw-security-agy", "role_id": "ROLE-06", "name": "Security Auditor", "since": "2026-09-29"},
+}
+RETIRED_SESSION_IDS = {v["session_id"] for v in RETIRED_ROLES.values()}
+RETIRED_MENTION_RE = re.compile(r"(?<!\w)@(" + "|".join(RETIRED_ROLES) + r")\b", re.IGNORECASE)   # không bắt email abc@security.io
+
+def retired_role_error(role):
+    """Thông báo lỗi khi gọi/giao việc cho vai đã bỏ."""
+    info = RETIRED_ROLES.get((role or "").lower().lstrip("@"), {})
+    return (f"Vai @{role.lower().lstrip('@')} đã bỏ từ {info.get('since', '29/09')} (retired) — không giao việc được nữa. "
+            f"Việc rà soát/kiểm thử giao cho @qa; lịch sử cũ của {info.get('session_id', '')} vẫn giữ nguyên.")
+
+def retire_roles(project_id="PRJ-GEN-WORKPLACE"):
+    """
+    Migration idempotent (chỉ UPDATE): đánh dấu vai trong RETIRED_ROLES là 'retired' ở tmux_sessions + agent_roles.
+    Lần đầu đổi trạng thái thì tắt phiên tmux của vai đó. Không DELETE gì; lần chạy sau không làm gì.
+    Trả danh sách session_id vừa chuyển sang retired.
+    """
+    changed = []
+    with get_connection() as conn:
+        for info in RETIRED_ROLES.values():
+            cur = conn.execute("UPDATE tmux_sessions SET status = 'retired', pid = 0, updated_at = CURRENT_TIMESTAMP "
+                               "WHERE id = ? AND status != 'retired'", (info["session_id"],))
+            if cur.rowcount:
+                changed.append(info["session_id"])
+            conn.execute("UPDATE agent_roles SET status = 'retired' WHERE (id = ? OR name = ?) AND COALESCE(status, '') != 'retired'",
+                         (info["role_id"], info["name"]))
+        conn.commit()
+    for sid in changed:
+        try:
+            subprocess.run(["tmux", "kill-session", "-t", sid], capture_output=True, timeout=2.0)
+        except Exception:
+            pass
+        print(f"[migrate] Vai {sid} → retired (giữ lịch sử, đã tắt tmux)")
+    return changed
 
 def generate_role_spec_file(sid, role_name, scope="", mission="", conv_id="", allowed_paths=None, blocked_paths=None):
     """
@@ -2246,7 +2270,7 @@ def ensure_real_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
         rows = conn.execute("SELECT id, status FROM tmux_sessions WHERE project_id = ? ORDER BY id ASC", (project_id,)).fetchall()
     started = []
     for s in rows:
-        if s["status"] == "hibernated" or s["id"] in live:
+        if s["status"] in ("hibernated", "retired") or s["id"] in live:
             continue
         started.append(start_tmux_session(s["id"]))
     return started
@@ -2273,6 +2297,9 @@ def ensure_tmux_session_live(session_id):
         row = conn.execute("SELECT status FROM tmux_sessions WHERE id = ?", (session_id,)).fetchone()
     if not row:
         return {"status": "error", "session_id": session_id, "message": f"Không tìm thấy phiên {session_id}"}
+    if row["status"] == "retired":
+        return {"status": "error", "session_id": session_id, "action": "none",
+                "message": retired_role_error(next((k for k, v in RETIRED_ROLES.items() if v["session_id"] == session_id), session_id))}
     action = "none"
     res = {"status": row["status"], "session_id": session_id}
     if session_id not in tmux_live_sessions():
@@ -2321,7 +2348,7 @@ def reap_idle_tmux_sessions(idle_min=None, now=None, project_id=None):
         return out
     now = int(now if now is not None else time.time())
     live = _tmux_session_activity()
-    q = "SELECT id, status, COALESCE(last_activity_at, 0) AS last_act FROM tmux_sessions WHERE status != 'hibernated'"
+    q = "SELECT id, status, COALESCE(last_activity_at, 0) AS last_act FROM tmux_sessions WHERE status NOT IN ('hibernated', 'retired')"
     args = ()
     if project_id:
         q += " AND project_id = ?"
@@ -2399,7 +2426,7 @@ def seed_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
 
         conn.commit()
 
-def get_tmux_sessions(project_id="PRJ-GEN-WORKPLACE", output_sid=""):
+def get_tmux_sessions(project_id="PRJ-GEN-WORKPLACE", output_sid="", include_retired=False):
     """
     Danh sách phiên worker kèm tài khoản, quota, task. Chỉ đọc DB + đúng 1 `tmux list-sessions` (#30):
     không mở phiên, không capture-pane hàng loạt. `output_sid` = phiên đang xem ở màn Worker & terminal →
@@ -2419,7 +2446,8 @@ def get_tmux_sessions(project_id="PRJ-GEN-WORKPLACE", output_sid=""):
 
     with get_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM tmux_sessions WHERE project_id = ? ORDER BY id ASC", (project_id,))
+        cursor.execute("SELECT * FROM tmux_sessions WHERE project_id = ? " + ("" if include_retired else "AND status != 'retired' ")
+                       + "ORDER BY id ASC", (project_id,))
         rows = cursor.fetchall()
         results = []
 
@@ -2838,7 +2866,7 @@ def manage_tmux_swarm_lifecycle(action, target_id="all", project_id="PRJ-GEN-WOR
     project_id = normalize_project_id(project_id)
     with get_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT id, status FROM tmux_sessions WHERE project_id = ?", (project_id,))
+        cursor.execute("SELECT id, status FROM tmux_sessions WHERE project_id = ? AND status != 'retired'", (project_id,))
         sessions = cursor.fetchall()
 
     results = []
@@ -3326,7 +3354,7 @@ def spawn_worker(role_name, project_id="PRJ-GEN-WORKPLACE", account_type="owner_
         "created_at": now_time
     }
 
-SWARM_SESSION_IDS = ["gw-lead-agy", "gw-backend-agy", "gw-frontend-agy", "gw-devops-agy", "gw-qa-agy", "gw-security-agy"]
+SWARM_SESSION_IDS = [c["id"] for c in SWARM_DEFAULT_CONFIG]   # không có vai đã bỏ (RETIRED_ROLES)
 _TASK_TITLE_UNSAFE_RE = re.compile(r"[\'\"`$\\\n\r;|&<>(){}]")
 
 def build_task_directive(session_id, task_id, task_title, profile_dir=""):
@@ -4478,10 +4506,9 @@ WARROOM_ROLE_SESSIONS = {
     "frontend": "gw-frontend-agy",
     "devops": "gw-devops-agy",
     "qa": "gw-qa-agy",
-    "security": "gw-security-agy",
     "lead": "gw-lead-agy",
 }
-WARROOM_MENTION_RE = re.compile(r"@(backend|frontend|devops|qa|security|lead)\b", re.IGNORECASE)
+WARROOM_MENTION_RE = re.compile(r"@(backend|frontend|devops|qa|lead)\b", re.IGNORECASE)
 # @Gen / @Toàn Đội / @all: không giao việc (war-room chỉ giao cho vai cụ thể; Gen trả lời ở Bàn làm việc Gen)
 WARROOM_BROADCAST_RE = re.compile(r"@(gen|all|toàn\s*đội)(?![\w-])", re.IGNORECASE)
 TASK_REF_RE = re.compile(r"(?<![\w-])(TSK-\d+)(?![\w-])")
@@ -5249,8 +5276,12 @@ def assign_task_to_role(todo_id, session_id, project_id="PRJ-GEN-WORKPLACE", aut
     sid = resolve_role_session(session_id)
     if not todo_id:
         return {"error": "Thiếu todo_id (vd TSK-12)", "code": "bad_request"}
+    retired = next((k for k, v in RETIRED_ROLES.items()
+                    if str(session_id or "").strip().lstrip("@").lower() in (k, v["session_id"])), "")
+    if retired:
+        return {"error": retired_role_error(retired), "code": "retired_role"}
     if not sid:
-        return {"error": f"Vai không hợp lệ '{session_id}' (backend, frontend, devops, qa, security, lead hoặc gw-<vai>-agy)",
+        return {"error": f"Vai không hợp lệ '{session_id}' ({', '.join(WARROOM_ROLE_SESSIONS)} hoặc gw-<vai>-agy)",
                 "code": "bad_request"}
     task = _task_detail(todo_id, project_id)
     if not task:
@@ -5330,7 +5361,7 @@ def get_all_session_todos(project_id="PRJ-GEN-WORKPLACE"):
 
 def post_warroom_message(project_id="PRJ-GEN-WORKPLACE", channel_id="war_room", author="Ryan (Owner)", message="", tag="Directive", wait=False, task_id=""):
     """
-    Lưu tin nhắn; tin có @backend|@frontend|@devops|@qa|@security|@lead → chạy agy thật của vai đó ở thread nền (wait=True chạy
+    Lưu tin nhắn; tin có @backend|@frontend|@devops|@qa|@lead → chạy agy thật của vai đó ở thread nền (wait=True chạy
     đồng bộ, dùng cho test). Không có @vai → chỉ lưu (#3). @Gen / @Toàn Đội / @all KHÔNG giao việc (chỉ lưu, có ghi chú).
     Task của lần giao việc: task_id truyền vào > mã TSK-n đầu tiên có thật trong nội dung tin > current_task_id của worker.
     Prompt gửi agy kèm tiêu đề, mô tả, viec_ref và checklist của task đó.
@@ -5338,6 +5369,10 @@ def post_warroom_message(project_id="PRJ-GEN-WORKPLACE", channel_id="war_room", 
     project_id = normalize_project_id(project_id)
     if not message or not message.strip():
         return {"error": "Message is empty"}
+    # Gọi vai đã bỏ (vd @security) → lỗi rõ ràng, KHÔNG lưu tin, không giao việc cho ai
+    retired = [m.lower() for m in RETIRED_MENTION_RE.findall(message)]
+    if retired:
+        return {"error": retired_role_error(retired[0]), "code": "retired_role", "retired_roles": sorted(set(retired))}
 
     now_time = time.strftime("%H:%M:%S")
     now_iso = _now_iso()
@@ -5374,7 +5409,7 @@ def post_warroom_message(project_id="PRJ-GEN-WORKPLACE", channel_id="war_room", 
         note = (f"Đã chuyển tới {', '.join(dispatched)}; trả lời thật của agy sẽ xuất hiện trong kênh khi chạy xong (tối đa 15 phút). "
                 f"Chờ kết quả: wait_worker_result(dispatch_id=...) với dispatch_id trong 'dispatches'.")
     elif broadcast:
-        note = "@Gen / @Toàn Đội không giao việc cho worker nào; chỉ lưu tin. Gọi đúng vai: @backend, @frontend, @devops, @qa, @security, @lead."
+        note = "@Gen / @Toàn Đội không giao việc cho worker nào; chỉ lưu tin. Gọi đúng vai: @backend, @frontend, @devops, @qa, @lead."
     else:
         note = "Không có @vai nên chỉ lưu tin, không trả lời."
     return {
@@ -5446,8 +5481,6 @@ def get_default_model_for_role(role_name):
         return "Gemini 3.8 Flash (Medium)"
     if "qa" in rn or "test" in rn:
         return "Gemini 3.7 Flash (High)"
-    if "security" in rn or "audit" in rn:
-        return "Claude Sonnet 4.6 (Thinking)"
     return "Gemini 3.1 Pro (High)"
 
 def update_role_model(role_id, model_name, project_id="PRJ-GEN-WORKPLACE"):
@@ -5632,6 +5665,8 @@ def get_roles_sop():
     for fname in sorted(os.listdir(roles_dir)):
         if fname.endswith("_ROLE.md"):
             sid = fname.replace("_ROLE.md", "")
+            if sid in RETIRED_SESSION_IDS:   # vai đã bỏ (#34)
+                continue
             fpath = os.path.join(roles_dir, fname)
             try:
                 content = Path(fpath).read_text(encoding="utf-8")
@@ -7247,5 +7282,6 @@ def verify_mcp_request_auth(headers=None, query=None, tool_name=None):
 init_db()
 seed_real_project()
 seed_tmux_sessions()
+retire_roles()
 
 

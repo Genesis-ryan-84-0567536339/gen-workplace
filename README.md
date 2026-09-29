@@ -10,7 +10,7 @@
 ---
 
 ## 🌟 TỔNG QUAN HỆ THỐNG
-**Gen-workplace** cung cấp môi trường tích hợp (Mission Control SPA) giúp Owner quản trị nhiều dự án, tự động phân rã mục tiêu từ Plan & Chat tổng, phân công Role và chỉ định CLI Engine chuyên biệt (`Gemini CLI - agy`, `Claude Code CLI`, `Cursor CLI`, `Codex Security CLI`), theo dõi tiến trình qua Live Workflow Graph từng node, điều hành qua Swarm Chatroom thuần Việt với @mention/reaction emojis, và quản trị bộ nhớ Single Source of Truth (SSOT).
+**Gen-workplace** cung cấp môi trường tích hợp (Mission Control SPA) giúp Owner quản trị nhiều dự án, tự động phân rã mục tiêu từ Plan & Chat tổng, phân công Role và chỉ định CLI Engine chuyên biệt (`Gemini CLI - agy`, `Claude Code CLI`, `Cursor CLI`), theo dõi tiến trình qua Live Workflow Graph từng node, điều hành qua Swarm Chatroom thuần Việt với @mention/reaction emojis, và quản trị bộ nhớ Single Source of Truth (SSOT).
 
 Đặc biệt, hệ thống tích hợp sẵn **Model Context Protocol (MCP) Server chuẩn quốc tế** với **27 công cụ tự động hóa**, hỗ trợ kết nối 2 chiều cho mọi AI Agent ngoài (Cursor, Claude Desktop, Antigravity, OpenCode).
 
@@ -39,9 +39,8 @@ flowchart TD
         DevOps["🚢 gw-devops-agy (DevOps Engineer)<br/>• Dockerfile & docker-compose.yml (:z SELinux)<br/>• One-Command TUI Installer (install.sh)<br/>• Desktop Application Shortcut (.desktop)"]
     end
 
-    subgraph TIER4["TẦNG 4: KIỂM THẨM & BẢO VỆ"]
+    subgraph TIER4["TẦNG 4: KIỂM THỬ"]
         QA["🧪 gw-qa-agy (QA Tester)<br/>• Auto-Wake 68ms & Stress Test<br/>• Regression Test Suite"]
-        Sec["🛡️ gw-security-agy (Security Auditor)<br/>• Thẩm định OAuth 2.0 PKCE (RFC 7636)<br/>• Ranh giới Whitelist/Blacklist & Vault"]
     end
 
     Gen --> Lead
@@ -51,8 +50,7 @@ flowchart TD
     Backend -.-> QA
     Frontend -.-> QA
     DevOps -.-> QA
-    QA --> Sec
-    Sec --> Lead
+    QA --> Lead
 ```
 
 ---

@@ -131,7 +131,7 @@ dùng luật cũ (URL PR chỉ kiểm định dạng, file chỉ cần tồn t�
 - Cập nhật thủ công: `POST /api/quota/probe {"profile_id": "owner_default"}` hoặc MCP `probe_quota` (chạy `agy --gemini_dir=<dir> --mode plan -p 'ping'`, timeout 60s).
 
 ### 3.6. Chatroom gọi agy thật (#3)
-Tin trong War Room có `@backend|@frontend|@devops|@qa|@security|@lead` → thread nền chạy
+Tin trong War Room có `@backend|@frontend|@devops|@qa|@lead` → thread nền chạy (`@security` đã bỏ từ 29/09: trả lỗi `retired_role`, không lưu tin)
 `agy --gemini_dir=<profile của worker> --mode plan -p "<tin>"` (không `--sandbox`; timeout 15 phút) trong worktree riêng của vai; trả lời thật
 (tác giả = `gw-<vai>-agy`, body = output cắt 4000 ký tự + `exit=<code>`) được ghi vào `chat_messages`, kèm `dispatch_log` và báo cáo `~/gw-reports/warroom-<sid>-<ts>-<dispatch_id>.md`. Tin không có `@vai` chỉ được lưu.
 

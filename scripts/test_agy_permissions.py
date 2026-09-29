@@ -98,8 +98,8 @@ aliases, write = db.build_agy_aliases("gw-backend-agy", PROFILE, "conv-b", wt_be
 check("vai khác (backend) → không cờ", not write and all(FLAG not in a for a in aliases), str(aliases))
 aliases, write = db.build_agy_aliases("gw-backend-agy", PROFILE, "conv-b", wt_qa)
 check("backend nhưng cwd là worktree của qa → không cờ", not write)
-os.environ["GW_AGY_WRITE_ROLES"] = "gw-backend-agy, security"
-check("nhận cả session_id lẫn tên ngắn", db.role_may_skip_permissions("gw-backend-agy") and db.role_may_skip_permissions("gw-security-agy")
+os.environ["GW_AGY_WRITE_ROLES"] = "gw-backend-agy, devops"
+check("nhận cả session_id lẫn tên ngắn", db.role_may_skip_permissions("gw-backend-agy") and db.role_may_skip_permissions("gw-devops-agy")
       and not db.role_may_skip_permissions("gw-qa-agy"))
 os.environ.pop("GW_AGY_WRITE_ROLES")
 
@@ -181,7 +181,7 @@ else:
         p = pane_path(sid)
         if os.path.realpath(p) != os.path.realpath(os.path.join(WT_ROOT, sid)):
             check(f"{sid} mở trong worktree", False, p)
-    check("cả 6 vai mở trong worktree của mình", all(os.path.realpath(pane_path(s)) == os.path.realpath(os.path.join(WT_ROOT, s)) for s in db.SWARM_SESSION_IDS))
+    check("mọi vai mở trong worktree của mình", all(os.path.realpath(pane_path(s)) == os.path.realpath(os.path.join(WT_ROOT, s)) for s in db.SWARM_SESSION_IDS))
     # Script init nằm trong thư mục riêng của lần chạy (GW_TMUX_INIT_DIR), không phải /tmp chung → không bị tiến trình khác ghi đè
     qa_path_init = db.tmux_init_script_path("gw-qa-agy")
     check("script init nằm trong GW_TMUX_INIT_DIR của lần chạy", qa_path_init.startswith(os.environ["GW_TMUX_INIT_DIR"]), qa_path_init)

@@ -5159,7 +5159,7 @@ body.resizing-active, body.resizing-active * {
         <div class="pageHead">
           <div>
             <h1>Phòng giao ban</h1>
-            <p>Giao việc bằng @backend, @frontend, @devops, @qa, @security, @lead; tin có @vai được chạy thật bằng agy và trả kết quả về đây. Mã TSK-n / VIEC-n trong tin bấm được để mở thẻ task.</p>
+            <p>Giao việc bằng @backend, @frontend, @devops, @qa, @lead; tin có @vai được chạy thật bằng agy và trả kết quả về đây. Mã TSK-n / VIEC-n trong tin bấm được để mở thẻ task.</p>
           </div>
           <div class="actions">
             <button class="btn" onclick="loadWarRoomMessages(true)">↻ Làm mới kênh</button>
@@ -5259,17 +5259,6 @@ body.resizing-active, body.resizing-active * {
                 <button class="wrMentionBtn" onclick="insertWarRoomAt('@QA ')">@QA</button>
               </div>
 
-              <div class="wrMemberCard">
-                <div class="wrMemberInfo">
-                  <div class="wrMemberAvatar">SE</div>
-                  <div>
-                    <strong style="color:var(--text)">Security Auditor</strong>
-                    <div style="font-size:10px;color:var(--muted)">OAuth PKCE & Vault</div>
-                  </div>
-                </div>
-                <button class="wrMentionBtn" onclick="insertWarRoomAt('@Security ')">@Security</button>
-              </div>
-
             </div>
           </div>
 
@@ -5323,7 +5312,7 @@ body.resizing-active, body.resizing-active * {
 
               <div id="wrDispatchStrip" class="wrDispatchStrip" style="display:none"></div>
               <div class="wrInputBox">
-                <textarea id="wrMessageInput" class="wrTextarea" placeholder="Gõ @backend, @frontend, @devops, @qa, @security hoặc @lead rồi nêu việc; nhắc TSK-n để gắn tin vào task đó. Enter để gửi, Shift+Enter xuống dòng." onkeydown="handleWarRoomKeydown(event)"></textarea>
+                <textarea id="wrMessageInput" class="wrTextarea" placeholder="Gõ @backend, @frontend, @devops, @qa hoặc @lead rồi nêu việc; nhắc TSK-n để gắn tin vào task đó. Enter để gửi, Shift+Enter xuống dòng." onkeydown="handleWarRoomKeydown(event)"></textarea>
                 <button class="wrSendBtn" id="wrSendBtn" onclick="sendWarRoomMessage()">Gửi</button>
               </div>
             </div>
@@ -7525,7 +7514,6 @@ function getRoleDefaultModel(roleName) {
   if (rn.includes('frontend')) return 'Gemini 3.8 Flash (High)';
   if (rn.includes('devops') || rn.includes('docker')) return 'Gemini 3.8 Flash (Medium)';
   if (rn.includes('qa') || rn.includes('test')) return 'Gemini 3.7 Flash (High)';
-  if (rn.includes('security') || rn.includes('audit')) return 'Claude Sonnet 4.6 (Thinking)';
   return 'Gemini 3.1 Pro (High)';
 }
 
@@ -7696,8 +7684,7 @@ const ROLE_AVATARS = {
   'gw-backend-agy': 'BE',
   'gw-frontend-agy': 'FE',
   'gw-devops-agy': 'DO',
-  'gw-qa-agy': 'QA',
-  'gw-security-agy': 'SE'
+  'gw-qa-agy': 'QA'
 };
 
 function renderTmuxSessions() {
@@ -7774,18 +7761,6 @@ const ROLE_DETAILS = {
       { text: 'Chạy regression test suite trên các API endpoints', done: false },
       { text: 'Báo cáo lỗi và cung cấp bằng chứng nghiệm thu thực nghiệm', done: false }
     ]
-  },
-  'gw-security-agy': {
-    title: 'Security Auditor (Chuyên Gia Bảo Mật & Kiểm Toán)',
-    mission: 'Kiểm toán mã nguồn, bảo vệ Vault bí mật, cô lập token OAuth 2.0 PKCE và phân quyền file.',
-    inputFrom: 'Nhận mã nguồn, cấu hình Docker và luồng lưu trữ token',
-    outputTo: 'Báo cáo thẩm định an ninh và xác thực zero-secret-leak cho Lead Architect',
-    checklist: [
-      { text: 'Quét toàn bộ repo ngăn ngừa rò rỉ API key và token OAuth dạng plaintext', done: false },
-      { text: 'Thẩm định cơ chế xác thực Google OAuth 2.0 chuẩn RFC 7636 PKCE', done: false },
-      { text: 'Kiểm tra phân quyền thư mục ~/.gemini và cấu hình volume SELinux', done: false },
-      { text: 'Xác lập ranh giới bảo vệ Secret Vault bất khả xâm phạm', done: false }
-    ]
   }
 };
 
@@ -7810,7 +7785,15 @@ function renderExpertSquadGrid() {
   const container = $('expertSquadGrid');
   if (!container) return;
 
-  container.innerHTML = state.tmuxSessions.map(s => {
+  // Ẩn vai có hồ sơ chưa đăng nhập (is_auth=false), trừ khi Boss bấm "Hiện" hoặc đang chọn chính vai đó (#34)
+  const all = state.tmuxSessions || [];
+  const hidden = all.filter(s => s.is_auth === false && s.id !== state.selectedTmuxSessionId);
+  const shown = state.showUnauthWorkers ? all : all.filter(s => !hidden.includes(s));
+  const hiddenNote = hidden.length
+    ? `<div class="hint" style="padding:6px 10px;font-size:10.5px">${state.showUnauthWorkers ? 'Đang hiện' : 'Đã ẩn'} ${hidden.length} vai chưa đăng nhập (${hidden.map(s => escapeHtml(s.id.replace(/^gw-|-agy$/g, ''))).join(', ')}) · <a href="#" onclick="state.showUnauthWorkers=!state.showUnauthWorkers;renderExpertSquadGrid();return false">${state.showUnauthWorkers ? 'Ẩn' : 'Hiện'}</a></div>`
+    : '';
+
+  container.innerHTML = hiddenNote + shown.map(s => {
     const isSel = s.id === state.selectedTmuxSessionId;
     const avatar = ROLE_AVATARS[s.id] || '';
     const qG = s.quota_gemini || {};
@@ -8806,7 +8789,7 @@ function renderOrchDefinition() {
           <div><strong>• Tầng 1 (Chỉ Huy Kỹ Thuật):</strong> <code>gw-lead-agy</code> (Lead Architect) · Khóa SSOT, Phân rã DAG & Ký duyệt nghiệm thu</div>
           <div><strong>• Tầng 2 (Xây Dựng Cốt Lõi):</strong> <code>gw-backend-agy</code> (Backend & DB) · <code>gw-frontend-agy</code> (Frontend UI)</div>
           <div><strong>• Tầng 3 (Hạ Tầng & Đóng Gói):</strong> <code>gw-devops-agy</code> (DevOps & Packaging) · Docker, TUI Installer & Desktop Shortcut</div>
-          <div><strong>• Tầng 4 (Kiểm Thẩm & Bảo Vệ):</strong> <code>gw-qa-agy</code> (QA Tester) · <code>gw-security-agy</code> (Security Auditor)</div>
+          <div><strong>• Tầng 4 (Kiểm Thẩm & Bảo Vệ):</strong> <code>gw-qa-agy</code> (QA Tester)</div>
         </div>
       </div>
     </div>
@@ -13414,7 +13397,7 @@ const WARROOM_CHANNEL_META = {
   },
   handoff: {
     title: 'Hợp Đồng I/O & Bàn Giao Liên Vai Trò',
-    desc: 'Bàn giao hợp đồng schema API, mock data, artifact và test log giữa Backend, Frontend, QA và Security.',
+    desc: 'Bàn giao hợp đồng schema API, mock data, artifact và test log giữa Backend, Frontend và QA.',
     defaultTag: 'IO'
   }
 };
@@ -13669,8 +13652,8 @@ const HUB_ROLE_TEAMS = [
   { key: 'backend', name: 'Backend', sid: 'gw-backend-agy', match: ['backend'] },
   { key: 'frontend', name: 'Frontend', sid: 'gw-frontend-agy', match: ['frontend'] },
   { key: 'devops', name: 'DevOps', sid: 'gw-devops-agy', match: ['devops', 'docker'] },
-  { key: 'qa', name: 'QA', sid: 'gw-qa-agy', match: ['qa', 'test'] },
-  { key: 'security', name: 'Security', sid: 'gw-security-agy', match: ['security', 'audit'] }
+  { key: 'qa', name: 'QA', sid: 'gw-qa-agy', match: ['qa', 'test'] }
+  // security đã bỏ (29/09, #34): backend đánh dấu retired, @security trả lỗi rõ ràng
 ];
 const HUB_SID_ROLE = Object.fromEntries(HUB_ROLE_TEAMS.map(r => [r.sid, r.key]));
 let hubPendingFocus = null;
@@ -13736,18 +13719,31 @@ function renderTaskLinkMeta(t) {
     </div>`;
 }
 
+// Vai giao được: bỏ vai đã retired (không còn trong /api/tmux/sessions) và vai có hồ sơ chưa đăng nhập (is_auth=false) (#34)
+function hubAssignableRoles() {
+  const ss = state.tmuxSessions || [];
+  if (!ss.length) return HUB_ROLE_TEAMS;
+  return HUB_ROLE_TEAMS.filter(r => {
+    const s = ss.find(x => x.id === r.sid);
+    return s && s.status !== 'retired' && s.is_auth !== false;
+  });
+}
+
 // Hàng nút: Giao cho @vai · Tin #n · Terminal (+ Phiên, Nghiệm thu)
 function renderTaskLinkActions(t, ctx) {
   const key = `${ctx}-${t.id}`;
-  const roleNow = hubAssignChoice[key] || taskRoleKey(t) || 'qa';
+  const roles = hubAssignableRoles();
+  let roleNow = hubAssignChoice[key] || taskRoleKey(t) || 'qa';
+  if (roles.length && !roles.some(r => r.key === roleNow)) roleNow = roles.some(r => r.key === 'qa') ? 'qa' : roles[0].key;
   const d = t.last_dispatch;
   const msgId = d ? (d.reply_msg_id || d.request_msg_id) : null;
   const sid = taskWorkerSid(t);
   const isDone = t.status === 'done';
-  const opts = HUB_ROLE_TEAMS.map(r => `<option value="${r.key}" ${r.key === roleNow ? 'selected' : ''}>@${r.key}</option>`).join('');
+  const opts = roles.map(r => `<option value="${r.key}" ${r.key === roleNow ? 'selected' : ''}>@${r.key}</option>`).join('');
   return `
     <div class="taskLinkActions" onclick="event.stopPropagation()">
-      ${isDone ? '' : `<select class="taskAssignSel" id="assignSel-${escapeHtml(key)}" onchange="hubAssignChoice['${escapeHtml(key)}']=this.value;document.getElementById('assignBtn-${escapeHtml(key)}').textContent='Giao cho @'+this.value" title="Chọn vai">${opts}</select>
+      ${isDone || roles.length ? '' : '<span class="hint" title="Đăng nhập hồ sơ Google cho vai ở màn Worker & terminal">Chưa vai nào đăng nhập để giao</span>'}
+      ${isDone || !roles.length ? '' : `<select class="taskAssignSel" id="assignSel-${escapeHtml(key)}" onchange="hubAssignChoice['${escapeHtml(key)}']=this.value;document.getElementById('assignBtn-${escapeHtml(key)}').textContent='Giao cho @'+this.value" title="Chọn vai">${opts}</select>
       <button class="btn small taskAssignBtn" id="assignBtn-${escapeHtml(key)}" onclick="assignTaskFromCard('${escapeHtml(t.id)}','${escapeHtml(key)}')" title="Claim task cho vai + gửi war-room @vai kèm tiêu đề, checklist, viec_ref">Giao cho @${roleNow}</button>`}
       ${msgId ? `<button class="btn small" onclick="openWarroomMessage(${Number(msgId)}, '${escapeHtml((d && d.channel_id) || 'war_room')}')" title="Mở phòng giao ban tại tin này">Tin #${Number(msgId)}</button>` : ''}
       ${sid ? `<button class="btn small" onclick="openWorkerTerminal('${escapeHtml(sid)}')" title="Mở Worker & Terminal của ${escapeHtml(sid)}">Terminal</button>` : ''}
