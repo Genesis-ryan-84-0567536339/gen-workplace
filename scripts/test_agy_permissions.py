@@ -44,6 +44,7 @@ os.environ["GW_AGY_BIN"] = AGY
 os.environ["GW_DISPATCH_REPO"] = REPO
 os.environ["GW_WORKTREE_ROOT"] = os.path.join(TMP, "gw-worktrees")
 os.environ["TMUX_TMPDIR"] = os.path.join(TMP, "tmux")
+os.environ["GW_TMUX_INIT_DIR"] = os.path.join(TMP, "tmux-init")
 os.environ.pop("TMUX", None)
 for k in ("GW_AGY_WRITE_ROLES", "GW_WARROOM_SKIP_PERMISSIONS", "GW_AGY_PLAN_ALLOW", "GW_DIRECTIVE_ALLOW_ALL"):
     os.environ.pop(k, None)
@@ -180,8 +181,11 @@ else:
         if os.path.realpath(p) != os.path.realpath(os.path.join(WT_ROOT, sid)):
             check(f"{sid} mở trong worktree", False, p)
     check("cả 6 vai mở trong worktree của mình", all(os.path.realpath(pane_path(s)) == os.path.realpath(os.path.join(WT_ROOT, s)) for s in db.SWARM_SESSION_IDS))
-    qa_init = open("/tmp/tmux_init_gw-qa-agy.sh").read()
-    be_init = open("/tmp/tmux_init_gw-backend-agy.sh").read()
+    # Script init nằm trong thư mục riêng của lần chạy (GW_TMUX_INIT_DIR), không phải /tmp chung → không bị tiến trình khác ghi đè
+    qa_path_init = db.tmux_init_script_path("gw-qa-agy")
+    check("script init nằm trong GW_TMUX_INIT_DIR của lần chạy", qa_path_init.startswith(os.environ["GW_TMUX_INIT_DIR"]), qa_path_init)
+    qa_init = open(qa_path_init).read()
+    be_init = open(db.tmux_init_script_path("gw-backend-agy")).read()
     check("init script gw-qa-agy không có skip-permissions", FLAG not in qa_init, qa_init[-600:])
     be_alias = [ln for ln in be_init.splitlines() if ln.startswith("alias agy")]
     check("gw-backend-agy (được cấu hình): chỉ agy-run có cờ", len(be_alias) == 2 and FLAG not in be_alias[0] and FLAG in be_alias[1], str(be_alias))

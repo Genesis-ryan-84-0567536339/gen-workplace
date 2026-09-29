@@ -479,6 +479,8 @@ def init_db():
         cursor.execute("UPDATE gen_session_files SET owner_id = 'owner-ryan' WHERE owner_id IS NULL OR owner_id = ''")
         cursor.execute("UPDATE gen_compact_snapshots SET owner_id = 'owner-ryan' WHERE owner_id IS NULL OR owner_id = ''")
         cursor.execute("UPDATE tmux_sessions SET owner_id = 'owner-ryan' WHERE owner_id IS NULL OR owner_id = ''")
+        # Sửa dữ liệu hỏng do nút Test switch_google_account gửi {} (account_type = NULL → /api/tmux/sessions 500)
+        cursor.execute("UPDATE tmux_sessions SET account_type = 'owner_default' WHERE account_type IS NULL OR TRIM(account_type) = ''")
         cursor.execute("UPDATE master_ssot SET owner_id = 'owner-ryan' WHERE owner_id IS NULL OR owner_id = ''")
 
         # 20. Gen Session Todos & Interactive Checklists (Kanban DAG chuyên dụng theo phiên)
@@ -622,7 +624,9 @@ def init_db():
                               ("request_msg_id", "INTEGER"), ("reply_msg_id", "INTEGER"),
                               # tự chuyển tài khoản khi hết quota (#22): hồ sơ gán cho vai, hồ sơ chạy thật, lý do, các hồ sơ đã thử (JSON)
                               ("profile_initial", "TEXT DEFAULT ''"), ("profile_used", "TEXT DEFAULT ''"),
-                              ("fallback_reason", "TEXT DEFAULT ''"), ("profiles_tried", "TEXT DEFAULT ''")]:
+                              ("fallback_reason", "TEXT DEFAULT ''"), ("profiles_tried", "TEXT DEFAULT ''"),
+                              # tin kết quả đã ghi về phiên (conversation) của task: id gen_messages (tránh ghi 2 lần)
+                              ("task_msg_id", "INTEGER")]:
             try:
                 cursor.execute(f"ALTER TABLE dispatch_log ADD COLUMN {col} {col_type};")
             except Exception:
@@ -1002,7 +1006,9 @@ def get_full_state(project_id="PRJ-GEN-WORKPLACE"):
             "roleMemory": role_memory,
             "catalog": catalog,
             "refs": refs,
-            "events": events
+            "events": events,
+            # Task thật (Kanban phiên, MCP create_kanban_task / claim) cho màn Việc & tiến độ (#24)
+            "gen_session_todos": get_all_session_todos(project_id)
         }
 
 def search_catalog_fts(query_str, project_id="PRJ-GEN-WORKPLACE"):
@@ -1185,6 +1191,7 @@ def refresh_google_oauth_token(profile_id="owner_default"):
     Tự động làm mới OAuth Access Token từ Google OAuth endpoint bằng refresh_token
     khi access token hết hạn. Hỗ trợ cả owner_default và profile1-4.
     """
+    profile_id = profile_id or "owner_default"
     target_dir = os.path.join(HOME_DIR, ".gemini") if profile_id == "owner_default" else os.path.join(HOME_DIR, ".agy-profiles", profile_id)
     token_file = os.path.join(target_dir, "antigravity-cli", "antigravity-oauth-token")
     if not os.path.exists(token_file):
@@ -1242,6 +1249,8 @@ def fetch_live_google_quota(profile_id="owner_default", force=False):
     Tự động refresh token nếu hết hạn, hỗ trợ đa tài khoản (profile1, profile2, profile3, profile4).
     """
     global _LIVE_QUOTA_CACHE, _LIVE_QUOTA_CACHE_TIME
+    # account_type NULL/rỗng (vd do lần bấm Test switch_google_account {} trước đây) → coi là owner_default, không lỗi os.path.join(None)
+    profile_id = profile_id or "owner_default"
     now = time.time()
     if not force and profile_id in _LIVE_QUOTA_CACHE:
         if now - _LIVE_QUOTA_CACHE_TIME.get(profile_id, 0) < QUOTA_CACHE_TTL:
@@ -1503,6 +1512,26 @@ def fetch_live_google_quota(profile_id="owner_default", force=False):
     except Exception as e:
         print(f"[Live Quota] Error processing quota models: {e}")
         return _LIVE_QUOTA_CACHE.get(profile_id)
+
+def live_quota_response(profile_id="owner_default", force=True):
+    """
+    Dữ liệu cho GET /api/quota/live và MCP get_live_quota. Có số từ Cloud Code API → source cloudcode_api_live; không có → quota
+    từ lần gọi agy thật (get_quota_telemetry). Cả 2 nhánh đều gắn exhausted / reset_at / reset_at_label từ profile_quota_state
+    (trước đây nhánh Cloud Code trả gemini.exhausted = null).
+    """
+    profile_id = profile_id or "owner_default"
+    live = fetch_live_google_quota(profile_id, force=force)
+    if live:
+        g_q, a_q = dict(live[0]), dict(live[1])
+        source = "cloudcode_api_live"
+        for q, fam in ((g_q, "gemini"), (a_q, "claude")):
+            st = get_profile_quota_state(profile_id, fam)
+            q.update({"profile_id": profile_id, "exhausted": st["exhausted"], "reset_at": st["reset_at"],
+                      "reset_at_label": st["reset_at_label"]})
+    else:
+        g_q, a_q = get_quota_telemetry(profile_id)
+        source = "agy_probe_or_unknown"
+    return {"ok": True, "source": source, "gemini": g_q, "claude": a_q, "quota_state": get_profile_quota_state(profile_id)}
 
 QUOTA_PROBE_MAX_AGE_SEC = 6 * 3600
 
@@ -2079,6 +2108,16 @@ def generate_role_spec_file(sid, role_name, scope="", mission="", conv_id="", al
         print(f"Error writing role spec for {sid}: {e}")
     return str(role_spec_path)
 
+def tmux_init_dir():
+    """Thư mục chứa script khởi tạo tmux của từng vai: GW_TMUX_INIT_DIR, mặc định <DATA_DIR>/tmux-init.
+    Không dùng /tmp chung: nhiều tiến trình (app thật, test chạy song song) ghi đè cùng file /tmp/tmux_init_*.sh."""
+    d = os.environ.get("GW_TMUX_INIT_DIR") or os.path.join(str(DATA_DIR), "tmux-init")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+def tmux_init_script_path(session_id):
+    return os.path.join(tmux_init_dir(), f"tmux_init_{session_id}.sh")
+
 def ensure_real_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
     """
     Đảm bảo 6 phiên tmux thật sự đang chạy nền trên host (app chạy bằng python3 backend/main.py, không dùng Docker).
@@ -2116,7 +2155,7 @@ def ensure_real_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
                 continue
 
             role_name = s["role_name"]
-            acc_type = s["account_type"]
+            acc_type = s["account_type"] or "owner_default"
             profile_dir = s["profile_dir"]
             conv_id = s["conversation_id"] if "conversation_id" in s.keys() and s["conversation_id"] else f"conv-{sid}"
 
@@ -2133,7 +2172,7 @@ def ensure_real_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
 
             # Nếu phiên tmux chưa chạy thật sự -> Khởi tạo phiên tmux bash thật!
             if sid not in live_sessions:
-                init_script_path = f"/tmp/tmux_init_{sid}.sh"
+                init_script_path = tmux_init_script_path(sid)
                 try:
                     p_dir_clean = profile_dir or os.path.join(HOME_DIR, ".gemini")
                     role_cwd = tmux_role_cwd(sid)  # worktree riêng của vai, không mở thẳng trong repo app (#7)
@@ -2248,7 +2287,7 @@ def get_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
         results = []
 
         for r in rows:
-            acc_type = r["account_type"]
+            acc_type = r["account_type"] or "owner_default"
             p_info = oauth_map.get(acc_type, {})
             email = p_info.get("email") or None
             is_auth = bool(p_info.get("is_auth"))
@@ -2280,11 +2319,16 @@ def get_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
             task_roadmap = ""
             evidence_ref = ""
             task_viec_ref = ""
+            task_conv_id = ""
+            task_chk_total = 0
+            task_chk_done = 0
             if task_id:
-                cursor.execute("SELECT title, status, roadmap_id, evidence_ref, viec_ref FROM todos WHERE id = ? LIMIT 1", (task_id,))
+                cursor.execute("SELECT title, status, roadmap_id, evidence_ref, viec_ref, '' AS conversation_id, '[]' AS checklist_json "
+                               "FROM todos WHERE id = ? LIMIT 1", (task_id,))
                 t_row = cursor.fetchone()
                 if not t_row:
-                    cursor.execute("SELECT title, status, '' AS roadmap_id, evidence_ref, viec_ref FROM gen_session_todos WHERE id = ? LIMIT 1", (task_id,))
+                    cursor.execute("SELECT title, status, '' AS roadmap_id, evidence_ref, viec_ref, conversation_id, checklist_json "
+                                   "FROM gen_session_todos WHERE id = ? LIMIT 1", (task_id,))
                     t_row = cursor.fetchone()
                 if t_row:
                     task_title = t_row["title"]
@@ -2292,6 +2336,13 @@ def get_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
                     task_roadmap = t_row["roadmap_id"] or ""
                     evidence_ref = t_row["evidence_ref"] or ""
                     task_viec_ref = t_row["viec_ref"] or ""
+                    task_conv_id = t_row["conversation_id"] or ""
+                    try:
+                        chk = json.loads(t_row["checklist_json"] or "[]")
+                        task_chk_total = len(chk)
+                        task_chk_done = sum(1 for c in chk if isinstance(c, dict) and c.get("done"))
+                    except Exception:
+                        pass
             else:
                 # Tìm task gần nhất đã hoàn tất của chuyên gia này để thể hiện bằng chứng nghiệm thu thực tế
                 role_first_word = r["role_name"].split()[0]
@@ -2342,6 +2393,9 @@ def get_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
                 "task_status": task_status,
                 "task_roadmap": task_roadmap,
                 "task_viec_ref": task_viec_ref,
+                "task_conversation_id": task_conv_id,
+                "task_checklist_total": task_chk_total,
+                "task_checklist_done": task_chk_done,
                 "evidence_ref": evidence_ref,
                 "attach_cmd": f"tmux attach -t {r['id']}",
                 "updated_at": r["updated_at"]
@@ -2349,8 +2403,35 @@ def get_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
 
         return results
 
+ACCOUNT_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,40}$")
+
+def validate_account_switch(session_id, account_id, custom_dir=""):
+    """
+    Kiểm tham số đổi tài khoản của 1 worker (MCP switch_google_account, POST /api/tmux/account). Trả '' nếu hợp lệ, không thì
+    chuỗi lỗi. Trước đây gửi {} ghi account_type=NULL → fetch_live_google_quota lỗi → /api/tmux/sessions 500.
+    account_id='custom' chỉ hợp lệ khi kèm custom_dir (hồ sơ tự chọn thư mục ở màn đổi tài khoản).
+    """
+    session_id = session_id.strip() if isinstance(session_id, str) else ""
+    account_id = account_id.strip() if isinstance(account_id, str) else ""
+    if not session_id:
+        return "Thiếu session_id (vd gw-qa-agy)"
+    if not account_id:
+        return "Thiếu account_id (vd owner_default, profile1)"
+    if not ACCOUNT_ID_RE.match(account_id):
+        return f"account_id '{account_id}' sai định dạng (chỉ chữ, số, _ và -)"
+    with get_connection() as conn:
+        if not conn.execute("SELECT 1 FROM tmux_sessions WHERE id = ?", (session_id,)).fetchone():
+            return f"Không có worker '{session_id}'"
+    if account_id == "custom" and (custom_dir or "").strip():
+        return ""
+    known = [p["id"] for p in get_oauth_profiles()]
+    if account_id not in known:
+        return f"Không có hồ sơ '{account_id}' (hiện có: {', '.join(known)})"
+    return ""
+
 def update_tmux_account(session_id, account_type, account_label="", profile_dir=""):
     """Đổi tài khoản OAuth cho phiên Tmux và cập nhật môi trường runtime ngay trong tmux. Nhãn để trống sẽ được tính từ email thật; trả về nhãn đã dùng."""
+    account_type = (account_type or "").strip() or "owner_default"   # không bao giờ ghi NULL
     if not account_label:
         account_label = compute_account_label(account_type)
     with get_connection() as conn:
@@ -2576,7 +2657,7 @@ def wake_tmux_session(session_id):
             return {"status": "error", "message": f"Không tìm thấy phiên {session_id}"}
 
         role_name = s["role_name"]
-        acc_type = s["account_type"]
+        acc_type = s["account_type"] or "owner_default"
         profile_dir = s["profile_dir"]
         conv_id = s["conversation_id"] or f"conv-{session_id}"
         prev_output = s["terminal_output"] or ""
@@ -2586,7 +2667,7 @@ def wake_tmux_session(session_id):
         p_dir_clean = profile_dir or p_info.get("path") or os.path.join(HOME_DIR, ".gemini")
         role_spec_file = generate_role_spec_file(session_id, role_name, conv_id=conv_id)
 
-        init_script_path = f"/tmp/tmux_init_{session_id}.sh"
+        init_script_path = tmux_init_script_path(session_id)
         try:
             role_cwd = tmux_role_cwd(session_id)  # worktree riêng của vai (#7)
             with open(init_script_path, "w") as f:
@@ -3547,7 +3628,9 @@ def _log_evidence_override(conn, table, todo_id, project_id, session_id, old_ev,
                                      new_evidence_ref, new_verified_by, reason, action, held_by)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (todo_id, table, project_id, session_id or "", old_ev or "", old_by or "", new_ev, new_by, reason or "", action, held_by or ""))
-    if action == "force_close":
+    if action == "holder_dispatch":
+        print(f"[evidence] {session_id} đóng task {todo_id} ({table}) thay {held_by} bằng dispatch của chính {held_by}: '{new_ev}'")
+    elif action == "force_close":
         print(f"[evidence] force đóng task {todo_id} ({table}) đang do {held_by} giữ, người đóng {session_id}: '{new_ev}'"
               + (f" — lý do: {reason}" if reason else ""))
     else:
@@ -3566,6 +3649,18 @@ def get_task_evidence_audit(task_id="", limit=50):
 # Người đang giữ task (claim_task): todos → assigned_session_id, Kanban phiên → claimed_by (assigned_agent chỉ là nhãn giao việc)
 _TASK_HOLDER_COL = {"todos": "assigned_session_id", "gen_session_todos": "claimed_by"}
 
+def _is_holder_dispatch_evidence(evidence_ref, todo_id, holder):
+    """evidence_ref = dispatch:<id> của chính holder, gắn đúng task todo_id, đã done."""
+    m = EVIDENCE_DISPATCH_RE.match((evidence_ref or "").strip()) if isinstance(evidence_ref, str) else None
+    if not m or not holder:
+        return False
+    try:
+        row = _get_dispatch_row(int(m.group(1)))
+    except Exception:
+        return False
+    return bool(row) and row.get("session_id") == holder and (row.get("task_id") or "") == todo_id \
+        and _row_status(row) in DISPATCH_OK_STATUSES
+
 def complete_task(session_id, todo_id, evidence_ref, verified_by="Lead Architect", project_id="PRJ-GEN-WORKPLACE", force=False, reason=""):
     """
     HÀM CHUNG duy nhất chuyển task sang 'done' (Evidence-Backed Completion, #4, #16, #18). Mọi đường đổi trạng thái
@@ -3580,6 +3675,8 @@ def complete_task(session_id, todo_id, evidence_ref, verified_by="Lead Architect
     - Task đã done → {"error", "code": "already_done"} và KHÔNG ghi đè; chỉ ghi đè khi force=True,
       mỗi lần ghi đè được lưu vào task_evidence_audit (bằng chứng cũ → mới, ai, lý do) và in log.
     - verified_by được tính: 'git:commit' / 'file' / 'github:pr' / 'dispatch' / 'warroom' (tham số verified_by chỉ giữ để tương thích API).
+    - Ngoại lệ không cần force: bằng chứng là dispatch:<id> ĐÃ XONG của chính người đang giữ task, gắn đúng task này (kết quả
+      là của người giữ) → đóng thay được, trả closed_for_holder và ghi task_evidence_audit action='holder_dispatch' (#24).
     - Tự động nhả khóa session để sẵn sàng nhận nhiệm vụ tiếp theo.
     """
     project_id = normalize_project_id(project_id)
@@ -3602,7 +3699,12 @@ def complete_task(session_id, todo_id, evidence_ref, verified_by="Lead Architect
                          "Cần sửa bằng chứng thì gọi lại với force=true (sẽ được ghi log).",
                 "code": "already_done", "task_id": todo_id, "evidence_ref": row["evidence_ref"] or "", "verified_by": row["verified_by"] or ""}
     holder = (row["holder"] or "").strip()
-    if not was_done and holder and holder != session_id and not force:
+    acting_for = ""
+    if not was_done and holder and holder != session_id and not force and _is_holder_dispatch_evidence(evidence_ref, todo_id, holder):
+        # Bằng chứng là lần giao việc (dispatch) ĐÃ XONG của chính người giữ task cho đúng task này → đóng thay người giữ được,
+        # không cần force (kết quả là của người giữ); ghi task_evidence_audit action='holder_dispatch'.
+        acting_for = holder
+    if not was_done and holder and holder != session_id and not force and not acting_for:
         return {"error": f"Task {todo_id} đang do {holder} giữ — chỉ người giữ task mới được đóng. "
                          "Muốn đóng thay thì gọi lại với force=true (sẽ được ghi nhật ký task_evidence_audit).",
                 "code": "not_holder", "task_id": todo_id, "held_by": holder, "session_id": session_id}
@@ -3624,7 +3726,7 @@ def complete_task(session_id, todo_id, evidence_ref, verified_by="Lead Architect
             if not force:
                 # Nguyên tử: chưa done và (chưa ai giữ hoặc chính người gọi đang giữ) ngay tại lúc ghi
                 guard = f" AND status != 'done' AND COALESCE({holder_col}, '') IN ('', ?)"
-                guard_params = [session_id]
+                guard_params = [acting_for or session_id]
             if table == "todos":
                 cur = conn.execute(f"""
                 UPDATE todos
@@ -3645,7 +3747,12 @@ def complete_task(session_id, todo_id, evidence_ref, verified_by="Lead Architect
                         "code": "not_holder", "task_id": todo_id, "held_by": old["holder"] if old else ""}
             overridden = bool(old and old["status"] == "done")
             old_holder = (old["holder"] or "").strip() if old else ""
-            force_closed = bool(old and not overridden and old_holder and old_holder != session_id)
+            force_closed = bool(old and not overridden and old_holder and old_holder != session_id and not acting_for)
+            if acting_for:
+                _log_evidence_override(conn, table, todo_id, project_id, session_id, old["evidence_ref"] if old else "",
+                                       old["verified_by"] if old else "", evidence_ref, verified_by, reason or "bằng chứng là dispatch của người giữ task",
+                                       action="holder_dispatch", held_by=acting_for)
+                conn.execute("UPDATE tmux_sessions SET current_task_id = '' WHERE id = ? AND current_task_id = ?", (acting_for, todo_id))
             if overridden:
                 _log_evidence_override(conn, table, todo_id, project_id, session_id, old["evidence_ref"], old["verified_by"],
                                        evidence_ref, verified_by, reason)
@@ -3669,6 +3776,8 @@ def complete_task(session_id, todo_id, evidence_ref, verified_by="Lead Architect
         res["overridden"] = {"old_evidence_ref": old["evidence_ref"] or "", "old_verified_by": old["verified_by"] or "", "reason": reason or ""}
     if force_closed:
         res["force_closed"] = {"held_by": old_holder, "reason": reason or ""}
+    if acting_for:
+        res["closed_for_holder"] = acting_for
     return res
 
 TASK_STATUS_ERROR_HTTP = {"not_found": 404, "already_done": 409, "not_holder": 409, "wrong_conversation": 404}
@@ -3854,12 +3963,29 @@ def send_event_webhook(event, project_id="PRJ-GEN-WORKPLACE", viec_ref="", task_
         print(f"[webhook] Không gửi được {event} tới {url}: {e}")
         return False
 
-def get_dispatch_log(limit=50):
-    """Nhật ký dispatch_log (mới nhất trước) cho GET /api/dispatch/log."""
-    limit = max(1, min(int(limit or 50), 500))
+def get_dispatch_log(limit=50, task_id="", session_id=""):
+    """Nhật ký dispatch_log (mới nhất trước) cho GET /api/dispatch/log; lọc theo task_id và/hoặc session_id (khớp đúng)."""
+    try:
+        limit = max(1, min(int(limit or 50), 500))
+    except (TypeError, ValueError):
+        limit = 50
+    where, params = [], []
+    if (task_id or "").strip():
+        where.append("task_id = ?")
+        params.append(task_id.strip())
+    if (session_id or "").strip():
+        where.append("session_id = ?")
+        params.append(session_id.strip())
+    sql = "SELECT * FROM dispatch_log" + (" WHERE " + " AND ".join(where) if where else "") + " ORDER BY id DESC LIMIT ?"
     with get_connection() as conn:
-        rows = conn.execute("SELECT * FROM dispatch_log ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
-        return [dict(r) for r in rows]
+        rows = conn.execute(sql, params + [limit]).fetchall()
+    out = []
+    for r in rows:
+        d = dict(r)
+        d["status"] = _row_status(d)
+        d["fallback"] = bool(d.get("profile_used")) and (d.get("profile_used") or "") != (d.get("profile_initial") or "")
+        out.append(d)
+    return out
 
 # ---------------------------------------------------------------------------
 # Chờ kết quả worker phía server (Issue #9): wait_worker_result
@@ -3967,6 +4093,7 @@ def _finish_tmux_dispatch(row, exit_code, output, project_id="PRJ-GEN-WORKPLACE"
             with get_connection() as conn:
                 conn.execute("UPDATE dispatch_log SET webhook_sent = 1 WHERE id = ?", (row["id"],))
                 conn.commit()
+        report_dispatch_to_task(row["id"], project_id)
         _notify_dispatch_change()
     return claimed
 
@@ -4236,6 +4363,9 @@ WARROOM_ROLE_SESSIONS = {
     "lead": "gw-lead-agy",
 }
 WARROOM_MENTION_RE = re.compile(r"@(backend|frontend|devops|qa|security|lead)\b", re.IGNORECASE)
+# @Gen / @Toàn Đội / @all: không giao việc (war-room chỉ giao cho vai cụ thể; Gen trả lời ở Bàn làm việc Gen)
+WARROOM_BROADCAST_RE = re.compile(r"@(gen|all|toàn\s*đội)(?![\w-])", re.IGNORECASE)
+TASK_REF_RE = re.compile(r"(?<![\w-])(TSK-\d+)(?![\w-])")
 WARROOM_DISPATCH_TIMEOUT_SEC = 15 * 60
 
 def _worktree_root():
@@ -4434,6 +4564,9 @@ def dispatch_warroom_to_agent(project_id, channel_id, session_id, message, timeo
     project_id = normalize_project_id(project_id)
     if dispatch_id is None:
         dispatch_id = start_dispatch_log(session_id, kind="warroom", channel_id=channel_id, task_id=_current_task_of(session_id), request_msg_id=reply_to)
+    # Task của lần giao việc: đã chốt lúc tạo dòng dispatch_log (mã TSK trong tin > current_task_id của worker)
+    task_id = ((_get_dispatch_row(dispatch_id) or {}).get("task_id") or "").strip()
+    task_block = build_task_prompt_block(task_id, project_id) if task_id else ""
     account_type, profile_dir = "owner_default", ""
     try:
         with get_connection() as conn:
@@ -4447,7 +4580,8 @@ def dispatch_warroom_to_agent(project_id, channel_id, session_id, message, timeo
     cwd = ensure_role_worktree(session_id)
     # --mode plan: agy chỉ đọc, không sửa file. Không dùng --sandbox vì sandbox chặn cả việc đọc repo
     # (agy chỉ trả "Để tôi khám phá..." rồi dừng). Dặn trả lời trọn trong một lượt vì -p không tương tác.
-    prompt = (f"{message}\n\n(Bạn là {session_id}, đang ở worktree của repo gen-workplace. "
+    prompt = (f"{message}\n\n" + (f"{task_block}\n\n" if task_block else "") +
+              f"(Bạn là {session_id}, đang ở worktree của repo gen-workplace. "
               "Hãy tự đọc file cần thiết rồi trả lời ĐẦY ĐỦ ngay trong một lượt bằng tiếng Việt; "
               "không hỏi lại, không chỉ nêu kế hoạch.)")
     # agy -p không tương tác: tool cần quyền bị auto-denied. Cấp quy tắc chỉ đọc (read_file(worktree), command(ls|grep|git log|...))
@@ -4543,13 +4677,8 @@ def dispatch_warroom_to_agent(project_id, channel_id, session_id, message, timeo
         print(f"[dispatch] Không ghi được báo cáo: {e}")
         report_path = ""
 
-    task_id = ""
-    try:
-        with get_connection() as conn:
-            r = conn.execute("SELECT current_task_id FROM tmux_sessions WHERE id = ?", (session_id,)).fetchone()
-            task_id = (r["current_task_id"] or "") if r else ""
-    except Exception:
-        pass
+    if not task_id:
+        task_id = _current_task_of(session_id)
     # exit=0 nhưng agy báo auto-denied / no output produced → vẫn là failed
     status = "done" if exit_code == 0 and not fail_reason else "failed"
     viec_ref = get_task_viec_ref(task_id, project_id)
@@ -4578,6 +4707,8 @@ def dispatch_warroom_to_agent(project_id, channel_id, session_id, message, timeo
                   status, summary, reply_msg_id, account_type, fb["profile_used"], fb["note"],
                   json.dumps(fb["attempts"], ensure_ascii=False), dispatch_id))
             conn.commit()
+        # Kết quả tự ghi về phiên (conversation) của task TRƯỚC khi báo xong → ai chờ wait_worker_result thấy luôn tin kết quả
+        report_dispatch_to_task(dispatch_id, project_id)
     finally:
         _notify_dispatch_change()
     return {"dispatch_id": dispatch_id, "session_id": session_id, "status": status, "exit_code": exit_code, "report_path": report_path, "cwd": cwd,
@@ -4585,8 +4716,251 @@ def dispatch_warroom_to_agent(project_id, channel_id, session_id, message, timeo
             "reply_msg_id": reply_msg_id, "error": fail_reason, "profile_initial": account_type,
             "profile_used": fb["profile_used"], "fallback": fb["fallback"], "fallback_reason": fb["note"], "attempts": fb["attempts"]}
 
-def post_warroom_message(project_id="PRJ-GEN-WORKPLACE", channel_id="war_room", author="Ryan (Owner)", message="", tag="Directive", wait=False):
-    """Lưu tin nhắn; tin có @backend|@frontend|@devops|@qa|@security|@lead → chạy agy thật của vai đó ở thread nền (wait=True chạy đồng bộ, dùng cho test). Không có @vai → chỉ lưu (#3)."""
+# ---------------------------------------------------------------------------
+# Việc là trung tâm: task ↔ war-room ↔ worker (Issue #24)
+# ---------------------------------------------------------------------------
+TASK_PROMPT_CHECKLIST_MAX = 30
+TASK_REPORT_SUMMARY_MAX = 3000
+KANBAN_CHECK_RE = re.compile(r"\[KANBAN_UPDATE:\s*(TSK-\d+)\s*\|\s*CHECK:\s*([A-Za-z0-9_.:-]{1,64})\s*\]", re.IGNORECASE)
+
+
+def _task_detail(task_id, project_id="PRJ-GEN-WORKPLACE"):
+    """Thông tin 1 task (Kanban phiên gen_session_todos, hoặc roadmap todos): id, table, title, description, status, viec_ref,
+    checklist, conversation_id, holder. Không có → None."""
+    task_id = (task_id or "").strip()
+    if not task_id:
+        return None
+    project_id = normalize_project_id(project_id)
+    try:
+        with get_connection() as conn:
+            r = conn.execute("SELECT * FROM gen_session_todos WHERE id = ? AND project_id = ?", (task_id, project_id)).fetchone()
+            if r:
+                try:
+                    chk = json.loads(r["checklist_json"] or "[]")
+                except Exception:
+                    chk = []
+                return {"id": r["id"], "table": "gen_session_todos", "title": r["title"] or "", "description": r["description"] or "",
+                        "status": r["status"] or "", "viec_ref": r["viec_ref"] or "", "checklist": chk if isinstance(chk, list) else [],
+                        "conversation_id": r["conversation_id"] or "", "holder": r["claimed_by"] or ""}
+            r = conn.execute("SELECT * FROM todos WHERE id = ? AND project_id = ?", (task_id, project_id)).fetchone()
+            if r:
+                return {"id": r["id"], "table": "todos", "title": r["title"] or "", "description": "", "status": r["status"] or "",
+                        "viec_ref": r["viec_ref"] or "", "checklist": [], "conversation_id": "", "holder": r["assigned_session_id"] or ""}
+    except Exception:
+        pass
+    return None
+
+
+def find_task_ref_in_message(message, project_id="PRJ-GEN-WORKPLACE"):
+    """Mã TSK-n đầu tiên trong nội dung tin mà có task thật trong DB; không có → ''."""
+    for tid in dict.fromkeys(m.upper() for m in TASK_REF_RE.findall(message or "")):
+        if _task_detail(tid, project_id):
+            return tid
+    return ""
+
+
+def build_task_prompt_block(task_id, project_id="PRJ-GEN-WORKPLACE"):
+    """Khối thông tin task nhồi vào prompt agy: tiêu đề, mã việc Kho, mô tả, checklist (kèm id mục) và cách báo tick checklist."""
+    d = _task_detail(task_id, project_id)
+    if not d:
+        return ""
+    lines = [f"[THÔNG TIN VIỆC {d['id']}]", f"Tiêu đề: {d['title']}"]
+    if d["viec_ref"]:
+        lines.append(f"Mã việc Kho Ryan (viec_ref): {d['viec_ref']}")
+    if d["description"]:
+        lines.append(f"Mô tả: {d['description'][:1500]}")
+    chk = d["checklist"][:TASK_PROMPT_CHECKLIST_MAX]
+    if chk:
+        done = sum(1 for c in d["checklist"] if isinstance(c, dict) and c.get("done"))
+        lines.append(f"Checklist ({done}/{len(d['checklist'])} xong):")
+        for c in chk:
+            if isinstance(c, dict):
+                lines.append(f"- [{'x' if c.get('done') else ' '}] ({c.get('id', '')}) {c.get('text', '')}")
+        lines.append(f"Xong mục nào thì ghi đúng một dòng [KANBAN_UPDATE: {d['id']} | CHECK: <id mục>] trong câu trả lời để hệ thống tick checklist.")
+    return "\n".join(lines)
+
+
+def _apply_dispatch_checklist_marks(task, text):
+    """Tick các mục checklist mà worker báo bằng [KANBAN_UPDATE: TSK-n | CHECK: <id>] cho ĐÚNG task của lần giao việc. Trả id đã tick."""
+    if not task or task.get("table") != "gen_session_todos" or not text:
+        return []
+    ids = {str(c.get("id")) for c in task["checklist"] if isinstance(c, dict) and c.get("id")}
+    ticked = []
+    for tid, item_id in KANBAN_CHECK_RE.findall(text):
+        if tid.upper() != task["id"].upper() or item_id not in ids or item_id in ticked:
+            continue
+        res = toggle_gen_session_todo_checklist_item(task["conversation_id"], task["id"], item_id, True)
+        if "error" not in res:
+            ticked.append(item_id)
+    return ticked
+
+
+def report_dispatch_to_task(dispatch_id, project_id="PRJ-GEN-WORKPLACE"):
+    """
+    Lần giao việc gắn task đã kết thúc → ghi 1 tin kết quả vào phiên (conversation) của task qua log_gen_message:
+    trạng thái, tóm tắt, report_path, link dispatch:<id> (bằng chứng nghiệm thu khi done), tin war-room trả lời.
+    Worker báo [KANBAN_UPDATE: TSK-n | CHECK: id] → tick checklist. Chỉ ghi 1 lần (dispatch_log.task_msg_id). Lỗi chỉ log, không ném.
+    Trả message_id đã ghi hoặc None.
+    """
+    try:
+        row = _get_dispatch_row(dispatch_id)
+        if not row or not (row.get("task_id") or "").strip() or row.get("task_msg_id") is not None:
+            return None
+        status = _row_status(row)
+        if status == "running":
+            return None
+        task = _task_detail(row["task_id"], project_id)
+        if not task or not task.get("conversation_id"):
+            return None
+        with get_connection() as conn:   # giữ chỗ trước (-1) để 2 luồng không cùng ghi
+            cur = conn.execute("UPDATE dispatch_log SET task_msg_id = -1 WHERE id = ? AND task_msg_id IS NULL", (row["id"],))
+            conn.commit()
+            if cur.rowcount != 1:
+                return None
+        full_output = _read_report_tail(row.get("report_path")) or row.get("summary") or ""
+        if "\n## Output\n" in full_output:   # báo cáo war-room: chỉ xét phần output của agy, không xét tin người giao
+            full_output = full_output.split("\n## Output\n", 1)[1]
+        ticked = _apply_dispatch_checklist_marks(task, full_output) if status in DISPATCH_OK_STATUSES else []
+        fallback = bool(row.get("profile_used")) and (row.get("profile_used") or "") != (row.get("profile_initial") or "")
+        label = {"done": "XONG", "ok": "XONG", "failed": "LỖI"}.get(status, status.upper())
+        summary = (row.get("summary") or "").strip()
+        if len(summary) > TASK_REPORT_SUMMARY_MAX:
+            summary = summary[:TASK_REPORT_SUMMARY_MAX] + "\n…(đã cắt, xem báo cáo)"
+        lines = [f"Kết quả giao việc dispatch:{row['id']} · {task['id']} · {row['session_id']} · {label}"
+                 + (f" (exit={row.get('exit_code')})" if row.get("exit_code") is not None else "")]
+        if fallback:
+            lines.append(f"Tài khoản: đã chuyển hồ sơ {row.get('profile_initial') or '?'} → {row.get('profile_used')}"
+                         + (f" ({row.get('fallback_reason')})" if row.get("fallback_reason") else ""))
+        if ticked:
+            lines.append(f"Checklist đã tick theo báo cáo worker: {', '.join(ticked)}")
+        lines.append("Tóm tắt:\n" + (summary or "(không có output)"))
+        if row.get("report_path"):
+            lines.append(f"Báo cáo: {row['report_path']}")
+        if row.get("reply_msg_id"):
+            lines.append(f"Tin war-room: #{row['reply_msg_id']}")
+        lines.append(f"Link: dispatch:{row['id']}")
+        if status in DISPATCH_OK_STATUSES:
+            lines.append(f"Bằng chứng nghiệm thu gợi ý: dispatch:{row['id']}")
+        res = log_gen_message(task["conversation_id"], "\n".join(lines), "assistant", f"{row['session_id']} (agy)")
+        msg_id = res.get("message_id")
+        with get_connection() as conn:
+            conn.execute("UPDATE dispatch_log SET task_msg_id = ? WHERE id = ?", (msg_id if msg_id else None, row["id"]))
+            conn.commit()
+        if not msg_id:
+            print(f"[dispatch] Không ghi được kết quả dispatch:{row['id']} về phiên {task['conversation_id']}: {res.get('error')}")
+        return msg_id
+    except Exception as e:
+        print(f"[dispatch] Lỗi ghi kết quả dispatch:{dispatch_id} về task: {e}")
+        return None
+
+
+def resolve_role_session(role_or_sid):
+    """'qa' / '@qa' / 'QA' / 'gw-qa-agy' → 'gw-qa-agy'; worker lạ → ''."""
+    v = (role_or_sid or "").strip().lstrip("@").strip().lower() if isinstance(role_or_sid, str) else ""
+    if v in WARROOM_ROLE_SESSIONS:
+        return WARROOM_ROLE_SESSIONS[v]
+    if v in WARROOM_ROLE_SESSIONS.values():
+        return v
+    return ""
+
+
+def assign_task_to_role(todo_id, session_id, project_id="PRJ-GEN-WORKPLACE", author="Ryan (Owner)", channel_id="war_room", wait=False):
+    """
+    Giao 1 task cho 1 vai (POST /api/task/assign): claim task cho worker, gửi war-room "@vai Thực hiện TSK-n …" (prompt agy kèm
+    tiêu đề, checklist, viec_ref của task), trả dispatch_id để theo dõi / chờ (wait_worker_result).
+    Lỗi: {"error", "code"}: bad_request (thiếu / sai vai), not_found, already_done, locked (người khác đang giữ).
+    """
+    project_id = normalize_project_id(project_id)
+    todo_id = (todo_id or "").strip() if isinstance(todo_id, str) else ""
+    sid = resolve_role_session(session_id)
+    if not todo_id:
+        return {"error": "Thiếu todo_id (vd TSK-12)", "code": "bad_request"}
+    if not sid:
+        return {"error": f"Vai không hợp lệ '{session_id}' (backend, frontend, devops, qa, security, lead hoặc gw-<vai>-agy)",
+                "code": "bad_request"}
+    task = _task_detail(todo_id, project_id)
+    if not task:
+        return {"error": "Task not found", "code": "not_found", "task_id": todo_id}
+    if task["status"] == "done":
+        return {"error": f"Task {todo_id} đã done — không giao lại", "code": "already_done", "task_id": todo_id}
+    claim = claim_task(sid, todo_id, project_id)
+    if "error" in claim:
+        claim.setdefault("code", "locked")
+        return claim
+    role = next(k for k, v in WARROOM_ROLE_SESSIONS.items() if v == sid)
+    head = f"@{role} Thực hiện {todo_id}" + (f" ({task['viec_ref']})" if task["viec_ref"] else "") + f": {task['title']}"
+    chk = [c for c in task["checklist"] if isinstance(c, dict)]
+    body = head + ("\nChecklist:\n" + "\n".join(f"- [{'x' if c.get('done') else ' '}] {c.get('text', '')}" for c in chk[:TASK_PROMPT_CHECKLIST_MAX])
+                   if chk else "")
+    res = post_warroom_message(project_id, channel_id, author, body, "Assignment", wait=wait, task_id=todo_id)
+    if "error" in res:
+        return res
+    d = (res.get("dispatches") or [{}])[0]
+    return {"status": "assigned", "task_id": todo_id, "session_id": sid, "role": role, "viec_ref": task["viec_ref"],
+            "dispatch_id": d.get("dispatch_id"), "request_msg_id": (res.get("user_message") or {}).get("id"),
+            "channel_id": channel_id, "claim": claim, "message": body}
+
+
+def _dispatch_brief(r):
+    d = dict(r)
+    return {"id": d["id"], "session_id": d.get("session_id") or "", "status": _row_status(d), "kind": d.get("kind") or "",
+            "exit_code": d.get("exit_code"), "started_at": d.get("started_at") or "", "finished_at": d.get("finished_at") or "",
+            "request_msg_id": d.get("request_msg_id"), "reply_msg_id": d.get("reply_msg_id"), "report_path": d.get("report_path") or "",
+            "profile_initial": d.get("profile_initial") or "", "profile_used": d.get("profile_used") or "",
+            "fallback": bool(d.get("profile_used")) and (d.get("profile_used") or "") != (d.get("profile_initial") or ""),
+            "fallback_reason": d.get("fallback_reason") or "", "channel_id": d.get("channel_id") or "",
+            "task_msg_id": d.get("task_msg_id")}
+
+
+def attach_task_links(todos):
+    """Gắn vào mỗi task: last_dispatch (lần giao gần nhất), dispatch_count, holder (claimed_by), conversation_title."""
+    if not todos:
+        return todos
+    ids = [t["id"] for t in todos]
+    marks = ",".join("?" for _ in ids)
+    with get_connection() as conn:
+        rows = conn.execute(f"SELECT * FROM dispatch_log WHERE task_id IN ({marks}) ORDER BY id DESC", ids).fetchall()
+        convs = {r["id"]: r["title"] for r in conn.execute("SELECT id, title FROM gen_conversations").fetchall()}
+    last, counts = {}, {}
+    for r in rows:
+        counts[r["task_id"]] = counts.get(r["task_id"], 0) + 1
+        if r["task_id"] not in last:
+            last[r["task_id"]] = _dispatch_brief(r)
+    for t in todos:
+        t["last_dispatch"] = last.get(t["id"])
+        t["dispatch_count"] = counts.get(t["id"], 0)
+        t["holder"] = t.get("claimed_by") or ""
+        t["conversation_title"] = convs.get(t.get("conversation_id"), "")
+    return todos
+
+
+def get_all_session_todos(project_id="PRJ-GEN-WORKPLACE"):
+    """Mọi task Kanban phiên (bảng gen_session_todos — nơi chứa task thật của MCP create_kanban_task / claim) của dự án, kèm
+    checklist đã parse, tiến độ x/y và thông tin giao việc (attach_task_links). Dùng cho /api/state → màn Việc & tiến độ."""
+    project_id = normalize_project_id(project_id)
+    with get_connection() as conn:
+        rows = conn.execute("SELECT * FROM gen_session_todos WHERE project_id = ? ORDER BY updated_at DESC, id ASC", (project_id,)).fetchall()
+    todos = []
+    for r in rows:
+        d = dict(r)
+        try:
+            d["checklist"] = json.loads(d.get("checklist_json") or "[]")
+        except Exception:
+            d["checklist"] = []
+        d.pop("checklist_json", None)
+        d["total_items"] = len(d["checklist"])
+        d["done_items"] = sum(1 for it in d["checklist"] if isinstance(it, dict) and it.get("done"))
+        todos.append(d)
+    return attach_task_links(todos)
+
+
+def post_warroom_message(project_id="PRJ-GEN-WORKPLACE", channel_id="war_room", author="Ryan (Owner)", message="", tag="Directive", wait=False, task_id=""):
+    """
+    Lưu tin nhắn; tin có @backend|@frontend|@devops|@qa|@security|@lead → chạy agy thật của vai đó ở thread nền (wait=True chạy
+    đồng bộ, dùng cho test). Không có @vai → chỉ lưu (#3). @Gen / @Toàn Đội / @all KHÔNG giao việc (chỉ lưu, có ghi chú).
+    Task của lần giao việc: task_id truyền vào > mã TSK-n đầu tiên có thật trong nội dung tin > current_task_id của worker.
+    Prompt gửi agy kèm tiêu đề, mô tả, viec_ref và checklist của task đó.
+    """
     project_id = normalize_project_id(project_id)
     if not message or not message.strip():
         return {"error": "Message is empty"}
@@ -4606,18 +4980,29 @@ def post_warroom_message(project_id="PRJ-GEN-WORKPLACE", channel_id="war_room", 
 
     dispatched = []
     dispatches = []
+    ref_task = (task_id or "").strip() or find_task_ref_in_message(clean_msg, project_id)
     for role in dict.fromkeys(m.lower() for m in WARROOM_MENTION_RE.findall(clean_msg)):
         sid = WARROOM_ROLE_SESSIONS[role]
+        d_task = ref_task or _current_task_of(sid)
         # Tạo dòng dispatch_log (running) TRƯỚC khi chạy để bên gọi có dispatch_id truyền cho wait_worker_result (#9)
-        did = start_dispatch_log(sid, kind="warroom", channel_id=channel_id, task_id=_current_task_of(sid), request_msg_id=user_msg_id)
+        did = start_dispatch_log(sid, kind="warroom", channel_id=channel_id, task_id=d_task,
+                                 viec_ref=get_task_viec_ref(d_task, project_id), request_msg_id=user_msg_id)
         if wait:
             dispatch_warroom_to_agent(project_id, channel_id, sid, clean_msg, dispatch_id=did, reply_to=user_msg_id)
         else:
             threading.Thread(target=dispatch_warroom_to_agent, args=(project_id, channel_id, sid, clean_msg),
                              kwargs={"dispatch_id": did, "reply_to": user_msg_id}, daemon=True, name=f"warroom-dispatch-{sid}").start()
         dispatched.append(sid)
-        dispatches.append({"session_id": sid, "dispatch_id": did})
+        dispatches.append({"session_id": sid, "dispatch_id": did, "task_id": d_task})
 
+    broadcast = bool(WARROOM_BROADCAST_RE.search(clean_msg))
+    if dispatched:
+        note = (f"Đã chuyển tới {', '.join(dispatched)}; trả lời thật của agy sẽ xuất hiện trong kênh khi chạy xong (tối đa 15 phút). "
+                f"Chờ kết quả: wait_worker_result(dispatch_id=...) với dispatch_id trong 'dispatches'.")
+    elif broadcast:
+        note = "@Gen / @Toàn Đội không giao việc cho worker nào; chỉ lưu tin. Gọi đúng vai: @backend, @frontend, @devops, @qa, @security, @lead."
+    else:
+        note = "Không có @vai nên chỉ lưu tin, không trả lời."
     return {
         "status": "sent",
         "channel_id": channel_id,
@@ -4625,9 +5010,8 @@ def post_warroom_message(project_id="PRJ-GEN-WORKPLACE", channel_id="war_room", 
         "agent_reply": None,
         "dispatched": dispatched,
         "dispatches": dispatches,
-        "note": (f"Đã chuyển tới {', '.join(dispatched)}; trả lời thật của agy sẽ xuất hiện trong kênh khi chạy xong (tối đa 15 phút). "
-                 f"Chờ kết quả: wait_worker_result(dispatch_id=...) với dispatch_id trong 'dispatches'."
-                 if dispatched else "Không có @vai nên chỉ lưu tin, không trả lời.")
+        "task_id": ref_task,
+        "note": note,
     }
 
 def generate_structure_from_ssot(content, project_id="PRJ-GEN-WORKPLACE"):
@@ -6028,7 +6412,7 @@ def get_gen_session_todos(conv_id, project_id="PRJ-GEN-WORKPLACE"):
             d["done_items"] = done_items
             d["progress_percent"] = int((done_items / total_items) * 100) if total_items > 0 else (100 if d["status"] == "done" else 0)
             todos.append(d)
-        return todos
+    return attach_task_links(todos)
 
 def save_gen_session_todo(conv_id, todo_id=None, title="Nhiệm vụ mới", description="", status="todo", priority="high", assigned_agent="Gen Core", checklist=None, evidence_ref="", order_idx=0, owner_id="owner-ryan", viec_ref="", session_id="", force=False, reason=""):
     """
@@ -6268,8 +6652,17 @@ def parse_and_apply_agent_kanban_updates(conv_id, agent_text):
 
     return updates_made
 
-def get_mcp_auth_status():
+def public_origin(origin=None):
+    """Gốc URL (scheme://host[:port]) để in link MCP: origin tính từ Host header của request > GW_PUBLIC_ORIGIN >
+    http://localhost:<PORT>. Không ghi cứng localhost:8888 (app thường chạy sau IP / domain khác)."""
+    o = (origin or os.environ.get("GW_PUBLIC_ORIGIN") or "").strip().rstrip("/")
+    if o:
+        return o
+    return f"http://localhost:{os.environ.get('PORT', '8888')}"
+
+def get_mcp_auth_status(origin=None):
     """Lấy trạng thái cấu hình xác thực MCP."""
+    base = public_origin(origin)
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT value FROM mcp_auth_settings WHERE key = 'require_auth'")
@@ -6283,20 +6676,20 @@ def get_mcp_auth_status():
             "require_auth": req_auth,
             "active_tokens": active_count,
             "total_tokens": total_count,
-            "origin": "http://localhost:8888",
-            "endpoint": "http://localhost:8888/mcp"
+            "origin": base,
+            "endpoint": f"{base}/mcp"
         }
 
-def set_mcp_strict_auth(enabled: bool):
+def set_mcp_strict_auth(enabled: bool, origin=None):
     """Bật / tắt chế độ bắt buộc xác thực MCP."""
     val = "1" if enabled else "0"
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("INSERT OR REPLACE INTO mcp_auth_settings (key, value, updated_at) VALUES ('require_auth', ?, CURRENT_TIMESTAMP)", (val,))
         conn.commit()
-    return get_mcp_auth_status()
+    return get_mcp_auth_status(origin)
 
-def get_mcp_agent_tokens(owner_id="owner-ryan"):
+def get_mcp_agent_tokens(owner_id="owner-ryan", origin=None):
     """Lấy danh sách các Agent Token đã cấp."""
     with get_connection() as conn:
         cursor = conn.cursor()
@@ -6330,10 +6723,10 @@ def get_mcp_agent_tokens(owner_id="owner-ryan"):
             })
         return {
             "tokens": tokens,
-            "auth_status": get_mcp_auth_status()
+            "auth_status": get_mcp_auth_status(origin)
         }
 
-def create_mcp_agent_token(name, permissions=None, expires_days=90, client="Manual Token", role="agent", owner_id="owner-ryan"):
+def create_mcp_agent_token(name, permissions=None, expires_days=90, client="Manual Token", role="agent", owner_id="owner-ryan", origin=None):
     """Tạo mới một Agent Token xác thực MCP chuẩn như Gen-hub."""
     if not name or not str(name).strip():
         return {"error": "Tên Agent không được để trống"}
@@ -6358,7 +6751,7 @@ def create_mcp_agent_token(name, permissions=None, expires_days=90, client="Manu
         """, (token_id, name.strip(), token_val, token_hash, client, role, perms_json, expires_at, owner_id))
         conn.commit()
 
-    endpoint = "http://localhost:8888/mcp"
+    endpoint = f"{public_origin(origin)}/mcp"
     auth_url = f"{endpoint}?token={token_val}"
     curl_snippet = (
         f'curl -X POST {endpoint} \\\n'

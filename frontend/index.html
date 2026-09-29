@@ -4232,7 +4232,51 @@ body.resizing-active, body.resizing-active * {
   border-color: var(--accent);
   font-weight: 600;
 }
+
+/* ===== Việc là trung tâm (#24): thẻ task liên kết Kanban ↔ war-room ↔ worker ===== */
+.hubCol { background:#0e131b; border:1px solid var(--line); border-radius:8px; display:flex; flex-direction:column; min-height:220px; overflow:hidden; min-width:0; }
+.hubColHead { background:#131a24; border-bottom:1px solid var(--line); padding:8px 10px; display:flex; align-items:center; justify-content:space-between; gap:6px; }
+.hubColHead strong { font-size:11.5px; color:var(--text); display:block; line-height:1.2; }
+.hubColSid { font-size:9.5px; color:var(--accent); font-family:var(--mono); }
+.hubColModel { padding:4px 10px; font-size:9.5px; color:var(--muted); border-bottom:1px solid #141b26; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.hubColModel b { color:var(--text); font-weight:600; }
+.hubColBody { padding:8px; display:flex; flex-direction:column; gap:6px; flex:1; overflow-y:auto; max-height:460px; }
+.hubColFoot { padding:6px 8px; border-top:1px solid #141b26; background:#0b0f17; }
+.hubEmpty { color:var(--muted2); font-size:10.5px; text-align:center; padding:16px 0; }
+.hubTaskCard { background:#121822; border:1px solid var(--panel3); border-radius:6px; padding:7px 9px; display:flex; flex-direction:column; gap:5px; }
+.hubTaskCard.live { border-color:var(--accent); background:rgba(56,189,248,0.05); }
+.hubTaskCard.done { border-color:rgba(74,222,128,0.25); opacity:.85; }
+.hubTaskHead { display:flex; align-items:center; justify-content:space-between; gap:6px; }
+.hubTaskId { font-family:var(--mono); font-size:10px; font-weight:700; color:var(--accent); }
+.hubTaskTitle { font-size:11px; color:var(--text); line-height:1.35; font-weight:500; }
+.hubTaskEvidence { font-size:9.5px; font-family:var(--mono); color:var(--yellow); background:rgba(245,158,11,0.08); padding:2px 6px; border-radius:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.taskLinkMeta { display:flex; flex-wrap:wrap; gap:4px; align-items:center; }
+.taskLinkMeta .chip { font-size:9px; padding:0 6px; }
+.taskLinkActions { display:flex; flex-wrap:wrap; gap:4px; align-items:center; }
+.taskLinkActions .btn.small { font-size:9.5px; padding:1px 6px; }
+.taskAssignSel { font-size:9.5px; padding:1px 2px; background:#0b0f17; color:var(--text); border:1px solid var(--line2); border-radius:4px; }
+.refChip { display:inline-flex; align-items:center; font-family:var(--mono); font-size:9.5px; font-weight:700; padding:0 6px; margin:0 2px; border-radius:4px; cursor:pointer; line-height:16px; border:1px solid rgba(122,162,247,.45); background:rgba(122,162,247,.12); color:var(--accent2, #9ab8ff); }
+.refChip.viec { border-color:rgba(224,179,90,.45); background:rgba(224,179,90,.12); color:var(--yellow); }
+.refChip:hover { filter:brightness(1.25); }
+.flash { animation: gwFlash 1.6s ease-out 1; box-shadow:0 0 0 2px var(--accent); }
+@keyframes gwFlash { 0% { box-shadow:0 0 0 3px var(--yellow); } 100% { box-shadow:0 0 0 2px var(--accent); } }
+.wrMsgNo { font-family:var(--mono); font-size:10px; color:var(--muted2); }
+.wrReplyLink { background:none; border:none; color:var(--accent); font-size:10px; cursor:pointer; padding:0 4px; }
+.wrReplyLink:hover { text-decoration:underline; }
+.wrMsgLinks { display:flex; flex-wrap:wrap; gap:4px; align-items:center; margin-top:4px; font-size:10px; }
+.wrMsgLinks .chip { font-size:9.5px; padding:0 6px; }
+.wrDispatchStrip { display:flex; flex-wrap:wrap; gap:6px; align-items:center; padding:6px 10px; font-size:10.5px; border-top:1px solid var(--line); }
+.wrDispatchStrip .chip { font-size:9.5px; padding:0 6px; }
+.wrMemberHint a { color:var(--accent); }
+.wrMemberHint { font-size:10.5px; color:var(--muted); line-height:1.45; padding:6px 8px; border:1px dashed var(--line2); border-radius:6px; margin-bottom:6px; }
+.wrMemberAvatar { display:grid; place-items:center; font-size:9.5px; font-weight:700; color:var(--accent); font-family:var(--mono); }
+.wbRecentDispatches { display:flex; flex-wrap:wrap; gap:6px 10px; align-items:center; font-size:10.5px; background:#0d1219; border:1px solid #1f2a3a; border-radius:8px; padding:6px 10px; flex-shrink:0; }
+.wbRecentLabel { font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; }
+.wbRecentItem { display:inline-flex; align-items:center; gap:4px; }
+.wbRecentItem .chip { font-size:9.5px; padding:0 6px; }
+.expertTaskLine { min-width:0; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--text); background:rgba(255,255,255,0.03); padding:2px 6px; border-radius:4px; border:1px solid rgba(255,255,255,0.06); }
 </style>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%237aa2f7'/%3E%3Ctext x='16' y='21' font-size='13' font-family='monospace' font-weight='700' text-anchor='middle' fill='%23fff'%3EGW%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
 <link rel="stylesheet" href="theme.css?v=1">
@@ -4260,7 +4304,7 @@ body.resizing-active, body.resizing-active * {
     <div class="topRight">
       <span class="topmeta" id="syncState">Git: main</span>
       <button class="btn ghost" id="topMcpBadge" onclick="openMcpModal()" title="Cổng MCP cho AI agent: xem tool và lấy cấu hình kết nối">
-        <span class="mcpDot">●</span> MCP <span class="badge subtle" id="topMcpToolBadge">27 tools</span>
+        <span class="mcpDot">●</span> MCP <span class="badge subtle" id="topMcpToolBadge">… tools</span>
       </button>
       <button class="btn ghost" id="topOwnerBadge" onclick="openOwnerProfileModal()" title="Hồ sơ chủ sở hữu">
         <span class="ownerDisplayName" id="topOwnerDisplayName">Ryan</span>
@@ -4306,7 +4350,7 @@ body.resizing-active, body.resizing-active * {
         </button>
         <button class="navItem" onclick="openMcpModal()" title="Cổng MCP cho AI agent">
           <span class="navIcon">◎</span><span>MCP server</span>
-          <span class="badge subtle" id="sideMcpToolBadge">27</span>
+          <span class="badge subtle" id="sideMcpToolBadge">…</span>
         </button>
       </div>
 
@@ -4452,7 +4496,7 @@ body.resizing-active, body.resizing-active * {
                       <div>
                         <div style="display:flex;align-items:center;gap:6px">
                           <strong style="font-size:12.5px;color:var(--text)" id="genSessionFilesTitle">Tệp của phiên</strong>
-                          <button class="btn small" style="font-size:9px;padding:1px 5px" onclick="renameCurrentGenSession()" title="Đổi tên tiêu đề phiên này"></button>
+                          <button class="btn small" style="font-size:9px;padding:1px 5px" onclick="renameCurrentGenSession()" title="Đổi tên tiêu đề phiên này">Đổi tên</button>
                         </div>
                         <div style="font-size:10px;color:var(--muted)" id="genSessionFilesSubtitle">Không gian thư mục làm việc riêng biệt của phiên chat này</div>
                       </div>
@@ -4579,7 +4623,7 @@ body.resizing-active, body.resizing-active * {
                           <button class="btn small primary" id="btnDetailOpenEditor" style="font-size:10px;padding:3px 9px" onclick="openCurrentDetailInEditor()" title="Mở sang Tab Soạn thảo File Viewer đầy đủ">Mở Soạn Thảo ↗</button>
                           <button class="btn small" id="btnDetailCopyContent" style="font-size:10px;padding:3px 8px" onclick="copyDetailFileContent()" title="Sao chép toàn bộ nội dung tệp vào Clipboard">Chép Nội Dung</button>
                           <button class="btn small" id="btnDetailCopyPath" style="font-size:10px;padding:3px 8px" onclick="copyDetailFilePath()" title="Sao chép đường dẫn tệp">Chép Đường Dẫn</button>
-                          <button class="btn small" id="btnDetailDelete" style="font-size:10px;padding:3px 7px;color:var(--red)" onclick="deleteCurrentDetailFile()" title="Xóa tệp khỏi phiên"></button>
+                          <button class="btn small" id="btnDetailDelete" style="font-size:10px;padding:3px 7px;color:var(--red)" onclick="deleteCurrentDetailFile()" title="Xóa tệp khỏi phiên">Xóa</button>
                         </div>
                       </div>
 
@@ -5115,7 +5159,7 @@ body.resizing-active, body.resizing-active * {
         <div class="pageHead">
           <div>
             <h1>Phòng giao ban</h1>
-            <p>Giao việc bằng @backend, @frontend, @devops, @qa, @security, @lead; tin có @vai được chạy thật bằng agy và trả kết quả về đây.</p>
+            <p>Giao việc bằng @backend, @frontend, @devops, @qa, @security, @lead; tin có @vai được chạy thật bằng agy và trả kết quả về đây. Mã TSK-n / VIEC-n trong tin bấm được để mở thẻ task.</p>
           </div>
           <div class="actions">
             <button class="btn" onclick="loadWarRoomMessages(true)">↻ Làm mới kênh</button>
@@ -5158,20 +5202,11 @@ body.resizing-active, body.resizing-active * {
             <div class="warroomMembersPane">
               <span class="wrSectionTitle">Thành viên Ban Chỉ Huy & Swarm</span>
               
-              <div class="wrMemberCard">
-                <div class="wrMemberInfo">
-                  <div class="wrMemberAvatar"></div>
-                  <div>
-                    <strong style="color:var(--text)">Core Gen</strong>
-                    <div style="font-size:10px;color:var(--muted)">Tổng Chỉ Huy Tác Chiến</div>
-                  </div>
-                </div>
-                <button class="wrMentionBtn" onclick="insertWarRoomAt('@Gen ')">@Gen</button>
-              </div>
+              <div class="wrMemberHint">Tin có @vai được giao cho agy của vai đó. Gen trả lời ở <a href="#" onclick="go('gen_workplace');return false">Bàn làm việc Gen</a>; war-room không có @Gen / @Toàn Đội.</div>
 
               <div class="wrMemberCard">
                 <div class="wrMemberInfo">
-                  <div class="wrMemberAvatar"></div>
+                  <div class="wrMemberAvatar">LD</div>
                   <div>
                     <strong style="color:var(--text)">Lead Architect</strong>
                     <div style="font-size:10px;color:var(--muted)">Kiến Trúc Sư Trưởng</div>
@@ -5182,7 +5217,7 @@ body.resizing-active, body.resizing-active * {
 
               <div class="wrMemberCard">
                 <div class="wrMemberInfo">
-                  <div class="wrMemberAvatar"></div>
+                  <div class="wrMemberAvatar">BE</div>
                   <div>
                     <strong style="color:var(--text)">Backend Specialist</strong>
                     <div style="font-size:10px;color:var(--muted)">SQLite WAL & REST API</div>
@@ -5193,7 +5228,7 @@ body.resizing-active, body.resizing-active * {
 
               <div class="wrMemberCard">
                 <div class="wrMemberInfo">
-                  <div class="wrMemberAvatar"></div>
+                  <div class="wrMemberAvatar">FE</div>
                   <div>
                     <strong style="color:var(--text)">Frontend Specialist</strong>
                     <div style="font-size:10px;color:var(--muted)">Giao Diện & Live Workbench</div>
@@ -5204,7 +5239,7 @@ body.resizing-active, body.resizing-active * {
 
               <div class="wrMemberCard">
                 <div class="wrMemberInfo">
-                  <div class="wrMemberAvatar"></div>
+                  <div class="wrMemberAvatar">DO</div>
                   <div>
                     <strong style="color:var(--text)">DevOps Engineer</strong>
                     <div style="font-size:10px;color:var(--muted)">Docker, Volume & Tmux</div>
@@ -5215,7 +5250,7 @@ body.resizing-active, body.resizing-active * {
 
               <div class="wrMemberCard">
                 <div class="wrMemberInfo">
-                  <div class="wrMemberAvatar"></div>
+                  <div class="wrMemberAvatar">QA</div>
                   <div>
                     <strong style="color:var(--text)">QA Tester</strong>
                     <div style="font-size:10px;color:var(--muted)">Kiểm thử &amp; nghiệm thu</div>
@@ -5226,7 +5261,7 @@ body.resizing-active, body.resizing-active * {
 
               <div class="wrMemberCard">
                 <div class="wrMemberInfo">
-                  <div class="wrMemberAvatar"></div>
+                  <div class="wrMemberAvatar">SE</div>
                   <div>
                     <strong style="color:var(--text)">Security Auditor</strong>
                     <div style="font-size:10px;color:var(--muted)">OAuth PKCE & Vault</div>
@@ -5235,16 +5270,6 @@ body.resizing-active, body.resizing-active * {
                 <button class="wrMentionBtn" onclick="insertWarRoomAt('@Security ')">@Security</button>
               </div>
 
-              <div class="wrMemberCard" style="border-style:dashed">
-                <div class="wrMemberInfo">
-                  <div class="wrMemberAvatar"></div>
-                  <div>
-                    <strong style="color:var(--accent)">Toàn Bộ Swarm</strong>
-                    <div style="font-size:10px;color:var(--muted)">Broadcast lệnh chung</div>
-                  </div>
-                </div>
-                <button class="wrMentionBtn" onclick="insertWarRoomAt('@Toàn Đội ')">@Toàn Đội</button>
-              </div>
             </div>
           </div>
 
@@ -5296,8 +5321,9 @@ body.resizing-active, body.resizing-active * {
                 </div>
               </div>
 
+              <div id="wrDispatchStrip" class="wrDispatchStrip" style="display:none"></div>
               <div class="wrInputBox">
-                <textarea id="wrMessageInput" class="wrTextarea" placeholder="Gõ @backend, @frontend, @devops, @qa, @security hoặc @lead rồi nêu việc cần làm. Enter để gửi, Shift+Enter xuống dòng." onkeydown="handleWarRoomKeydown(event)"></textarea>
+                <textarea id="wrMessageInput" class="wrTextarea" placeholder="Gõ @backend, @frontend, @devops, @qa, @security hoặc @lead rồi nêu việc; nhắc TSK-n để gắn tin vào task đó. Enter để gửi, Shift+Enter xuống dòng." onkeydown="handleWarRoomKeydown(event)"></textarea>
                 <button class="wrSendBtn" id="wrSendBtn" onclick="sendWarRoomMessage()">Gửi</button>
               </div>
             </div>
@@ -5330,7 +5356,7 @@ body.resizing-active, body.resizing-active * {
           <div class="cockpitListPane">
             <div class="cockpitPaneHeader">
               <span class="cockpitPaneTitle">Sáu vai</span>
-              <span class="badge" style="font-size:9.5px;background:var(--panel3);color:var(--accent)">6 Pods Online</span>
+              <span class="badge" id="podsOnlineBadge" style="font-size:9.5px;background:var(--panel3);color:var(--muted)" title="Số phiên tmux đang chạy thật">…</span>
             </div>
             <div class="cockpitPaneScroll expertSquadGrid" id="expertSquadGrid"></div>
           </div>
@@ -5344,7 +5370,7 @@ body.resizing-active, body.resizing-active * {
                     <h3>
                       <span id="deckAgentRole">Lead Architect</span>
                       <span class="expertSidBadge" id="deckAgentSid">gw-lead-agy</span>
-                      <span class="expertStatusChip live" id="deckAgentStatusBadge">● Đang chạy</span>
+                      <span class="expertStatusChip" id="deckAgentStatusBadge">…</span>
                     </h3>
                     <p>
                       <span>Mạch tư duy: <code id="deckAgentConv" style="color:#5eead4;font-size:10.5px">conv-lead-architect</code></span>
@@ -5353,11 +5379,12 @@ body.resizing-active, body.resizing-active * {
                         <span class="gIconBadge">G</span>
                         <span id="deckAgentEmail">—</span>
                       </span>
+                      <span id="deckAgentProfileInUse" style="font-size:10.5px;color:var(--muted)"></span>
                     </p>
                   </div>
                 </div>
                 <div class="deckHeadActions">
-                  <span class="deckQuotaPill" id="deckQuotaPill">5h: 85% | Tuần: 37% · Tuần: 0%</span>
+                  <span class="deckQuotaPill" id="deckQuotaPill">quota: đang tải…</span>
                   <button class="btn small" onclick="triggerSessionLifecycle('pause')" title="Tạm dừng đóng băng CPU">Tạm dừng</button>
                   <button class="btn small" onclick="triggerSessionLifecycle('sleep')" title="Ngủ đông giải phóng 100% RAM">Sleep</button>
                   <button class="btn small primary" onclick="triggerSessionLifecycle('resume')" title="Đánh thức phiên">Thức</button>
@@ -5369,7 +5396,7 @@ body.resizing-active, body.resizing-active * {
                 <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
                   <div style="display:flex;align-items:center;gap:5px">
                     <span style="color:var(--muted);font-weight:600">Nhiệm vụ:</span>
-                    <span id="deckAgentActiveTask" style="font-family:var(--mono);font-weight:700;color:var(--accent);background:rgba(56,189,248,0.12);padding:2px 8px;border-radius:4px;border:1px solid rgba(56,189,248,0.3)">Chưa nhận việc</span>
+                    <span id="deckAgentActiveTask" style="font-family:var(--mono);font-weight:700;color:var(--accent);background:rgba(56,189,248,0.12);padding:2px 8px;border-radius:4px;border:1px solid rgba(56,189,248,0.3)">…</span>
                   </div>
                   <div style="display:flex;align-items:center;gap:5px">
                     <span style="color:var(--muted);font-weight:600">Quyền sửa:</span>
@@ -5381,7 +5408,7 @@ body.resizing-active, body.resizing-active * {
                   </div>
                 </div>
                 <div style="display:flex;align-items:center;gap:6px">
-                  <button class="btn small" style="font-size:10.5px;padding:3px 9px;background:rgba(56,189,248,0.15);color:var(--accent);border-color:rgba(56,189,248,0.3)" onclick="promptClaimTask()" title="Khóa độc quyền một nhiệm vụ cho chuyên gia này (Task Mutex)">
+                  <button class="btn small" id="btnDeckClaim" style="font-size:10.5px;padding:3px 9px;background:rgba(56,189,248,0.15);color:var(--accent);border-color:rgba(56,189,248,0.3)" onclick="openClaimPicker()" title="Chọn task trong danh sách để khóa (claim) cho worker này">
                     Khóa Task (Claim)
                   </button>
                   <button class="btn small" style="font-size:10.5px;padding:3px 9px;background:rgba(74,222,128,0.15);color:var(--green);border-color:rgba(74,222,128,0.3)" onclick="promptCompleteTask()" title="Nghiệm thu hoàn thành task kèm bằng chứng commit/artifact">
@@ -5416,15 +5443,17 @@ body.resizing-active, body.resizing-active * {
                   <div class="wbRibbonCard" style="background:#111620;border:1px solid #1f2a3a;border-radius:8px;padding:8px 12px;display:flex;flex-direction:column;gap:3px">
                     <div style="display:flex;align-items:center;justify-content:space-between">
                       <span style="font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:0.5px">Nhiệm Vụ Đang Làm</span>
-                      <span class="expertStatusChip live" id="wbTaskStatusChip" style="font-size:8.5px;padding:1px 6px">● Đang chạy</span>
+                      <span class="expertStatusChip" id="wbTaskStatusChip" style="font-size:8.5px;padding:1px 6px">…</span>
                     </div>
                     <div id="wbTaskTitle" style="font-size:12px;font-weight:700;color:var(--text);line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
                       Đang tải nhiệm vụ...
                     </div>
                     <div style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:6px">
-                      <span>Mã: <code id="wbTaskId" style="color:var(--accent);font-weight:600">TODO-xx</code></span>
+                      <span>Mã: <code id="wbTaskId" style="color:var(--accent);font-weight:600">—</code></span>
                       <span>·</span>
-                      <span>Lộ trình: <span id="wbTaskRoadmap" style="color:var(--text)">RM-xx</span></span>
+                      <span>Việc: <span id="wbTaskRoadmap" style="color:var(--text)">—</span></span>
+                      <span>·</span>
+                      <span>Checklist: <span id="wbTaskChecklist" style="color:var(--text)">—</span></span>
                     </div>
                   </div>
 
@@ -5432,10 +5461,10 @@ body.resizing-active, body.resizing-active * {
                   <div class="wbRibbonCard" style="background:#111620;border:1px solid #1f2a3a;border-radius:8px;padding:8px 12px;display:flex;flex-direction:column;gap:3px">
                     <span style="font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:0.5px">Hợp Đồng Bàn Giao I/O</span>
                     <div style="font-size:11px;color:var(--text);line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
-                      <span style="color:var(--muted)">Nhận từ:</span> <span id="wbInputFrom" style="color:var(--accent)">Lead Architect</span>
+                      <span style="color:var(--muted)">Nhận từ:</span> <span id="wbInputFrom" style="color:var(--accent)">—</span>
                     </div>
                     <div style="font-size:11px;color:var(--text);line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
-                      <span style="color:var(--muted)">Giao cho:</span> <span id="wbOutputTo" style="color:var(--green)">QA Tester & Lead</span>
+                      <span style="color:var(--muted)">Giao cho:</span> <span id="wbOutputTo" style="color:var(--green)">—</span>
                     </div>
                   </div>
 
@@ -5446,13 +5475,16 @@ body.resizing-active, body.resizing-active * {
                       <button class="btn small" style="font-size:9.5px;padding:1px 6px;height:18px" onclick="switchDeckTab('sop')" title="Xem chi tiết hồ sơ SOP">Xem SOP đầy đủ </button>
                     </div>
                     <div style="font-size:10.5px;font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
-                      <span style="color:var(--green)" id="wbAllowedBox">Sửa: backend/**</span>
+                      <span style="color:var(--green)" id="wbAllowedBox">—</span>
                     </div>
                     <div style="font-size:10.5px;font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
-                      <span style="color:var(--red)" id="wbBlockedBox">Cấm: frontend/**</span>
+                      <span style="color:var(--red)" id="wbBlockedBox">—</span>
                     </div>
                   </div>
                 </div>
+
+                <!-- 5 lần giao việc gần nhất của worker (GET /api/dispatch/log?session_id=) -->
+                <div id="wbRecentDispatches" class="wbRecentDispatches"><span class="hint">Lần giao gần nhất: đang tải…</span></div>
 
                 <!-- Live Terminal & Console Stream (100% Full Width Cột Phải) -->
                 <div class="streamlinedConsole" id="workbenchConsole" style="flex:1;min-height:420px;display:flex;flex-direction:column;border:1px solid #1f2a3a;border-radius:10px;overflow:hidden;background:#080b0f">
@@ -5514,8 +5546,8 @@ body.resizing-active, body.resizing-active * {
                     <div class="card" style="padding:12px 14px;background:#111620;border:1px solid #1f2a3a;border-radius:10px;display:flex;flex-direction:column;gap:8px">
                       <h4 style="margin:0;font-size:11.5px;color:var(--accent);text-transform:uppercase;letter-spacing:0.5px">Hợp Đồng Bàn Giao I/O</h4>
                       <div style="display:flex;flex-direction:column;gap:6px;font-size:11.5px">
-                        <div><strong style="color:var(--muted)">Nhận đầu vào từ:</strong> <div id="sopInputFrom" style="color:var(--text);background:rgba(255,255,255,0.03);padding:6px 10px;border-radius:6px;margin-top:3px;border:1px solid rgba(255,255,255,0.05)">Đặc tả bài toán từ Ryan</div></div>
-                        <div><strong style="color:var(--muted)">Bàn giao đầu ra cho:</strong> <div id="sopOutputTo" style="color:var(--text);background:rgba(255,255,255,0.03);padding:6px 10px;border-radius:6px;margin-top:3px;border:1px solid rgba(255,255,255,0.05)">QA Tester & Backend</div></div>
+                        <div><strong style="color:var(--muted)">Nhận đầu vào từ:</strong> <div id="sopInputFrom" style="color:var(--text);background:rgba(255,255,255,0.03);padding:6px 10px;border-radius:6px;margin-top:3px;border:1px solid rgba(255,255,255,0.05)">—</div></div>
+                        <div><strong style="color:var(--muted)">Bàn giao đầu ra cho:</strong> <div id="sopOutputTo" style="color:var(--text);background:rgba(255,255,255,0.03);padding:6px 10px;border-radius:6px;margin-top:3px;border:1px solid rgba(255,255,255,0.05)">—</div></div>
                       </div>
                     </div>
 
@@ -5662,7 +5694,7 @@ body.resizing-active, body.resizing-active * {
         <div class="genBar">
           <div class="genPill done">01 · Input & Chỉ Thị Tổng</div>
           <div class="genPill done">02 · File Plan: docs/SSOT_ORIGINAL_SPEC.md</div>
-          <div class="genPill done">03 · Roadmap Đã Phân Rã (5 Phase)</div>
+          <div class="genPill done">03 · Roadmap</div>
           <div class="genPill live">04 · Todo DAG Tasks</div>
           <div class="genPill live">05 · Cấu Hình Model AI Cho Role</div>
         </div>
@@ -5676,15 +5708,15 @@ body.resizing-active, body.resizing-active * {
                 <span style="font-size:18px"></span>
                 <div>
                   <strong style="font-size:13px;color:var(--text)">Kanban theo vai</strong>
-                  <div class="hint">Việc của từng vai, tiến độ và bàn giao giữa các vai.</div>
+                  <div class="hint" id="dashKanbanHint">Task thật (Kanban phiên, gen_session_todos): ai đang giữ, lần giao gần nhất, checklist. Giao việc, xem tin war-room và terminal ngay trên thẻ.</div>
                 </div>
               </div>
               <div style="display:flex;align-items:center;gap:8px">
                 <div class="tabPills" style="display:flex;background:#0b0f17;padding:2px;border-radius:6px;border:1px solid var(--line)">
-                  <button class="tabPill active" id="tabDashKanbanRoles" onclick="switchDashKanbanView('roles')" style="font-size:10.5px;padding:4px 12px;border:none;border-radius:4px;cursor:pointer;background:var(--panel3);color:var(--accent);font-weight:600">Theo 6 Role Teams</button>
-                  <button class="tabPill" id="tabDashKanbanStages" onclick="switchDashKanbanView('stages')" style="font-size:10.5px;padding:4px 12px;border:none;border-radius:4px;cursor:pointer;background:transparent;color:var(--muted);font-weight:600">Theo 4 Trạng Thái</button>
+                  <button class="tabPill active" id="tabDashKanbanRoles" onclick="switchDashKanbanView('roles')" style="font-size:10.5px;padding:4px 12px;border:none;border-radius:4px;cursor:pointer;background:var(--panel3);color:var(--accent);font-weight:600">Theo vai</button>
+                  <button class="tabPill" id="tabDashKanbanStages" onclick="switchDashKanbanView('stages')" style="font-size:10.5px;padding:4px 12px;border:none;border-radius:4px;cursor:pointer;background:transparent;color:var(--muted);font-weight:600">Theo trạng thái</button>
                 </div>
-                <button class="btn small" onclick="renderDashboardKanban()" title="Làm mới bảng Kanban">↻ Làm mới</button>
+                <button class="btn small" onclick="refreshHubTasks(true)" title="Tải lại task từ server">↻ Làm mới</button>
               </div>
             </div>
             <div class="cardBody" style="padding:12px;overflow-x:auto;width:100%">
@@ -5714,14 +5746,14 @@ body.resizing-active, body.resizing-active * {
               </div>
             </div>
 
-            <!-- Cột 2: 02 · Lộ Trình Roadmap (5 Phase) -->
+            <!-- Cột 2: 02 · Lộ Trình Roadmap -->
             <div class="card implCardCol">
               <div class="cardHead">
                 <div style="display:flex;align-items:center;gap:6px">
                   <span style="font-size:14px"></span>
-                  <strong style="font-size:12px;color:var(--text)">02 · Lộ Trình Roadmap (5 Phase)</strong>
+                  <strong style="font-size:12px;color:var(--text)">02 · Lộ Trình Roadmap</strong>
                 </div>
-                <span class="hint" id="roadmapSourceState" style="font-size:10px">5 giai đoạn</span>
+                <span class="hint" id="roadmapSourceState" style="font-size:10px">—</span>
               </div>
               <div class="cardBody" style="overflow-y:auto;flex:1;max-height:360px">
                 <div class="roadmapList" id="roadmapList"></div>
@@ -6076,6 +6108,7 @@ body.resizing-active, body.resizing-active * {
         <label for="evidenceModalInput">Bằng chứng kiểm được (bắt buộc)</label>
         <input id="evidenceModalInput" autocomplete="off" placeholder="commit SHA · https://github.com/<owner>/<repo>/pull/<n> · dispatch:<id> · warroom:<id> · ~/gw-reports/<file>">
       </div>
+      <div id="evidenceModalSuggest" style="display:none;font-size:10.5px;color:var(--muted);margin:-4px 0 8px"></div>
       <div style="font-size:10px;color:var(--muted2);line-height:1.5;margin-bottom:8px">Hệ thống kiểm thật: SHA phải có trong repo, URL PR phải tồn tại, dispatch phải done, file báo cáo không rỗng. Không đạt → task giữ nguyên cột cũ.</div>
       <label style="display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--muted)"><input type="checkbox" id="evidenceModalForce"> Đóng thay người đang giữ task (force — ghi nhật ký task_evidence_audit)</label>
       <div class="field" style="margin-top:6px">
@@ -6497,7 +6530,7 @@ body.resizing-active, body.resizing-active * {
         Lấy Links & Xác Thực Agent
       </button>
       <button class="btn small" onclick="switchMcpMainTab('tools')" id="btnMcpMainTab-tools" style="background:transparent;color:var(--muted);font-size:11px;padding:4px 12px;border-radius:5px">
-        27 MCP Tools & Test Console
+        <span id="mcpToolsTabLabel">MCP Tools</span> & Test Console
       </button>
       <button class="btn small" onclick="switchMcpMainTab('configs')" id="btnMcpMainTab-configs" style="background:transparent;color:var(--muted);font-size:11px;padding:4px 12px;border-radius:5px">
         Cấu Hình Client (Antigravity / Claude / Cursor)
@@ -6531,7 +6564,7 @@ body.resizing-active, body.resizing-active * {
                 <span class="badge" style="background:#0369a1;color:#fff;font-size:8px">Streamable HTTP</span>
               </div>
               <div style="display:flex;gap:6px">
-                <input type="text" id="mcpFieldAuthUrl" readonly class="input mono" style="font-size:11px;flex:1;background:#02050b;color:var(--text);padding:5px 8px;border:1px solid var(--line2);border-radius:4px" value="http://localhost:8888/mcp">
+                <input type="text" id="mcpFieldAuthUrl" readonly class="input mono" style="font-size:11px;flex:1;background:#02050b;color:var(--text);padding:5px 8px;border:1px solid var(--line2);border-radius:4px" value="">
                 <button type="button" class="btn small" style="color:var(--accent);padding:4px 8px;font-size:10px" onclick="copyMcpField('mcpFieldAuthUrl', 'Link MCP Authenticated')">Copy</button>
               </div>
               <div style="font-size:9.5px;color:var(--muted);margin-top:4px">Được xác thực trực tiếp qua query <code style="color:var(--accent)">?token=...</code></div>
@@ -6557,7 +6590,7 @@ body.resizing-active, body.resizing-active * {
                 <span class="badge" style="background:#5b21b6;color:#fff;font-size:8px">SSE Stream</span>
               </div>
               <div style="display:flex;gap:6px">
-                <input type="text" id="mcpFieldSseUrl" readonly class="input mono" style="font-size:11px;flex:1;background:#02050b;color:var(--text);padding:5px 8px;border:1px solid var(--line2);border-radius:4px" value="http://localhost:8888/sse">
+                <input type="text" id="mcpFieldSseUrl" readonly class="input mono" style="font-size:11px;flex:1;background:#02050b;color:var(--text);padding:5px 8px;border:1px solid var(--line2);border-radius:4px" value="">
                 <button type="button" class="btn small" style="color:var(--purple);padding:4px 8px;font-size:10px" onclick="copyMcpField('mcpFieldSseUrl', 'Link SSE Stream')">Copy</button>
               </div>
               <div style="font-size:9.5px;color:var(--muted);margin-top:4px">Hỗ trợ MCP client giao tiếp qua chuẩn Server-Sent Events</div>
@@ -6571,6 +6604,7 @@ body.resizing-active, body.resizing-active * {
               </div>
               <div style="display:flex;gap:6px">
                 <input type="text" id="mcpFieldBearerToken" readonly class="input mono" style="font-size:11px;flex:1;background:#02050b;color:var(--yellow);padding:5px 8px;border:1px solid var(--line2);border-radius:4px" value="">
+                <button type="button" class="btn small" id="btnMcpRevealToken" style="color:var(--yellow);padding:4px 8px;font-size:10px" onclick="toggleMcpTokenReveal()" title="Hiện / che token">Hiện</button>
                 <button type="button" class="btn small" style="color:var(--yellow);padding:4px 8px;font-size:10px" onclick="copyMcpField('mcpFieldBearerToken', 'Khóa Bearer Token')">Copy</button>
               </div>
               <div style="font-size:9.5px;color:var(--muted);margin-top:4px">Dùng trong Header: <code style="color:var(--yellow)">Authorization: Bearer &lt;token&gt;</code></div>
@@ -6631,7 +6665,7 @@ body.resizing-active, body.resizing-active * {
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
                 <label style="font-size:10.5px;font-weight:700;color:var(--accent);margin-bottom:0">CẤP QUYỀN CÔNG CỤ (TOOL SCOPES)</label>
                 <label style="font-size:10px;color:var(--muted);cursor:pointer;display:flex;align-items:center;gap:4px">
-                  <input type="checkbox" id="mcpCheckAllPerms" checked onchange="toggleAllPermChecks(this.checked)"> Chọn tất cả 27 Tools
+                  <input type="checkbox" id="mcpCheckAllPerms" checked onchange="toggleAllPermChecks(this.checked)"> Chọn tất cả tool
                 </label>
               </div>
               <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(160px, 1fr));gap:6px" id="mcpPermOptionsContainer">
@@ -6724,12 +6758,13 @@ body.resizing-active, body.resizing-active * {
         </div>
       </div>
 
-      <!-- ================= TAB 2: 27 MCP TOOLS & TEST CONSOLE ================= -->
+      <!-- ================= TAB 2: MCP TOOLS & TEST CONSOLE ================= -->
       <div id="mcpPane-tools" style="display:none;flex-direction:column;gap:12px">
         <div style="display:flex;align-items:center;justify-content:space-between">
           <div style="display:flex;align-items:center;gap:6px">
-            <strong style="font-size:12px;color:var(--text)">Danh Mục 27 Công Cụ Nghiệp Vụ (MCP Tools)</strong>
-            <span class="badge" style="background:#064e3b;color:var(--green);font-size:8.5px" id="mcpToolsTotalBadge">27 Tools Active</span>
+            <strong style="font-size:12px;color:var(--text)">Danh mục công cụ MCP</strong>
+            <span class="badge" style="background:#064e3b;color:var(--green);font-size:8.5px" id="mcpToolsTotalBadge">đang tải…</span>
+            <span style="font-size:10px;color:var(--muted)">Test gọi thẳng tool chỉ đọc; tool có tác dụng phụ phải nhập tham số và xác nhận.</span>
           </div>
           <input type="text" id="mcpToolSearchInput" placeholder="Lọc tool theo tên hoặc chức năng..." oninput="filterMcpTools(this.value)" style="font-size:11px;padding:3px 8px;border-radius:5px;width:240px;background:#090d15;border:1px solid var(--panel3);color:var(--text)">
         </div>
@@ -6886,6 +6921,7 @@ function go(id, el) {
   } else if (id === 'implementation') {
     renderImplementation();
     renderDashboardKanban();
+    refreshHubTasks();
   } else if (id === 'data') {
     switchData('repo');
   }
@@ -6913,6 +6949,7 @@ function openEvidenceModal(taskId, title) {
   $('evidenceModalTaskId').textContent = taskId || '';
   $('evidenceModalTaskTitle').textContent = title ? `— ${title}` : '';
   $('evidenceModalInput').value = '';
+  suggestDispatchEvidence(taskId);
   $('evidenceModalForce').checked = false;
   $('evidenceModalReason').value = '';
   const err = $('evidenceModalError');
@@ -7184,10 +7221,12 @@ async function generateFromSource() {
       if (data.state) {
         Object.assign(state, data.state);
       }
-      $('sourceState').textContent = 'Đã sinh từ nguồn SSOT';
+      $('sourceState').textContent = 'Đã lưu đặc tả cho các vai';
       $('sourceState').className = 'chip live';
-      $('roadmapSourceState').textContent = '5 Phase gen-workplace (Đã khóa)';
-      renderAll();
+      // Backend chỉ lưu đặc tả (generated = 0), không sinh roadmap → nói đúng số giai đoạn đang có
+      const nRm = (state.roadmap || []).length;
+      $('roadmapSourceState').textContent = nRm ? `${nRm} giai đoạn` : `chưa có roadmap (sinh ${data.generated || 0})`;
+      refreshAll();
       showToast(data.note || 'Đã lưu đặc tả làm nguồn cho các vai');
     } else {
       { const err = await res.json().catch(() => ({})); showToast('Không lưu được đặc tả: ' + (err.error || res.status)); }
@@ -7618,106 +7657,65 @@ function renderDashboardKanban() {
   const container = $('dashRoleKanbanBoard');
   if (!container) return;
 
-  const allTodos = (state.todos || []).flat();
-
+  // Task thật nằm ở bảng gen_session_todos (MCP create_kanban_task, claim, /api/task/assign) — không phải bảng todos cũ (#24)
+  const allTasks = sortHubTasks(hubTasks());
   if (dashKanbanCurrentView === 'roles') {
-    const roleTeams = [
-      { key: 'lead', name: 'Lead Architect', sid: 'gw-lead-agy', icon: '', match: ['lead'] },
-      { key: 'backend', name: 'Backend Specialist', sid: 'gw-backend-agy', icon: '', match: ['backend'] },
-      { key: 'frontend', name: 'Frontend Specialist', sid: 'gw-frontend-agy', icon: '', match: ['frontend'] },
-      { key: 'devops', name: 'DevOps & Packaging', sid: 'gw-devops-agy', icon: '', match: ['devops', 'docker'] },
-      { key: 'qa', name: 'QA Tester', sid: 'gw-qa-agy', icon: '', match: ['qa', 'test'] },
-      { key: 'security', name: 'Security Auditor', sid: 'gw-security-agy', icon: '', match: ['security', 'audit'] }
-    ];
-
-    container.style.gridTemplateColumns = 'repeat(6, minmax(180px, 1fr))';
+    const cols = HUB_ROLE_TEAMS.map(rt => ({ rt, items: allTasks.filter(t => taskRoleKey(t) === rt.key) }));
+    const others = allTasks.filter(t => !taskRoleKey(t));
+    container.style.gridTemplateColumns = `repeat(${cols.length + 1}, minmax(210px, 1fr))`;
     container.style.width = '100%';
-    container.innerHTML = roleTeams.map(rt => {
-      const roleTodos = allTodos.filter(t => {
-        const rName = (t.role || '').toLowerCase();
-        return rt.match.some(m => rName.includes(m));
-      });
-      const doneCount = roleTodos.filter(t => t.status === 'done').length;
-      const totalCount = roleTodos.length;
-      
+    const roleCol = ({ rt, items }) => {
+      const doneCount = items.filter(t => t.status === 'done').length;
       const rObj = (state.roles || []).find(x => rt.match.some(m => (x.name || '').toLowerCase().includes(m))) || {};
       const modelName = rObj.model || getRoleDefaultModel(rt.name);
-
       return `
-        <div style="background:#0e131b;border:1px solid var(--line);border-radius:8px;display:flex;flex-direction:column;min-height:220px;overflow:hidden">
-          <div style="background:#131a24;border-bottom:1px solid var(--line);padding:8px 10px;display:flex;align-items:center;justify-content:space-between">
-            <div style="display:flex;align-items:center;gap:6px">
-              <span style="font-size:15px">${rt.icon}</span>
-              <div>
-                <strong style="font-size:11.5px;color:var(--text);display:block;line-height:1.2">${rt.name}</strong>
-                <span style="font-size:9.5px;color:var(--accent);font-family:var(--mono)">${rt.sid}</span>
-              </div>
+        <div class="hubCol">
+          <div class="hubColHead">
+            <div>
+              <strong>${rt.name}</strong>
+              <span class="hubColSid">${rt.sid}</span>
             </div>
-            <span class="badge" style="font-size:9.5px;background:var(--panel3);color:${doneCount === totalCount && totalCount > 0 ? 'var(--green)' : 'var(--accent)'}">${doneCount}/${totalCount}</span>
+            <span class="badge" style="font-size:9.5px;background:var(--panel3);color:${doneCount === items.length && items.length ? 'var(--green)' : 'var(--accent)'}">${doneCount}/${items.length}</span>
           </div>
-
-          <div style="padding:5px 8px;background:var(--bg);border-bottom:1px solid #141b26;display:flex;align-items:center;justify-content:space-between;gap:4px">
-            <span style="font-size:9px;color:var(--muted);white-space:nowrap">Model:</span>
-            <span style="font-size:9.5px;font-weight:600;color:var(--text);background:rgba(56,189,248,0.08);padding:1px 5px;border-radius:3px;border:1px solid rgba(56,189,248,0.2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(modelName)}">${escapeHtml(modelName)}</span>
+          <div class="hubColModel" title="${escapeHtml(modelName)}">Model: <b>${escapeHtml(modelName)}</b></div>
+          <div class="hubColBody">
+            ${items.length ? items.map(t => renderHubTaskCard(t, 'dash')).join('') : `<div class="hubEmpty">Chưa có task của vai này</div>`}
           </div>
-
-          <div style="padding:8px;display:flex;flex-direction:column;gap:6px;flex:1;overflow-y:auto;max-height:300px">
-            ${roleTodos.length === 0 ? `<div style="color:var(--muted2);font-size:10.5px;text-align:center;padding:16px 0">Sẵn sàng nhận task</div>` : ''}
-            ${roleTodos.map(t => {
-              const isDone = t.status === 'done';
-              const isLive = t.status === 'live' || t.status === 'running' || t.status === 'in_progress';
-              return `
-                <div style="background:${isLive ? 'rgba(56,189,248,0.06)' : '#121822'};border:1px solid ${isLive ? 'var(--accent)' : isDone ? 'rgba(74,222,128,0.2)' : 'var(--panel3)'};border-radius:6px;padding:7px 9px;display:flex;flex-direction:column;gap:4px">
-                  <div style="display:flex;align-items:center;justify-content:space-between">
-                    <span style="font-family:var(--mono);font-size:10px;font-weight:700;color:${isDone ? 'var(--green)' : isLive ? 'var(--accent)' : 'var(--muted)'}">${escapeHtml(t.id)}</span>
-                    <span class="chip ${isDone ? 'done' : isLive ? 'live' : 'wait'}" style="font-size:8.5px;padding:0 5px">${isDone ? '✓ Xong' : isLive ? 'Đang chạy' : 'Chờ'}</span>
-                  </div>
-                  <div style="font-size:11px;color:var(--text);line-height:1.35;font-weight:500">${escapeHtml(t.title)}</div>
-                </div>
-              `;
-            }).join('')}
+          <div class="hubColFoot">
+            <button class="btn small" style="width:100%;justify-content:center" onclick="openWorkerTerminal('${rt.sid}')">Mở terminal ${rt.sid}</button>
           </div>
-          <div style="padding:6px 8px;border-top:1px solid #141b26;background:#0b0f17">
-            <button class="btn small" style="width:100%;font-size:9.5px;padding:2px 0;justify-content:center" onclick="selectTmuxSession('${rt.sid}');go('runtimes')">Mở Console </button>
+        </div>`;
+    };
+    container.innerHTML = cols.map(roleCol).join('') + `
+        <div class="hubCol">
+          <div class="hubColHead"><div><strong>Chưa giao vai</strong><span class="hubColSid">Gen Core / agent khác</span></div>
+            <span class="badge" style="font-size:9.5px;background:var(--panel3);color:var(--accent)">${others.length}</span></div>
+          <div class="hubColBody">
+            ${others.length ? others.map(t => renderHubTaskCard(t, 'dash')).join('') : `<div class="hubEmpty">Trống</div>`}
           </div>
-        </div>
-      `;
-    }).join('');
+        </div>`;
   } else {
-    // Stage-based view (Workflow 4 stages)
     const stages = [
-      { key: 'backlog', title: 'Backlog', filter: t => !t.status || t.status === 'backlog' },
-      { key: 'ready', title: 'In Queue / Sẵn Sàng', filter: t => t.status === 'wait' || t.status === 'queued' || t.status === 'ready' },
-      { key: 'progress', title: 'Đang Thực Thi', filter: t => t.status === 'live' || t.status === 'running' || t.status === 'in_progress' },
-      { key: 'done', title: 'Đã Nghiệm Thu', filter: t => t.status === 'done' }
+      { key: 'todo', title: 'Cần làm' },
+      { key: 'in_progress', title: 'Đang làm' },
+      { key: 'review', title: 'Review' },
+      { key: 'done', title: 'Đã nghiệm thu' }
     ];
-
-    container.style.gridTemplateColumns = 'repeat(4, minmax(200px, 1fr))';
+    container.style.gridTemplateColumns = 'repeat(4, minmax(230px, 1fr))';
     container.style.width = '100%';
     container.innerHTML = stages.map(st => {
-      const items = allTodos.filter(st.filter);
+      const items = allTasks.filter(t => (t.status || 'todo') === st.key);
       return `
-        <div style="background:#0e131b;border:1px solid var(--line);border-radius:8px;display:flex;flex-direction:column;min-height:220px;overflow:hidden">
-          <div style="background:#131a24;border-bottom:1px solid var(--line);padding:8px 10px;display:flex;align-items:center;justify-content:space-between">
-            <strong style="font-size:11px;color:var(--text)">${st.title}</strong>
-            <span class="badge" style="font-size:9.5px;background:var(--panel3);color:var(--accent)">${items.length}</span>
+        <div class="hubCol">
+          <div class="hubColHead"><div><strong>${st.title}</strong></div>
+            <span class="badge" style="font-size:9.5px;background:var(--panel3);color:var(--accent)">${items.length}</span></div>
+          <div class="hubColBody">
+            ${items.length ? items.map(t => renderHubTaskCard(t, 'dash')).join('') : `<div class="hubEmpty">Trống</div>`}
           </div>
-          <div style="padding:8px;display:flex;flex-direction:column;gap:6px;flex:1;overflow-y:auto;max-height:280px">
-            ${items.length === 0 ? `<div style="color:var(--muted2);font-size:10px;text-align:center;padding:16px 0">Trống</div>` : ''}
-            ${items.map(t => `
-              <div style="background:#121822;border:1px solid var(--panel3);border-radius:6px;padding:7px 9px;display:flex;flex-direction:column;gap:4px">
-                <div style="display:flex;align-items:center;justify-content:space-between">
-                  <span style="font-family:var(--mono);font-size:10px;font-weight:700;color:var(--text)">${escapeHtml(t.id)}</span>
-                  <span class="badge" style="font-size:8.5px;background:var(--panel3);color:var(--accent)">${escapeHtml(t.role?.split(' ')[0] || '')}</span>
-                </div>
-                <div style="font-size:11px;color:var(--text);line-height:1.35">${escapeHtml(t.title)}</div>
-              </div>
-            `).join('')}
-          </div>
-        </div>
-      `;
+        </div>`;
     }).join('');
   }
+  if (hubPendingFocus) focusHubTaskCard(hubPendingFocus);
 }
 
 // =========================================================================
@@ -7795,6 +7793,7 @@ async function refreshTmuxSessions(showNotify = false) {
 
   syncGenQuotaTelemetry();
   renderTmuxSessions();
+  updateSidebarFoot();
 }
 
 // Quota: backend có thể trả status 'unknown' / percent null (chưa kiểm tra thật) -> hiện '?' thay vì số giả
@@ -7927,27 +7926,28 @@ function renderExpertSquadGrid() {
   container.innerHTML = state.tmuxSessions.map(s => {
     const isSel = s.id === state.selectedTmuxSessionId;
     const avatar = ROLE_AVATARS[s.id] || '';
-    const qG = s.quota_gemini || { percent: 100, model: 'Gemini 3.8 Flash' };
-    const qA = s.quota_anthropic || { percent: 100, model: 'Claude Sonnet 4.6' };
+    const qG = s.quota_gemini || {};
+    const qA = s.quota_anthropic || {};
     const isHib = s.status === 'hibernated';
     const isPaused = s.status === 'paused';
 
-    const statusDotColor = isHib ? 'var(--muted2)' : (isPaused ? 'var(--yellow)' : 'var(--green)');
-    const statusTitle = isHib ? 'Ngủ đông' : (isPaused ? 'Tạm dừng' : 'Đang chạy');
+    const statusDotColor = isHib ? 'var(--muted2)' : (isPaused ? 'var(--yellow)' : (Number(s.pid) > 0 ? 'var(--green)' : 'var(--red)'));
+    const statusTitle = isHib ? 'Ngủ đông' : (isPaused ? 'Tạm dừng' : (Number(s.pid) > 0 ? 'Phiên tmux đang chạy' : 'Chưa có phiên tmux'));
     const roleInfo = rolesSopData[s.id] || ROLE_DETAILS[s.id] || { mission: 'Thực thi các tác vụ theo phân công SSOT' };
     
     const isDone = s.task_status === 'done';
     const isRunning = s.task_status === 'in_progress';
+    const chkTxt = s.task_checklist_total ? ` · <span title="Checklist">${s.task_checklist_done}/${s.task_checklist_total}</span>` : '';
     let taskHtml = '';
-    if (isDone) {
-      taskHtml = `<span style="color:var(--green);font-weight:700">✓ DUYỆT</span> <span style="color:var(--text)">${escapeHtml(s.current_task_id)}</span> <span style="color:var(--muted)">· ${escapeHtml(s.task_title || '')}</span>`;
-    } else if (isRunning) {
-      taskHtml = `<span style="color:var(--accent);font-weight:700">CHẠY</span> <span style="color:var(--text)">${escapeHtml(s.current_task_id)}</span> <span style="color:var(--muted)">· ${escapeHtml(s.task_title || '')}</span>`;
-    } else if (s.current_task_id) {
-      taskHtml = `<span style="color:var(--accent);font-weight:700"></span> <span style="color:var(--text)">${escapeHtml(s.current_task_id)}</span> <span style="color:var(--muted)">· ${escapeHtml(s.task_title || '')}</span>`;
+    if (s.current_task_id) {
+      const tag = isDone ? '<span style="color:var(--green);font-weight:700">XONG</span>' : isRunning ? '<span style="color:var(--accent);font-weight:700">ĐANG LÀM</span>' : '<span style="color:var(--muted);font-weight:700">GIỮ</span>';
+      taskHtml = `${tag} ${taskChip(s.current_task_id)}${viecChip(s.task_viec_ref)}<span style="color:var(--muted)">${chkTxt} · ${escapeHtml(s.task_title || '')}</span>`;
     } else {
-      taskHtml = `<span style="color:var(--muted)">Sẵn sàng nhận việc</span>`;
+      taskHtml = `<span style="color:var(--muted)">Chưa giữ task nào</span>`;
     }
+    const qTitle = `Gemini (${s.quota_gemini?.source || '?'}): ${quotaText(qG)} · ${qG.detail || ''}\nClaude: ${quotaText(qA)}`;
+    const qShort = qG.exhausted ? 'HẾT' : (qPct(qG, 'percent_5h') === null ? (qG.status === 'rate_limited' ? '429' : '—') : qTxt(qPct(qG, 'percent_5h')));
+    const tmuxLive = Number(s.pid) > 0;
 
     return `
       <div class="expertCard ${isSel ? 'active' : ''} ${isHib ? 'hibernated' : ''}" onclick="selectTmuxSession('${escapeHtml(s.id)}')">
@@ -7968,9 +7968,9 @@ function renderExpertSquadGrid() {
               ? `<button class="expertMiniBtn wake" onclick="triggerGridLifecycle('${escapeHtml(s.id)}', 'wake')" title="Đánh thức dậy">Thức</button>`
               : (isPaused
                   ? `<button class="expertMiniBtn wake" onclick="triggerGridLifecycle('${escapeHtml(s.id)}', 'resume')" title="Tiếp tục">▶</button>
-                     <button class="expertMiniBtn" onclick="triggerGridLifecycle('${escapeHtml(s.id)}', 'hibernate')" title="Ngủ đông"></button>`
-                  : `<button class="expertMiniBtn" onclick="triggerGridLifecycle('${escapeHtml(s.id)}', 'pause')" title="Tạm dừng"></button>
-                     <button class="expertMiniBtn" onclick="triggerGridLifecycle('${escapeHtml(s.id)}', 'hibernate')" title="Ngủ đông"></button>`
+                     <button class="expertMiniBtn" onclick="triggerGridLifecycle('${escapeHtml(s.id)}', 'hibernate')" title="Ngủ đông">Ngủ</button>`
+                  : `<button class="expertMiniBtn" onclick="triggerGridLifecycle('${escapeHtml(s.id)}', 'pause')" title="Tạm dừng">❚❚</button>
+                     <button class="expertMiniBtn" onclick="triggerGridLifecycle('${escapeHtml(s.id)}', 'hibernate')" title="Ngủ đông">Ngủ</button>`
                 )
             }
           </div>
@@ -7978,16 +7978,19 @@ function renderExpertSquadGrid() {
 
         <!-- Hàng 2: Task tag ngắn gọn & Quota chip -->
         <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:10px">
-          <div style="min-width:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text);background:rgba(255,255,255,0.03);padding:2px 6px;border-radius:4px;border:1px solid rgba(255,255,255,0.06)" title="${escapeHtml(s.current_task_id ? `${s.current_task_id}: ${s.task_title || ''} (${s.evidence_ref || 'Verified'})` : 'Sẵn sàng')}">
+          <div class="expertTaskLine" title="${escapeHtml(s.current_task_id ? `${s.current_task_id}: ${s.task_title || ''}${s.evidence_ref ? ' (' + s.evidence_ref + ')' : ''}` : 'Chưa giữ task')}">
             ${taskHtml}
           </div>
-          <div style="font-family:var(--mono);color:var(--muted);font-size:9.5px;flex-shrink:0;background:rgba(0,0,0,0.3);padding:2px 5px;border-radius:4px" title="Quota: Gemini 5h: ${qTxt(qPct(qG,'percent_5h'))} | Tuần: ${qTxt(qPct(qG,'percent_weekly'))} · Claude Tuần: ${qTxt(qPct(qA,'percent_weekly'))}">
-            ${qTxt(qPct(qG,'percent_5h'))} ${qTxt(qPct(qA,'percent_weekly'))}
+          <div style="font-family:var(--mono);color:${qG.exhausted ? 'var(--red)' : 'var(--muted)'};font-size:9.5px;flex-shrink:0;background:rgba(0,0,0,0.3);padding:2px 5px;border-radius:4px" title="${escapeHtml(qTitle)}">
+            G ${qShort}
           </div>
+        </div>
+        <div style="font-size:9.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+          ${tmuxLive ? '' : '<span style="color:var(--yellow)">chưa có tmux · </span>'}hồ sơ: ${escapeHtml(s.profile_in_use || s.account_type || 'owner_default')}${s.last_dispatch_id ? ` · giao gần nhất #${s.last_dispatch_id} ${escapeHtml((dispatchStatusInfo({ status: s.last_dispatch_status || 'running' }) || {}).label || '')}` : ''}
         </div>
         ${(s.exhausted || (s.profile_in_use && s.profile_in_use !== s.account_type)) ? `
         <div style="font-size:9.5px;color:var(--yellow);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escapeHtml(s.fallback_reason || '')}">
-          ${s.exhausted ? `${escapeHtml(s.account_type)} hết quota · có lại ${escapeHtml(s.reset_at_label || '?')}` : ''}${s.profile_in_use && s.profile_in_use !== s.account_type ? ` · đang chạy bằng ${escapeHtml(s.profile_in_use)}` : ''}
+          ${s.exhausted ? `${escapeHtml(s.account_type)} hết quota · có lại ${escapeHtml(s.reset_at_label || '?')}` : ''}${s.profile_in_use && s.profile_in_use !== s.account_type ? ` · đang chạy bằng ${escapeHtml(s.profile_in_use)} (đã chuyển hồ sơ)` : ''}
         </div>` : ''}
       </div>
     `;
@@ -8002,8 +8005,8 @@ function updateCommandDeck() {
   const email = current.email || (current.account_label?.includes('@') ? current.account_label.split('(')[1]?.replace(')', '') : 'Chưa đăng nhập');
   const isHib = current.status === 'hibernated';
   const isPaused = current.status === 'paused';
-  const qG = current.quota_gemini || { percent: 100 };
-  const qA = current.quota_anthropic || { percent: 100 };
+  const qG = current.quota_gemini || {};
+  const qA = current.quota_anthropic || {};
   const roleInfo = rolesSopData[current.id] || ROLE_DETAILS[current.id] || { 
     title: current.role_name, 
     mission: 'Thực thi các nhiệm vụ chuyên trách theo quy chuẩn SSOT',
@@ -8021,10 +8024,20 @@ function updateCommandDeck() {
   const g5h = qTxt(qPct(qG, 'percent_5h'));
   const gWk = qTxt(qPct(qG, 'percent_weekly'));
   const cWk = qTxt(qPct(qA, 'percent_weekly'));
-  const deckPillStr = `Gemini 5h ${g5h} · tuần ${gWk} | Claude tuần ${cWk}`;
+  const deckPillStr = `Gemini ${quotaText(qG)} | Claude ${quotaText(qA)}`;
   if ($('deckQuotaGeminiVal')) $('deckQuotaGeminiVal').textContent = `${g5h} (tuần ${gWk})`;
   if ($('deckQuotaClaudeVal')) $('deckQuotaClaudeVal').textContent = cWk;
-  if ($('deckQuotaPill')) $('deckQuotaPill').textContent = deckPillStr;
+  if ($('deckQuotaPill')) {
+    $('deckQuotaPill').textContent = deckPillStr;
+    $('deckQuotaPill').title = `Nguồn: ${qG.source || '?'} · ${qG.detail || ''}`;
+    $('deckQuotaPill').style.color = qG.exhausted ? 'var(--red)' : '';
+  }
+  if ($('deckAgentProfileInUse')) {
+    const inUse = current.profile_in_use || current.account_type || 'owner_default';
+    $('deckAgentProfileInUse').innerHTML = `· hồ sơ đang dùng: <b style="color:${inUse !== current.account_type ? 'var(--yellow)' : 'var(--text)'}">${escapeHtml(current.profile_in_use_label || inUse)}</b>`
+      + (inUse !== current.account_type ? ` <span style="color:var(--yellow)" title="${escapeHtml(current.fallback_reason || '')}">(đã chuyển hồ sơ từ ${escapeHtml(current.account_type)})</span>` : '')
+      + (current.exhausted ? ` <span style="color:var(--red)">· ${escapeHtml(current.account_type)} hết quota, có lại ${escapeHtml(current.reset_at_label || '?')}</span>` : '');
+  }
   if ($('orchDeckQuotaPill')) $('orchDeckQuotaPill').textContent = deckPillStr;
   if ($('orchOwnerQuotaSmall')) $('orchOwnerQuotaSmall').textContent = `Owner · ${deckPillStr}`;
 
@@ -8033,17 +8046,18 @@ function updateCommandDeck() {
   if (taskEl) {
     if (current.task_status === 'done') {
       const evText = current.evidence_ref ? ` (${current.evidence_ref})` : '';
-      taskEl.innerHTML = `<span style="color:var(--green);font-weight:700">ĐÃ NGHIỆM THU:</span> ${escapeHtml(current.current_task_id)} · ${escapeHtml(current.task_title || '')} <span class="chip done" style="font-size:9px;padding:1px 6px;margin-left:6px" title="${escapeHtml(current.evidence_ref || 'Verified')}">✓ Bằng chứng: ${escapeHtml(current.evidence_ref ? current.evidence_ref.slice(0, 32) : 'verified')}</span>`;
+      taskEl.innerHTML = `<span style="color:var(--green);font-weight:700">ĐÃ NGHIỆM THU:</span> ${taskChip(current.current_task_id)} · ${escapeHtml(current.task_title || '')} <span class="chip done" style="font-size:9px;padding:1px 6px;margin-left:6px" title="${escapeHtml(current.evidence_ref || 'Verified')}">✓ Bằng chứng: ${escapeHtml(current.evidence_ref ? current.evidence_ref.slice(0, 32) : 'verified')}</span>`;
       taskEl.style.color = 'var(--green)';
       taskEl.style.background = 'rgba(34,197,94,0.12)';
       taskEl.style.borderColor = 'rgba(34,197,94,0.35)';
     } else if (current.current_task_id && current.current_task_id.trim()) {
-      taskEl.innerHTML = `<span style="color:var(--accent);font-weight:700">ĐANG CHẤP HÀNH:</span> ${escapeHtml(current.current_task_id)} · ${escapeHtml(current.task_title || '')}`;
+      const chk = current.task_checklist_total ? ` · checklist ${current.task_checklist_done}/${current.task_checklist_total}` : '';
+      taskEl.innerHTML = `<span style="color:var(--accent);font-weight:700">ĐANG LÀM:</span> ${taskChip(current.current_task_id)}${viecChip(current.task_viec_ref)} ${escapeHtml(current.task_title || '')}${chk}`;
       taskEl.style.color = 'var(--accent)';
       taskEl.style.background = 'rgba(56,189,248,0.15)';
       taskEl.style.borderColor = 'rgba(56,189,248,0.4)';
     } else {
-      taskEl.textContent = 'Sẵn sàng nhận việc';
+      taskEl.textContent = 'Chưa giữ task nào';
       taskEl.style.color = 'var(--muted)';
       taskEl.style.background = 'rgba(148,163,184,0.1)';
       taskEl.style.borderColor = 'rgba(148,163,184,0.2)';
@@ -8073,22 +8087,29 @@ function updateCommandDeck() {
     } else if (isPaused) {
       badge.textContent = 'Tạm dừng CPU (0.0% CPU)';
       badge.className = 'expertStatusChip paused';
-    } else {
-      badge.textContent = '● Đang làm việc (Live)';
+    } else if (Number(current.pid) > 0) {
+      badge.textContent = '● Phiên tmux đang chạy';
       badge.className = 'expertStatusChip live';
+    } else {
+      badge.textContent = 'Chưa có phiên tmux';
+      badge.className = 'expertStatusChip paused';
     }
   }
 
   // 1. UPDATE LIVE WORKBENCH PANEL ELEMENTS
   if ($('wbTaskTitle')) {
     const isDone = current.task_status === 'done';
-    $('wbTaskTitle').innerHTML = (isDone ? '<span style="color:var(--green);font-weight:700">[ĐÃ NGHIỆM THU] </span>' : '') + escapeHtml(current.task_title || roleInfo.mission);
+    $('wbTaskTitle').innerHTML = (isDone ? '<span style="color:var(--green);font-weight:700">[ĐÃ NGHIỆM THU] </span>' : '')
+      + (current.current_task_id ? escapeHtml(current.task_title || '') : '<span style="color:var(--muted)">Chưa giữ task nào — bấm "Khóa Task (Claim)" hoặc "Giao cho @vai" trên thẻ task</span>');
   }
   if ($('wbTaskId')) {
-    $('wbTaskId').textContent = current.current_task_id || 'CHƯA NHẬN VIỆC';
+    $('wbTaskId').innerHTML = current.current_task_id ? taskChip(current.current_task_id) : '—';
   }
   if ($('wbTaskRoadmap')) {
-    $('wbTaskRoadmap').textContent = current.task_roadmap || 'RM-04';
+    $('wbTaskRoadmap').innerHTML = current.task_viec_ref ? viecChip(current.task_viec_ref) : (current.task_roadmap ? escapeHtml(current.task_roadmap) : '—');
+  }
+  if ($('wbTaskChecklist')) {
+    $('wbTaskChecklist').textContent = current.task_checklist_total ? `${current.task_checklist_done}/${current.task_checklist_total}` : '—';
   }
   if ($('wbTaskStatusChip')) {
     if (current.task_status === 'done') {
@@ -8098,18 +8119,23 @@ function updateCommandDeck() {
       $('wbTaskStatusChip').style.color = 'var(--green)';
       $('wbTaskStatusChip').style.borderColor = 'var(--green)';
     } else {
-      $('wbTaskStatusChip').textContent = isHib ? 'Ngủ đông' : (isPaused ? 'Tạm dừng' : '● Đang triển khai');
-      $('wbTaskStatusChip').className = `expertStatusChip ${isHib ? 'sleep' : (isPaused ? 'paused' : 'live')}`;
+      const noTask = !current.current_task_id;
+      $('wbTaskStatusChip').textContent = isHib ? 'Ngủ đông' : (isPaused ? 'Tạm dừng' : (noTask ? 'Rảnh' : (current.task_status === 'in_progress' ? '● Đang làm' : (current.task_status || '—'))));
+      $('wbTaskStatusChip').className = `expertStatusChip ${isHib ? 'sleep' : (isPaused || noTask ? 'paused' : 'live')}`;
       $('wbTaskStatusChip').style.background = '';
       $('wbTaskStatusChip').style.color = '';
       $('wbTaskStatusChip').style.borderColor = '';
     }
   }
+  // Hợp đồng I/O: chỉ lấy từ ROLE.md thật (/api/roles/sop), không dùng chữ mẫu
+  const sopReal = rolesSopData[current.id] || {};
   if ($('wbInputFrom')) {
-    $('wbInputFrom').textContent = roleInfo.inputFrom || '—';
+    $('wbInputFrom').textContent = sopReal.inputFrom || 'chưa khai báo trong ROLE.md';
+    $('wbInputFrom').style.color = sopReal.inputFrom ? 'var(--accent)' : 'var(--muted2)';
   }
   if ($('wbOutputTo')) {
-    $('wbOutputTo').textContent = roleInfo.outputTo || '—';
+    $('wbOutputTo').textContent = sopReal.outputTo || 'chưa khai báo trong ROLE.md';
+    $('wbOutputTo').style.color = sopReal.outputTo ? 'var(--green)' : 'var(--muted2)';
   }
   if ($('wbAllowedBox')) {
     const al = current.allowed_paths?.join(', ') || 'Toàn quyền trong workspace';
@@ -8137,12 +8163,19 @@ function updateCommandDeck() {
     renderRichTerminalOutput($('wbTerminalOutput'), rawText, current.id);
   }
   updateRibbonSummary();
+  // 5 lần giao việc gần nhất của worker (dispatch_log lọc session_id)
+  renderWorkerRecentDispatches(current.id);
+  if (!updateCommandDeck._lastLoad || updateCommandDeck._lastSid !== current.id || Date.now() - updateCommandDeck._lastLoad > 4500) {
+    updateCommandDeck._lastLoad = Date.now();
+    updateCommandDeck._lastSid = current.id;
+    loadWorkerRecentDispatches(current.id);
+  }
 
   // Update SOP Panel Elements
   if ($('sopRoleTitle')) $('sopRoleTitle').textContent = `${current.role_name} (${current.id}) · Quy Chuẩn Vận Hành SOP`;
   if ($('sopRoleMission')) $('sopRoleMission').textContent = roleInfo.mission;
-  if ($('sopInputFrom')) $('sopInputFrom').textContent = roleInfo.inputFrom || '—';
-  if ($('sopOutputTo')) $('sopOutputTo').textContent = roleInfo.outputTo || '—';
+  if ($('sopInputFrom')) $('sopInputFrom').textContent = sopReal.inputFrom || 'chưa khai báo trong ROLE.md';
+  if ($('sopOutputTo')) $('sopOutputTo').textContent = sopReal.outputTo || 'chưa khai báo trong ROLE.md';
   if ($('sopAllowedPaths')) $('sopAllowedPaths').textContent = current.allowed_paths?.join(', ') || '* (Toàn quyền trong workspace)';
   if ($('sopBlockedPaths')) $('sopBlockedPaths').textContent = current.blocked_paths?.join(', ') || 'Không có hạn chế';
   if ($('sopStatusChip')) {
@@ -8215,7 +8248,7 @@ function switchDeckTab(tabName, el) {
     if (p) p.style.display = (tab === tabName) ? (tab === 'chat' || tab === 'workbench' || tab === 'thinking' ? 'flex' : 'block') : 'none';
   });
 
-  if (tabName === 'kanban') renderKanban();
+  if (tabName === 'kanban') { renderKanban(); refreshHubTasks(); }
   if (tabName === 'thinking') renderThinkingCards();
   if (tabName === 'oauth') renderOauthProfiles();
   if (tabName === 'workbench' || tabName === 'sop') updateCommandDeck();
@@ -8415,7 +8448,7 @@ function updateRibbonSummary() {
   const roleInfo = rolesSopData[current?.id] || ROLE_DETAILS[current?.id] || ROLE_DETAILS['gw-lead-agy'];
   const summaryEl = $('wbRibbonSummaryText');
   if (summaryEl) {
-    summaryEl.innerHTML = `<strong>${escapeHtml(current?.current_task_id || 'Task')}</strong>: ${escapeHtml((roleInfo.mission || '').substring(0, 60))}... | <span style="color:var(--accent)">${escapeHtml(roleInfo.inputFrom)}</span> | <span style="color:var(--green)">${current?.allowed_paths?.join(', ') || '*'}</span>`;
+    summaryEl.innerHTML = `<strong>${escapeHtml(current?.current_task_id || 'Chưa giữ task')}</strong>: ${escapeHtml(((current?.current_task_id ? current.task_title : roleInfo.mission) || '').substring(0, 70))} | <span style="color:var(--green)">${escapeHtml(current?.allowed_paths?.join(', ') || '*')}</span>`;
   }
 }
 
@@ -8958,10 +8991,11 @@ function renderOrchSwarmCards() {
     const isPaused = s.status === 'paused';
     const isLive = !isHib && !isPaused;
 
-    const statusLabel = isHib ? 'Ngủ đông' : (isPaused ? 'Tạm dừng' : '● Đang chạy');
-    const statusClass = isHib ? 'sleep' : (isPaused ? 'paused' : 'live');
-    const qG = qTxt(qPct(s.quota_gemini, 'percent_5h'));
-    const qA = qTxt(qPct(s.quota_anthropic, 'percent_weekly'));
+    const tmuxLive = Number(s.pid) > 0;
+    const statusLabel = isHib ? 'Ngủ đông' : (isPaused ? 'Tạm dừng' : (tmuxLive ? '● Đang chạy' : 'Chưa có tmux'));
+    const statusClass = isHib ? 'sleep' : (isPaused || !tmuxLive ? 'paused' : 'live');
+    const qG = 'Gemini ' + quotaText(s.quota_gemini);
+    const qA = 'Claude ' + quotaText(s.quota_anthropic);
 
     const hasTask = Boolean(s.current_task_id && s.current_task_id.trim());
     const allowed = (s.allowed_paths && s.allowed_paths.length) ? s.allowed_paths.join(', ') : 'Toàn quyền';
@@ -8988,7 +9022,7 @@ function renderOrchSwarmCards() {
         <div style="font-size:11px;display:flex;flex-direction:column;gap:3px;background:rgba(255,255,255,0.02);padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.05)">
           <div style="display:flex;align-items:center;gap:5px">
             <span style="color:var(--muted);font-size:10.5px">Nhiệm vụ:</span>
-            <span style="font-family:var(--mono);font-size:10.5px;font-weight:600;color:${hasTask ? 'var(--accent)' : 'var(--muted)'}">${escapeHtml(hasTask ? s.current_task_id : 'Rảnh rỗi')}</span>
+            <span style="font-family:var(--mono);font-size:10.5px;font-weight:600;color:${hasTask ? 'var(--accent)' : 'var(--muted)'}">${hasTask ? taskChip(s.current_task_id) + viecChip(s.task_viec_ref) : 'Rảnh'}</span>
           </div>
           <div style="display:flex;align-items:center;gap:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
             <span style="color:var(--muted);font-size:10px">Được sửa:</span>
@@ -9087,47 +9121,21 @@ async function promptClaimTask(defaultTaskId) {
 async function promptCompleteTask() {
   const current = state.tmuxSessions?.find(s => s.id === state.selectedTmuxSessionId) || state.tmuxSessions?.[0];
   if (!current) return;
-
-  const taskId = current.current_task_id || prompt(`[Nghiệm Thu Nhiệm Vụ] Nhập mã Task ID mà ${current.role_name} đã hoàn thành:`);
-  if (!taskId || !taskId.trim()) return;
-
-  const evidence = prompt(`[Bằng Chứng Nghiệm Thu Bắt Buộc] Nhập bằng chứng kiểm được cho task ${taskId.trim()}:\n- commit SHA có trong repo\n- file báo cáo không rỗng (~/gw-reports/... hoặc trong repo/worktree)\n- dispatch:<id> (lần giao việc đã done)\n- warroom:<id> (tin trả lời của agent)\n- URL PR GitHub có thật`);
-  if (!evidence || !evidence.trim()) {
-    alert('⚠️ Điều lệ số 5: Không thể hoàn tất nhiệm vụ mà không có bằng chứng (Evidence)! Yêu cầu nhập commit SHA, file báo cáo, dispatch:<id>, warroom:<id> hoặc URL PR.');
+  const taskId = (current.current_task_id || '').trim();
+  if (!taskId) {
+    showToast(`${current.id} chưa giữ task nào — claim hoặc giao task trước.`, 5000);
     return;
   }
-
-  const sendComplete = (extra) => fetch('/api/task/complete', {
+  // Hộp nhập bằng chứng dùng chung (gợi ý dispatch:<id> của lần giao đã xong); đóng với tư cách worker đang giữ task
+  const send = (extra) => fetch('/api/task/complete', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(Object.assign({
-      task_id: taskId.trim(),
-      session_id: current.id,
-      evidence_ref: evidence.trim(),
-      project_id: state.project?.id || 'PRJ-GEN-WORKPLACE'
-    }, extra || {}))
+    body: JSON.stringify(Object.assign({ task_id: taskId, session_id: current.id, project_id: 'PRJ-GEN-WORKPLACE' }, extra || {}))
   });
-
-  try {
-    let res = await sendComplete();
-    let data = await res.json();
-    if (res.status === 409 && data.code === 'already_done') {
-      const reason = prompt(`Task ${taskId.trim()} đã nghiệm thu với bằng chứng "${data.evidence_ref || ''}".\nGhi đè bằng "${evidence.trim()}"? Việc ghi đè sẽ được lưu nhật ký.\nNhập lý do để ghi đè (để trống = hủy):`);
-      if (!reason || !reason.trim()) return;
-      res = await sendComplete({ force: true, reason: reason.trim() });
-      data = await res.json();
-    }
-    if (res.ok) {
-      showToast(data.overridden
-        ? `Đã ghi đè bằng chứng task ${taskId.trim()} (${data.verified_by}); đã lưu nhật ký.`
-        : `Nghiệm thu thành công task ${taskId.trim()} (${data.verified_by})! Bằng chứng đã lưu vào hệ thống.`);
-      await refreshTmuxSessions();
-      if (typeof loadTodos === 'function') loadTodos();
-    } else {
-      alert(`Không thể nghiệm thu task: ${data.error || data.detail || 'Lỗi không xác định'}`);
-    }
-  } catch (e) {
-    alert(`Lỗi kết nối: ${e.message}`);
+  const r = await requestTaskDone(taskId, current.task_title || '', send);
+  if (r.ok) {
+    await refreshTmuxSessions();
+    await refreshHubTasks();
   }
 }
 
@@ -9423,7 +9431,8 @@ async function submitAccountChange() {
       }
       await refreshTmuxSessions();
     } else {
-      showToast('Lỗi khi cập nhật tài khoản');
+      const err = await res.json().catch(() => ({}));
+      showToast('Không đổi được tài khoản: ' + (err.error || res.status), 6000);
     }
   } catch (err) {
     showToast('Lỗi kết nối: ' + err.message);
@@ -9582,7 +9591,7 @@ function renderOauthProfiles() {
             <button class="btn small primary" onclick="openOauthModal('${escapeHtml(p.id)}')">Đăng nhập OAuth</button>
             <button class="btn small" onclick="openAssignModal('${escapeHtml(p.id)}')">Gán Role</button>
             <button class="btn small" onclick="checkSingleProfileStatus('${escapeHtml(p.id)}')">Kiểm tra</button>
-            ${isAuth ? `<button class="btn small" onclick="logoutProfile('${escapeHtml(p.id)}')" title="Đăng xuất" style="color:var(--red)"></button>` : ''}
+            ${isAuth ? `<button class="btn small" onclick="logoutProfile('${escapeHtml(p.id)}')" title="Đăng xuất" style="color:var(--red)">Đăng xuất</button>` : ''}
           </td>
         </tr>
       `;
@@ -10009,33 +10018,31 @@ function insertEmoji(emoji) {
 }
 
 
-// Live Kanban Drag & Drop
+// Kanban riêng của worker đang chọn: task thật (gen_session_todos) do worker này giữ (claimed_by) hoặc được giao (assigned_agent)
 function renderKanban() {
   const k = $('kanban');
+  if (!k) return;
+  const sid = state.selectedTmuxSessionId;
+  const roleKey = HUB_SID_ROLE[sid] || '';
+  const mine = sortHubTasks(hubTasks().filter(t => (t.claimed_by || '') === sid
+    || (!t.claimed_by && ((t.assigned_agent || '') === sid || (roleKey && taskRoleKey(t) === roleKey)))));
   const cols = [
-    ['backlog', 'BACKLOG'],
-    ['ready', 'IN QUEUE'],
-    ['progress', 'AGENT RUNNING '],
-    ['done', 'DONE & VERIFIED ']
+    ['todo', 'Cần làm'],
+    ['in_progress', 'Đang làm'],
+    ['review', 'Review'],
+    ['done', 'Đã nghiệm thu']
   ];
-  k.innerHTML = cols.map(([key, label]) => `
-    <div class="kanCol" ondragover="event.preventDefault()" ondrop="dropKanban(event, '${key}')">
+  k.innerHTML = `<div class="hint" style="grid-column:1/-1;margin-bottom:4px">Task của <b>${escapeHtml(sid || '?')}</b> (đang giữ hoặc được giao): ${mine.length}</div>` + cols.map(([key, label]) => {
+    const items = mine.filter(t => (t.status || 'todo') === key);
+    return `
+    <div class="kanCol">
       <div class="kanHead">
         <span>${label}</span>
-        <span>${state.kanban[key].length}</span>
+        <span>${items.length}</span>
       </div>
-      ${state.kanban[key].map((t, i) => `
-        <div class="taskCard" draggable="true" ondragstart="dragKanban(event, '${key}', ${i})">
-          <b>${escapeHtml(t[1])}</b>
-          <small>${t[0]} · ${escapeHtml(t[2])}</small>
-          <div class="taskFoot">
-            <span>${key}</span>
-            <span>${escapeHtml(t[2].slice(0, 7))}</span>
-          </div>
-        </div>
-      `).join('')}
-    </div>
-  `).join('');
+      ${items.length ? items.map(t => renderHubTaskCard(t, 'wk')).join('') : '<div class="hubEmpty">Trống</div>'}
+    </div>`;
+  }).join('');
 }
 
 let dragRef = null;
@@ -10605,7 +10612,7 @@ function syncGenQuotaTelemetry() {
     }
   }
   if (elC5hFill) {
-    elC5hFill.style.width = c5hDisabled ? '0%' : `${qTxt(c5h)}`;
+    elC5hFill.style.width = c5hDisabled ? '0%' : `${c5h ?? 0}%`;
     elC5hFill.style.background = c5hDisabled ? 'var(--muted2)' : 'var(--accent)';
   }
   if (elC5hReset) {
@@ -10629,6 +10636,12 @@ function syncGenQuotaTelemetry() {
 
   if (qG.status === 'unknown' && elGSummary) { elGSummary.textContent = qG.status_label || 'chưa kiểm tra'; elGSummary.style.color = 'var(--muted2)'; }
   if (qC.status === 'unknown' && elCSummary) { elCSummary.textContent = qC.status_label || 'chưa kiểm tra'; elCSummary.style.color = 'var(--muted2)'; }
+  // "?" không bao giờ đứng một mình: rê chuột thấy lý do (chưa gọi agy thật / lỗi gọi / nguồn Cloud Code không có số)
+  [[elG5hText, qG, g5h], [elGWkText, qG, gWk], [elCWkText, qC, cWk], [elC5hText, qC, c5h]].forEach(([el, q, v]) => {
+    if (el) el.title = v === null ? `Chưa có số: ${q.status_label || 'chưa kiểm tra'}. ${q.detail || ''}` : (q.detail || '');
+  });
+  if (qG.exhausted && elGSummary) { elGSummary.textContent = `HẾT QUOTA · có lại ${qG.reset_at_label || '?'}`; elGSummary.style.color = 'var(--red)'; }
+  if (qC.exhausted && elCSummary) { elCSummary.textContent = `HẾT QUOTA · có lại ${qC.reset_at_label || '?'}`; elCSummary.style.color = 'var(--red)'; }
 
   // Legacy elements backward compatibility
   const gFill = $('genGeminiQuotaFill');
@@ -10641,12 +10654,12 @@ function syncGenQuotaTelemetry() {
   if (cText) { cText.textContent = qC.status_label || `Tuần: ${qTxt(cWk)} · 5h: ${qTxt(c5h)}`; }
 
   // 3. Đồng bộ các thanh hiển thị quota toàn bộ giao diện
-  const pillStr = `5h: ${qTxt(g5h)} | Tuần: ${qTxt(gWk)} · Tuần: ${qTxt(cWk)}`;
-  if ($('deckQuotaPill')) $('deckQuotaPill').textContent = pillStr;
+  // deckQuotaPill (worker đang chọn) do updateCommandDeck ghi; ở đây chỉ quota hồ sơ owner cho màn Tổng chỉ huy
+  const pillStr = `Gemini ${quotaText(qG)} | Claude ${quotaText(qC)}`;
   if ($('orchDeckQuotaPill')) $('orchDeckQuotaPill').textContent = pillStr;
   if ($('deckQuotaGeminiVal')) $('deckQuotaGeminiVal').textContent = `${qTxt(g5h)} (Tuần ${qTxt(gWk)})`;
   if ($('deckQuotaClaudeVal')) $('deckQuotaClaudeVal').textContent = `${qTxt(cWk)}`;
-  if ($('orchOwnerQuotaSmall')) $('orchOwnerQuotaSmall').textContent = `Owner · 5h:${qTxt(g5h)} Tuần:${qTxt(gWk)} · Tuần:${qTxt(cWk)}`;
+  if ($('orchOwnerQuotaSmall')) $('orchOwnerQuotaSmall').textContent = `Owner · ${pillStr}`;
 }
 
 // 1.1. Live Quota Checker on-demand (Nút bấm kiểm tra Quota Live)
@@ -11489,7 +11502,7 @@ function renderGenSessionFilesTree() {
                   <span class="genFileTypeBadge">${escapeHtml(f.type)}</span>
                   <span style="font-family:var(--mono);color:var(--muted)">${escapeHtml(f.size)}</span>
                   <button class="btn small" style="font-size:9px;padding:1px 5px" onclick="event.stopPropagation();openGenFileFromTree('${escapeHtml(sessPath)}')">Mở ↗</button>
-                  <button class="btn small" style="font-size:9px;padding:1px 5px;color:var(--red)" onclick="event.stopPropagation();deleteSessionFile('${escapeHtml(f.path)}')" title="Xóa tệp khỏi phiên"></button>
+                  <button class="btn small" style="font-size:9px;padding:1px 5px;color:var(--red)" onclick="event.stopPropagation();deleteSessionFile('${escapeHtml(f.path)}')" title="Xóa tệp khỏi phiên">Xóa</button>
                 </div>
               </div>
             `;
@@ -12299,8 +12312,8 @@ function renderGenSessionTodoTable() {
           </td>
           <td style="text-align:right">
             <div style="display:flex;align-items:center;justify-content:flex-end;gap:3px">
-              <button class="btn small" style="font-size:9px;padding:1px 5px" onclick="openEditSessionTodoModal('${t.id}')" title="Sửa nhiệm vụ"></button>
-              <button class="btn small" style="font-size:9px;padding:1px 5px;color:var(--red)" onclick="deleteSessionTodo('${t.id}')" title="Xóa"></button>
+              <button class="btn small" style="font-size:9px;padding:1px 5px" onclick="openEditSessionTodoModal('${t.id}')" title="Sửa nhiệm vụ">Sửa</button>
+              <button class="btn small" style="font-size:9px;padding:1px 5px;color:var(--red)" onclick="deleteSessionTodo('${t.id}')" title="Xóa">Xóa</button>
             </div>
           </td>
         </tr>
@@ -12418,7 +12431,7 @@ function updateActiveTaskBanner() {
   const statusIcon = activeTask.status === 'in_progress' ? '' : (activeTask.status === 'review' ? '' : (activeTask.status === 'done' ? '' : ''));
 
   titleEl.innerHTML = `${statusIcon} <span style="font-family:var(--mono);color:var(--accent)">[${escapeHtml(activeTask.id)}]</span> ${escapeHtml(activeTask.title)}`;
-  progBadge.textContent = `${doneCount}/${items.length} checklist (${activeTask.progress_pct || 0}%)`;
+  progBadge.textContent = `${doneCount}/${items.length} checklist (${activeTask.progress_percent || 0}%)`;
 }
 
 function renderGenSessionKanban() {
@@ -12451,7 +12464,7 @@ function renderGenSessionKanban() {
       list.forEach(t => {
         const chk = t.checklist || [];
         const doneCount = chk.filter(x => x.done).length;
-        const pct = t.progress_pct || 0;
+        const pct = t.progress_percent || 0;
         const priorityClass = t.priority || 'high';
 
         let chkHtml = '';
@@ -12462,8 +12475,7 @@ function renderGenSessionKanban() {
               ${chk.map(item => `
                 <label class="genKanbanCheckItem ${item.done ? 'done' : ''}" onclick="event.stopPropagation()">
                   <input type="checkbox" ${item.done ? 'checked' : ''} onchange="toggleSessionTodoCheckItem('${t.id}', '${item.id}', this.checked)">
-                  <span style="font-family:var(--mono);font-size:9.5px;color:var(--muted2)">${escapeHtml(item.id)}</span>
-                  <span>${escapeHtml(item.text)}</span>
+                  <span title="${escapeHtml(item.id)}">${escapeHtml(item.text || item.id)}</span>
                 </label>
               `).join('')}
             </div>
@@ -12492,8 +12504,8 @@ function renderGenSessionKanban() {
           <div class="genKanbanCard" data-task-id="${escapeHtml(t.id)}" draggable="true" ondragstart="dragGenKanban(event, '${t.id}', '${col.id}')" onclick="openEditSessionTodoModal('${t.id}')" style="cursor:pointer">
             <div class="genKanbanCardHead">
               <div style="display:flex;align-items:center;gap:5px">
-                <span class="genKanbanCardId">${escapeHtml(t.id)}</span>${t.viec_ref ? `<span class="badge viec">${escapeHtml(t.viec_ref)}</span>` : ''}
-                <span class="badge" style="font-size:8.5px;background:var(--panel3);color:var(--muted)">${escapeHtml(t.assigned_agent || 'Gen Core')}</span>
+                <span class="genKanbanCardId">${escapeHtml(t.id)}</span>
+                <span class="badge" style="font-size:8.5px;background:var(--panel3);color:var(--muted)" title="Được giao (assigned_agent)">${escapeHtml(t.assigned_agent || 'Gen Core')}</span>
               </div>
               <span class="genKanbanPriorityBadge ${priorityClass}">${escapeHtml(t.priority || 'high')}</span>
             </div>
@@ -12512,6 +12524,9 @@ function renderGenSessionKanban() {
 
             ${chkHtml}
 
+            ${renderTaskLinkMeta(t)}
+            ${renderTaskLinkActions(t, 'sess')}
+
             ${t.evidence_ref ? `
               <div style="font-size:9.5px;font-family:var(--mono);color:var(--yellow);background:rgba(245,158,11,0.08);padding:3px 6px;border-radius:3px;display:flex;align-items:center;gap:4px">
                 <span>Bằng chứng:</span>
@@ -12524,8 +12539,8 @@ function renderGenSessionKanban() {
                 ${moveButtons}
               </div>
               <div style="display:flex;align-items:center;gap:3px">
-                <button class="btn small" style="font-size:9px;padding:1px 5px" onclick="openEditSessionTodoModal('${t.id}')" title="Sửa task"></button>
-                <button class="btn small" style="font-size:9px;padding:1px 5px;color:var(--red)" onclick="deleteSessionTodo('${t.id}')" title="Xóa task"></button>
+                <button class="btn small" style="font-size:9px;padding:1px 5px" onclick="openEditSessionTodoModal('${t.id}')" title="Sửa task">Sửa</button>
+                <button class="btn small" style="font-size:9px;padding:1px 5px;color:var(--red)" onclick="deleteSessionTodo('${t.id}')" title="Xóa task">Xóa</button>
               </div>
             </div>
           </div>
@@ -12638,9 +12653,9 @@ function openNewSessionTodoModal() {
   $('sessionTodoModalTitle').textContent = 'Tạo Nhiệm Vụ Mới Cho Phiên';
   $('todoModalId').value = '';
   
-  // Tự sinh ID task tiếp theo
-  const currentCount = (genState.sessionTodos || []).length + 1;
-  $('todoModalTaskId').value = `TSK-${String(currentCount).padStart(2, '0')}`;
+  // Mã task do server cấp (duy nhất toàn app); đoán theo số task của phiên dễ trùng task phiên khác → lỗi wrong_conversation
+  $('todoModalTaskId').value = '';
+  $('todoModalTaskId').placeholder = 'tự cấp khi lưu (TSK-n)';
   if ($('todoModalViecRef')) $('todoModalViecRef').value = '';
   $('todoModalPriority').value = 'high';
   $('todoModalTitle').value = '';
@@ -12726,7 +12741,7 @@ async function saveSessionTodoFromModal() {
     return;
   }
 
-  const taskId = ($('todoModalTaskId')?.value || '').trim() || `TSK-${Date.now().toString().slice(-4)}`;
+  const taskId = ($('todoModalTaskId')?.value || '').trim();
   const priority = $('todoModalPriority')?.value || 'high';
   const desc = ($('todoModalDesc')?.value || '').trim();
   const status = $('todoModalStatus')?.value || 'todo';
@@ -12757,7 +12772,7 @@ async function saveSessionTodoFromModal() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         conv_id: genState.currentConvId,
-        id: taskId,
+        id: taskId || undefined,
         title: title,
         description: desc,
         status: status,
@@ -12770,9 +12785,11 @@ async function saveSessionTodoFromModal() {
       })
     });
     if (res.ok) {
-      showToast(`Đã lưu nhiệm vụ [${taskId}] thành công!`);
+      const saved = await res.json().catch(() => ({}));
+      showToast(`Đã lưu nhiệm vụ [${saved.id || taskId}] thành công!`);
       closeSessionTodoModal();
       await loadGenSessionTodos();
+      refreshHubTasks();
     } else {
       const err = await res.json().catch(() => ({}));
       showToast('Không lưu được: ' + (err.error || err.reason || res.status), 7000);
@@ -13104,9 +13121,7 @@ async function loadGitData() {
 Branch: ${stat.branch} (Head: ${stat.head})
 Status: ${stat.clean ? 'Clean (0 uncommitted changes)' : 'Modified files: ' + stat.changed_files.join(', ')}
 Total Commits: ${stat.total_commits} commits
-Docker Container: gen-workplace-app (Live mount: /app/repo)
-Desktop Entry: ~/Desktop/Gen-workplace.desktop
-Web Endpoint: http://localhost:8888`;
+Web Endpoint: ${location.origin}`;
       }
     }
   } catch (err) {
@@ -13458,6 +13473,8 @@ function refreshAll() {
   try { renderOrchSwarmCards(); } catch (e) { console.warn('[refreshAll] renderOrchSwarmCards:', e); }
   try { renderKanban(); } catch (e) { console.warn('[refreshAll] renderKanban:', e); }
   try { updateCommandDeck(); } catch (e) { console.warn('[refreshAll] updateCommandDeck:', e); }
+  try { renderDashboardKanban(); } catch (e) { console.warn('[refreshAll] renderDashboardKanban:', e); }
+  try { updateSidebarFoot(); } catch (e) { console.warn('[refreshAll] updateSidebarFoot:', e); }
 }
 
 // Keyboard shortcuts
@@ -13556,13 +13573,43 @@ async function loadWarRoomMessages(silent = false) {
   if (!container) return;
 
   try {
-    const res = await fetch(`/api/warroom/messages?channel=${currentWarRoomChannel}&project=PRJ-GEN-WORKPLACE`);
+    const [res, dRes] = await Promise.all([
+      fetch(`/api/warroom/messages?channel=${currentWarRoomChannel}&project=PRJ-GEN-WORKPLACE&limit=200`),
+      fetch('/api/dispatch/log?limit=200').catch(() => null)
+    ]);
     if (!res.ok) return;
     const data = await res.json();
+    // Lần giao việc theo tin yêu cầu (request_msg_id) và tin trả lời (reply_msg_id) → hiện trạng thái dưới tin
+    wrDispatchIndex = { byRequest: {}, byReply: {} };
+    if (dRes && dRes.ok) {
+      const dData = await dRes.json().catch(() => ({}));
+      (dData.items || []).forEach(d => {
+        if (d.request_msg_id) (wrDispatchIndex.byRequest[d.request_msg_id] = wrDispatchIndex.byRequest[d.request_msg_id] || []).push(d);
+        if (d.reply_msg_id) wrDispatchIndex.byReply[d.reply_msg_id] = d;
+      });
+    }
     renderWarRoomMessages(data.messages || []);
   } catch (err) {
     console.error("Lỗi tải tin nhắn war room:", err);
   }
+}
+
+let wrDispatchIndex = { byRequest: {}, byReply: {} };
+
+// Nội dung tin: escape rồi biến TSK-n / VIEC-n thành chip bấm được (mở thẻ task)
+function linkifyWarroomBody(text) {
+  return escapeHtml(text || '')
+    .replace(/(^|[^\w-])(TSK-\d+)(?![\w-])/g, (m, pre, id) => `${pre}${taskChip(id)}`)
+    .replace(/(^|[^\w-])(VIEC-\d+)(?![\w-])/g, (m, pre, id) => `${pre}${viecChip(id)}`)
+    .replace(/\n/g, '<br>');
+}
+
+function focusWarroomMessage(msgId) {
+  const el = $(`wrMsg-${msgId}`);
+  if (!el) return false;
+  el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  return true;
 }
 
 function renderWarRoomMessages(messages) {
@@ -13575,6 +13622,9 @@ function renderWarRoomMessages(messages) {
     container.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted)">Chưa có tin nhắn nào trong kênh này. Hãy phát lệnh đầu tiên!</div>';
     return;
   }
+
+  const byReplyTo = {};
+  messages.forEach(x => { if (x.reply_to) (byReplyTo[x.reply_to] = byReplyTo[x.reply_to] || []).push(x); });
 
   container.innerHTML = messages.map(m => {
     let authorClass = 'specialist';
@@ -13616,25 +13666,58 @@ function renderWarRoomMessages(messages) {
       ? `<div class="wrReacts">${m.reacts.map(r => `<span class="wrReactItem">${escapeHtml(r)}</span>`).join('')}</div>`
       : '';
 
+    // Nối tin trả lời ↔ tin hỏi (reply_to) và lần giao việc (dispatch_log) của tin
+    const replyToHtml = m.reply_to
+      ? `<button class="wrReplyLink" onclick="focusWarroomMessage(${Number(m.reply_to)})" title="Tin yêu cầu">↳ trả lời tin #${Number(m.reply_to)}</button>` : '';
+    const replies = byReplyTo[m.id] || [];
+    const repliesHtml = replies.length
+      ? replies.map(r => `<button class="wrReplyLink" onclick="focusWarroomMessage(${Number(r.id)})">→ trả lời #${Number(r.id)} (${escapeHtml(r.author || '')})</button>`).join('') : '';
+    const reqDispatches = wrDispatchIndex.byRequest[m.id] || [];
+    const replyDispatch = wrDispatchIndex.byReply[m.id];
+    const dispatchHtml = [...reqDispatches, ...(replyDispatch ? [replyDispatch] : [])].map(d => {
+      const di = dispatchStatusInfo(d);
+      return `<span class="chip ${di.cls}" title="${escapeHtml(d.fallback_reason || '')}">dispatch #${d.id} · ${escapeHtml(d.session_id)} · ${di.label}</span>${d.task_id ? taskChip(d.task_id) : ''}`;
+    }).join(' ');
+
     return `
-      <div class="wrMsgItem ${authorClass}">
+      <div class="wrMsgItem ${authorClass}" id="wrMsg-${Number(m.id)}" data-msg-id="${Number(m.id)}">
         <div class="wrMsgHeader">
-          <span>${authorIcon}</span>
+          <span class="wrMsgNo">#${Number(m.id)}</span>
           <span class="wrAuthor">${escapeHtml(m.author)}</span>
           <span class="wrTag ${tagClass}">${tagLabel}</span>
           <span class="wrTime">${escapeHtml(m.created_time || '')}</span>
+          ${replyToHtml}
         </div>
         <div class="wrBubble">
-          ${escapeHtml(m.body || '').replace(/\n/g, '<br>')}
+          ${linkifyWarroomBody(m.body)}
           ${reactsHtml}
         </div>
+        ${(dispatchHtml || repliesHtml) ? `<div class="wrMsgLinks">${dispatchHtml} ${repliesHtml}</div>` : ''}
       </div>
     `;
   }).join('');
 
-  if ($('wrAutoScrollCheck')?.checked) {
+  if (wrPendingFocusMsg) {
+    const target = wrPendingFocusMsg;
+    if (focusWarroomMessage(target)) wrPendingFocusMsg = null;
+    else if (!messages.some(x => x.id === target)) { wrPendingFocusMsg = null; showToast(`Tin #${target} không có trong 200 tin gần nhất của kênh này`, 4000); }
+  } else if ($('wrAutoScrollCheck')?.checked) {
     container.scrollTop = container.scrollHeight;
   }
+}
+
+// Sau khi gửi: hiện dispatches[] (vai nào nhận, dispatch id, task gắn kèm) ngay dưới khung soạn tin
+function renderWarroomDispatchStrip(data) {
+  const strip = $('wrDispatchStrip');
+  if (!strip) return;
+  const ds = (data && data.dispatches) || [];
+  if (!ds.length) {
+    strip.innerHTML = `<span class="hint">${escapeHtml((data && data.note) || '')}</span>`;
+  } else {
+    strip.innerHTML = `<span class="hint">Tin #${Number(data.user_message?.id)} đã giao:</span> ` + ds.map(d =>
+      `<span class="chip live">${escapeHtml(d.session_id)} · dispatch #${d.dispatch_id}</span>${d.task_id ? taskChip(d.task_id) : ''}`).join(' ');
+  }
+  strip.style.display = 'flex';
 }
 
 async function sendWarRoomMessage() {
@@ -13665,12 +13748,15 @@ async function sendWarRoomMessage() {
       })
     });
 
+    const data = await res.json().catch(() => ({}));
     if (res.ok) {
       input.value = '';
       await loadWarRoomMessages(true);
-      showToast('Đã gửi. Nếu có @vai, agy sẽ chạy và trả kết quả về kênh này.');
+      renderWarroomDispatchStrip(data);
+      (data.dispatches || []).forEach(d => watchDispatch(d.dispatch_id));
+      showToast(data.note || 'Đã gửi.', 5000);
     } else {
-      showToast('Không gửi được tin.');
+      showToast('Không gửi được tin: ' + (data.error || res.status));
     }
   } catch (err) {
     showToast('Lỗi mạng khi gửi tin.');
@@ -13681,6 +13767,380 @@ async function sendWarRoomMessage() {
     }
     input.focus();
   }
+}
+
+// =========================================================================
+// VIỆC LÀ TRUNG TÂM (#24): Kanban ↔ Phòng giao ban ↔ Worker & Terminal
+// Task thật = bảng gen_session_todos (GET /api/tasks, /api/state.gen_session_todos). Mỗi thẻ task có:
+// người giữ, lần giao gần nhất (dispatch_log), chip VIEC, checklist x/y và 3 lối đi: Giao cho @vai · Tin #n · Terminal.
+// =========================================================================
+const HUB_ROLE_TEAMS = [
+  { key: 'lead', name: 'Lead Architect', sid: 'gw-lead-agy', match: ['lead'] },
+  { key: 'backend', name: 'Backend', sid: 'gw-backend-agy', match: ['backend'] },
+  { key: 'frontend', name: 'Frontend', sid: 'gw-frontend-agy', match: ['frontend'] },
+  { key: 'devops', name: 'DevOps', sid: 'gw-devops-agy', match: ['devops', 'docker'] },
+  { key: 'qa', name: 'QA', sid: 'gw-qa-agy', match: ['qa', 'test'] },
+  { key: 'security', name: 'Security', sid: 'gw-security-agy', match: ['security', 'audit'] }
+];
+const HUB_SID_ROLE = Object.fromEntries(HUB_ROLE_TEAMS.map(r => [r.sid, r.key]));
+let hubPendingFocus = null;
+const hubAssignChoice = {};   // vai đã chọn ở ô "Giao cho" của từng thẻ (giữ qua các lần vẽ lại)
+let hubWatching = {};   // dispatch_id → true (đang chờ kết quả để cập nhật thẻ)
+
+function hubTasks() { return Array.isArray(state.gen_session_todos) ? state.gen_session_todos : []; }
+function findHubTask(id) {
+  return hubTasks().find(t => t.id === id) || (typeof genState !== 'undefined' ? (genState.sessionTodos || []).find(t => t.id === id) : null) || null;
+}
+function sortHubTasks(list) {
+  const rank = { in_progress: 0, review: 1, todo: 2, done: 3 };
+  return [...list].sort((a, b) => (rank[a.status] ?? 2) - (rank[b.status] ?? 2) || String(b.updated_at || '').localeCompare(String(a.updated_at || '')));
+}
+// Vai của task: người đang giữ (claimed_by) trước, rồi assigned_agent (worker id hoặc tên vai)
+function taskRoleKey(t) {
+  const who = String(t.claimed_by || t.assigned_agent || '').toLowerCase();
+  if (!who) return '';
+  if (HUB_SID_ROLE[who]) return HUB_SID_ROLE[who];
+  const rt = HUB_ROLE_TEAMS.find(r => r.match.some(m => new RegExp(`(^|[^a-z])${m}([^a-z]|$)`).test(who)));
+  return rt ? rt.key : '';
+}
+function taskWorkerSid(t) {
+  const who = String(t.claimed_by || '').trim();
+  if (who && (state.tmuxSessions || []).some(s => s.id === who)) return who;
+  if (HUB_SID_ROLE[who]) return who;
+  const k = taskRoleKey(t);
+  return k ? HUB_ROLE_TEAMS.find(r => r.key === k).sid : '';
+}
+function checklistXY(t) {
+  const chk = Array.isArray(t.checklist) ? t.checklist : [];
+  const done = chk.filter(c => c && c.done).length;
+  return { done, total: chk.length, text: chk.length ? `${done}/${chk.length}` : '0' };
+}
+function dispatchStatusInfo(d) {
+  if (!d) return null;
+  const st = d.status || 'running';
+  const base = st === 'running' ? { cls: 'live', label: 'đang chạy' }
+    : (st === 'done' || st === 'ok') ? { cls: 'done', label: 'xong' }
+    : st === 'failed' ? { cls: 'bad', label: 'lỗi' } : { cls: 'wait', label: st };
+  if (d.fallback) base.label += ' · đã chuyển hồ sơ';
+  return base;
+}
+function viecChip(v) {
+  return v ? `<button class="refChip viec" onclick="event.stopPropagation();openViecTasks('${escapeHtml(v)}')" title="Mở các task của ${escapeHtml(v)}">${escapeHtml(v)}</button>` : '';
+}
+function taskChip(id) {
+  return `<button class="refChip tsk" onclick="event.stopPropagation();openTaskCard('${escapeHtml(id)}')" title="Mở thẻ task ${escapeHtml(id)}">${escapeHtml(id)}</button>`;
+}
+
+// Hàng thông tin liên kết: người giữ · lần giao gần nhất · VIEC · checklist
+function renderTaskLinkMeta(t) {
+  const xy = checklistXY(t);
+  const holder = t.claimed_by || '';
+  const d = t.last_dispatch;
+  const di = dispatchStatusInfo(d);
+  return `
+    <div class="taskLinkMeta">
+      ${viecChip(t.viec_ref)}
+      <span class="chip ${holder ? 'live' : 'wait'}" title="Người đang giữ task (claim)">${holder ? 'giữ: ' + escapeHtml(holder) : 'chưa ai giữ'}</span>
+      <span class="chip" title="Checklist đã xong / tổng">checklist ${xy.text}</span>
+      ${di ? `<span class="chip ${di.cls}" data-dispatch-status="${escapeHtml(d.status || '')}" title="Lần giao gần nhất: dispatch:${d.id} · ${escapeHtml(d.session_id || '')}${d.fallback_reason ? ' · ' + escapeHtml(d.fallback_reason) : ''}">#${d.id} ${di.label}</span>` : '<span class="chip" title="Chưa giao lần nào">chưa giao</span>'}
+    </div>`;
+}
+
+// Hàng nút: Giao cho @vai · Tin #n · Terminal (+ Phiên, Nghiệm thu)
+function renderTaskLinkActions(t, ctx) {
+  const key = `${ctx}-${t.id}`;
+  const roleNow = hubAssignChoice[key] || taskRoleKey(t) || 'qa';
+  const d = t.last_dispatch;
+  const msgId = d ? (d.reply_msg_id || d.request_msg_id) : null;
+  const sid = taskWorkerSid(t);
+  const isDone = t.status === 'done';
+  const opts = HUB_ROLE_TEAMS.map(r => `<option value="${r.key}" ${r.key === roleNow ? 'selected' : ''}>@${r.key}</option>`).join('');
+  return `
+    <div class="taskLinkActions" onclick="event.stopPropagation()">
+      ${isDone ? '' : `<select class="taskAssignSel" id="assignSel-${escapeHtml(key)}" onchange="hubAssignChoice['${escapeHtml(key)}']=this.value;document.getElementById('assignBtn-${escapeHtml(key)}').textContent='Giao cho @'+this.value" title="Chọn vai">${opts}</select>
+      <button class="btn small taskAssignBtn" id="assignBtn-${escapeHtml(key)}" onclick="assignTaskFromCard('${escapeHtml(t.id)}','${escapeHtml(key)}')" title="Claim task cho vai + gửi war-room @vai kèm tiêu đề, checklist, viec_ref">Giao cho @${roleNow}</button>`}
+      ${msgId ? `<button class="btn small" onclick="openWarroomMessage(${Number(msgId)}, '${escapeHtml((d && d.channel_id) || 'war_room')}')" title="Mở phòng giao ban tại tin này">Tin #${Number(msgId)}</button>` : ''}
+      ${sid ? `<button class="btn small" onclick="openWorkerTerminal('${escapeHtml(sid)}')" title="Mở Worker & Terminal của ${escapeHtml(sid)}">Terminal</button>` : ''}
+      ${t.conversation_id ? `<button class="btn small" onclick="openTaskConversation('${escapeHtml(t.conversation_id)}')" title="Mở phiên của task (tin kết quả của worker ghi ở đây)">Phiên</button>` : ''}
+      ${isDone ? '' : `<button class="btn small" style="color:var(--green)" onclick="closeHubTask('${escapeHtml(t.id)}')" title="Nghiệm thu task (bằng chứng kiểm được)">Nghiệm thu</button>`}
+    </div>`;
+}
+
+function renderHubTaskCard(t, ctx) {
+  const isDone = t.status === 'done';
+  const isLive = t.status === 'in_progress';
+  const stLabel = { todo: 'Cần làm', in_progress: 'Đang làm', review: 'Review', done: 'Xong' }[t.status] || t.status;
+  return `
+    <div class="hubTaskCard ${isLive ? 'live' : ''} ${isDone ? 'done' : ''}" id="hubTask-${escapeHtml(ctx)}-${escapeHtml(t.id)}" data-task-id="${escapeHtml(t.id)}">
+      <div class="hubTaskHead">
+        <span class="hubTaskId">${escapeHtml(t.id)}</span>
+        <span class="chip ${isDone ? 'done' : isLive ? 'live' : 'wait'}" style="font-size:9px;padding:0 6px">${escapeHtml(stLabel)}</span>
+      </div>
+      <div class="hubTaskTitle">${escapeHtml(t.title || '')}</div>
+      ${renderTaskLinkMeta(t)}
+      ${t.evidence_ref ? `<div class="hubTaskEvidence" title="Bằng chứng nghiệm thu">Bằng chứng: ${escapeHtml(t.evidence_ref)}</div>` : ''}
+      ${renderTaskLinkActions(t, ctx)}
+    </div>`;
+}
+
+async function refreshHubTasks(showNotify = false) {
+  try {
+    const res = await fetch('/api/tasks');
+    if (!res.ok) return;
+    const data = await res.json();
+    state.gen_session_todos = data.tasks || [];
+    rerenderHubViews();
+    if (showNotify) showToast(`Đã tải ${state.gen_session_todos.length} task`);
+  } catch (e) {
+    console.warn('[Tasks] Không tải được /api/tasks:', e);
+  }
+}
+
+function rerenderHubViews() {
+  const active = document.querySelector('.screen.active')?.id;
+  if (active === 'implementation') renderDashboardKanban();
+  if (state.currentDeckTab === 'kanban') renderKanban();
+  if (active === 'runtimes') updateCommandDeck();
+}
+
+async function assignTaskFromCard(todoId, key) {
+  const role = $(`assignSel-${key}`)?.value || 'qa';
+  const btn = $(`assignBtn-${key}`);
+  if (btn) { btn.disabled = true; btn.textContent = 'Đang giao…'; }
+  try {
+    const res = await fetch('/api/task/assign', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ todo_id: todoId, session_id: role, author: 'Ryan (Owner)' })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.error) {
+      const extra = data.code === 'locked' && data.held_by ? ` (đang do ${data.held_by} giữ)` : '';
+      showToast(`Không giao được ${todoId}: ${data.error || res.status}${extra}`, 7000);
+      return;
+    }
+    showToast(`Đã giao ${todoId} cho @${role} · dispatch #${data.dispatch_id} · tin war-room #${data.request_msg_id}`, 5000);
+    await refreshHubTasks();
+    if (typeof genState !== 'undefined' && genState.currentConvId) loadGenSessionTodos();
+    watchDispatch(data.dispatch_id);
+  } catch (e) {
+    showToast('Lỗi kết nối khi giao việc: ' + e.message, 6000);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = `Giao cho @${role}`; }
+  }
+}
+
+// Chờ 1 lần giao việc xong (long-poll /api/dispatch/wait) rồi cập nhật mọi màn đang hiện task / war-room / worker
+async function watchDispatch(did) {
+  if (!did || hubWatching[did]) return;
+  hubWatching[did] = true;
+  try {
+    for (let i = 0; i < 40; i++) {
+      const res = await fetch(`/api/dispatch/wait?dispatch_id=${encodeURIComponent(did)}&timeout_sec=20`);
+      const data = await res.json().catch(() => ({}));
+      if (data.status && data.status !== 'running') {
+        const di = dispatchStatusInfo(data);
+        showToast(`dispatch #${did} (${data.task_id || 'không gắn task'}) ${di ? di.label : data.status}`, 4000);
+        break;
+      }
+      await refreshHubTasks();
+    }
+  } catch (e) {
+    console.warn('[watchDispatch]', e);
+  } finally {
+    delete hubWatching[did];
+    await refreshHubTasks();
+    if (typeof genState !== 'undefined' && genState.currentConvId) loadGenSessionTodos();
+    if (document.querySelector('.screen.active')?.id === 'warroom') loadWarRoomMessages(true);
+    if (document.querySelector('.screen.active')?.id === 'runtimes') loadWorkerRecentDispatches(state.selectedTmuxSessionId);
+  }
+}
+
+function focusHubTaskCard(taskId) {
+  const cards = document.querySelectorAll(`#dashRoleKanbanBoard [data-task-id="${CSS.escape(taskId)}"]`);
+  if (!cards.length) return false;
+  hubPendingFocus = null;
+  cards.forEach(c => { c.classList.remove('flash'); void c.offsetWidth; c.classList.add('flash'); });
+  cards[0].scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+  return true;
+}
+
+// Chip TSK-n ở bất kỳ đâu → màn Việc & tiến độ, cuộn tới thẻ và nháy sáng
+async function openTaskCard(taskId) {
+  hubPendingFocus = taskId;
+  go('implementation');
+  if (!findHubTask(taskId)) await refreshHubTasks();
+  renderDashboardKanban();
+  if (!findHubTask(taskId)) { hubPendingFocus = null; showToast(`Không tìm thấy task ${taskId}`, 4000); return; }
+  setTimeout(() => focusHubTaskCard(taskId), 60);
+}
+
+async function openViecTasks(viec) {
+  go('implementation');
+  if (!hubTasks().length) await refreshHubTasks();
+  renderDashboardKanban();
+  const ids = hubTasks().filter(t => (t.viec_ref || '').toUpperCase() === viec.toUpperCase()).map(t => t.id);
+  if (!ids.length) { showToast(`Chưa có task nào gắn ${viec}`, 4000); return; }
+  setTimeout(() => { ids.forEach(id => focusHubTaskCard(id)); }, 60);
+  showToast(`${viec}: ${ids.length} task (${ids.join(', ')})`, 4000);
+}
+
+let wrPendingFocusMsg = null;
+function openWarroomMessage(msgId, channel) {
+  wrPendingFocusMsg = Number(msgId);
+  go('warroom');
+  const ch = channel && WARROOM_CHANNEL_META[channel] ? channel : 'war_room';
+  if (ch !== currentWarRoomChannel) switchWarRoomChannel(ch);
+}
+
+function openWorkerTerminal(sid) {
+  state.selectedTmuxSessionId = sid;
+  go('runtimes');
+  switchDeckTab('workbench');
+  renderTmuxSessions();
+}
+
+async function openTaskConversation(convId) {
+  go('gen_workplace');
+  try { await selectGenConversation(convId); } catch (e) { console.warn('[openTaskConversation]', e); }
+}
+
+// Nghiệm thu từ thẻ: hộp bằng chứng (gợi ý dispatch:<id> của lần giao đã xong) → /api/gen/session/todos/status
+async function closeHubTask(todoId) {
+  const t = findHubTask(todoId);
+  if (!t) return;
+  const send = (extra) => fetch('/api/gen/session/todos/status', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(Object.assign({ conv_id: t.conversation_id, todo_id: todoId, status: 'done' }, extra || {}))
+  });
+  await requestTaskDone(todoId, t.title, send);
+  await refreshHubTasks();
+  if (typeof genState !== 'undefined' && genState.currentConvId) loadGenSessionTodos();
+}
+
+// Gợi ý bằng chứng trong hộp nghiệm thu: dispatch:<id> của lần giao gần nhất ĐÃ XONG cho task
+async function suggestDispatchEvidence(taskId) {
+  const box = $('evidenceModalSuggest');
+  if (!box) return;
+  box.style.display = 'none';
+  box.innerHTML = '';
+  if (!taskId) return;
+  try {
+    const res = await fetch(`/api/dispatch/log?task_id=${encodeURIComponent(taskId)}&limit=20`);
+    if (!res.ok) return;
+    const data = await res.json();
+    const d = (data.items || []).find(x => x.status === 'done' || x.status === 'ok');
+    if (!d || $('evidenceModalTaskId')?.textContent !== taskId) return;
+    const ev = `dispatch:${d.id}`;
+    const input = $('evidenceModalInput');
+    if (input && !input.value.trim()) input.value = ev;
+    box.innerHTML = `Gợi ý: <button class="refChip tsk" type="button" onclick="$('evidenceModalInput').value='${ev}'">${ev}</button> — lần giao của ${escapeHtml(d.session_id)} đã xong lúc ${escapeHtml(d.finished_at || '?')}${d.report_path ? ` · báo cáo <code>${escapeHtml(d.report_path)}</code>` : ''}`;
+    box.style.display = 'block';
+  } catch (e) {
+    console.warn('[suggestDispatchEvidence]', e);
+  }
+}
+
+// Worker & Terminal: 5 lần giao gần nhất của worker đang chọn
+let workerDispatchCache = {};
+async function loadWorkerRecentDispatches(sid) {
+  const box = $('wbRecentDispatches');
+  if (!box || !sid) return;
+  try {
+    const res = await fetch(`/api/dispatch/log?session_id=${encodeURIComponent(sid)}&limit=5`);
+    if (!res.ok) { box.innerHTML = `<span class="hint">Không tải được nhật ký giao việc (HTTP ${res.status})</span>`; return; }
+    const data = await res.json();
+    workerDispatchCache[sid] = data.items || [];
+    if (state.selectedTmuxSessionId === sid) renderWorkerRecentDispatches(sid);
+  } catch (e) {
+    box.innerHTML = `<span class="hint">Không tải được nhật ký giao việc: ${escapeHtml(e.message)}</span>`;
+  }
+}
+function renderWorkerRecentDispatches(sid) {
+  const box = $('wbRecentDispatches');
+  if (!box) return;
+  const items = workerDispatchCache[sid];
+  if (!items) { box.innerHTML = '<span class="hint">Lần giao gần nhất: đang tải…</span>'; return; }
+  if (!items.length) { box.innerHTML = `<span class="hint">${escapeHtml(sid)} chưa được giao việc lần nào (dispatch_log trống).</span>`; return; }
+  box.innerHTML = `<span class="wbRecentLabel">5 lần giao gần nhất:</span>` + items.map(d => {
+    const di = dispatchStatusInfo(d);
+    const msgId = d.reply_msg_id || d.request_msg_id;
+    return `<span class="wbRecentItem" title="${escapeHtml((d.summary || '').slice(0, 300))}">
+      <span class="chip ${di.cls}">#${d.id} ${di.label}</span>
+      ${d.task_id ? taskChip(d.task_id) : '<span class="hint">không gắn task</span>'}
+      <span class="hint">${escapeHtml((d.finished_at || d.started_at || '').slice(5, 16))}</span>
+      ${msgId ? `<button class="btn small" style="font-size:9.5px;padding:0 6px" onclick="openWarroomMessage(${Number(msgId)}, '${escapeHtml(d.channel_id || 'war_room')}')">Tin #${Number(msgId)}</button>` : ''}
+    </span>`;
+  }).join('');
+}
+
+// Nút Claim: chọn task trong danh sách (không gõ tay)
+async function openClaimPicker() {
+  const current = state.tmuxSessions?.find(s => s.id === state.selectedTmuxSessionId) || state.tmuxSessions?.[0];
+  if (!current) return;
+  await refreshHubTasks();
+  const open = sortHubTasks(hubTasks().filter(t => t.status !== 'done'));
+  openModal();
+  $('modalTitle').textContent = `Claim task cho ${current.role_name} (${current.id})`;
+  $('modalBody').innerHTML = open.length ? `
+    <div class="field"><label>Task chưa xong (${open.length})</label>
+      <select id="claimPickSelect" size="${Math.min(10, Math.max(3, open.length))}" style="width:100%;font-family:var(--mono);font-size:11.5px">
+        ${open.map((t, i) => `<option value="${escapeHtml(t.id)}" ${i === 0 ? 'selected' : ''}>${escapeHtml(t.id)} · ${escapeHtml(t.viec_ref || '—')} · ${escapeHtml((t.title || '').slice(0, 70))}${t.claimed_by ? ' · giữ: ' + escapeHtml(t.claimed_by) : ''}</option>`).join('')}
+      </select>
+    </div>
+    <div class="hint">Claim = khóa độc quyền task cho worker này (task đang do worker khác giữ sẽ bị từ chối). Muốn worker chạy luôn, dùng "Giao cho @vai" trên thẻ task.</div>`
+    : '<div class="hint">Không có task nào chưa xong. Tạo task ở Bàn làm việc Gen → Kanban phiên.</div>';
+  $('modalPrimary').textContent = open.length ? 'Claim' : 'Đóng';
+  $('modalPrimary').onclick = open.length ? () => submitClaimPick(current) : closeModal;
+}
+async function submitClaimPick(current) {
+  const taskId = $('claimPickSelect')?.value;
+  if (!taskId) return;
+  try {
+    const res = await fetch('/api/task/claim', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ task_id: taskId, session_id: current.id, project_id: 'PRJ-GEN-WORKPLACE' })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) {
+      closeModal();
+      showToast(`Đã claim ${taskId} cho ${current.id}`);
+      await refreshTmuxSessions();
+      await refreshHubTasks();
+    } else {
+      const extra = data.code === 'locked' && data.held_by ? ` — đang do ${data.held_by} giữ` : '';
+      showToast(`Không claim được ${taskId}: ${data.error || res.status}${extra}`, 7000);
+    }
+  } catch (e) {
+    showToast('Lỗi kết nối: ' + e.message, 6000);
+  }
+}
+
+// Thanh chân trái: Repo / Worker / SSOT lấy từ dữ liệu thật
+function updateSidebarFoot() {
+  const repo = state.project?.repo || '';
+  if ($('sideRepo')) { $('sideRepo').textContent = repo ? repo.split('/').filter(Boolean).slice(-1)[0] || repo : '—'; $('sideRepo').title = repo; }
+  const ss = state.tmuxSessions || [];
+  const live = ss.filter(s => Number(s.pid) > 0 && s.status !== 'hibernated').length;
+  if ($('sideRuntime')) { $('sideRuntime').textContent = ss.length ? `${live}/${ss.length} chạy` : '—'; $('sideRuntime').title = 'Số phiên tmux có tiến trình thật / tổng số vai'; }
+  if ($('sideSsot')) $('sideSsot').textContent = (state.ssot || []).length ? `${state.ssot.length} mục` : 'chưa có';
+  const badge = $('podsOnlineBadge');
+  if (badge) {
+    badge.textContent = !ss.length ? 'chưa tải' : (live ? `${live}/${ss.length} phiên tmux chạy` : 'không có tmux chạy');
+    badge.style.color = live ? 'var(--green)' : 'var(--yellow)';
+  }
+}
+
+// Nhãn quota: có % thật thì hiện %, không thì nói rõ lý do (status_label), hết quota thì hiện giờ có lại
+function quotaText(q) {
+  if (!q) return 'chưa có dữ liệu';
+  if (q.exhausted) return `HẾT QUOTA · có lại ${q.reset_at_label || '?'}`;
+  const p5 = qPct(q, 'percent_5h');
+  const pw = qPct(q, 'percent_weekly');
+  if (p5 === null && pw === null) return q.status_label || 'chưa có dữ liệu';
+  return `5h ${qTxt(p5)} · tuần ${qTxt(pw)}`;
 }
 
 // Initial boot
@@ -13720,6 +14180,7 @@ setInterval(async () => {
       if (data && data.project && data.project.name === 'gen-workplace') {
         if (data.kanban) state.kanban = data.kanban;
         if (data.todos) state.todos = data.todos;
+        if (Array.isArray(data.gen_session_todos)) state.gen_session_todos = data.gen_session_todos;
         if (data.roadmap) state.roadmap = data.roadmap;
         if (data.ssot) state.ssot = data.ssot;
         if (data.roles) state.roles = data.roles;
@@ -13750,7 +14211,9 @@ setInterval(async () => {
     // 4. Render lại giao diện trực quan ngay lập tức
     renderExpertSquadGrid();
     updateCommandDeck();
+    updateSidebarFoot();
     if (state.currentDeckTab === 'kanban') renderKanban();
+    if (document.querySelector('.screen.active')?.id === 'implementation' && !document.querySelector('#dashRoleKanbanBoard select:focus')) renderDashboardKanban();
   } catch (e) {
     // ignore network tick
   } finally {
@@ -13768,6 +14231,16 @@ let mcpTokensList = [];
 let mcpAuthStatus = { require_auth: false, active_tokens: 0, total_tokens: 0 };
 let mcpSelectedToken = null;
 let mcpLastCreatedTokenData = null;
+let mcpTokenRevealed = false;      // token master mặc định bị che (••••), bấm "Hiện" mới thấy
+let mcpSnippetReal = null;
+let mcpReadOnlyTools = new Set();
+function maskToken(tok) { return tok ? `${String(tok).slice(0, 8)}••••••••` : ''; }
+function toggleMcpTokenReveal() {
+  mcpTokenRevealed = !mcpTokenRevealed;
+  const b = document.getElementById('btnMcpRevealToken');
+  if (b) b.textContent = mcpTokenRevealed ? 'Che' : 'Hiện';
+  updateMcpLinkFields();
+}
 
 function switchMcpMainTab(tab) {
   mcpMainActiveTab = tab;
@@ -13796,8 +14269,11 @@ function switchMcpMainTab(tab) {
 }
 
 function updateMcpConfigSnippets() {
-  const tokVal = (mcpSelectedToken && mcpSelectedToken.token_raw) ? mcpSelectedToken.token_raw : 'gw_live_your_token_here';
-  const urlWithTok = `http://localhost:8888/mcp?token=${tokVal}`;
+  // Token trong snippet chỉ hiện khi đã bấm "Hiện"; Copy JSON luôn lấy bản có token thật
+  const rawTok = (mcpSelectedToken && mcpSelectedToken.token_raw) ? mcpSelectedToken.token_raw : '';
+  const tokVal = rawTok ? (mcpTokenRevealed ? rawTok : maskToken(rawTok)) : 'gw_live_your_token_here';
+  const urlWithTok = `${location.origin}/mcp?token=${tokVal}`;
+  mcpSnippetReal = null;
 
   const mcpConfigs = {
     antigravity: `{
@@ -13827,6 +14303,7 @@ function updateMcpConfigSnippets() {
   if (snippetEl) {
     snippetEl.textContent = mcpConfigs[mcpActiveTab] || '';
   }
+  mcpSnippetReal = rawTok ? (mcpConfigs[mcpActiveTab] || '').split(tokVal).join(rawTok) : null;
 
   const helpEl = document.getElementById('mcpConfigSnippetPathHelp');
   if (helpEl) {
@@ -13860,7 +14337,7 @@ function switchMcpConfigTab(tab) {
 function copyCurrentMcpSnippet() {
   const snippetEl = document.getElementById('mcpConfigSnippet');
   if (snippetEl) {
-    copyText(snippetEl.textContent);
+    copyText(mcpSnippetReal || snippetEl.textContent);
     showToast(`Đã copy JSON cấu hình MCP cho ${mcpActiveTab.toUpperCase()}!`);
   }
 }
@@ -13903,7 +14380,7 @@ function renderMcpTokensUI() {
     const activeTokens = mcpTokensList.filter(t => t.status === 'active');
     if (activeTokens.length > 0) {
       selectEl.innerHTML = activeTokens.map((t, idx) => 
-        `<option value="${t.id}" ${idx === 0 ? 'selected' : ''}>${t.name} (${t.token_masked})</option>`
+        `<option value="${escapeHtml(t.id)}" ${idx === 0 ? 'selected' : ''}>${escapeHtml(t.name)} (${escapeHtml(t.token_masked)})</option>`
       ).join('');
       mcpSelectedToken = activeTokens[0];
     } else {
@@ -13933,7 +14410,7 @@ function renderMcpTokensUI() {
         : '<span class="badge" style="background:var(--line2);color:var(--muted);font-size:8.5px">Revoked</span>';
 
       const permBadge = (t.permissions.includes('all') || t.permissions.includes('*'))
-        ? '<span class="badge" style="background:#0369a1;color:#bae6fd;font-size:8.5px">Toàn quyền (27)</span>'
+        ? `<span class="badge" style="background:#0369a1;color:#bae6fd;font-size:8.5px">Toàn quyền (${mcpCachedTools.length || 'mọi'} tool)</span>`
         : `<span class="badge" style="background:var(--panel3);color:var(--accent);font-size:8.5px">${t.permissions.join(', ')}</span>`;
 
       const revokeBtn = isAct
@@ -13943,13 +14420,13 @@ function renderMcpTokensUI() {
       return `
         <tr style="border-bottom:1px solid #141c2b">
           <td style="padding:6px 8px">
-            <strong style="color:var(--text)">${t.name}</strong>
+            <strong style="color:var(--text)">${escapeHtml(t.name)}</strong>
             <div style="font-size:9px;color:var(--muted2);font-family:var(--mono)">${t.id} · ${t.client}</div>
           </td>
           <td style="padding:6px 8px">
             <div style="display:flex;align-items:center;gap:4px">
               <code style="color:var(--yellow);font-size:10px">${t.token_masked}</code>
-              <button class="btn small" style="font-size:8.5px;padding:1px 5px;color:var(--yellow)" onclick="copyText('${t.token_raw}')" title="Sao chép toàn bộ Token"></button>
+              <button class="btn small" style="font-size:8.5px;padding:1px 5px;color:var(--yellow)" onclick="copyMcpTokenById('${escapeHtml(t.id)}')" title="Sao chép toàn bộ Token">Copy</button>
             </div>
           </td>
           <td style="padding:6px 8px">${permBadge}</td>
@@ -13962,6 +14439,11 @@ function renderMcpTokensUI() {
       `;
     }).join('');
   }
+}
+
+function copyMcpTokenById(id) {
+  const t = mcpTokensList.find(x => x.id === id);
+  if (t) copyText(t.token_raw);
 }
 
 function onMcpTokenSelectChange() {
@@ -13978,23 +14460,22 @@ function updateMcpLinkFields() {
   const sseUrlField = document.getElementById('mcpFieldSseUrl');
   const bearerField = document.getElementById('mcpFieldBearerToken');
 
-  const baseOrigin = 'http://localhost:8888';
-  if (authUrlField) {
-    authUrlField.value = rawToken ? `${baseOrigin}/mcp?token=${rawToken}` : `${baseOrigin}/mcp`;
-  }
-  if (sseUrlField) {
-    sseUrlField.value = rawToken ? `${baseOrigin}/sse?token=${rawToken}` : `${baseOrigin}/sse`;
-  }
-  if (bearerField) {
-    bearerField.value = rawToken;
-  }
+  // Host thật mà trình duyệt đang mở (không ghi cứng localhost:8888); ô hiển thị che token, dataset.real giữ bản đầy đủ để Copy
+  const baseOrigin = location.origin;
+  const shown = mcpTokenRevealed ? rawToken : maskToken(rawToken);
+  const setField = (el, real, display) => { if (!el) return; el.value = display; el.dataset.real = real; };
+  setField(authUrlField, rawToken ? `${baseOrigin}/mcp?token=${rawToken}` : `${baseOrigin}/mcp`, rawToken ? `${baseOrigin}/mcp?token=${shown}` : `${baseOrigin}/mcp`);
+  setField(sseUrlField, rawToken ? `${baseOrigin}/sse?token=${rawToken}` : `${baseOrigin}/sse`, rawToken ? `${baseOrigin}/sse?token=${shown}` : `${baseOrigin}/sse`);
+  setField(bearerField, rawToken, rawToken ? shown : '(chưa có token)');
   updateMcpConfigSnippets();
 }
 
 function copyMcpField(inputId, label) {
   const el = document.getElementById(inputId);
-  if (!el || !el.value) return;
-  copyText(el.value);
+  if (!el) return;
+  const v = el.dataset.real !== undefined ? el.dataset.real : el.value;
+  if (!v) { showToast('Chưa có token để sao chép'); return; }
+  copyText(v);
   showToast(`Đã copy ${label}!`);
 }
 
@@ -14135,7 +14616,8 @@ async function revokeMcpToken(id, name) {
 async function openMcpModal() {
   const modal = document.getElementById('mcpModal');
   if (!modal) return;
-  modal.classList.add('active');
+  // CSS chỉ hiện modal khi có class "show" (giống mọi modal khác) — trước đây thêm "active" nên bấm không mở gì
+  modal.classList.add('show');
   switchMcpMainTab('links');
 
   // Nạp danh sách tokens và trạng thái auth
@@ -14147,11 +14629,14 @@ async function openMcpModal() {
     if (res.ok) {
       const data = await res.json();
       mcpCachedTools = data.tools || [];
+      mcpReadOnlyTools = new Set(data.read_only_tools || mcpCachedTools.filter(t => t.annotations && t.annotations.readOnlyHint).map(t => t.name));
       const totalBadge = document.getElementById('mcpToolsTotalBadge');
       const topBadge = document.getElementById('topMcpToolBadge');
       const sideBadge = document.getElementById('sideMcpToolBadge');
-      const countText = `${mcpCachedTools.length} Tools Active`;
+      const countText = `${mcpCachedTools.length} tool · ${mcpReadOnlyTools.size} chỉ đọc`;
       if (totalBadge) totalBadge.textContent = countText;
+      const tabLabel = document.getElementById('mcpToolsTabLabel');
+      if (tabLabel) tabLabel.textContent = `${mcpCachedTools.length} MCP Tools`;
       if (topBadge) topBadge.textContent = `${mcpCachedTools.length} Tools`;
       if (sideBadge) sideBadge.textContent = `${mcpCachedTools.length} Tools`;
       renderMcpToolsList(mcpCachedTools);
@@ -14163,7 +14648,7 @@ async function openMcpModal() {
 
 function closeMcpModal() {
   const modal = document.getElementById('mcpModal');
-  if (modal) modal.classList.remove('active');
+  if (modal) modal.classList.remove('show');
 }
 
 function renderMcpToolsList(tools) {
@@ -14177,16 +14662,19 @@ function renderMcpToolsList(tools) {
 
   container.innerHTML = tools.map(t => {
     const props = (t.inputSchema && t.inputSchema.properties) ? Object.keys(t.inputSchema.properties) : [];
-    const propsTag = props.length > 0 ? props.slice(0, 3).map(p => `<span style="font-size:9px;color:var(--accent2);background:#172554;padding:1px 4px;border-radius:3px">${p}</span>`).join(' ') : '<span style="font-size:9px;color:var(--muted)">Không cần tham số</span>';
-    
+    const propsTag = props.length > 0 ? props.slice(0, 4).map(p => `<span style="font-size:9px;color:var(--accent2);background:#172554;padding:1px 4px;border-radius:3px">${escapeHtml(p)}</span>`).join(' ') : '<span style="font-size:9px;color:var(--muted)">Không cần tham số</span>';
+    const ro = mcpReadOnlyTools.has(t.name);
     return `
       <div style="background:#090d16;border:1px solid #1a2436;border-radius:6px;padding:9px 11px;display:flex;flex-direction:column;justify-content:space-between;gap:6px">
         <div>
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px">
-            <span style="font-family:var(--mono);font-size:11px;font-weight:700;color:var(--accent)">${t.name}</span>
-            <button class="btn small" style="font-size:9px;padding:2px 7px;color:var(--green);border-color:#065f46" onclick="testMcpTool('${t.name}')">Test</button>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px;gap:6px">
+            <span style="font-family:var(--mono);font-size:11px;font-weight:700;color:var(--accent)">${escapeHtml(t.name)}</span>
+            <span style="display:flex;align-items:center;gap:4px">
+              <span class="badge" style="font-size:8.5px;${ro ? 'background:#064e3b;color:var(--green)' : 'background:#7c2d12;color:#fdba74'}">${ro ? 'chỉ đọc' : 'có tác dụng phụ'}</span>
+              <button class="btn small" data-mcp-test="${escapeHtml(t.name)}" style="font-size:9px;padding:2px 7px;color:${ro ? 'var(--green)' : 'var(--yellow)'};border-color:${ro ? '#065f46' : '#78350f'}" onclick="testMcpTool('${escapeHtml(t.name)}')" title="${ro ? 'Gọi thật (tool chỉ đọc)' : 'Mở form tham số; chỉ gọi sau khi xác nhận'}">${ro ? 'Test' : 'Test…'}</button>
+            </span>
           </div>
-          <div style="font-size:10.5px;color:var(--text);line-height:1.35;margin-bottom:5px">${t.description}</div>
+          <div style="font-size:10.5px;color:var(--text);line-height:1.35;margin-bottom:5px">${escapeHtml(t.description || '')}</div>
         </div>
         <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap">
           <span style="font-size:9px;color:var(--muted2)">Params:</span>
@@ -14210,46 +14698,103 @@ function filterMcpTools(query) {
   renderMcpToolsList(filtered);
 }
 
-async function testMcpTool(toolName) {
+// Tham số mặc định an toàn cho tool chỉ đọc
+function mcpDefaultArgs(toolName) {
+  const a = {};
+  if (toolName === 'get_live_quota') { a.profile_id = 'owner_default'; a.force_refresh = false; }
+  if (toolName === 'list_kanban_tasks' || toolName === 'get_conversation_messages') a.conv_id = (typeof genState !== 'undefined' && genState.currentConvId) || '';
+  if (toolName === 'read_workspace_file') a.file_path = 'README.md';
+  if (toolName === 'get_worker_terminal_output') { a.session_id = state.selectedTmuxSessionId || 'gw-lead-agy'; a.lines = 20; }
+  if (toolName === 'wait_worker_result') a.timeout_sec = 1;
+  return a;
+}
+
+// Nút Test: tool CHỈ ĐỌC → gọi thật ngay với tham số mặc định (và hiện form để chạy lại).
+// Tool CÓ TÁC DỤNG PHỤ → chỉ mở form tham số; bấm "Chạy thật" + xác nhận mới gọi (không bao giờ tự gửi {}).
+function testMcpTool(toolName) {
+  const tool = mcpCachedTools.find(t => t.name === toolName);
   const testSec = document.getElementById('mcpLiveTestSection');
   const titleEl = document.getElementById('mcpTestToolTitle');
   const outEl = document.getElementById('mcpLiveTestOutput');
-  if (!testSec || !titleEl || !outEl) return;
-
+  if (!tool || !testSec || !titleEl || !outEl) return;
+  const ro = mcpReadOnlyTools.has(toolName);
+  const schema = tool.inputSchema || {};
+  const props = schema.properties || {};
+  const required = new Set(schema.required || []);
+  const defaults = ro ? mcpDefaultArgs(toolName) : {};
   testSec.style.display = 'block';
-  titleEl.innerHTML = `Đang thử nghiệm công cụ: <code style="color:var(--yellow)">${toolName}</code> ...`;
+  titleEl.innerHTML = `${ro ? 'Tool chỉ đọc' : '<span style="color:var(--yellow)">Tool có tác dụng phụ — nhập tham số rồi xác nhận</span>'}: <code style="color:var(--yellow)">${escapeHtml(toolName)}</code>`;
+  let form = document.getElementById('mcpTestForm');
+  if (!form) {
+    form = document.createElement('div');
+    form.id = 'mcpTestForm';
+    form.style.cssText = 'display:grid;grid-template-columns:160px 1fr;gap:4px 8px;margin:6px 0;font-size:10.5px;align-items:center';
+    outEl.parentNode.insertBefore(form, outEl);
+  }
+  form.dataset.tool = toolName;
+  form.innerHTML = Object.keys(props).map(k => {
+    const p = props[k] || {};
+    const v = defaults[k] !== undefined ? defaults[k] : (ro && p.default !== undefined ? p.default : '');
+    const isObj = p.type === 'array' || p.type === 'object';
+    return `<label style="color:var(--muted);font-family:var(--mono)" title="${escapeHtml(p.description || '')}">${escapeHtml(k)}${required.has(k) ? ' *' : ''} <span style="color:var(--muted2)">(${escapeHtml(p.type || 'string')})</span></label>
+      <input class="mcpTestArg" data-key="${escapeHtml(k)}" data-type="${escapeHtml(p.type || 'string')}" value="${escapeHtml(typeof v === 'object' ? JSON.stringify(v) : String(v))}" placeholder="${escapeHtml((p.description || '').slice(0, 90))}${isObj ? ' (JSON)' : ''}" style="font-size:10.5px;padding:3px 6px;background:#090d16;border:1px solid var(--line2);color:var(--text);border-radius:4px;font-family:var(--mono)">`;
+  }).join('') + `<span></span><div style="display:flex;gap:6px;align-items:center">
+      <button class="btn small ${ro ? '' : 'primary'}" id="mcpTestRunBtn" onclick="runMcpToolFromForm()" style="font-size:10px">${ro ? 'Chạy lại' : 'Chạy thật…'}</button>
+      <span style="font-size:9.5px;color:var(--muted)">${Object.keys(props).length ? '* = bắt buộc' : 'Không có tham số'}</span></div>`;
+  if (ro) {
+    runMcpToolFromForm();
+  } else {
+    outEl.textContent = 'Chưa gọi. Tool này thay đổi dữ liệu / chạy lệnh thật: điền tham số, bấm "Chạy thật…" và xác nhận.';
+  }
+}
+
+async function runMcpToolFromForm() {
+  const form = document.getElementById('mcpTestForm');
+  const titleEl = document.getElementById('mcpTestToolTitle');
+  const outEl = document.getElementById('mcpLiveTestOutput');
+  if (!form || !outEl) return;
+  const toolName = form.dataset.tool;
+  const tool = mcpCachedTools.find(t => t.name === toolName) || {};
+  const required = new Set((tool.inputSchema || {}).required || []);
+  const ro = mcpReadOnlyTools.has(toolName);
+  const args = {};
+  const missing = [];
+  for (const inp of form.querySelectorAll('.mcpTestArg')) {
+    const k = inp.dataset.key, type = inp.dataset.type, raw = inp.value.trim();
+    if (!raw) { if (required.has(k)) missing.push(k); continue; }
+    try {
+      if (type === 'integer' || type === 'number') args[k] = Number(raw);
+      else if (type === 'boolean') args[k] = ['true', '1', 'yes', 'có'].includes(raw.toLowerCase());
+      else if (type === 'array' || type === 'object') args[k] = JSON.parse(raw);
+      else args[k] = raw;
+    } catch (e) {
+      outEl.textContent = `Tham số ${k} phải là JSON hợp lệ: ${e.message}`;
+      return;
+    }
+  }
+  if (missing.length) {
+    outEl.textContent = `Thiếu tham số bắt buộc: ${missing.join(', ')} — chưa gọi tool.`;
+    return;
+  }
+  if (!ro && !confirm(`Gọi THẬT tool "${toolName}" (có tác dụng phụ) với tham số:\n${JSON.stringify(args, null, 2)}\n\nTiếp tục?`)) {
+    outEl.textContent = 'Đã hủy — không gọi tool.';
+    return;
+  }
   outEl.textContent = 'Đang gửi JSON-RPC tools/call tới /mcp...';
-
-  const defaultArgs = {};
-  if (toolName === 'get_live_quota') { defaultArgs.profile_id = 'owner_default'; defaultArgs.force_refresh = false; }
-  if (toolName === 'list_kanban_tasks') { defaultArgs.conv_id = genState.currentConvId || ''; }
-  if (toolName === 'read_workspace_file') { defaultArgs.file_path = 'backend/main.py'; }
-  if (toolName === 'get_worker_terminal_output') { defaultArgs.session_id = 'gw-lead-agy'; defaultArgs.lines = 20; }
-
   try {
-    const payload = {
-      jsonrpc: "2.0",
-      id: Date.now(),
-      method: "tools/call",
-      params: {
-        name: toolName,
-        arguments: defaultArgs
-      }
-    };
     const tok = (mcpSelectedToken && mcpSelectedToken.token_raw) ? mcpSelectedToken.token_raw : '';
     const headers = { 'Content-Type': 'application/json' };
     if (tok) headers['Authorization'] = `Bearer ${tok}`;
-
     const res = await fetch('/mcp', {
       method: 'POST',
-      headers: headers,
-      body: JSON.stringify(payload)
+      headers,
+      body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method: 'tools/call', params: { name: toolName, arguments: args } })
     });
     const data = await res.json();
-    titleEl.innerHTML = `Kết quả thực thi công cụ: <code style="color:var(--green)">${toolName}</code>`;
+    titleEl.innerHTML = `Kết quả <code style="color:var(--green)">${escapeHtml(toolName)}</code> ${ro ? '(chỉ đọc)' : '(đã xác nhận)'}`;
     outEl.textContent = JSON.stringify(data, null, 2);
   } catch (err) {
-    titleEl.innerHTML = `Lỗi thực thi công cụ: <code style="color:var(--red)">${toolName}</code>`;
+    titleEl.innerHTML = `Lỗi thực thi công cụ: <code style="color:var(--red)">${escapeHtml(toolName)}</code>`;
     outEl.textContent = String(err);
   }
 }

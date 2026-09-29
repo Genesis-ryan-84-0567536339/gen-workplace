@@ -218,7 +218,7 @@ TOOLS = [
     },
     {
         "name": "post_warroom_message",
-        "description": "Đăng tin nhắn / chỉ thị vào phòng họp chung War Room. Tin có @backend, @frontend, @devops, @qa, @security hoặc @lead sẽ được chuyển cho agy thật của vai đó chạy nền (--mode plan, trong worktree riêng của vai) và trả lời thật xuất hiện trong kênh; không có @vai thì chỉ lưu. Response có 'dispatches': [{session_id, dispatch_id}] — truyền dispatch_id cho wait_worker_result để chờ kết quả.",
+        "description": "Đăng tin nhắn / chỉ thị vào phòng họp chung War Room. Tin có @backend, @frontend, @devops, @qa, @security hoặc @lead sẽ được chuyển cho agy thật của vai đó chạy nền (--mode plan, trong worktree riêng của vai) và trả lời thật xuất hiện trong kênh; không có @vai thì chỉ lưu. Tin nhắc TSK-<n> (task có thật) được gắn vào task đó: prompt agy kèm tiêu đề + checklist + viec_ref, kết quả tự ghi về phiên của task. @Gen / @Toàn Đội không giao việc. Response có 'dispatches': [{session_id, dispatch_id, task_id}] — truyền dispatch_id cho wait_worker_result để chờ kết quả.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -240,6 +240,10 @@ TOOLS = [
                     "type": "string",
                     "description": "ID kênh (mặc định 'war_room').",
                     "default": "war_room"
+                },
+                "task_id": {
+                    "type": "string",
+                    "description": "Gắn lần giao việc với task này (bỏ trống = mã TSK-<n> đầu tiên trong tin, rồi task đang làm của worker)."
                 }
             },
             "required": ["message"]
@@ -335,8 +339,12 @@ TOOLS = [
                 },
                 "assigned_agent": {
                     "type": "string",
-                    "description": "Tên Agent được giao phụ trách (vd: 'Lead Architect', 'Fullstack Dev').",
+                    "description": "Agent / worker được giao phụ trách (vd: 'gw-qa-agy', 'claude-dieu-phoi'). Nhận cả tên cũ assigned_to.",
                     "default": "Gen Core"
+                },
+                "assigned_to": {
+                    "type": "string",
+                    "description": "Bí danh của assigned_agent (giữ tương thích)."
                 },
                 "checklist": {
                     "type": "array",
@@ -701,6 +709,17 @@ TOOLS = [
 ]
 
 # Map tool names to fast lookup
+# Tool CHỈ ĐỌC (không đổi dữ liệu, không chạy agy, không gửi gì vào tmux): nút Test trên màn MCP chỉ gọi thẳng các tool này.
+# Tool còn lại có tác dụng phụ → màn MCP bắt nhập tham số + hộp xác nhận trước khi gọi (#24).
+READ_ONLY_TOOLS = {
+    "get_live_quota", "list_google_accounts", "list_swarm_workers", "get_worker_terminal_output", "get_warroom_messages",
+    "wait_worker_result", "list_kanban_tasks", "list_conversations", "get_conversation_messages", "list_notes",
+    "read_workspace_file", "list_workspace_files", "get_system_status",
+}
+for _t in TOOLS:
+    # MCP tool annotations (spec 2025-03-26): client biết tool nào chỉ đọc
+    _t["annotations"] = {"readOnlyHint": _t["name"] in READ_ONLY_TOOLS, "destructiveHint": False}
+
 TOOL_LOOKUP = {t["name"]: t for t in TOOLS}
 
 # ==========================================
@@ -772,27 +791,9 @@ def execute_tool(name: str, args: dict) -> dict:
     try:
         # 1. get_live_quota
         if name == "get_live_quota":
-            profile_id = args.get("profile_id", "owner_default")
+            profile_id = args.get("profile_id") or "owner_default"
             force = bool(args.get("force_refresh", True))
-            quota_res = db.fetch_live_google_quota(profile_id, force=force)
-            if quota_res:
-                g_q, a_q = quota_res
-                data = {
-                    "ok": True,
-                    "source": "cloudcode_api_live",
-                    "gemini": g_q,
-                    "claude": a_q,
-                    "quota_state": db.get_profile_quota_state(profile_id)
-                }
-            else:
-                g_q, a_q = db.get_quota_telemetry(profile_id)
-                data = {
-                    "ok": True,
-                    "source": "agy_probe_or_unknown",
-                    "gemini": g_q,
-                    "claude": a_q,
-                    "quota_state": db.get_profile_quota_state(profile_id)
-                }
+            data = db.live_quota_response(profile_id, force=force)
             return {"content": [{"type": "text", "text": json.dumps(data, ensure_ascii=False, indent=2)}], "isError": False}
 
         # 1b. probe_quota
@@ -810,6 +811,10 @@ def execute_tool(name: str, args: dict) -> dict:
         if name == "switch_google_account":
             account_id = args.get("account_id")
             session_id = args.get("session_id", "gw-lead-agy")
+            # Kiểm tham số: gửi {} trước đây ghi account_type = NULL → /api/tmux/sessions 500
+            err = db.validate_account_switch(session_id, account_id)
+            if err:
+                return {"content": [{"type": "text", "text": json.dumps({"error": err}, ensure_ascii=False)}], "isError": True}
             account_label = db.update_tmux_account(session_id, account_id)
             db.append_tmux_output(session_id, f"auth switch --account='{account_label}'", f"Đã chuyển cấu hình phiên sang: {account_label}")
             return {"content": [{"type": "text", "text": json.dumps({"status": "account_updated", "session_id": session_id, "account_label": account_label}, ensure_ascii=False, indent=2)}], "isError": False}
@@ -890,7 +895,7 @@ def execute_tool(name: str, args: dict) -> dict:
             author = args.get("author", "AI Agent")
             tag = args.get("tag", "Directive")
             channel = args.get("channel_id", "war_room")
-            res = db.post_warroom_message("PRJ-GEN-WORKPLACE", channel, author, msg, tag)
+            res = db.post_warroom_message("PRJ-GEN-WORKPLACE", channel, author, msg, tag, task_id=str(args.get("task_id") or "").strip())
             return {"content": [{"type": "text", "text": json.dumps(res, ensure_ascii=False, indent=2)}], "isError": "error" in res}
 
         # 10. get_warroom_messages
@@ -923,7 +928,8 @@ def execute_tool(name: str, args: dict) -> dict:
             title = args.get("title", "")
             desc = args.get("description", "")
             priority = args.get("priority", "high")
-            assigned = args.get("assigned_agent", "Gen Core")
+            # assigned_to là bí danh cũ — trước đây bị bỏ qua nên task luôn gán "Gen Core"
+            assigned = (str(args.get("assigned_agent") or args.get("assigned_to") or "").strip()) or "Gen Core"
             raw_checklist = args.get("checklist") or []
             viec_ref = (args.get("viec_ref") or "").strip()
             # Chuyển checklist strings thành dạng object nếu cần

@@ -151,6 +151,16 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             except Exception:
                 pass
 
+    def _request_origin(self):
+        """scheme://host[:port] mà trình duyệt / agent đang gọi (Host header, tôn trọng X-Forwarded-*); rỗng nếu thiếu Host."""
+        host = (self.headers.get("X-Forwarded-Host") or self.headers.get("Host") or "").split(",")[0].strip()
+        if not host or not re.match(r"^[A-Za-z0-9.\-\[\]:]{1,255}$", host):
+            return None
+        proto = (self.headers.get("X-Forwarded-Proto") or "http").split(",")[0].strip().lower()
+        if proto not in ("http", "https"):
+            proto = "http"
+        return f"{proto}://{host}"
+
     def _handle_dispatch_wait(self, params):
         """Chờ lần giao việc xong (tối đa 120s). 200 = done/failed/running; 400 = thiếu tham số; 404 = không tìm thấy."""
         res = db.wait_worker_result(params.get("dispatch_id"), params.get("task_id", ""), params.get("session_id", ""),
@@ -192,13 +202,14 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             return
 
         if path in ("/mcp/tools", "/api/mcp/tools", "/api/mcp/status"):
-            auth_st = db.get_mcp_auth_status()
+            auth_st = db.get_mcp_auth_status(self._request_origin())
             self._send_json(200, {
                 "status": "online",
                 "serverInfo": mcp_core.MCP_SERVER_INFO,
                 "protocolVersion": mcp_core.MCP_PROTOCOL_VERSION,
                 "instructions": mcp_core.MCP_INSTRUCTIONS,
                 "tools_count": len(mcp_core.TOOLS),
+                "read_only_tools": sorted(mcp_core.READ_ONLY_TOOLS),
                 "auth": auth_st,
                 "tools": mcp_core.TOOLS,
                 "resources": mcp_core.RESOURCES,
@@ -207,22 +218,30 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             return
 
         if path == "/api/mcp/tokens":
-            tokens_data = db.get_mcp_agent_tokens()
+            tokens_data = db.get_mcp_agent_tokens(origin=self._request_origin())
             self._send_json(200, tokens_data)
             return
 
         if path == "/api/mcp/auth/status":
-            self._send_json(200, db.get_mcp_auth_status())
+            self._send_json(200, db.get_mcp_auth_status(self._request_origin()))
             return
 
-        # 0.8. Nhật ký dispatch (agy thật chạy từ chatroom): GET /api/dispatch/log?limit=50 → {"items": [...], "count": n}
+        # 0.8. Nhật ký dispatch (agy thật chạy từ chatroom): GET /api/dispatch/log?limit=50&task_id=TSK-1&session_id=gw-qa-agy
+        #      → {"items": [...], "count": n}; task_id / session_id lọc đúng giá trị (bỏ trống = không lọc)
         if path == "/api/dispatch/log":
             limit = query.get("limit", ["50"])[0]
             try:
-                items = db.get_dispatch_log(limit)
+                items = db.get_dispatch_log(limit, query.get("task_id", [""])[0], query.get("session_id", [""])[0])
                 self._send_json(200, {"items": items, "count": len(items), "webhook_enabled": bool(os.environ.get("GW_EVENT_WEBHOOK_URL"))})
             except Exception as e:
                 self._send_json(500, {"error": str(e)})
+            return
+
+        # 0.81. Task thật của dự án (bảng gen_session_todos) kèm lần giao gần nhất — màn Việc & tiến độ poll endpoint này (#24)
+        if path == "/api/tasks":
+            prj_id = query.get("project", ["PRJ-GEN-WORKPLACE"])[0]
+            tasks = db.get_all_session_todos(prj_id)
+            self._send_json(200, {"tasks": tasks, "count": len(tasks)})
             return
 
         # 0.82. Nhật ký ghi đè bằng chứng (complete_task force=true, #16): GET /api/task/evidence-audit?task_id=&limit=50
@@ -329,27 +348,10 @@ class SwarmHandler(SimpleHTTPRequestHandler):
 
         # 5. API Kiểm tra Quota Live từ Google Cloud Code API của agy CLI
         if path in ("/api/quota/live", "/api/quota/check"):
-            profile_id = query.get("profile", ["owner_default"])[0]
+            profile_id = query.get("profile", ["owner_default"])[0] or "owner_default"
             force = query.get("force", ["1"])[0] not in ("0", "false", "False")
-            quota_res = db.fetch_live_google_quota(profile_id, force=force)
-            if quota_res:
-                g_q, a_q = quota_res
-                self._send_json(200, {
-                    "ok": True,
-                    "source": "cloudcode_api_live",
-                    "gemini": g_q,
-                    "claude": a_q,
-                    "quota_state": db.get_profile_quota_state(profile_id)
-                })
-            else:
-                g_q, a_q = db.get_quota_telemetry(profile_id)
-                self._send_json(200, {
-                    "ok": True,
-                    "source": "agy_probe_or_unknown",
-                    "gemini": g_q,
-                    "claude": a_q,
-                    "quota_state": db.get_profile_quota_state(profile_id)
-                })
+            # gemini/claude luôn có exhausted + reset_at từ profile_quota_state (kể cả khi số lấy từ Cloud Code API)
+            self._send_json(200, db.live_quota_response(profile_id, force=force))
             return
 
         # 6. API Danh sách OAuth Profiles & Trạng thái Google Login
@@ -508,6 +510,12 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             self._send_json(200, {"todos": todos, "count": len(todos), "conversation_id": conv_id})
             return
 
+        # Trình duyệt tự xin /favicon.ico: trả 204 thay vì 404 (index.html đã có icon data: URI)
+        if path == "/favicon.ico":
+            self.send_response(204)
+            self.end_headers()
+            return
+
         return super().do_GET()
 
     def _handle_post(self):
@@ -556,7 +564,7 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             perms = data.get("permissions", ["all"])
             expires_days = data.get("expires_days", 90)
             client = data.get("client", "Manual Token")
-            res = db.create_mcp_agent_token(name, perms, expires_days, client)
+            res = db.create_mcp_agent_token(name, perms, expires_days, client, origin=self._request_origin())
             self._send_json(200 if "error" not in res else 400, res)
             return
 
@@ -573,7 +581,7 @@ class SwarmHandler(SimpleHTTPRequestHandler):
         # 0.3 API Bật / Tắt Chế Độ Bắt Buộc Xác Thực MCP (Strict Auth)
         if path == "/api/mcp/auth/toggle":
             enabled = bool(data.get("require_auth", False))
-            res = db.set_mcp_strict_auth(enabled)
+            res = db.set_mcp_strict_auth(enabled, origin=self._request_origin())
             self._send_json(200, res)
             return
 
@@ -658,6 +666,10 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             account_type = data.get("account_type", "owner_default")
             account_label = data.get("account_label", "")
             profile_dir = data.get("profile_dir", "")
+            err = db.validate_account_switch(session_id, account_type, profile_dir)
+            if err:
+                self._send_json(400, {"error": err})
+                return
             if session_id:
                 account_label = db.update_tmux_account(session_id, account_type, account_label, profile_dir)
                 db.append_tmux_output(session_id, f"auth switch --account='{account_label}'", f"Đã chuyển cấu hình phiên sang: {account_label}")
@@ -855,6 +867,21 @@ class SwarmHandler(SimpleHTTPRequestHandler):
                 self._send_json(400, {"error": "Missing session_id or todo_id (or task_id)"})
             return
 
+        # 14b. Giao task cho 1 vai (#24): POST /api/task/assign {todo_id, session_id: "qa" | "gw-qa-agy", author?, channel_id?}
+        #      → claim task cho worker + war-room "@vai Thực hiện TSK-n" (prompt kèm tiêu đề, checklist, viec_ref) → {dispatch_id, ...}
+        #      400 thiếu/sai tham số · 404 không có task · 409 task đã done / người khác đang giữ
+        if path == "/api/task/assign":
+            todo_id = str(data.get("todo_id") or data.get("task_id") or "").strip()
+            session_id = str(data.get("session_id") or data.get("role") or "").strip()
+            res = db.assign_task_to_role(todo_id, session_id, data.get("project_id", "PRJ-GEN-WORKPLACE"),
+                                         author=str(data.get("author") or "Ryan (Owner)"), channel_id=str(data.get("channel_id") or "war_room"))
+            code = {"bad_request": 400, "not_found": 404, "already_done": 409, "locked": 409, "retry": 409}.get(res.get("code"), 400) \
+                if "error" in res else 200
+            if res.get("error") == "Task not found":
+                code = 404
+            self._send_json(code, res)
+            return
+
         # 15. Nghiệm thu hoàn tất nhiệm vụ (Evidence-Backed Task Completion)
         if path == "/api/task/complete":
             session_id = data.get("session_id", "").strip()
@@ -891,7 +918,7 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             author = data.get("author", "Ryan (Owner)")
             msg = data.get("message", "")
             tag = data.get("tag", "Directive")
-            res = db.post_warroom_message(prj_id, channel_id, author, msg, tag)
+            res = db.post_warroom_message(prj_id, channel_id, author, msg, tag, task_id=str(data.get("task_id") or "").strip())
             status_code = 400 if "error" in res else 200
             self._send_json(status_code, res)
             return
