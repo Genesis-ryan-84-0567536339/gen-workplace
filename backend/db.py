@@ -5431,6 +5431,20 @@ def assign_task_to_role(todo_id, session_id, project_id="PRJ-GEN-WORKPLACE", aut
             "channel_id": channel_id, "claim": claim, "message": body}
 
 
+# Mã HTTP cho kết quả assign_task_to_role: REST POST /api/task/assign trả đúng mã này; tool MCP assign_task (#61) ghi vào
+# http_status (lỗi → isError). Mã lỗi lạ (retired_role, ...) → 400.
+ASSIGN_ERROR_HTTP = {"bad_request": 400, "not_found": 404, "already_done": 409, "locked": 409, "retry": 409, "busy": 409}
+
+
+def assign_task_http_status(res):
+    """200 nếu giao được; lỗi: 404 không có task, 409 đã done / người khác giữ / đang chạy, còn lại 400."""
+    if "error" not in res:
+        return 200
+    if res.get("error") == "Task not found":
+        return 404
+    return ASSIGN_ERROR_HTTP.get(res.get("code"), 400)
+
+
 def _dispatch_brief(r):
     d = dict(r)
     return {"id": d["id"], "session_id": d.get("session_id") or "", "status": _row_status(d), "kind": d.get("kind") or "",

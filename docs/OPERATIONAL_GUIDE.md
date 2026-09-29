@@ -169,7 +169,8 @@ Tin trong War Room có `@backend|@devops|@qa|@lead` → thread nền chạy (`@s
 
 ### 3.6c. Chế độ "Làm" (build) — agy sửa code thật (Issue #45)
 Boss chốt 29/09 (VIEC-12): agy được code thật, nhưng chỉ trong worktree riêng của task; app (không phải agy) test, push, ghi kết quả.
-- **Giao**: `POST /api/task/assign {todo_id, session_id, mode}` — `mode` ∈ `build` ("Làm", **mặc định**) | `review` ("Rà soát").
+- **Giao**: `POST /api/task/assign {todo_id, session_id, mode}` hoặc tool MCP `assign_task {task_id, session_id, mode?}` (Issue #61,
+  cho agent chỉ có connector MCP; cùng hàm `db.assign_task_to_role`, xem 3.10) — `mode` ∈ `build` ("Làm", **mặc định**) | `review` ("Rà soát").
   Thẻ task có ô chọn chế độ (mặc định "Làm") cạnh ô chọn vai. **Tin war-room `@vai` luôn là Rà soát** (`--mode plan`, 3.6).
   Response build thêm `mode: "build"`, `branch`, `worktree_dir`; task đang có lần Làm chạy → 409 `code: busy`.
 - **Worktree**: `<GW_WORKTREE_ROOT>/TSK-n` (mặc định `../gw-worktrees/TSK-n`), nhánh `wt/TSK-n`, tạo bằng
@@ -236,6 +237,7 @@ python3 scripts/test_agy_readonly_dispatch.py  # #26: allow/deny-rule chỉ đ�
 python3 scripts/test_mcp_instructions.py   # #19: initialize.instructions (HTTP + stdio), log_session_message chỉ lưu, create_conversation reuse
 python3 scripts/test_task_hub.py           # #24: task ↔ war-room ↔ worker, kết quả ghi về phiên, kiểm tham số switch_google_account
 python3 scripts/test_agy_build.py          # #45: chế độ Làm — worktree, allow/deny, commit, test, push remote giả, chặn push/main, dọn worktree
+python3 scripts/test_mcp_assign_task.py    # #61: tool MCP assign_task — tools/list + TOOL_META, build/review đúng lệnh agy, 400/404/409 isError, quyền theo scope
 ```
 
 ### 3.8. Issue #12 — gỡ toàn bộ dữ liệu / phản hồi giả (hợp đồng API cho frontend)
@@ -280,7 +282,7 @@ python3 scripts/test_agy_build.py          # #45: chế độ Làm — worktree,
 Agent kết nối MCP gen-workplace (HTTP `POST /mcp` hoặc stdio `backend/mcp_server.py`) nhận quy trình bắt buộc trong `result.instructions` của `initialize`. Nhờ vậy việc agent làm hiện trong chatroom và Kanban cho Boss xem.
 
 - **Sửa nội dung:** file `backend/mcp_instructions.md`. File được đọc 1 lần lúc app hoặc stdio khởi động, nên sửa xong phải restart (auto-update sẽ tự restart khi merge vào main). Nếu thiếu file hoặc file rỗng thì dùng `mcp_core.DEFAULT_MCP_INSTRUCTIONS`. Chuỗi hiện hành xem ở `GET /api/mcp/status` → `instructions`.
-- **Nội dung (tóm tắt):** (1) mỗi việc là 1 phiên `VIEC-<n>: <tên việc>`, phiên đã có thì dùng lại; (2) chia bước thành `create_kanban_task` có `viec_ref` và `conv_id`, rồi `claim_task` và `update_task_checklist`; (3) ghi tiến độ bằng `log_session_message` ở mỗi mốc, kèm link; (4) giao việc bằng `post_warroom_message @<vai>` rồi `wait_worker_result`; (5) đóng việc bằng `complete_task` có evidence thật; (6) skill đầy đủ ở `Genesis-ryan-84-0567536339/Brain` → `skills/work-style/subskills/gen-workplace-dispatch/SKILL.md`.
+- **Nội dung (tóm tắt):** (1) mỗi việc là 1 phiên `VIEC-<n>: <tên việc>`, phiên đã có thì dùng lại; (2) chia bước thành `create_kanban_task` có `viec_ref` và `conv_id`, rồi `claim_task` và `update_task_checklist`; (3) ghi tiến độ bằng `log_session_message` ở mỗi mốc, kèm link; (4) giao việc sửa code bằng `assign_task(task_id, session_id, mode="build")` (#61), `post_warroom_message @<vai>` chỉ để rà soát, rồi `wait_worker_result(dispatch_id)`; (5) đóng việc bằng `complete_task` có evidence thật; (6) skill đầy đủ ở `Genesis-ryan-84-0567536339/Brain` → `skills/work-style/subskills/gen-workplace-dispatch/SKILL.md`.
 
 | API / tool | Hợp đồng |
 |---|---|
@@ -307,6 +309,7 @@ Task thật nằm ở bảng `gen_session_todos` (MCP `create_kanban_task`, `cla
 |---|---|
 | `GET /api/tasks?project=` | `{tasks: [...], count}`: mọi task của dự án, checklist đã parse, `total_items`/`done_items`, `holder` (= `claimed_by`), `conversation_title`, `dispatch_count`, `last_dispatch: {id, session_id, status, request_msg_id, reply_msg_id, report_path, profile_initial, profile_used, fallback, fallback_reason, channel_id, task_msg_id, ...}` (lần giao gần nhất). `/api/state` có cùng danh sách ở khóa `gen_session_todos`; `GET /api/gen/session/todos` cũng kèm `last_dispatch`. |
 | `POST /api/task/assign {todo_id, session_id, mode?, author?, channel_id?}` | `mode` = `build` (mặc định, chế độ Làm — xem 3.6c) hoặc `review`; mô tả dưới đây là `review`. `session_id` nhận `qa`, `@qa` hoặc `gw-qa-agy`. Claim task cho worker (như `claim_task`), gửi war-room `@qa Thực hiện TSK-n (VIEC-m): <tiêu đề>` + checklist; prompt agy kèm khối `[THÔNG TIN VIỆC TSK-n]` (tiêu đề, `viec_ref`, mô tả, checklist có id mục). Trả `{status: "assigned", task_id, session_id, role, viec_ref, dispatch_id, request_msg_id, channel_id, claim, message}`. 400 thiếu/sai vai · 404 không có task · 409 task đã done (`already_done`) hoặc người khác đang giữ (`locked`, kèm `held_by`). |
+| MCP `assign_task {task_id, session_id, mode?, author?}` (#61) | Cùng hàm với `POST /api/task/assign` (`db.assign_task_to_role`), dành cho agent chỉ có connector MCP (vd Claude điều phối trên cloud). `mode` mặc định `build` (agy sửa code **với toàn quyền trên máy Fedora** trong worktree của task, 3.6c), `review` = chỉ đọc. Không nhận `engine` (truyền vào → lỗi `bad_request`). Không chờ agy chạy: trả ngay `{status, mode, task_id, session_id, role, viec_ref, dispatch_id, branch?, worktree_dir?, ..., http_status: 200, next}`; chờ kết quả bằng `wait_worker_result(dispatch_id)`. Lỗi → `isError: true`, `error` + `code` + `http_status` như REST: 400 (`bad_request`, `retired_role`), 404 (`not_found`), 409 (`already_done`, `locked` kèm `held_by`, `busy` kèm `dispatch_id` đang chạy). Nhóm Việc & Kanban, scope token `kanban` (token `all` cũng gọi được; token chỉ có `swarm` / `chat` / `files` / `quota` → 401 "không có quyền thực thi công cụ 'assign_task'"). |
 | `GET /api/dispatch/log?limit=&task_id=&session_id=` | Lọc đúng giá trị (bỏ trống = không lọc, 2 tham số cùng lúc = AND). `status` luôn đã chuẩn hóa (`running\|done\|failed`), thêm `fallback` (bool). `limit` sai → 50. |
 | `post_warroom_message` / `POST /api/warroom/send {..., task_id?}` | Task của lần giao việc: `task_id` truyền vào > mã `TSK-n` đầu tiên **có thật** trong nội dung tin > `current_task_id` của worker. `dispatches[]` thêm `task_id`; response thêm `task_id`. `@Gen`, `@Toàn Đội`, `@all` không giao việc (chỉ lưu, `note` nói rõ). |
 | Kết quả giao việc ghi về task | Dispatch gắn task kết thúc (war-room hoặc tmux) → 1 tin `log_gen_message` trong phiên (`conversation_id`) của task, tác giả `<worker> (agy)`: trạng thái XONG/LỖI + exit, "đã chuyển hồ sơ" nếu fallback, tóm tắt, `Báo cáo: <report_path>`, `Tin war-room: #<id>`, `Link: dispatch:<id>`, và `Bằng chứng nghiệm thu gợi ý: dispatch:<id>` khi done. Ghi đúng 1 lần (`dispatch_log.task_msg_id`), trước khi `wait_worker_result` trả về. Worker ghi `[KANBAN_UPDATE: TSK-n \| CHECK: <id mục>]` trong output → mục checklist đó được tick (chỉ task của lần giao đó). |
@@ -358,7 +361,7 @@ curl -s http://<host>:8888/mcp -H "Authorization: Bearer $GW_TOKEN" -H 'Content-
 | Việc | REST |
 |---|---|
 | Ghi tiến độ vào phiên | `POST /api/gen/conversations/log {conv_id, content, author}` |
-| Giao task cho vai | `POST /api/task/assign {todo_id, session_id: "backend", mode: "build"}` (sửa code, 3.6c) · `mode: "review"` hoặc `POST /api/warroom/send {message: "@qa ...", task_id}` (chỉ đọc) |
+| Giao task cho vai | tool MCP `assign_task {task_id, session_id: "backend", mode: "build"}` hoặc `POST /api/task/assign {todo_id, session_id: "backend", mode: "build"}` (sửa code, 3.6c) · `mode: "review"` hoặc `POST /api/warroom/send {message: "@qa ...", task_id}` (chỉ đọc) |
 | Chờ kết quả | `POST /api/dispatch/wait {dispatch_id, timeout_sec}` (tối đa 120 giây; gọi từ `workplace_exec` thì để dưới 60 giây) |
 | Nhận / đóng task | `POST /api/task/claim`, `POST /api/task/complete {session_id, todo_id, evidence_ref}` |
 
