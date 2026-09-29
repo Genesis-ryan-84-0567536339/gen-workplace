@@ -7985,6 +7985,10 @@ function renderExpertSquadGrid() {
             ${qTxt(qPct(qG,'percent_5h'))} ${qTxt(qPct(qA,'percent_weekly'))}
           </div>
         </div>
+        ${(s.exhausted || (s.profile_in_use && s.profile_in_use !== s.account_type)) ? `
+        <div style="font-size:9.5px;color:var(--yellow);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escapeHtml(s.fallback_reason || '')}">
+          ${s.exhausted ? `${escapeHtml(s.account_type)} hết quota · có lại ${escapeHtml(s.reset_at_label || '?')}` : ''}${s.profile_in_use && s.profile_in_use !== s.account_type ? ` · đang chạy bằng ${escapeHtml(s.profile_in_use)}` : ''}
+        </div>` : ''}
       </div>
     `;
   }).join('');
