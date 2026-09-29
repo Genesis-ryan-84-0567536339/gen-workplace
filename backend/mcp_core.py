@@ -218,7 +218,7 @@ TOOLS = [
     },
     {
         "name": "post_warroom_message",
-        "description": "Đăng tin nhắn / chỉ thị vào phòng họp chung War Room. Tin có @backend, @frontend, @devops, @qa hoặc @lead sẽ được chuyển cho agy thật của vai đó chạy nền (--mode plan, trong worktree riêng của vai) và trả lời thật xuất hiện trong kênh; không có @vai thì chỉ lưu. @security đã bỏ (29/09): tin nhắc @security bị từ chối với lỗi rõ ràng, không lưu. Tin nhắc TSK-<n> (task có thật) được gắn vào task đó: prompt agy kèm tiêu đề + checklist + viec_ref, kết quả tự ghi về phiên của task. @Gen / @Toàn Đội không giao việc. Response có 'dispatches': [{session_id, dispatch_id, task_id}] — truyền dispatch_id cho wait_worker_result để chờ kết quả.",
+        "description": "Đăng tin nhắn / chỉ thị vào phòng họp chung War Room. Tin có @backend, @devops, @qa hoặc @lead sẽ được chuyển cho agy thật của vai đó chạy nền (--mode plan, trong worktree riêng của vai) và trả lời thật xuất hiện trong kênh; không có @vai thì chỉ lưu. @security và @frontend đã bỏ (29/09): tin nhắc vai đã bỏ bị từ chối với lỗi rõ ràng (code retired_role), không lưu; việc giao diện giao cho @backend. Tin nhắc TSK-<n> (task có thật) được gắn vào task đó: prompt agy kèm tiêu đề + checklist + viec_ref, kết quả tự ghi về phiên của task. @Gen / @Toàn Đội không giao việc. Response có 'dispatches': [{session_id, dispatch_id, task_id}] — truyền dispatch_id cho wait_worker_result để chờ kết quả.",
         "inputSchema": {
             "type": "object",
             "properties": {

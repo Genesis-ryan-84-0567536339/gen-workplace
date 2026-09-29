@@ -248,7 +248,7 @@ try:
 except Exception as e:
     check("fetch_live_google_quota(None) không lỗi", False, repr(e))
 st, res = call("GET", "/api/tmux/sessions")
-check("/api/tmux/sessions 200 (5 vai, security đã bỏ)", st == 200 and len(res.get("sessions", [])) == 5, f"{st} {str(res)[:200]}")
+check("/api/tmux/sessions 200 (4 vai, security + frontend đã bỏ)", st == 200 and len(res.get("sessions", [])) == 4, f"{st} {str(res)[:200]}")
 qa = next((s for s in res.get("sessions", []) if s["id"] == "gw-qa-agy"), {})
 check("worker có account_type NULL hiện owner_default", qa.get("account_type") == "owner_default", str(qa.get("account_type")))
 db.init_db()
@@ -271,9 +271,9 @@ check("MCP get_live_quota cũng có exhausted", json.loads(r["content"][0]["text
 db.fetch_live_google_quota = lambda profile_id="owner_default", force=False: None
 
 print("[11] MCP: create_kanban_task assigned_to, annotations, link theo Host")
-r = mcp_core.execute_tool("create_kanban_task", {"conv_id": CONV, "title": "Task gán qua assigned_to", "viec_ref": "VIEC-7", "assigned_to": "gw-frontend-agy"})
+r = mcp_core.execute_tool("create_kanban_task", {"conv_id": CONV, "title": "Task gán qua assigned_to", "viec_ref": "VIEC-7", "assigned_to": "gw-backend-agy"})
 tid = json.loads(r["content"][0]["text"]).get("id")
-check("assigned_to được lưu vào assigned_agent", db._task_detail(tid) and next(t for t in db.get_gen_session_todos(CONV) if t["id"] == tid)["assigned_agent"] == "gw-frontend-agy", str(r))
+check("assigned_to được lưu vào assigned_agent", db._task_detail(tid) and next(t for t in db.get_gen_session_todos(CONV) if t["id"] == tid)["assigned_agent"] == "gw-backend-agy", str(r))
 anns = {t["name"]: t.get("annotations", {}).get("readOnlyHint") for t in mcp_core.TOOLS}
 check("annotations.readOnlyHint: list_kanban_tasks true, switch_google_account false, post_warroom_message false",
       anns.get("list_kanban_tasks") is True and anns.get("switch_google_account") is False and anns.get("post_warroom_message") is False, str(anns))

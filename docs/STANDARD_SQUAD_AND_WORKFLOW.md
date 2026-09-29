@@ -7,6 +7,8 @@
 
 > **Cập nhật 29/09 (VIEC-12, #34):** Boss chốt **bỏ vai `gw-security-agy` (Security Auditor)**. Vai được đánh dấu `retired` trong DB (giữ lịch sử), không còn nhận việc; `@security` trong Phòng giao ban trả lỗi rõ ràng. Việc rà soát/kiểm thử giao cho `@qa`. Các phần dưới đã bỏ security; phần còn lại mô tả thiết kế gốc và sẽ được rút gọn tiếp ở các PR sau.
 
+> **Cập nhật 29/09 (VIEC-12, #39):** Boss chốt **bỏ vai `gw-frontend-agy` (Frontend Specialist)** (chưa từng được giao việc, hồ sơ chưa đăng nhập). Vai được đánh dấu `retired` trong DB (giữ lịch sử); `@frontend` trả lỗi `retired_role`. Việc giao diện (`frontend/**`) giao cho `@backend`. Còn 4 vai: lead, backend, devops, qa.
+
 ---
 
 ## I. CƠ CẤU ĐỘI NGŨ CHUẨN (STANDARD SWARM SQUAD ARCHITECTURE)
@@ -24,8 +26,7 @@ flowchart TD
     end
 
     subgraph TIER2["TẦNG 2: XÂY DỰNG CỐT LÕI (CORE BUILDERS)"]
-        Backend["🗄️ gw-backend-agy (Backend & DB Specialist)<br/>• SQLite WAL & FTS5 Catalog Engine<br/>• RESTful & SSE APIs<br/>• Mutex Task Locking & Background Runners"]
-        Frontend["🎨 gw-frontend-agy (Frontend Specialist)<br/>• Single Page Application (SPA)<br/>• Bảng điều hành Mission Control UI<br/>• frontend/index.html"]
+        Backend["🗄️ gw-backend-agy (Backend & DB Specialist)<br/>• SQLite WAL & FTS5 Catalog Engine<br/>• RESTful & SSE APIs<br/>• Mutex Task Locking & Background Runners<br/>• Giao diện frontend/index.html"]
     end
 
     subgraph TIER3["TẦNG 3: HẠ TẦNG & ĐÓNG GÓI (INFRASTRUCTURE & PACKAGING)"]
@@ -38,23 +39,20 @@ flowchart TD
 
     Gen --> Lead
     Lead --> Backend
-    Lead --> Frontend
     Lead --> DevOps
     Backend -.-> QA
-    Frontend -.-> QA
     DevOps -.-> QA
     QA --> Lead
 ```
 
 ---
 
-## II. HỒ SƠ 5 CHUYÊN GIA & RANH GIỚI THƯ MỤC CỨNG (0-CONFLICT POLICY)
+## II. HỒ SƠ 4 CHUYÊN GIA & RANH GIỚI THƯ MỤC CỨNG (0-CONFLICT POLICY)
 
 | Mã Định Danh | Tên Chuyên Môn | Vai Trò & Trách Nhiệm Cốt Lõi | 🛡️ Ranh Giới Whitelist (Được Sửa) | ⛔ Ranh Giới Blacklist (CẤM SỬA) | Tài Khoản / Profile OAuth |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **`gw-lead-agy`** | **Lead Architect** | Chỉ huy kiến trúc, duy trì SSOT, thiết kế DAG phụ thuộc, kiểm duyệt bằng chứng và nghiệm thu sản phẩm. | `docs/**`, `workspace/roles/**`, `AGENTS.md`, `README.md`, `ROADMAP.md` | *(Toàn quyền đọc/thẩm định, cấm commit đè code module)* | Mặc định Owner (`owner@genesis.local`) |
-| **`gw-backend-agy`** | **Backend & DB Specialist** | Thiết kế CSDL SQLite WAL, FTS5 catalog, các endpoint API nghiệp vụ, cơ chế task mutex và process runner. | `backend/**`, `data/**`, `migrations/**` | `frontend/**`, `Dockerfile`, `docker-compose.yml` | Profile #1 (`owner@genesis.local`) |
-| **`gw-frontend-agy`** | **Frontend Specialist** | Xây dựng Web UI (`frontend/index.html`), tương tác thời gian thực, Command Deck, thẻ chuyên gia và dashboard. | `frontend/**`, `assets/**` | `backend/**`, `data/**`, `Dockerfile` | Profile #2 (`claude.bot@genesis.local`) |
+| **`gw-backend-agy`** | **Backend & DB Specialist** | Thiết kế CSDL SQLite WAL, FTS5 catalog, các endpoint API nghiệp vụ, cơ chế task mutex và process runner; nhận thêm giao diện `frontend/index.html` (vai frontend đã bỏ). | `backend/**`, `frontend/**`, `data/**`, `migrations/**` | `Dockerfile`, `docker-compose.yml` | Profile #1 (`owner@genesis.local`) |
 | **`gw-devops-agy`** | **DevOps & Packaging** | Container hóa hệ thống, cấu hình volume live-mount SELinux `:z`, kịch bản cài đặt TUI và desktop shortcut. | `Dockerfile`, `docker-compose.yml`, `install.sh`, `installer_tui.py`, `*.desktop`, `scripts/**` | `backend/main.py`, `frontend/**` | Profile #3 (`shared.bot@genesis.local`) |
 | **`gw-qa-agy`** | **QA Tester** | Kiểm thử tự động bằng `scripts/test_*.py` (không cần agy/tmux), API regression test, đối soát tiêu chuẩn nghiệm thu của Roadmap. | `tests/**`, `qa_reports/**`, `fixtures/**` | `backend/**`, `frontend/**`, `Dockerfile` | Profile #4 (`shared.bot@genesis.local`) |
 
@@ -67,18 +65,18 @@ flowchart TD
 - **C (Consulted)**: Được tham vấn chuyên môn, phối hợp kỹ thuật.
 - **I (Informed)**: Được thông báo trạng thái tiến độ.
 
-| Nhiệm Vụ Trọng Tâm | Core Gen | Lead | Backend | Frontend | DevOps | QA |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| **1. Tiếp nhận đề bài & Khóa SSOT gốc** | **A** | **R** | I | I | I | I |
-| **2. Phân rã Roadmap & Khóa Chuỗi Todo DAG** | **A** | **R** | C | C | C | I |
-| **3. Thiết kế CSDL SQLite WAL & FTS5** | I | A | **R** | C | I | C |
-| **4. Xây dựng API Control Plane & Task Mutex** | I | A | **R** | C | I | C |
-| **5. Phát triển Giao diện Mission Control SPA** | I | A | C | **R** | I | C |
-| **6. Đóng gói Docker & Cấu hình Live Mount :z** | I | A | C | C | **R** | C |
-| **7. Viết Kịch bản TUI Installer & Desktop Icon** | I | A | C | I | **R** | C |
-| **8. Kiểm thử Tự Động & Thẩm Định Hồi Quy** | I | A | C | C | C | **R** |
-| **10. Nghiệm thu Hoàn Tất (Evidence Sign-off)** | C | **A** | R (nộp) | R (nộp) | R (nộp) | C |
-| **11. Xuất xưởng Release & Báo Cáo Cho Owner** | **R/A** | C | I | I | C | I |
+| Nhiệm Vụ Trọng Tâm | Core Gen | Lead | Backend | DevOps | QA |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **1. Tiếp nhận đề bài & Khóa SSOT gốc** | **A** | **R** | I | I | I |
+| **2. Phân rã Roadmap & Khóa Chuỗi Todo DAG** | **A** | **R** | C | C | I |
+| **3. Thiết kế CSDL SQLite WAL & FTS5** | I | A | **R** | I | C |
+| **4. Xây dựng API Control Plane & Task Mutex** | I | A | **R** | I | C |
+| **5. Phát triển Giao diện Mission Control SPA** | I | A | **R** | I | C |
+| **6. Đóng gói Docker & Cấu hình Live Mount :z** | I | A | C | **R** | C |
+| **7. Viết Kịch bản TUI Installer & Desktop Icon** | I | A | C | **R** | C |
+| **8. Kiểm thử Tự Động & Thẩm Định Hồi Quy** | I | A | C | C | **R** |
+| **10. Nghiệm thu Hoàn Tất (Evidence Sign-off)** | C | **A** | R (nộp) | R (nộp) | C |
+| **11. Xuất xưởng Release & Báo Cáo Cho Owner** | **R/A** | C | I | C | I |
 
 ---
 
@@ -92,7 +90,7 @@ sequenceDiagram
     actor Owner as 👤 Ryan (Owner)
     participant Gen as 👑 Core Orchestrator (Gen)
     participant Lead as 👑 Lead Architect
-    participant Builders as 🗄️ Backend / 🎨 Frontend / 🚢 DevOps
+    participant Builders as 🗄️ Backend / 🚢 DevOps
     participant Verifiers as 🧪 QA
 
     %% Stage 1
@@ -195,7 +193,6 @@ sequenceDiagram
 | Chuyển Giao (From → To) | Hợp Đồng Đầu Vào (Input) | Hợp Đồng Đầu Ra (Output) | Bằng Chứng Nghiệm Thu (Evidence) |
 | :--- | :--- | :--- | :--- |
 | **Lead → Backend** | Yêu cầu nghiệp vụ, mô hình dữ liệu SSOT | Schema SQLite WAL, migration scripts, REST APIs | `data/gen-workplace.db`, API specs, Test curls 200 OK |
-| **Backend → Frontend** | JSON Response schemas, SSE stream events | UI components, data binding, command deck view | Mã HTML/JS không lỗi cú pháp, visual verify |
 | **DevOps → All** | Yêu cầu môi trường, port, thư mục dữ liệu | Tiến trình `python3 backend/main.py` trên host (systemd --user `gen-workplace.service`), `DATA_DIR` | Healthcheck `curl -f /api/status` trả về 200 OK |
 | **Builders → QA** | Mã nguồn hoàn thiện, commit hash, kịch bản test | Bộ test suite tự động, test logs, bug reports | Test output log, exit code 0 |
 | **QA → Lead** | Kết quả test | Biên bản nghiệm thu (Sign-off Certificate) | Evidence hash lưu trong SQLite `todos.evidence_ref` |

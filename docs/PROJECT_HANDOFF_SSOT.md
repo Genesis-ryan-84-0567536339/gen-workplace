@@ -51,7 +51,7 @@ Hệ thống được thiết kế theo mô hình **All-In-One Containerized SPA
 |         v                                    v                                    v     |
 |  +---------------+                 +--------------------+              +--------------+ |
 |  | CƠ SỞ DỮ LIỆU |                 | CORE AGENT RUNNER  |              | SWARM TMUX   | |
-|  | SQLite 3 WAL  |                 | call_agy_cli_turn  |              | 6 CHUYÊN GIA | |
+|  | SQLite 3 WAL  |                 | call_agy_cli_turn  |              | 4 CHUYÊN GIA | |
 |  | + FTS5 Engine |                 | /usr/local/bin/agy |              | (lead, be,   | |
 |  | /app/data/*.db|                 | Google OAuth Live  |              | fe, devops,  | |
 |  +---------------+                 +--------------------+              | qa, sec)     | |
@@ -148,19 +148,19 @@ Cơ sở dữ liệu được đặt tại `/app/data/gen-workplace.db` (chế �
 
 ---
 
-## 6. HỆ THỐNG 6 CHUYÊN GIA SWARM & PHÂN CÔNG TRÁCH NHIỆM
+## 6. HỆ THỐNG CHUYÊN GIA SWARM (4 VAI) & PHÂN CÔNG TRÁCH NHIỆM
 
 Mỗi vai trò vận hành trong một phiên Tmux riêng biệt bên trong container:
 
 | Mã Phiên Tmux | Vai Trò (Role) | CLI Engine Tiêu Chuẩn | Trách Nhiệm Cốt Lõi & Ranh Giới Whitelist |
 |---|---|---|---|
 | `gw-lead-agy` | **Lead Architect** | `Gemini CLI (agy --effort high)` | Bảo tồn SSOT, phân rã DAG Roadmap/Todos, thẩm định bằng chứng, ký duyệt nghiệm thu. |
-| `gw-backend-agy` | **Backend & DB Specialist** | `Gemini CLI (agy --mode accept-edits)` | Quản trị SQLite WAL, REST API Control Plane, Task Mutex Lock, Process Runner kết nối CLI. |
-| `gw-frontend-agy` | **Frontend Specialist** | `Gemini CLI (agy)` | Giao diện console SPA (`frontend/index.html`), quản trị trạng thái 3 cột, stream terminal. |
+| `gw-backend-agy` | **Backend & DB Specialist** | `Gemini CLI (agy --mode accept-edits)` | Quản trị SQLite WAL, REST API Control Plane, Task Mutex Lock, Process Runner kết nối CLI; giao diện `frontend/index.html`. |
 | `gw-devops-agy` | **DevOps & Packaging** | `Gemini CLI (agy --agent devops)` | Systemd unit, tmux, `scripts/gw-update.sh`, TUI installer, desktop icon launcher. |
 | `gw-qa-agy` | **QA Tester** | `Gemini CLI (agy)` | Kiểm thử bằng `scripts/test_*.py` (chạy không cần agy/tmux), test API /api/status, nghiệm thu có bằng chứng kiểm được. |
 
 > `gw-security-agy` (Security Auditor) đã bỏ từ 29/09 (VIEC-12, #34): `status='retired'` trong DB, giữ lịch sử, `@security` trả lỗi.
+> `gw-frontend-agy` (Frontend Specialist) đã bỏ từ 29/09 (VIEC-12, #39): `status='retired'`, giữ lịch sử, `@frontend` trả lỗi `retired_role`; việc giao diện giao cho `@backend`.
 
 ---
 
@@ -195,7 +195,7 @@ Mỗi vai trò vận hành trong một phiên Tmux riêng biệt bên trong cont
 - `POST /api/gen/session/file/delete`: Xóa tệp trong phiên.
 - `GET /api/file/content?path=...`: Đọc nội dung tệp tin với bộ đếm dòng và định dạng code.
 - `POST /api/tmux/send`: Gửi lệnh hoặc phím điều khiển vào phiên chuyên gia Tmux.
-- `GET /api/tmux/sessions`: Lấy trạng thái và dòng output mới nhất của 6 chuyên gia Swarm.
+- `GET /api/tmux/sessions`: Lấy trạng thái và dòng output mới nhất của các chuyên gia Swarm (4 vai; vai retired bị lọc).
 - `POST /api/task/claim` & `POST /api/task/complete`: Nhận và nghiệm thu nhiệm vụ kèm bằng chứng kiểm được; `complete` trả thêm `viec_ref`, `webhook_sent` và bắn webhook `task_completed` (nếu `GW_EVENT_WEBHOOK_URL`).
 - `POST /api/gen/session/todos/save`: Tạo/sửa task Kanban của phiên; tạo mới bắt buộc `viec_ref` (`VIEC-<số>`, mã việc Kho Ryan) → thiếu/sai trả 400.
 - `POST /api/orch/chat`: Chỉ thị cho Orchestrator → agy thật (`conv-orchestrator`); lỗi → `Orchestrator (lỗi)` + lý do.

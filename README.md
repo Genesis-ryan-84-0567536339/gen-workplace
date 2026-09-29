@@ -31,8 +31,7 @@ flowchart TD
     end
 
     subgraph TIER2["TẦNG 2: XÂY DỰNG CỐT LÕI"]
-        Backend["🗄️ gw-backend-agy (Backend Specialist)<br/>• SQLite WAL & FTS5 Catalog Engine<br/>• Task Mutex & REST APIs"]
-        Frontend["🎨 gw-frontend-agy (Frontend Specialist)<br/>• Mission Control SPA 3-Tier Layout<br/>• Visual Pipeline Circuit 5 trạm"]
+        Backend["🗄️ gw-backend-agy (Backend Specialist)<br/>• SQLite WAL & FTS5 Catalog Engine<br/>• Task Mutex & REST APIs<br/>• Giao diện frontend/index.html"]
     end
 
     subgraph TIER3["TẦNG 3: HẠ TẦNG & ĐÓNG GÓI"]
@@ -45,10 +44,8 @@ flowchart TD
 
     Gen --> Lead
     Lead --> Backend
-    Lead --> Frontend
     Lead --> DevOps
     Backend -.-> QA
-    Frontend -.-> QA
     DevOps -.-> QA
     QA --> Lead
 ```

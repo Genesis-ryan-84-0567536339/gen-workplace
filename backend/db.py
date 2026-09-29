@@ -667,7 +667,7 @@ def migrate_unverified_done_tasks():
     return changed
 
 def seed_real_project():
-    """Chỉ tạo bản ghi project PRJ-GEN-WORKPLACE và cấu hình 6 vai (agent_roles). Không còn seed roadmap/todo/chat/catalog/sự kiện giả."""
+    """Chỉ tạo bản ghi project PRJ-GEN-WORKPLACE và cấu hình các vai đang dùng (agent_roles). Không còn seed roadmap/todo/chat/catalog/sự kiện giả."""
     with get_connection() as conn:
         cursor = conn.cursor()
         spec_path = BASE_DIR / "docs" / "SSOT_ORIGINAL_SPEC.md"
@@ -682,10 +682,9 @@ def seed_real_project():
         roles = [
             ('ROLE-01', 'L', 'Lead Architect', 'Gemini CLI (agy --effort high)', 'Quản trị SSOT, điều phối toàn bộ tiến trình gen-workplace', 'Chịu trách nhiệm bảo toàn SSOT đặc tả gốc, thẩm định evidence từ các role và điều phối live workflow.'),
             ('ROLE-02', 'B', 'Backend & DB Specialist', 'Claude Code CLI', 'Python daemon, SQLite WAL, FTS5 catalog và runner', 'Thực thi API control plane, tối ưu truy vấn FTS5 catalog sub-ms và stream log terminal.'),
-            ('ROLE-03', 'F', 'Frontend Specialist', 'Cursor CLI', 'Web console UI, CSS Gen-workplace v1.1, real-time sync', 'Duy trì phong cách thiết kế tối kỹ thuật v1.1, bind dữ liệu thật từ backend và tối ưu UX.'),
             ('ROLE-04', 'D', 'DevOps & Packaging', 'Gemini CLI (agy --agent devops)', 'Systemd service, tmux, cài đặt và cập nhật app trên host', 'Đảm bảo app chạy ổn định trên host Linux (systemd + tmux), script cài đặt/cập nhật 1 lệnh.'),
             ('ROLE-05', 'Q', 'QA Tester', 'Gemini CLI (agy)', 'Kiểm thử cross-platform, test API /api/status, xác thực installer', 'Chạy regression tests, nghiệm thu thanh loading % của installer và báo cáo phản hồi.')
-            # ROLE-06 Security Auditor đã bỏ (29/09): không seed nữa; DB cũ được retire_roles() đánh dấu 'retired'
+            # ROLE-03 Frontend Specialist và ROLE-06 Security Auditor đã bỏ (29/09): không seed nữa; DB cũ được retire_roles() đánh dấu 'retired'
         ]
         for rl in roles:
             cursor.execute("INSERT OR IGNORE INTO agent_roles (id, project_id, role_key, name, cli_tool, scope, instruction) VALUES (?, 'PRJ-GEN-WORKPLACE', ?, ?, ?, ?, ?)", rl)
@@ -1797,7 +1796,7 @@ def probe_quota(profile_id="owner_default", timeout=60):
     }
 
 # =========================================================================
-# REAL TMUX SWARM ENGINE (6 INTERACTIVE PROCESSES & SHARED CONTEXT)
+# REAL TMUX SWARM ENGINE (4 INTERACTIVE PROCESSES & SHARED CONTEXT)
 # =========================================================================
 
 SWARM_DEFAULT_CONFIG = [
@@ -1823,25 +1822,11 @@ SWARM_DEFAULT_CONFIG = [
         "conv_id": "conv-backend-db",
         "gemini_model": "Gemini 3.8 Flash (Low)",
         "anthropic_model": "Claude Sonnet 4.6 (Thinking)",
-        "allowed_paths": ["backend/**", "data/**", "migrations/**"],
-        "blocked_paths": ["frontend/**", "Dockerfile", "docker-compose.yml"],
+        "allowed_paths": ["backend/**", "frontend/**", "data/**", "migrations/**"],
+        "blocked_paths": ["Dockerfile", "docker-compose.yml"],
         "current_task_id": "",
         "scope": "Python daemon, SQLite WAL, FTS5 catalog và runner",
         "mission": "Thực thi API control plane, tối ưu truy vấn FTS5 catalog sub-ms, quản trị SQLite WAL và lock task."
-    },
-    {
-        "id": "gw-frontend-agy",
-        "role_name": "Frontend Specialist",
-        "cli_tool": "Gemini CLI (agy)",
-        "account_type": "profile2",
-        "conv_id": "conv-frontend-ui",
-        "gemini_model": "Gemini 3.7 Flash (High)",
-        "anthropic_model": "Claude Sonnet 4.6 (Thinking)",
-        "allowed_paths": ["frontend/**", "assets/**"],
-        "blocked_paths": ["backend/**", "data/**", "Dockerfile"],
-        "current_task_id": "",
-        "scope": "Web console UI, CSS Gen-workplace v1.1, real-time sync",
-        "mission": "Duy trì giao diện console (frontend/index.html), bố cục 2 cột List+Detail & Tabs, bind dữ liệu thật từ backend."
     },
     {
         "id": "gw-devops-agy",
@@ -1876,16 +1861,19 @@ SWARM_DEFAULT_CONFIG = [
 # Vai đã bỏ (Boss chốt 29/09, VIEC-12): KHÔNG xóa dòng DB (giữ lịch sử dispatch_log / chat_messages),
 # chỉ đánh dấu status='retired', tắt tmux, lọc khỏi UI / giao việc; @vai trả lỗi rõ ràng.
 RETIRED_ROLES = {
-    "security": {"session_id": "gw-security-agy", "role_id": "ROLE-06", "name": "Security Auditor", "since": "2026-09-29"},
+    "security": {"session_id": "gw-security-agy", "role_id": "ROLE-06", "name": "Security Auditor", "since": "2026-09-29",
+                 "handover": "Việc rà soát/kiểm thử giao cho @qa"},
+    "frontend": {"session_id": "gw-frontend-agy", "role_id": "ROLE-03", "name": "Frontend Specialist", "since": "2026-09-29",
+                 "handover": "Việc giao diện (frontend/**) giao cho @backend"},
 }
 RETIRED_SESSION_IDS = {v["session_id"] for v in RETIRED_ROLES.values()}
-RETIRED_MENTION_RE = re.compile(r"(?<!\w)@(" + "|".join(RETIRED_ROLES) + r")\b", re.IGNORECASE)   # không bắt email abc@security.io
+RETIRED_MENTION_RE = re.compile(r"(?<!\w)@(" + "|".join(RETIRED_ROLES) + r")\b", re.IGNORECASE)   # không bắt email abc@security.io / x@frontend.dev
 
 def retired_role_error(role):
     """Thông báo lỗi khi gọi/giao việc cho vai đã bỏ."""
     info = RETIRED_ROLES.get((role or "").lower().lstrip("@"), {})
     return (f"Vai @{role.lower().lstrip('@')} đã bỏ từ {info.get('since', '29/09')} (retired) — không giao việc được nữa. "
-            f"Việc rà soát/kiểm thử giao cho @qa; lịch sử cũ của {info.get('session_id', '')} vẫn giữ nguyên.")
+            f"{info.get('handover', 'Giao cho @lead, @backend, @devops hoặc @qa')}; lịch sử cũ của {info.get('session_id', '')} vẫn giữ nguyên.")
 
 def retire_roles(project_id="PRJ-GEN-WORKPLACE"):
     """
@@ -3208,7 +3196,7 @@ def build_task_directive(session_id, task_id, task_title, profile_dir=""):
 
 def dispatch_swarm_workflow(project_id="PRJ-GEN-WORKPLACE", session_id=None):
     """
-    "Chạy Task này" (session_id) / "Chạy Toàn Bộ Swarm" (session_id=None → 6 worker):
+    "Chạy Task này" (session_id) / "Chạy Toàn Bộ Swarm" (session_id=None → mọi worker còn dùng):
     mỗi worker nhận lệnh agy THẬT cho task đang gán (tmux_sessions.current_task_id → todos).
     Worker không có task hoặc task đã done → {"status": "error", "reason": ...}; KHÔNG gửi echo giả.
     Mọi lệnh đi qua directive_guard.guard và ghi directive_audit. Trả {sid: {...}}.
@@ -4337,12 +4325,11 @@ def wait_worker_result(dispatch_id=None, task_id="", session_id="", timeout_sec=
 
 WARROOM_ROLE_SESSIONS = {
     "backend": "gw-backend-agy",
-    "frontend": "gw-frontend-agy",
     "devops": "gw-devops-agy",
     "qa": "gw-qa-agy",
     "lead": "gw-lead-agy",
 }
-WARROOM_MENTION_RE = re.compile(r"@(backend|frontend|devops|qa|lead)\b", re.IGNORECASE)
+WARROOM_MENTION_RE = re.compile(r"@(backend|devops|qa|lead)\b", re.IGNORECASE)
 # @Gen / @Toàn Đội / @all: không giao việc (war-room chỉ giao cho vai cụ thể; Gen trả lời ở Bàn làm việc Gen)
 WARROOM_BROADCAST_RE = re.compile(r"@(gen|all|toàn\s*đội)(?![\w-])", re.IGNORECASE)
 TASK_REF_RE = re.compile(r"(?<![\w-])(TSK-\d+)(?![\w-])")
@@ -5195,7 +5182,7 @@ def get_all_session_todos(project_id="PRJ-GEN-WORKPLACE"):
 
 def post_warroom_message(project_id="PRJ-GEN-WORKPLACE", channel_id="war_room", author="Ryan (Owner)", message="", tag="Directive", wait=False, task_id=""):
     """
-    Lưu tin nhắn; tin có @backend|@frontend|@devops|@qa|@lead → chạy agy thật của vai đó ở thread nền (wait=True chạy
+    Lưu tin nhắn; tin có @backend|@devops|@qa|@lead → chạy agy thật của vai đó ở thread nền (wait=True chạy
     đồng bộ, dùng cho test). Không có @vai → chỉ lưu (#3). @Gen / @Toàn Đội / @all KHÔNG giao việc (chỉ lưu, có ghi chú).
     Task của lần giao việc: task_id truyền vào > mã TSK-n đầu tiên có thật trong nội dung tin > current_task_id của worker.
     Prompt gửi agy kèm tiêu đề, mô tả, viec_ref và checklist của task đó.
@@ -5243,7 +5230,7 @@ def post_warroom_message(project_id="PRJ-GEN-WORKPLACE", channel_id="war_room", 
         note = (f"Đã chuyển tới {', '.join(dispatched)}; trả lời thật của agy sẽ xuất hiện trong kênh khi chạy xong (tối đa 15 phút). "
                 f"Chờ kết quả: wait_worker_result(dispatch_id=...) với dispatch_id trong 'dispatches'.")
     elif broadcast:
-        note = "@Gen / @Toàn Đội không giao việc cho worker nào; chỉ lưu tin. Gọi đúng vai: @backend, @frontend, @devops, @qa, @lead."
+        note = "@Gen / @Toàn Đội không giao việc cho worker nào; chỉ lưu tin. Gọi đúng vai: @backend, @devops, @qa, @lead."
     else:
         note = "Không có @vai nên chỉ lưu tin, không trả lời."
     return {
