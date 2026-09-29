@@ -8165,7 +8165,8 @@ function updateCommandDeck() {
   updateRibbonSummary();
   // 5 lần giao việc gần nhất của worker (dispatch_log lọc session_id)
   renderWorkerRecentDispatches(current.id);
-  if (!updateCommandDeck._lastLoad || updateCommandDeck._lastSid !== current.id || Date.now() - updateCommandDeck._lastLoad > 4500) {
+  const onRuntimes = document.querySelector('.screen.active')?.id === 'runtimes';
+  if (onRuntimes && (!updateCommandDeck._lastLoad || updateCommandDeck._lastSid !== current.id || Date.now() - updateCommandDeck._lastLoad > 4500)) {
     updateCommandDeck._lastLoad = Date.now();
     updateCommandDeck._lastSid = current.id;
     loadWorkerRecentDispatches(current.id);
