@@ -5341,7 +5341,7 @@ body.resizing-active, body.resizing-active * {
         <div class="pageHead">
           <div>
             <h1>Worker &amp; terminal</h1>
-            <p>Sáu phiên tmux chạy agy trên máy Boss: trạng thái, tài khoản, quota và console của từng vai.</p>
+            <p>Phiên tmux của từng vai: chỉ mở khi cần (gửi lệnh, Mở terminal, attach) và tự ngủ đông khi rảnh. Trạng thái, tài khoản, quota và console.</p>
           </div>
           <div class="actions">
             <button class="btn small" onclick="triggerSwarmLifecycle('sleep_all')">Ngủ đông cả đội</button>
@@ -7664,6 +7664,7 @@ async function refreshTmuxSessions(showNotify = false) {
       const data = await res.json();
       if (data && Array.isArray(data.sessions) && data.sessions.length > 0) {
         state.tmuxSessions = data.sessions;
+        if (data.idle_min !== undefined) state.tmuxIdleMin = data.idle_min;
         if (showNotify) showToast('Đã cập nhật trạng thái Quota & Session mới nhất');
       }
     }
@@ -8085,8 +8086,8 @@ function updateCommandDeck() {
   if (lifeBox) {
     if (isHib) {
       lifeBox.innerHTML = `
-        <button class="btn small primary" onclick="triggerSessionLifecycle('wake')" title="Khởi động lại phiên và nạp lại Conversation ID">
-          Đánh thức phiên này
+        <button class="btn small primary" onclick="openTmuxSessionOnDemand(state.selectedTmuxSessionId)" title="Mở phiên tmux (phiên tự ngủ lại sau ${Number(state.tmuxIdleMin || 15)} phút rảnh)">
+          Mở terminal
         </button>
       `;
     } else if (isPaused) {
@@ -9095,20 +9096,22 @@ function copyText(text) {
   }
 }
 
-function copyTmuxAttachCmd() {
+async function copyTmuxAttachCmd() {
   const cmd = $('tmuxAttachCmdDisplay')?.textContent || `tmux attach -t ${state.selectedTmuxSessionId}`;
   if (navigator.clipboard) {
-    navigator.clipboard.writeText(cmd);
+    navigator.clipboard.writeText(cmd).catch(() => {});
   }
   showToast('Đã sao chép lệnh: ' + cmd);
+  await openTmuxSessionOnDemand(state.selectedTmuxSessionId);
 }
 
-function copyGridAttach(sid) {
+async function copyGridAttach(sid) {
   const cmd = `tmux attach -t ${sid}`;
   if (navigator.clipboard) {
-    navigator.clipboard.writeText(cmd);
+    navigator.clipboard.writeText(cmd).catch(() => {});
   }
   showToast('Đã sao chép lệnh: ' + cmd);
+  await openTmuxSessionOnDemand(sid);
 }
 
 function selectTmuxSession(sid) {
@@ -13880,11 +13883,30 @@ function openWarroomMessage(msgId, channel) {
   if (ch !== currentWarRoomChannel) switchWarRoomChannel(ch);
 }
 
-function openWorkerTerminal(sid) {
+// Phiên tmux mở theo nhu cầu (#32): "Mở terminal" / copy lệnh attach mở phiên nếu đang ngủ (không khởi động lại phiên đang chạy)
+async function openTmuxSessionOnDemand(sid) {
+  const s = (state.tmuxSessions || []).find(x => x.id === sid);
+  if (s && s.tmux_live && s.status !== 'paused') return true;
+  try {
+    const res = await fetch('/api/tmux/action', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: sid, action: 'open' })
+    });
+    if (!res.ok) { showToast(`Không mở được phiên ${sid} (HTTP ${res.status})`, 5000); return false; }
+    await refreshTmuxSessions();
+    return true;
+  } catch (e) {
+    showToast('Lỗi mở phiên: ' + e.message, 5000);
+    return false;
+  }
+}
+
+async function openWorkerTerminal(sid) {
   state.selectedTmuxSessionId = sid;
   go('runtimes');
   switchDeckTab('workbench');
   renderTmuxSessions();
+  await openTmuxSessionOnDemand(sid);
 }
 
 async function openTaskConversation(convId) {
