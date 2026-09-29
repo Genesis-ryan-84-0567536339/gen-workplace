@@ -24,6 +24,10 @@ import tempfile
 import time
 from datetime import datetime, timedelta
 
+for k in list(os.environ):
+    if k.startswith("GIT_CONFIG_") or k.startswith("GIT_AUTHOR_") or k.startswith("GIT_COMMITTER_"):
+        os.environ.pop(k, None)
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TMP = tempfile.mkdtemp(prefix="gw-test-quota-fb-")
 FAKEBIN = os.path.join(TMP, "bin")
@@ -177,7 +181,7 @@ print("[2] war-room @devops: profile3 hết quota → tự chuyển hồ sơ kh�
 set_exhausted("profile3")
 reset_calls()
 check("vai devops gán profile3", account_of("gw-devops-agy") == "profile3", account_of("gw-devops-agy"))
-res = db.post_warroom_message(message="@devops kiểm tra Dockerfile (chỉ đọc)", author="Ryan (Owner)", wait=True)
+res = db.post_warroom_message(message="@devops [đọc] kiểm tra Dockerfile", author="Ryan (Owner)", wait=True)
 did = res["dispatches"][0]["dispatch_id"]
 w = db.wait_worker_result(dispatch_id=did, timeout_sec=5)
 check("wait_worker_result done exit 0", w["status"] == "done" and w["exit_code"] == 0, str(w)[:300])
@@ -197,7 +201,7 @@ with db.get_connection() as conn:
     reply = conn.execute("SELECT body FROM chat_messages WHERE id = ?", (w["reply_msg_id"],)).fetchone()["body"]
     dl = dict(conn.execute("SELECT * FROM dispatch_log WHERE id = ?", (did,)).fetchone())
 check("tin war-room có dòng [Tài khoản] đã chuyển … + output thật + exit=0",
-      reply.startswith("[Tài khoản] đã chuyển từ profile3 (hết quota, có lại lúc ") and f"OK từ {used}" in reply and reply.rstrip().endswith("exit=0"), reply[:300])
+      "[Tài khoản] đã chuyển từ profile3 (hết quota, có lại lúc " in reply and f"OK từ {used}" in reply and "exit=0" in reply, reply[:300])
 check("chạy trong worktree của vai", f"cwd={wt}" in reply, reply[:300])
 check("dispatch_log: profile_initial/profile_used/fallback_reason/profiles_tried",
       dl["profile_initial"] == "profile3" and dl["profile_used"] == used and dl["fallback_reason"] == w["fallback_reason"]

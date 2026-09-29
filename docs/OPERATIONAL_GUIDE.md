@@ -1,4 +1,5 @@
 # 🛠️ CẨM NANG VẬN HÀNH & KIỂM THỬ (OPERATIONAL GUIDE)
+> **gen-workplace là nơi các agent ngoài phát lệnh chỉ huy vào Phòng giao ban để đội agy CLI làm việc.**  
 > **Dự án:** `GEN-WORKPLACE`  
 > **Dành cho:** Developer & Builder Agent tại phiên `Gen_workplace Builder`
 
@@ -170,7 +171,7 @@ Tin trong War Room có `@backend|@devops|@qa|@lead` → thread nền chạy (`@s
 Boss chốt 29/09 (VIEC-12): agy được code thật, nhưng chỉ trong worktree riêng của task; app (không phải agy) test, push, ghi kết quả.
 - **Giao**: `POST /api/task/assign {todo_id, session_id, mode}` hoặc tool MCP `assign_task {task_id, session_id, mode?}` (Issue #61,
   cho agent chỉ có connector MCP; cùng hàm `db.assign_task_to_role`, xem 3.10) — `mode` ∈ `build` ("Làm", **mặc định**) | `review` ("Rà soát").
-  Thẻ task có ô chọn chế độ (mặc định "Làm") cạnh ô chọn vai. **Tin war-room `@vai` luôn là Rà soát** (`--mode plan`, 3.6).
+  Thẻ task có ô chọn chế độ (mặc định "Làm") cạnh ô chọn vai. **Tin war-room `@vai` mặc định THỰC THI (Làm)**; thêm `[đọc]` sau `@vai` hoặc `mode="review"` để chỉ đọc (`--mode plan`, 3.6).
   Response build thêm `mode: "build"`, `branch`, `worktree_dir`; task đang có lần Làm chạy → 409 `code: busy`.
 - **Worktree**: `<GW_WORKTREE_ROOT>/TSK-n` (mặc định `../gw-worktrees/TSK-n`), nhánh `wt/TSK-n`, tạo bằng
   `git fetch origin main` + `git worktree add --no-track -b wt/TSK-n <dir> origin/main`. Giao lại cùng task → dùng lại worktree / nhánh.
@@ -360,7 +361,7 @@ curl -s http://<host>:8888/mcp -H "Authorization: Bearer $GW_TOKEN" -H 'Content-
 | Việc | REST |
 |---|---|
 | Ghi tiến độ vào phiên | `POST /api/gen/conversations/log {conv_id, content, author}` |
-| Giao task cho vai | tool MCP `assign_task {task_id, session_id: "backend", mode: "build"}` hoặc `POST /api/task/assign {todo_id, session_id: "backend", mode: "build"}` (sửa code, 3.6c) · `mode: "review"` hoặc `POST /api/warroom/send {message: "@qa ...", task_id}` (chỉ đọc) |
+| Giao task cho vai | tool MCP `assign_task {task_id, session_id: "backend", mode: "build"}` hoặc `POST /api/task/assign {todo_id, session_id: "backend", mode: "build"}` (sửa code, 3.6c) · `POST /api/warroom/send` có `@vai` mặc định Làm; thêm `[đọc]` hoặc `mode: "review"` để chỉ đọc |
 | Chờ kết quả | `POST /api/dispatch/wait {dispatch_id, timeout_sec}` (tối đa 120 giây; gọi từ `workplace_exec` thì để dưới 60 giây) |
 | Nhận / đóng task | `POST /api/task/claim`, `POST /api/task/complete {session_id, todo_id, evidence_ref}` |
 

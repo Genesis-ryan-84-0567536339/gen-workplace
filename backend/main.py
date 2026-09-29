@@ -917,7 +917,9 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             author = data.get("author", "Ryan (Owner)")
             msg = data.get("message", "")
             tag = data.get("tag", "Directive")
-            res = db.post_warroom_message(prj_id, channel_id, author, msg, tag, task_id=str(data.get("task_id") or "").strip())
+            mode = str(data.get("mode") or "build").strip() or "build"
+            res = db.post_warroom_message(prj_id, channel_id, author, msg, tag,
+                                          task_id=str(data.get("task_id") or "").strip(), mode=mode)
             status_code = 400 if "error" in res else 200
             self._send_json(status_code, res)
             return

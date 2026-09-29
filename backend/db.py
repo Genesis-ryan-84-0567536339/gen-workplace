@@ -4374,6 +4374,10 @@ WARROOM_MENTION_RE = re.compile(r"@(backend|devops|qa|lead)\b", re.IGNORECASE)
 # @Gen / @Toàn Đội / @all: không giao việc (war-room chỉ giao cho vai cụ thể; Gen trả lời ở Bàn làm việc Gen)
 WARROOM_BROADCAST_RE = re.compile(r"@(gen|all|toàn\s*đội)(?![\w-])", re.IGNORECASE)
 TASK_REF_RE = re.compile(r"(?<![\w-])(TSK-\d+)(?![\w-])")
+# Cờ [đọc] ngay sau @vai (không phân biệt hoa thường, có thể có dấu cách): '@backend [đọc] ...' → chế độ Rà soát
+WARROOM_READ_FLAG_RE = re.compile(r"@(backend|devops|qa|lead)\s*\[đọc\]", re.IGNORECASE)
+# Mã VIEC-n trong nội dung tin (để tìm task qua viec_ref)
+VIEC_IN_MSG_RE = re.compile(r"(?<![\w-])(VIEC-\d+)(?![\w-])", re.IGNORECASE)
 WARROOM_DISPATCH_TIMEOUT_SEC = 15 * 60
 # Chế độ Làm (#45): 1 lần agy sửa code + app chạy test/push; quá hạn này (cộng 2 phút) mà dòng vẫn running → coi là mất thread
 AGY_BUILD_TIMEOUT_SEC = int(os.environ.get("GW_AGY_BUILD_TIMEOUT_SEC", str(30 * 60)) or 30 * 60)
@@ -5004,9 +5008,11 @@ def tmux_role_env_block(session_id, role_name, conv_id, p_dir, role_spec_file, e
     ]
     return "\n".join(lines) + "\n"
 
-def dispatch_warroom_to_agent(project_id, channel_id, session_id, message, timeout=WARROOM_DISPATCH_TIMEOUT_SEC, dispatch_id=None, reply_to=None):
+def dispatch_warroom_to_agent(project_id, channel_id, session_id, message, timeout=WARROOM_DISPATCH_TIMEOUT_SEC, dispatch_id=None, reply_to=None, build_mode=False):
     """
-    Chạy agy thật (--mode plan -p <tin>) với profile của worker session_id trong worktree riêng; ghi trả lời thật vào chat_messages và dispatch_log (#3).
+    Chạy agy thật với profile của worker session_id trong worktree riêng; ghi trả lời thật vào chat_messages và dispatch_log (#3).
+    build_mode=False (mặc định trước đây): --mode plan (chỉ đọc) — dùng khi [đọc] hoặc mode=review.
+    build_mode=True (mặc định mới của war-room): agy chế độ Làm (không --mode plan) trong worktree riêng của vai.
     dispatch_id: dòng dispatch_log (status=running) đã tạo sẵn bởi post_warroom_message; None → tự tạo. Khi xong cập nhật
     status done/failed + exit_code + summary rồi báo hiệu cho wait_worker_result (#9).
     """
@@ -5027,20 +5033,42 @@ def dispatch_warroom_to_agent(project_id, channel_id, session_id, message, timeo
         pass
     p_dir = os.path.expanduser(profile_dir) if profile_dir else _profile_dir(account_type)
     cwd = ensure_role_worktree(session_id)
-    # --mode plan: agy chỉ đọc, không sửa file. Không dùng --sandbox vì sandbox chặn cả việc đọc repo
-    # (agy chỉ trả "Để tôi khám phá..." rồi dừng). Dặn trả lời trọn trong một lượt vì -p không tương tác.
-    # Prompt nói rõ CHỈ ĐỌC + công cụ/lệnh được dùng + ghi "CẦN QUYỀN" khi bị chặn (lỗi dispatch:9: agy tự chạy lệnh shell bị chặn)
-    prompt = build_agy_readonly_prompt(message, task_block, session_id)
-    # agy -p không tương tác: tool cần quyền bị auto-denied. Cấp quy tắc chỉ đọc (read_file(worktree), command(ls|grep|git log|...))
-    # trong settings của hồ sơ, KHÔNG bật skip-permissions cho mọi vai. Lối thoát cuối (opt-in GW_WARROOM_SKIP_PERMISSIONS=1):
-    # thêm --dangerously-skip-permissions nhưng chỉ khi cwd đúng là worktree riêng của vai (vẫn --mode plan).
     in_worktree = is_role_worktree(session_id, cwd)
+
+    repo = os.environ.get("GW_DISPATCH_REPO") or str(BASE_DIR)
+    before_head = ""
+    before_repo = {}
+    hooks = None
+    if build_mode:
+        # Chế độ Làm: agy chạy không --mode plan trong worktree của vai; tái dùng build_prompt của agy_build.py
+        try:
+            from backend import agy_build as _build
+        except ImportError:
+            import agy_build as _build
+        if os.path.exists(os.path.join(cwd, ".git")):
+            before_head = _build._out(_build._git(["rev-parse", "HEAD"], cwd=cwd))
+        before_repo = _build._repo_snapshot(repo)
+        hooks = _build.write_guard_hooks(session_id, cwd, f"wt/{session_id}")
+        t_id = task_id or session_id
+        prompt = _build.build_prompt(t_id, session_id, cwd, f"wt/{session_id}", project_id)
+        req_lines = []
+        if task_block:
+            req_lines.append(task_block)
+        req_lines.append(f"[YÊU CẦU / CHỈ THỊ TỪ PHÒNG GIAO BAN]\n{message}")
+        req_block = "\n\n".join(req_lines)
+        prompt = prompt.replace(f"[THÔNG TIN VIỆC {t_id}]\n\n", f"{req_block}\n\n", 1)
+    else:
+        # Chế độ Đọc: --mode plan, chỉ đọc, ưu tiên công cụ đọc file
+        prompt = build_agy_readonly_prompt(message, task_block, session_id)
 
     # --output-format stream-json: tool step có lệnh shell (run_command.CommandLine) → biết đúng lệnh nào bị chặn quyền.
     # agy cũ không nhận cờ → chạy lại không cờ (stream_state["ok"] = False cho các lần sau). Tắt hẳn: GW_AGY_NO_STREAM=1.
     stream_state = {"ok": not _env_on("GW_AGY_NO_STREAM")}
 
     def _build_cmd(pdir):
+        if build_mode:
+            # Chế độ Làm: không --mode plan, không --model, không --dangerously-skip-permissions
+            return [_agy_bin(), f"--gemini_dir={pdir}", "-p", prompt] + (AGY_STREAM_ARGS if stream_state["ok"] else [])
         c = [_agy_bin(), f"--gemini_dir={pdir}"]
         if in_worktree and _env_on("GW_WARROOM_SKIP_PERMISSIONS"):
             c.append(AGY_SKIP_PERMISSIONS_FLAG)
@@ -5058,9 +5086,20 @@ def dispatch_warroom_to_agent(project_id, channel_id, session_id, message, timeo
 
     def _attempt(pid, pdir):
         """1 lần chạy agy với hồ sơ pid (#22): ghi allow-rule vào settings của hồ sơ đó trước, cùng cwd/worktree và cùng lệnh."""
+        token = None
         if in_worktree:
-            ensure_agy_plan_permissions(pdir, cwd)
+            if build_mode:
+                token = ensure_agy_build_permissions(pdir, cwd, repo)
+            else:
+                ensure_agy_plan_permissions(pdir, cwd)
         c = _build_cmd(pdir)
+        env = _agy_env(pdir)
+        if build_mode and hooks:
+            try:
+                from backend import agy_build as _build
+            except ImportError:
+                import agy_build as _build
+            env = {**env, **_build.agy_git_env(hooks, session_id)}
         try:
             with get_connection() as conn:
                 conn.execute("UPDATE dispatch_log SET command = ?, profile_used = ? WHERE id = ?", (" ".join(c), pid, dispatch_id))
@@ -5068,12 +5107,12 @@ def dispatch_warroom_to_agent(project_id, channel_id, session_id, message, timeo
         except Exception:
             pass
         try:
-            res = subprocess.run(c, capture_output=True, text=True, timeout=timeout, cwd=cwd, env=_agy_env(pdir))
+            res = subprocess.run(c, capture_output=True, text=True, timeout=timeout, cwd=cwd, env=env)
             if stream_state["ok"] and agy_flag_unsupported(res):
                 print(f"[dispatch] agy không nhận {' '.join(AGY_STREAM_ARGS)} → chạy lại không cờ")
                 stream_state["ok"] = False
                 c = _build_cmd(pdir)
-                res = subprocess.run(c, capture_output=True, text=True, timeout=timeout, cwd=cwd, env=_agy_env(pdir))
+                res = subprocess.run(c, capture_output=True, text=True, timeout=timeout, cwd=cwd, env=env)
             res, sinfo = normalize_agy_stream_result(res)
             st, reset = record_quota_probe_from_result(pid, "default", res)
             return st, reset, {"cmd": c, "res": res, "stream": sinfo}
@@ -5083,6 +5122,9 @@ def dispatch_warroom_to_agent(project_id, channel_id, session_id, message, timeo
             return "timeout", "", {"cmd": c, "error_output": msg}
         except Exception as e:
             return "error", "", {"cmd": c, "error_output": f"Lỗi khi chạy agy ({_agy_bin()}): {e}"}
+        finally:
+            if token is not None:
+                release_agy_build_permissions(token)
 
     fb = run_agy_with_quota_fallback(account_type, p_dir, _attempt)
     payload = fb["payload"] or {}
@@ -5154,12 +5196,47 @@ def dispatch_warroom_to_agent(project_id, channel_id, session_id, message, timeo
 
     if not task_id:
         task_id = _current_task_of(session_id)
+
+    commits = []
+    tests = None
+    dirty = []
+    violations = []
+    build_head = ""
+    if build_mode and os.path.exists(os.path.join(cwd, ".git")):
+        try:
+            from backend import agy_build as _build
+        except ImportError:
+            import agy_build as _build
+        log = _build._out(_build._git(["log", "--format=%H %s", f"{before_head}..HEAD"], cwd=cwd)) if before_head else ""
+        commits = [ln for ln in log.splitlines() if ln.strip()]
+        build_head = _build._out(_build._git(["rev-parse", "HEAD"], cwd=cwd))
+        st = _build._git(["status", "--porcelain"], cwd=cwd)
+        dirty = [ln for ln in (st.stdout or "").splitlines() if ln.strip()][:30] if st.returncode == 0 else []
+        violations = _build.detect_violations(repo, before_repo, cwd, f"wt/{session_id}")
+        if violations:
+            fail_reason = fail_reason or ("VI PHẠM phạm vi chế độ Làm: " + "; ".join(violations))
+        elif commits:
+            tests = _build.run_tests(cwd)
+
+    build_lines = []
+    if build_mode:
+        bf = {"worktree_dir": cwd, "build_branch": f"wt/{session_id}", "build_commit": build_head if commits else "",
+              "build_tests": tests, "build_push": None, "compare_url": ""}
+        build_lines = format_build_lines(bf)
+        if commits:
+            build_lines.append("Commit mới: " + " | ".join(c[:10] + c[40:] for c in commits[:10]))
+        if dirty:
+            build_lines.append(f"Còn {len(dirty)} file sửa chưa commit: " + ", ".join(d[3:] for d in dirty[:10]))
+        if violations:
+            build_lines.append("VI PHẠM: " + "; ".join(violations))
+
     # exit=0 nhưng agy báo auto-denied / no output produced → vẫn là failed
     status = "done" if exit_code == 0 and not fail_reason else "failed"
     viec_ref = get_task_viec_ref(task_id, project_id)
     webhook_sent = send_event_webhook("dispatch_finished", project_id=project_id, viec_ref=viec_ref, task_id=task_id,
                                       session_id=session_id, exit_code=exit_code, report_path=report_path, status=status)
-    summary = _shorten_output(f"[{fail_reason}]\n{output}" if fail_reason else (f"[{blocked_line}]\n{output}" if blocked_line else output))
+    build_prefix = ("\n".join(build_lines) + "\n\n") if build_lines else ""
+    summary = _shorten_output(build_prefix + (f"[{fail_reason}]\n{output}" if fail_reason else (f"[{blocked_line}]\n{output}" if blocked_line else output)))
     need = agy_need_permission_lines(output)
     if need and not fail_reason:
         summary = _shorten_output("[agy báo cần quyền] " + " | ".join(need) + "\n" + summary)
@@ -5167,23 +5244,35 @@ def dispatch_warroom_to_agent(project_id, channel_id, session_id, message, timeo
         summary = f"[Tài khoản] {fb['note']}.\n{summary}"
 
     reply_msg_id = None
+    # Thêm nhãn chế độ vào body ghi về war-room (chk-4)
+    mode_label = "[Làm]" if build_mode else "[Đọc]"
+    if build_mode and build_lines:
+        body_with_label = f"{mode_label} " + "\n".join(build_lines) + f"\n\n{body}"
+    else:
+        body_with_label = f"{mode_label} {body}"
+    react = json.dumps(["🛠 agy Làm"] if build_mode else ["🤖 agy thật"], ensure_ascii=False)
     try:
         with get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
             INSERT INTO chat_messages (project_id, runtime_id, author, created_time, tag, body, react_json, reply_to, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (project_id, channel_id, session_id, time.strftime("%H:%M:%S"), "Report", body, json.dumps(["🤖 agy thật"], ensure_ascii=False),
+            """, (project_id, channel_id, session_id, time.strftime("%H:%M:%S"), "Report", body_with_label, react,
                   reply_to, _now_iso()))
             reply_msg_id = cursor.lastrowid
             cursor.execute("""
             UPDATE dispatch_log SET command = ?, exit_code = ?, report_path = ?, finished_at = ?, task_id = ?, viec_ref = ?,
                    channel_id = ?, webhook_sent = ?, status = ?, summary = ?, reply_msg_id = ?,
-                   profile_initial = ?, profile_used = ?, fallback_reason = ?, profiles_tried = ?
+                   profile_initial = ?, profile_used = ?, fallback_reason = ?, profiles_tried = ?,
+                   worktree_dir = ?, build_branch = ?, build_commit = ?, build_tests = ?
             WHERE id = ?
             """, (" ".join(cmd), exit_code, report_path, finished_at, task_id, viec_ref, channel_id, 1 if webhook_sent else 0,
                   status, summary, reply_msg_id, account_type, fb["profile_used"], fb["note"],
-                  json.dumps(fb["attempts"], ensure_ascii=False), dispatch_id))
+                  json.dumps(fb["attempts"], ensure_ascii=False),
+                  cwd if build_mode else None, f"wt/{session_id}" if build_mode else None,
+                  build_head if (build_mode and commits) else None,
+                  json.dumps(tests, ensure_ascii=False) if (build_mode and tests) else None,
+                  dispatch_id))
             conn.commit()
         # Kết quả tự ghi về phiên (conversation) của task TRƯỚC khi báo xong → ai chờ wait_worker_result thấy luôn tin kết quả
         report_dispatch_to_task(dispatch_id, project_id)
@@ -5234,6 +5323,35 @@ def find_task_ref_in_message(message, project_id="PRJ-GEN-WORKPLACE"):
     for tid in dict.fromkeys(m.upper() for m in TASK_REF_RE.findall(message or "")):
         if _task_detail(tid, project_id):
             return tid
+    return ""
+
+
+def find_task_id_in_message(message, project_id="PRJ-GEN-WORKPLACE"):
+    """Tìm task thật từ nội dung tin war-room: TSK-n trực tiếp hoặc VIEC-n (tra qua viec_ref).
+    Trả task_id (vd 'TSK-12') nếu tìm thấy, rỗng nếu không."""
+    project_id = normalize_project_id(project_id)
+    # Ưu tiên TSK-n trực tiếp
+    tid = find_task_ref_in_message(message, project_id)
+    if tid:
+        return tid
+    # Thử VIEC-n → tìm task có viec_ref khớp
+    for viec in dict.fromkeys(m.upper() for m in VIEC_IN_MSG_RE.findall(message or "")):
+        try:
+            with get_connection() as conn:
+                r = conn.execute(
+                    "SELECT id FROM gen_session_todos WHERE viec_ref = ? AND project_id = ? AND status != 'done' ORDER BY updated_at DESC LIMIT 1",
+                    (viec, project_id)
+                ).fetchone()
+                if r:
+                    return r["id"]
+                r = conn.execute(
+                    "SELECT id FROM todos WHERE viec_ref = ? AND project_id = ? AND status != 'done' ORDER BY id DESC LIMIT 1",
+                    (viec, project_id)
+                ).fetchone()
+                if r:
+                    return r["id"]
+        except Exception:
+            pass
     return ""
 
 
@@ -5422,7 +5540,7 @@ def assign_task_to_role(todo_id, session_id, project_id="PRJ-GEN-WORKPLACE", aut
             import agy_build as _build
         return _build.assign_build(todo_id, sid, role, task, body, claim, project_id=project_id, author=author,
                                    channel_id=channel_id, wait=wait)
-    res = post_warroom_message(project_id, channel_id, author, body, "Assignment", wait=wait, task_id=todo_id)
+    res = post_warroom_message(project_id, channel_id, author, body, "Assignment", wait=wait, task_id=todo_id, mode=mode)
     if "error" in res:
         return res
     d = (res.get("dispatches") or [{}])[0]
@@ -5540,11 +5658,15 @@ def get_all_session_todos(project_id="PRJ-GEN-WORKPLACE"):
     return attach_task_links(todos)
 
 
-def post_warroom_message(project_id="PRJ-GEN-WORKPLACE", channel_id="war_room", author="Ryan (Owner)", message="", tag="Directive", wait=False, task_id=""):
+def post_warroom_message(project_id="PRJ-GEN-WORKPLACE", channel_id="war_room", author="Ryan (Owner)", message="", tag="Directive", wait=False, task_id="", mode="build"):
     """
     Lưu tin nhắn; tin có @backend|@devops|@qa|@lead → chạy agy thật của vai đó ở thread nền (wait=True chạy
     đồng bộ, dùng cho test). Không có @vai → chỉ lưu (#3). @Gen / @Toàn Đội / @all KHÔNG giao việc (chỉ lưu, có ghi chú).
-    Task của lần giao việc: task_id truyền vào > mã TSK-n đầu tiên có thật trong nội dung tin > current_task_id của worker.
+    mode='build' (mặc định, chk-2): tin có TSK-n/VIEC-n → assign_task_to_role(mode='build'); không có task → agy chế
+    độ Làm trong worktree của vai (không --mode plan).
+    mode='review': giữ đúng như cũ — agy --mode plan, chỉ đọc.
+    Cờ [đọc] ngay sau @vai (vd '@backend [đọc] ...') ghi đè sang mode='review' (chk-3).
+    Task của lần giao việc: task_id truyền vào > mã TSK-n/VIEC-n đầu tiên có thật trong nội dung tin > current_task_id của worker.
     Prompt gửi agy kèm tiêu đề, mô tả, viec_ref và checklist của task đó.
     """
     project_id = normalize_project_id(project_id)
@@ -5555,39 +5677,97 @@ def post_warroom_message(project_id="PRJ-GEN-WORKPLACE", channel_id="war_room", 
     if retired:
         return {"error": retired_role_error(retired[0]), "code": "retired_role", "retired_roles": sorted(set(retired))}
 
+    # Chuẩn hóa mode: 'build'|'review'
+    mode_norm = normalize_assign_mode(mode)
+    effective_mode = mode_norm or "build"   # mặc định build
+
     now_time = time.strftime("%H:%M:%S")
     now_iso = _now_iso()
     clean_msg = message.strip()
+
+    # Phát hiện cờ [đọc] ngay sau @vai → ghi đè sang review bất kể mode truyền vào (chk-3)
+    has_read_flag = bool(WARROOM_READ_FLAG_RE.search(clean_msg))
+    if has_read_flag:
+        effective_mode = "review"
+        # Gỡ [đọc] ra khỏi tin gửi agy để không gây nhầm lẫn
+        clean_msg = re.sub(r"\s*\[đọc\]", "", clean_msg, flags=re.IGNORECASE).strip()
 
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
         INSERT INTO chat_messages (project_id, runtime_id, author, created_time, tag, body, react_json, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (project_id, channel_id, author, now_time, tag, clean_msg, json.dumps(["✅ đã ghi nhận"], ensure_ascii=False), now_iso))
+        """, (project_id, channel_id, author, now_time, tag, message.strip(), json.dumps(["✅ đã ghi nhận"], ensure_ascii=False), now_iso))
         user_msg_id = cursor.lastrowid
         conn.commit()
 
     dispatched = []
     dispatches = []
-    ref_task = (task_id or "").strip() or find_task_ref_in_message(clean_msg, project_id)
+    # Tìm task từ task_id truyền vào, hoặc TSK-n/VIEC-n đầu tiên có thật trong tin (chk-2)
+    ref_task = (task_id or "").strip() or find_task_id_in_message(clean_msg, project_id)
     for role in dict.fromkeys(m.lower() for m in WARROOM_MENTION_RE.findall(clean_msg)):
         sid = WARROOM_ROLE_SESSIONS[role]
         d_task = ref_task or _current_task_of(sid)
-        # Tạo dòng dispatch_log (running) TRƯỚC khi chạy để bên gọi có dispatch_id truyền cho wait_worker_result (#9)
-        did = start_dispatch_log(sid, kind="warroom", channel_id=channel_id, task_id=d_task,
-                                 viec_ref=get_task_viec_ref(d_task, project_id), request_msg_id=user_msg_id)
-        if wait:
-            dispatch_warroom_to_agent(project_id, channel_id, sid, clean_msg, dispatch_id=did, reply_to=user_msg_id)
+
+        if effective_mode == "build" and ref_task and _task_detail(ref_task, project_id):
+            # Tin có mã TSK-n hoặc VIEC-n của task tồn tại → giao qua assign_task_to_role(mode='build') (chk-2)
+            try:
+                from backend import agy_build as _build
+            except ImportError:
+                import agy_build as _build
+            bres = assign_task_to_role(ref_task, sid, project_id=project_id, author=author,
+                                       channel_id=channel_id, wait=wait, mode="build")
+            if "error" in bres:
+                # Lỗi giao việc (locked, busy...) → dispatch chế độ Đọc thay thế để không bỏ qua tin
+                did = start_dispatch_log(sid, kind="warroom", channel_id=channel_id, task_id=d_task,
+                                         viec_ref=get_task_viec_ref(d_task, project_id), request_msg_id=user_msg_id)
+                if wait:
+                    dispatch_warroom_to_agent(project_id, channel_id, sid, clean_msg, dispatch_id=did,
+                                              reply_to=user_msg_id, build_mode=False)
+                else:
+                    threading.Thread(target=dispatch_warroom_to_agent,
+                                     args=(project_id, channel_id, sid, clean_msg),
+                                     kwargs={"dispatch_id": did, "reply_to": user_msg_id, "build_mode": False},
+                                     daemon=True, name=f"warroom-dispatch-{sid}").start()
+                dispatched.append(sid)
+                dispatches.append({"session_id": sid, "dispatch_id": did, "task_id": d_task, "mode": "review", "assign_error": bres.get("error")})
+            else:
+                did = bres.get("dispatch_id")
+                dispatched.append(sid)
+                dispatches.append({"session_id": sid, "dispatch_id": did, "task_id": d_task, "mode": "build"})
+        elif effective_mode == "build":
+            # Không có task → agy chạy chế độ Làm trong worktree của vai (chk-2)
+            did = start_dispatch_log(sid, kind="warroom", channel_id=channel_id, task_id=d_task,
+                                     viec_ref=get_task_viec_ref(d_task, project_id), request_msg_id=user_msg_id)
+            if wait:
+                dispatch_warroom_to_agent(project_id, channel_id, sid, clean_msg, dispatch_id=did,
+                                          reply_to=user_msg_id, build_mode=True)
+            else:
+                threading.Thread(target=dispatch_warroom_to_agent,
+                                 args=(project_id, channel_id, sid, clean_msg),
+                                 kwargs={"dispatch_id": did, "reply_to": user_msg_id, "build_mode": True},
+                                 daemon=True, name=f"warroom-dispatch-{sid}").start()
+            dispatched.append(sid)
+            dispatches.append({"session_id": sid, "dispatch_id": did, "task_id": d_task, "mode": "build"})
         else:
-            threading.Thread(target=dispatch_warroom_to_agent, args=(project_id, channel_id, sid, clean_msg),
-                             kwargs={"dispatch_id": did, "reply_to": user_msg_id}, daemon=True, name=f"warroom-dispatch-{sid}").start()
-        dispatched.append(sid)
-        dispatches.append({"session_id": sid, "dispatch_id": did, "task_id": d_task})
+            # mode='review': hành vi cũ — agy --mode plan, chỉ đọc
+            did = start_dispatch_log(sid, kind="warroom", channel_id=channel_id, task_id=d_task,
+                                     viec_ref=get_task_viec_ref(d_task, project_id), request_msg_id=user_msg_id)
+            if wait:
+                dispatch_warroom_to_agent(project_id, channel_id, sid, clean_msg, dispatch_id=did,
+                                          reply_to=user_msg_id, build_mode=False)
+            else:
+                threading.Thread(target=dispatch_warroom_to_agent,
+                                 args=(project_id, channel_id, sid, clean_msg),
+                                 kwargs={"dispatch_id": did, "reply_to": user_msg_id, "build_mode": False},
+                                 daemon=True, name=f"warroom-dispatch-{sid}").start()
+            dispatched.append(sid)
+            dispatches.append({"session_id": sid, "dispatch_id": did, "task_id": d_task, "mode": "review"})
 
     broadcast = bool(WARROOM_BROADCAST_RE.search(clean_msg))
+    mode_note = "chế độ Làm (agy sửa code)" if effective_mode == "build" else "chế độ Đọc (agy --mode plan)"
     if dispatched:
-        note = (f"Đã chuyển tới {', '.join(dispatched)}; trả lời thật của agy sẽ xuất hiện trong kênh khi chạy xong (tối đa 15 phút). "
+        note = (f"Đã chuyển tới {', '.join(dispatched)} ({mode_note}); trả lời thật của agy sẽ xuất hiện trong kênh khi chạy xong (tối đa 15 phút). "
                 f"Chờ kết quả: wait_worker_result(dispatch_id=...) với dispatch_id trong 'dispatches'.")
     elif broadcast:
         note = "@Gen / @Toàn Đội không giao việc cho worker nào; chỉ lưu tin. Gọi đúng vai: @backend, @devops, @qa, @lead."
@@ -5596,11 +5776,12 @@ def post_warroom_message(project_id="PRJ-GEN-WORKPLACE", channel_id="war_room", 
     return {
         "status": "sent",
         "channel_id": channel_id,
-        "user_message": {"id": user_msg_id, "author": author, "body": clean_msg, "created_time": now_time, "created_at": now_iso, "tag": tag},
+        "user_message": {"id": user_msg_id, "author": author, "body": message.strip(), "created_time": now_time, "created_at": now_iso, "tag": tag},
         "agent_reply": None,
         "dispatched": dispatched,
         "dispatches": dispatches,
         "task_id": ref_task,
+        "mode": effective_mode,
         "note": note,
     }
 

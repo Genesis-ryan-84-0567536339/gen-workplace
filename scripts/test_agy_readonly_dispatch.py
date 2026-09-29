@@ -22,6 +22,10 @@ import subprocess
 import sys
 import tempfile
 
+for k in list(os.environ):
+    if k.startswith("GIT_CONFIG_") or k.startswith("GIT_AUTHOR_") or k.startswith("GIT_COMMITTER_"):
+        os.environ.pop(k, None)
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TMP = tempfile.mkdtemp(prefix="gw-test-agy-readonly-")
 FAKEBIN = os.path.join(TMP, "bin")
@@ -306,10 +310,13 @@ rep = open(row["report_path"]).read()
 check("báo cáo có mục lệnh shell agy đã gọi", "## Lệnh shell agy đã gọi" in rep and "`grep -n /api/task/ backend/main.py`" in rep, rep[:500])
 check("báo cáo: phần Output vẫn ở cuối (tick checklist chỉ xét output)", rep.rindex("## Output") > rep.index("## Lệnh shell agy đã gọi"))
 
-print("[6] war-room thường cũng dùng prompt chỉ đọc")
+print("[6] war-room mode=review (hoặc [đọc]) dùng prompt chỉ đọc; war-room thường (build) không nhất thiết có khối chỉ đọc")
 open(PROMPT_LOG, "w").close()
-db.post_warroom_message(message="@qa liệt kê endpoint", author="Ryan (Owner)", wait=True)
-check("prompt war-room có khối chỉ đọc", "CHẾ ĐỘ CHỈ ĐỌC" in open(PROMPT_LOG).read())
+db.post_warroom_message(message="@qa liệt kê endpoint", author="Ryan (Owner)", wait=True, mode="review")
+check("prompt war-room mode=review có khối CHỈ ĐỌC", "CHẾ ĐỘ CHỈ ĐỌC" in open(PROMPT_LOG).read())
+open(PROMPT_LOG, "w").close()
+db.post_warroom_message(message="@qa [đọc] liệt kê endpoint", author="Ryan (Owner)", wait=True)
+check("prompt war-room [đọc] có khối CHỈ ĐỌC", "CHẾ ĐỘ CHỈ ĐỌC" in open(PROMPT_LOG).read())
 
 print("[7] agy bị chặn: dispatch failed + ghi rõ lệnh bị chặn (trích từ stream-json)")
 os.environ["FAKE_AGY_MODE"] = "denied_stream"

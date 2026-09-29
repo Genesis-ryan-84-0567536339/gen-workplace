@@ -11,6 +11,10 @@ import sys
 import tempfile
 from pathlib import Path
 
+for k in list(os.environ):
+    if k.startswith("GIT_CONFIG_"):
+        os.environ.pop(k, None)
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from backend import auto_update as au
 

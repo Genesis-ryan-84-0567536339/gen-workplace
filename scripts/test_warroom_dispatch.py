@@ -4,12 +4,17 @@ Test #3: chatroom gọi agy thật thay câu mẫu. Chạy không cần server/a
 GW_AGY_BIN là script bash giả (echo "OK từ agy giả"; exit 0), GW_DISPATCH_REPO là
 repo git tạm, GW_WORKTREE_ROOT là thư mục tạm → kiểm worktree wt/<session_id>,
 chat_messages có trả lời thật (tác giả = session_id, có dòng exit=0) và dispatch_log.
+Cập nhật TSK-29: tin @vai mặc định THỰC THI (không --mode plan); [đọc] để chỉ đọc.
 """
 import os
 import sys
 import shutil
 import subprocess
 import tempfile
+
+for k in list(os.environ):
+    if k.startswith("GIT_CONFIG_") or k.startswith("GIT_AUTHOR_") or k.startswith("GIT_COMMITTER_"):
+        os.environ.pop(k, None)
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TMP = tempfile.mkdtemp(prefix="gw-test-warroom-")
@@ -80,20 +85,24 @@ check("status sent, dispatched rỗng", res["status"] == "sent" and res["dispatc
 check("chỉ thêm đúng 1 tin (của người gửi)", len(rows) == before + 1 and rows[-1]["author"] == "Ryan (Owner)", str(rows[-1:]))
 check("không còn câu mẫu theo từ khóa", not any("Đã rõ chỉ thị" in r["body"] for r in rows))
 
-print("[2] @backend → agy giả chạy trong worktree riêng, trả lời thật")
+print("[2] @backend → agy giả chạy trong worktree riêng, chế độ Làm (không --mode plan)")
 res = db.post_warroom_message(message="@backend kiểm tra API /api/state", author="Ryan (Owner)", wait=True)
 check("dispatched = gw-backend-agy", res["dispatched"] == ["gw-backend-agy"], str(res["dispatched"]))
+check("mode=build (mặc định mới)", res.get("mode") == "build", str(res.get("mode")))
 rows = channel_rows()
 reply = rows[-1]
 check("tác giả trả lời = session_id thật", reply["author"] == "gw-backend-agy", reply["author"])
 check("body là output thật của agy giả", "OK từ agy giả" in reply["body"], reply["body"][:120])
-check("body có dòng exit=0", reply["body"].rstrip().endswith("exit=0"), reply["body"][-40:])
+check("body có dòng exit=0", "exit=0" in reply["body"], reply["body"][-40:])
+# TSK-29: chế độ mặc định là build → KHÔNG có --mode plan, CÓ nhãn [Làm]
+check("lệnh KHÔNG có --mode plan (chế độ Làm mặc định)", "--mode plan" not in reply["body"], reply["body"][:300])
+check("body ghi nhãn [Làm]", "[Làm]" in reply["body"], reply["body"][:100])
 wt_dir = os.path.join(os.environ["GW_WORKTREE_ROOT"], "gw-backend-agy")
 check("worktree riêng tồn tại", os.path.exists(os.path.join(wt_dir, ".git")), wt_dir)
 check("agy chạy với cwd = worktree", f"cwd={os.path.realpath(wt_dir)}" in reply["body"] or f"cwd={wt_dir}" in reply["body"], reply["body"][:300])
 branches = subprocess.run(["git", "-C", DISPATCH_REPO, "branch", "--list", "wt/gw-backend-agy"], capture_output=True, text=True).stdout
 check("nhánh wt/gw-backend-agy được tạo", "wt/gw-backend-agy" in branches, branches)
-check("lệnh có --mode plan -p (không --sandbox) và dặn trả lời trọn lượt", "args=--gemini_dir=" in reply["body"] and "--mode plan -p @backend" in reply["body"] and "--sandbox" not in reply["body"] and "trả lời ĐẦY ĐỦ" in reply["body"], reply["body"][:300])
+check("lệnh có --gemini_dir= và không có --sandbox", "args=--gemini_dir=" in reply["body"] and "--sandbox" not in reply["body"], reply["body"][:300])
 with db.get_connection() as conn:
     dl = conn.execute("SELECT * FROM dispatch_log WHERE session_id='gw-backend-agy' ORDER BY id DESC LIMIT 1").fetchone()
 check("dispatch_log có dòng exit_code=0 + report_path", dl is not None and dl["exit_code"] == 0 and dl["report_path"] and os.path.exists(dl["report_path"]), dict(dl) if dl else "none")
@@ -128,6 +137,37 @@ for _ in range(50):
     time.sleep(0.2)
 rows = channel_rows()
 check("trả lời nền đã vào kênh", len(rows) == n_before + 2 and rows[-1]["author"] == "gw-devops-agy", str([r["author"] for r in rows[-2:]]))
+
+print("[6] mode=review → --mode plan (chỉ đọc); [đọc] sau @vai cũng chọn review")
+os.environ["GW_AGY_BIN"] = AGY_OK
+res_review = db.post_warroom_message(message="@lead xem file backend/db.py", author="Ryan (Owner)", wait=True, mode="review")
+check("mode=review → mode=review trong response", res_review.get("mode") == "review", str(res_review.get("mode")))
+reply_review = channel_rows()[-1]
+check("mode=review → body có --mode plan", "--mode plan" in reply_review["body"], reply_review["body"][:300])
+check("mode=review → body ghi nhãn [Đọc]", "[Đọc]" in reply_review["body"], reply_review["body"][:100])
+
+res2 = db.post_warroom_message(message="@backend [đọc] xem file README.md", author="Ryan (Owner)", wait=True)
+check("[đọc] sau @vai → effective_mode=review", res2.get("mode") == "review", str(res2.get("mode")))
+reply_doc = channel_rows()[-1]
+check("[đọc] → body ghi nhãn [Đọc]", "[Đọc]" in reply_doc["body"], reply_doc["body"][:100])
+check("[đọc] → body có --mode plan", "--mode plan" in reply_doc["body"], reply_doc["body"][:300])
+
+print("[7] tin có TSK-n → dùng worktree riêng của TSK-n qua assign_task_to_role(mode=build)")
+with db.get_connection() as conn:
+    conn.execute("INSERT OR IGNORE INTO gen_conversations (id, project_id, title) VALUES (?, ?, ?)",
+                 ("conv-test", "PRJ-GEN-WORKPLACE", "Test conv"))
+    conn.execute("""
+    INSERT INTO gen_session_todos (id, conversation_id, project_id, title, status, viec_ref, checklist_json)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, ("TSK-10", "conv-test", "PRJ-GEN-WORKPLACE", "Sửa lỗi auth", "pending", "VIEC-1", "[]"))
+    conn.commit()
+
+res_task = db.post_warroom_message(message="@backend thực hiện TSK-10 sửa lỗi auth", author="Ryan (Owner)", wait=True)
+check("tin có TSK-n → mode=build", res_task.get("mode") == "build", str(res_task.get("mode")))
+d0 = (res_task.get("dispatches") or [{}])[0]
+check("tin có TSK-n → gán đúng task_id TSK-10", d0.get("task_id") == "TSK-10", str(d0))
+tsk_wt = os.path.join(os.environ["GW_WORKTREE_ROOT"], "TSK-10")
+check("tin có TSK-n → tạo và dùng worktree của TSK-10", os.path.exists(os.path.join(tsk_wt, ".git")), tsk_wt)
 
 shutil.rmtree(TMP, ignore_errors=True)
 print(f"\n{PASSED}/{PASSED + FAILED} test pass")

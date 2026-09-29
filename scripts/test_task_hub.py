@@ -24,6 +24,10 @@ import time
 import urllib.error
 import urllib.request
 
+for k in list(os.environ):
+    if k.startswith("GIT_CONFIG_") or k.startswith("GIT_AUTHOR_") or k.startswith("GIT_COMMITTER_"):
+        os.environ.pop(k, None)
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TMP = tempfile.mkdtemp(prefix="gw-test-taskhub-")
 FAKEBIN = os.path.join(TMP, "bin")
@@ -183,15 +187,15 @@ check("limit sai → vẫn 200", st == 200, str(st))
 
 print("[5] post_warroom_message: mã TSK trong tin → task_id (ưu tiên hơn current_task_id)")
 # gw-qa-agy đang giữ T1 (current_task_id = T1); tin nhắc T2 → dispatch gắn T2
-res = db.post_warroom_message(message=f"@qa kiểm tra {T2} giúp", author="Ryan (Owner)", wait=True)
+res = db.post_warroom_message(message=f"@qa [đọc] kiểm tra {T2} giúp", author="Ryan (Owner)", wait=True)
 d = res["dispatches"][0]
 check("dispatches[] có task_id = TSK trong tin", d["task_id"] == T2 and res.get("task_id") == T2, str(res))
 with db.get_connection() as c:
     dt = c.execute("SELECT task_id FROM dispatch_log WHERE id = ?", (d["dispatch_id"],)).fetchone()["task_id"]
 check("dispatch_log.task_id = T2 (không phải current_task_id T1)", dt == T2, dt)
-res = db.post_warroom_message(message="@qa tiếp tục việc đang làm", author="Ryan (Owner)", wait=True)
+res = db.post_warroom_message(message="@qa [đọc] tiếp tục việc đang làm", author="Ryan (Owner)", wait=True)
 check("không nhắc TSK → dùng current_task_id", res["dispatches"][0]["task_id"] == T1, str(res["dispatches"]))
-res = db.post_warroom_message(message="@qa xem TSK-424242 (không tồn tại)", author="Ryan (Owner)", wait=True)
+res = db.post_warroom_message(message="@qa [đọc] xem TSK-424242 (không tồn tại)", author="Ryan (Owner)", wait=True)
 check("TSK không có thật → bỏ qua, dùng current_task_id", res["dispatches"][0]["task_id"] == T1, str(res["dispatches"]))
 res = db.post_warroom_message(message="@Gen @Toàn Đội họp nhanh", author="Ryan (Owner)", wait=True)
 check("@Gen / @Toàn Đội: không giao việc, có ghi chú", res["dispatched"] == [] and "không giao việc" in res["note"], str(res))
