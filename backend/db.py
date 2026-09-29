@@ -2118,66 +2118,76 @@ def tmux_init_dir():
 def tmux_init_script_path(session_id):
     return os.path.join(tmux_init_dir(), f"tmux_init_{session_id}.sh")
 
-def ensure_real_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
+def tmux_live_sessions():
     """
-    Đảm bảo 6 phiên tmux thật sự đang chạy nền trên host (app chạy bằng python3 backend/main.py, không dùng Docker).
-    Mỗi phiên là 1 tiến trình bash tương tác độc lập, được inject sẵn SSOT context,
-    conversation ID continuity, profile xác thực và alias gọi agy CLI trực tiếp.
+    Các phiên tmux đang chạy thật: {tên phiên: pane_pid của pane đang chọn}. Đúng 1 subprocess (`tmux list-sessions`).
+    Không có tmux / tmux server chưa chạy → {}.
     """
-    project_id = normalize_project_id(project_id)
-    live_sessions = set()
+    live = {}
     try:
-        res = subprocess.run(["tmux", "list-sessions", "-F", "#{session_name}"], capture_output=True, text=True, timeout=2.0)
+        res = subprocess.run(["tmux", "list-sessions", "-F", "#{session_name} #{pane_pid}"],
+                             capture_output=True, text=True, timeout=2.0)
         if res.returncode == 0:
-            live_sessions = {line.strip() for line in res.stdout.strip().splitlines() if line.strip()}
+            for line in res.stdout.splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                name, _, pid = line.rpartition(" ")
+                if not name:          # tmux cũ không hiểu #{pane_pid} → chỉ có tên
+                    name, pid = pid, ""
+                live[name] = int(pid) if pid.isdigit() else 0
     except Exception:
         pass
+    return live
 
-    oauth_map = {p["id"]: p for p in get_oauth_profiles()}
-
-    # Đảm bảo symlink docs trong /workspace để agent luôn đọc được SSOT spec
+def capture_tmux_pane(session_id, lines=200):
+    """Đọc màn hình 1 phiên tmux (bỏ dòng trống cuối). Lỗi / phiên không chạy → ''. Đúng 1 subprocess."""
     try:
-        if os.path.exists("/workspace") and not os.path.exists("/workspace/docs") and os.path.exists("/app/docs"):
-            os.symlink("/app/docs", "/workspace/docs")
+        res = subprocess.run(["tmux", "capture-pane", "-t", session_id, "-p", "-S", f"-{int(lines)}"],
+                             capture_output=True, text=True, timeout=1.5)
+        if res.returncode == 0 and res.stdout.strip():
+            raw_lines = res.stdout.splitlines()
+            while raw_lines and not raw_lines[-1].strip():
+                raw_lines.pop()
+            return "\n".join(raw_lines)
     except Exception:
         pass
+    return ""
 
+def start_tmux_session(session_id):
+    """
+    Mở 1 phiên tmux bash thật cho worker `session_id` (đã có dòng trong tmux_sessions), inject SSOT context,
+    conversation ID, profile xác thực và alias gọi agy. Phiên mở trong worktree riêng của vai (#7).
+    Chỉ đụng đúng phiên này; phiên đã chạy thì chỉ đọc lại pid. Trả {"status": "active"|"error", ...}.
+    """
+    oauth_map = {p["id"]: p for p in get_oauth_profiles()}
     with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM tmux_sessions WHERE project_id = ? ORDER BY id ASC", (project_id,))
-        db_sessions = cursor.fetchall()
+        s = conn.execute("SELECT * FROM tmux_sessions WHERE id = ?", (session_id,)).fetchone()
+    if not s:
+        return {"status": "error", "session_id": session_id, "message": f"Không tìm thấy phiên {session_id}"}
 
-        for s in db_sessions:
-            sid = s["id"]
-            sess_status = s["status"]
-            # Nếu phiên đang ngủ đông (hibernated) để giải phóng RAM & CPU, không tự động bật lại
-            if sess_status == "hibernated":
-                continue
+    sid = s["id"]
+    role_name = s["role_name"]
+    acc_type = s["account_type"] or "owner_default"
+    profile_dir = s["profile_dir"]
+    conv_id = s["conversation_id"] if "conversation_id" in s.keys() and s["conversation_id"] else f"conv-{sid}"
 
-            role_name = s["role_name"]
-            acc_type = s["account_type"] or "owner_default"
-            profile_dir = s["profile_dir"]
-            conv_id = s["conversation_id"] if "conversation_id" in s.keys() and s["conversation_id"] else f"conv-{sid}"
+    p_info = oauth_map.get(acc_type, {})
+    email = p_info.get("email") or "Chưa đăng nhập"
+    is_auth = bool(p_info.get("is_auth"))
+    if not profile_dir and p_info.get("path"):
+        profile_dir = p_info["path"]
 
-            p_info = oauth_map.get(acc_type, {})
-            email = p_info.get("email") or "Chưa đăng nhập"
-            is_auth = bool(p_info.get("is_auth"))
-            if not profile_dir and p_info.get("path"):
-                profile_dir = p_info["path"]
+    quota_g, quota_a = get_quota_telemetry(acc_type, email)
+    role_spec_file = generate_role_spec_file(sid, role_name, conv_id=conv_id)
 
-            quota_g, quota_a = get_quota_telemetry(acc_type, email)
-
-            # Tạo role bootstrap spec
-            role_spec_file = generate_role_spec_file(sid, role_name, conv_id=conv_id)
-
-            # Nếu phiên tmux chưa chạy thật sự -> Khởi tạo phiên tmux bash thật!
-            if sid not in live_sessions:
-                init_script_path = tmux_init_script_path(sid)
-                try:
-                    p_dir_clean = profile_dir or os.path.join(HOME_DIR, ".gemini")
-                    role_cwd = tmux_role_cwd(sid)  # worktree riêng của vai, không mở thẳng trong repo app (#7)
-                    with open(init_script_path, "w") as f:
-                        f.write(f"""clear
+    if sid not in tmux_live_sessions():
+        init_script_path = tmux_init_script_path(sid)
+        try:
+            p_dir_clean = profile_dir or os.path.join(HOME_DIR, ".gemini")
+            role_cwd = tmux_role_cwd(sid)  # worktree riêng của vai, không mở thẳng trong repo app (#7)
+            with open(init_script_path, "w") as f:
+                f.write(f"""clear
 echo "================================================================================"
 echo "🤖 GENESIS AGENT RUNTIME: {role_name} ({sid})"
 echo "💎 CLI Engine: agy v1.2.10 | Target Conv: {conv_id}"
@@ -2190,45 +2200,56 @@ echo "💡 Sẵn sàng chấp hành chỉ thị! Gõ 'agy-run' để tiếp tụ
 echo "   hoặc 'gw-role' để xem phạm vi role, hoặc 'gw-status' để kiểm tra context."
 echo "================================================================================"
 """ + tmux_role_env_block(sid, role_name, conv_id, p_dir_clean, role_spec_file, email, role_cwd))
-                    subprocess.run(["tmux", "new-session", "-d", "-s", sid, "-x", "200", "-y", "40", "-c", role_cwd, f"bash --init-file {init_script_path}"], capture_output=True, timeout=3.0)
-                    time.sleep(0.15)
-                except Exception as e:
-                    print(f"Error starting real tmux session {sid}: {e}")
+            subprocess.run(["tmux", "new-session", "-d", "-s", sid, "-x", "200", "-y", "40", "-c", role_cwd, f"bash --init-file {init_script_path}"], capture_output=True, timeout=3.0)
+            time.sleep(0.15)
+        except Exception as e:
+            print(f"Error starting real tmux session {sid}: {e}")
 
-            # Đọc Live Pane Output & Live PID
-            live_out = ""
-            pane_pid = 0
-            try:
-                subprocess.run(["tmux", "resize-window", "-t", sid, "-x", "200", "-y", "40"], capture_output=True, timeout=1.0)
-                c_res = subprocess.run(["tmux", "capture-pane", "-t", sid, "-p", "-S", "-100"], capture_output=True, text=True, timeout=1.5)
-                if c_res.returncode == 0 and c_res.stdout.strip():
-                    raw_lines = c_res.stdout.splitlines()
-                    while raw_lines and not raw_lines[-1].strip():
-                        raw_lines.pop()
-                    if raw_lines:
-                        live_out = "\n".join(raw_lines)
-                p_res = subprocess.run(["tmux", "list-panes", "-t", sid, "-F", "#{pane_pid}"], capture_output=True, text=True, timeout=1.0)
-                if p_res.returncode == 0 and p_res.stdout.strip().isdigit():
-                    pane_pid = int(p_res.stdout.strip().splitlines()[0])
-            except Exception:
-                pass
+    pane_pid = tmux_live_sessions().get(sid, 0)
+    live_out = capture_tmux_pane(sid, 100) if pane_pid else ""
 
-            # Cập nhật trạng thái vào SQLite
-            cursor.execute("""
-            UPDATE tmux_sessions
-            SET pid = CASE WHEN ? > 0 THEN ? ELSE pid END,
-                terminal_output = CASE WHEN ? != '' THEN ? ELSE terminal_output END,
-                conversation_id = ?,
-                quota_gemini_json = ?,
-                quota_anthropic_json = ?,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
-            """, (pane_pid, pane_pid, live_out, live_out, conv_id, json.dumps(quota_g, ensure_ascii=False), json.dumps(quota_a, ensure_ascii=False), sid))
-
+    with get_connection() as conn:
+        conn.execute("""
+        UPDATE tmux_sessions
+        SET status = CASE WHEN ? > 0 THEN 'active' ELSE status END,
+            pid = ?,
+            terminal_output = CASE WHEN ? != '' THEN ? ELSE terminal_output END,
+            conversation_id = ?,
+            quota_gemini_json = ?,
+            quota_anthropic_json = ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+        """, (pane_pid, pane_pid, live_out, live_out, conv_id, json.dumps(quota_g, ensure_ascii=False), json.dumps(quota_a, ensure_ascii=False), sid))
         conn.commit()
+    if not pane_pid:
+        return {"status": "error", "session_id": sid, "message": f"Không mở được phiên tmux {sid}"}
+    return {"status": "active", "session_id": sid, "pid": pane_pid, "conversation_id": conv_id}
+
+def ensure_real_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
+    """
+    Mở các phiên worker chưa chạy (bỏ qua phiên hibernated). CHỈ gọi lúc khởi động app (main.main) hoặc khi cần mở
+    phiên — KHÔNG gọi trong vòng poll (#30: trước đây mỗi lượt poll chạy ~25 subprocess tmux).
+    Phiên đang chạy thì không đụng tới.
+    """
+    project_id = normalize_project_id(project_id)
+    # Đảm bảo symlink docs trong /workspace để agent luôn đọc được SSOT spec
+    try:
+        if os.path.exists("/workspace") and not os.path.exists("/workspace/docs") and os.path.exists("/app/docs"):
+            os.symlink("/app/docs", "/workspace/docs")
+    except Exception:
+        pass
+    live = tmux_live_sessions()
+    with get_connection() as conn:
+        rows = conn.execute("SELECT id, status FROM tmux_sessions WHERE project_id = ? ORDER BY id ASC", (project_id,)).fetchall()
+    started = []
+    for s in rows:
+        if s["status"] == "hibernated" or s["id"] in live:
+            continue
+        started.append(start_tmux_session(s["id"]))
+    return started
 
 def seed_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
-    """Điền và đồng bộ cấu hình 6 phiên Swarm Runtimes trong SQLite Core DB."""
+    """Điền và đồng bộ cấu hình phiên worker trong SQLite Core DB. CHỈ ghi DB, không mở tmux (#30)."""
     project_id = normalize_project_id(project_id)
     with get_connection() as conn:
         cursor = conn.cursor()
@@ -2271,13 +2292,22 @@ def seed_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
 
         conn.commit()
 
-    # Kích hoạt tạo phiên thật sự
-    ensure_real_tmux_sessions(project_id)
-
-def get_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
-    """Lấy danh sách các phiên Tmux với đầy đủ thông tin Account, Quota và Output thời gian thực."""
+def get_tmux_sessions(project_id="PRJ-GEN-WORKPLACE", output_sid=""):
+    """
+    Danh sách phiên worker kèm tài khoản, quota, task. Chỉ đọc DB + đúng 1 `tmux list-sessions` (#30):
+    không mở phiên, không capture-pane hàng loạt. `output_sid` = phiên đang xem ở màn Worker & terminal →
+    capture-pane riêng phiên đó (thêm 1 subprocess) và lưu làm terminal_output mới nhất.
+    """
     project_id = normalize_project_id(project_id)
-    ensure_real_tmux_sessions(project_id)
+    live = tmux_live_sessions()
+    fresh_out = {}
+    if output_sid and output_sid in live:
+        out = capture_tmux_pane(output_sid, 200)
+        if out:
+            fresh_out[output_sid] = out
+            with get_connection() as conn:
+                conn.execute("UPDATE tmux_sessions SET terminal_output = ? WHERE id = ?", (out[-8000:], output_sid))
+                conn.commit()
     oauth_map = {p["id"]: p for p in get_oauth_profiles()}
 
     with get_connection() as conn:
@@ -2369,9 +2399,10 @@ def get_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
                 "account_label": compute_account_label(acc_type, oauth_map),
                 "profile_dir": r["profile_dir"],
                 "status": r["status"],
-                "pid": r["pid"],
+                "pid": live.get(r["id"], 0),
+                "tmux_live": r["id"] in live,
                 "cwd": r["cwd"],
-                "terminal_output": r["terminal_output"],
+                "terminal_output": fresh_out.get(r["id"], r["terminal_output"]),
                 "conversation_id": r["conversation_id"] if "conversation_id" in r.keys() else f"conv-{r['id']}",
                 "email": email,
                 "is_auth": is_auth,
@@ -2529,20 +2560,8 @@ def append_tmux_output(session_id, command, output=""):
 
 def pause_tmux_session(session_id):
     """Đóng băng CPU (0% CPU) cho phiên tmux bằng SIGSTOP mà không mất terminal."""
-    pid = 0
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT pid FROM tmux_sessions WHERE id = ?", (session_id,))
-        row = cursor.fetchone()
-        pid = row["pid"] if row else 0
-
-    if pid <= 0:
-        try:
-            res = subprocess.run(["tmux", "list-panes", "-t", session_id, "-F", "#{pane_pid}"], capture_output=True, text=True, timeout=1.0)
-            if res.returncode == 0 and res.stdout.strip().isdigit():
-                pid = int(res.stdout.strip().splitlines()[0])
-        except Exception:
-            pass
+    # pid lấy từ tmux đang chạy (không dùng pid cũ trong DB: vòng poll không còn làm mới cột pid, #30)
+    pid = tmux_live_sessions().get(session_id, 0)
 
     if pid > 0:
         subprocess.run(["kill", "-STOP", str(pid)], capture_output=True)
@@ -2562,20 +2581,8 @@ def pause_tmux_session(session_id):
 
 def resume_tmux_session(session_id):
     """Tiếp tục phiên tmux đang tạm dừng bằng SIGCONT trong 0ms."""
-    pid = 0
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT pid FROM tmux_sessions WHERE id = ?", (session_id,))
-        row = cursor.fetchone()
-        pid = row["pid"] if row else 0
-
-    if pid <= 0:
-        try:
-            res = subprocess.run(["tmux", "list-panes", "-t", session_id, "-F", "#{pane_pid}"], capture_output=True, text=True, timeout=1.0)
-            if res.returncode == 0 and res.stdout.strip().isdigit():
-                pid = int(res.stdout.strip().splitlines()[0])
-        except Exception:
-            pass
+    # pid lấy từ tmux đang chạy (không dùng pid cũ trong DB: vòng poll không còn làm mới cột pid, #30)
+    pid = tmux_live_sessions().get(session_id, 0)
 
     if pid > 0:
         subprocess.run(["kill", "-CONT", str(pid)], capture_output=True)

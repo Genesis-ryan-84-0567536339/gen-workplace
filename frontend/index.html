@@ -7646,10 +7646,20 @@ function setTmuxMode(mode) {
   renderTmuxSessions();
 }
 
+// Chỉ xin màn hình terminal (capture-pane) của phiên đang chọn khi đang ở màn Worker & terminal (#30):
+// các phiên khác dùng bản chụp gần nhất trong DB, không chạy tmux hàng loạt mỗi lượt poll.
+function tmuxSessionsUrl(prj) {
+  let url = '/api/tmux/sessions?project=' + encodeURIComponent(prj || state.project?.name || 'gen-workplace');
+  if (document.querySelector('.screen.active')?.id === 'runtimes' && state.selectedTmuxSessionId) {
+    url += '&output=' + encodeURIComponent(state.selectedTmuxSessionId);
+  }
+  return url;
+}
+
 async function refreshTmuxSessions(showNotify = false) {
   try {
     const prj = state.project?.name || 'gen-workplace';
-    const res = await fetch('/api/tmux/sessions?project=' + encodeURIComponent(prj));
+    const res = await fetch(tmuxSessionsUrl(prj));
     if (res.ok) {
       const data = await res.json();
       if (data && Array.isArray(data.sessions) && data.sessions.length > 0) {
@@ -14073,7 +14083,7 @@ setInterval(async () => {
       }
     }
     // 3. Tự động đồng bộ phiên Chuyên gia (task_status, terminal_output, quota)
-    const sRes = await fetch('/api/tmux/sessions?project=gen-workplace');
+    const sRes = await fetch(tmuxSessionsUrl('gen-workplace'));
     if (sRes.ok) {
       const sData = await sRes.json();
       if (sData && Array.isArray(sData.sessions) && sData.sessions.length > 0) {
