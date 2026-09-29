@@ -328,3 +328,35 @@ curl -s http://<host>:8888/mcp -H "Authorization: Bearer $GW_TOKEN" -H 'Content-
 ```bash
 python3 scripts/test_mcp_auth_security.py   # #41: danh sách không lộ token thô, toggle tắt thiếu token 401 / thiếu quyền 403, /mcp /sse /api/mcp 401 khi bật, audit, UI rpc
 ```
+
+### 3.13. Issue #43: worker Google Jules (chỉ mở PR)
+
+Jules nhận 1 task, đề xuất kế hoạch, **người duyệt**, rồi Jules làm và tự mở PR. App **không có đường nào merge** PR của Jules: Boss hoặc Claude điều phối kiểm và merge qua quy trình PR bình thường. Mã nằm ở `backend/jules_worker.py`.
+
+**Mặc định tắt.** Chỉ giao được khi có API key và repo nằm trong allowlist.
+
+| Biến | Mặc định | Ý nghĩa |
+|---|---|---|
+| `JULES_API_KEY` | (rỗng) | Key lấy từ env. Không có thì đọc `DATA_DIR/secrets/jules.key` (quyền 600, lưu qua màn MCP & Kết nối → Jules). |
+| `GW_JULES_REPOS` | `gen-workplace` | Allowlist, phân tách bằng dấu phẩy (`repo` hoặc `owner/repo`). Rỗng = không giao được. |
+| `GW_JULES_MAX_CONCURRENT` | `2` | Số phiên Jules chạy cùng lúc tối đa. Vượt → 429 `too_many_sessions`. |
+| `GW_JULES_POLL_SEC` | `45` | Chu kỳ thread poll (kẹp 30–60 giây). Poll chỉ đọc, không tạo phiên, không duyệt kế hoạch. |
+| `GW_JULES_WAIT_REFRESH_SEC` | `15` | `/api/dispatch/wait` làm mới phiên Jules tối đa 1 lần / N giây. |
+| `GW_JULES_TIMEOUT_SEC` | `10` | Timeout mỗi lần gọi Jules. |
+| `GW_JULES_BASE_URL` | `https://jules.googleapis.com/v1alpha` | Đổi sang Jules giả khi test (`scripts/fake_jules.py`). |
+
+| API | Hợp đồng |
+|---|---|
+| `GET /api/jules/status[?check=1]` | `{configured, key_source, key_last4, enabled, allowed_repos, max_concurrent, running, state: no_key\|unchecked\|connected\|error, error, sources[]}`. **Không bao giờ trả key.** `check=1` gọi Jules `GET /sources` để kiểm key (cache 60 giây). |
+| `POST /api/jules/key {key}` / `{action: "delete"}` | Lưu / xóa key. Trả `configured` + 4 ký tự cuối. Key sai định dạng → 400. |
+| `POST /api/task/assign {todo_id, engine: "jules", repo?, branch?, author?}` | Tạo phiên Jules với `requirePlanApproval: true`, `automationMode: AUTO_CREATE_PR`. Trả `dispatch_id`. Lỗi: chưa có key → 400 `not_configured`; repo ngoài allowlist → 403 `repo_not_allowed`; vượt giới hạn → 429 `too_many_sessions`; Jules 401/403 → 502 `unauthorized`/`forbidden`; Jules 429 → 429 `rate_limited`. |
+| `POST /api/jules/approve {dispatch_id \| task_id, author}` | Duyệt kế hoạch đã ghi vào phiên của task. Chưa có kế hoạch, hoặc Jules đổi kế hoạch → 409. |
+| `POST /api/jules/cancel {dispatch_id \| task_id, author}` | Xóa phiên Jules (`DELETE /sessions/{id}`; API không có lệnh hủy riêng). `dispatch_log.status = cancelled`, task về Cần làm. |
+| `GET/POST /api/dispatch/wait` | Dùng như cũ. Dòng Jules có thêm `engine`, `ext_session_id`, `ext_state`, `ext_url`, `pr_url`. |
+| MCP `assign_to_jules {task_id, repo?, branch?}` | Có tác dụng phụ. Không có tool MCP duyệt kế hoạch hoặc merge. |
+
+Kế hoạch, lúc duyệt, PR và lỗi đều được ghi vào phiên của task (tác giả "Jules (Google)"). Khi có PR, task sang `review` và nhả khóa. Bằng chứng nghiệm thu gợi ý là URL PR. Repo private thì app cần `GITHUB_TOKEN` để kiểm URL PR; không có thì đóng task bằng SHA merge.
+
+```bash
+python3 scripts/test_jules_worker.py   # #43: Jules giả; chưa key, key 600 + không lộ, plan → duyệt → PR, 401/429, concurrent, allowlist, không có đường merge
+```

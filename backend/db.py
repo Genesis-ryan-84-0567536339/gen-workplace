@@ -641,7 +641,11 @@ def init_db():
                               ("profile_initial", "TEXT DEFAULT ''"), ("profile_used", "TEXT DEFAULT ''"),
                               ("fallback_reason", "TEXT DEFAULT ''"), ("profiles_tried", "TEXT DEFAULT ''"),
                               # tin kết quả đã ghi về phiên (conversation) của task: id gen_messages (tránh ghi 2 lần)
-                              ("task_msg_id", "INTEGER")]:
+                              ("task_msg_id", "INTEGER"),
+                              # worker ngoài (#43, Jules): engine ('' = agy), id phiên bên ngoài, trạng thái bên ngoài, link phiên,
+                              # URL PR worker mở, id kế hoạch đã ghi về phiên của task (tránh ghi 2 lần)
+                              ("engine", "TEXT DEFAULT ''"), ("ext_session_id", "TEXT DEFAULT ''"), ("ext_state", "TEXT DEFAULT ''"),
+                              ("ext_url", "TEXT DEFAULT ''"), ("pr_url", "TEXT DEFAULT ''"), ("ext_plan_id", "TEXT DEFAULT ''")]:
             try:
                 cursor.execute(f"ALTER TABLE dispatch_log ADD COLUMN {col} {col_type};")
             except Exception:
@@ -3975,6 +3979,9 @@ def get_dispatch_log(limit=50, task_id="", session_id=""):
 # Chỗ ghi kết quả dispatch (dispatch_warroom_to_agent, watcher tmux) gọi _notify_dispatch_change();
 # wait_worker_result chờ trên Condition này, kèm poll DB mỗi giây (tiến trình MCP stdio riêng không nhận được notify).
 _DISPATCH_COND = threading.Condition()
+# Worker ngoài đăng ký hàm làm mới 1 dòng dispatch_log đang running theo kind (vd 'jules' → jules_worker.refresh_for_wait).
+# wait_worker_result gọi hàm này thay vì đánh dấu quá hạn kiểu war-room. db không import module worker (tránh vòng import).
+DISPATCH_POLLERS = {}
 WAIT_WORKER_DEFAULT_SEC = 60
 WAIT_WORKER_MAX_SEC = 120          # không vượt timeout HTTP của MCP
 WAIT_WORKER_POLL_SEC = 1.0
@@ -4290,6 +4297,12 @@ def wait_worker_result(dispatch_id=None, task_id="", session_id="", timeout_sec=
         if status == "running":
             if row.get("kind") == "tmux":
                 status = poll_tmux_dispatch(did)
+            elif row.get("kind") in DISPATCH_POLLERS:
+                try:
+                    status = DISPATCH_POLLERS[row["kind"]](did) or "running"
+                except Exception as e:
+                    print(f"[dispatch] làm mới dispatch:{did} ({row.get('kind')}) lỗi: {type(e).__name__}")
+                    status = "running"
             elif _mark_stale_warroom(row):
                 status = "failed"
             if status != "running":
@@ -4324,6 +4337,12 @@ def wait_worker_result(dispatch_id=None, task_id="", session_id="", timeout_sec=
         "profile_used": row.get("profile_used") or "",
         "fallback": bool(row.get("profile_used")) and (row.get("profile_used") or "") != (row.get("profile_initial") or ""),
         "fallback_reason": row.get("fallback_reason") or "",
+        # worker ngoài (#43): engine ('jules'), id phiên bên ngoài, trạng thái bên ngoài, URL PR đã mở
+        "engine": row.get("engine") or "",
+        "ext_session_id": row.get("ext_session_id") or "",
+        "ext_state": row.get("ext_state") or "",
+        "ext_url": row.get("ext_url") or "",
+        "pr_url": row.get("pr_url") or "",
         "waited_sec": round(time.time() - t0, 1),
         "timeout_sec": timeout_sec,
     }
@@ -5148,7 +5167,9 @@ def _dispatch_brief(r):
             "profile_initial": d.get("profile_initial") or "", "profile_used": d.get("profile_used") or "",
             "fallback": bool(d.get("profile_used")) and (d.get("profile_used") or "") != (d.get("profile_initial") or ""),
             "fallback_reason": d.get("fallback_reason") or "", "channel_id": d.get("channel_id") or "",
-            "task_msg_id": d.get("task_msg_id")}
+            "task_msg_id": d.get("task_msg_id"),
+            "engine": d.get("engine") or "", "ext_session_id": d.get("ext_session_id") or "", "ext_state": d.get("ext_state") or "",
+            "ext_url": d.get("ext_url") or "", "pr_url": d.get("pr_url") or ""}
 
 
 def attach_task_links(todos):

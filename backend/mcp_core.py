@@ -18,9 +18,11 @@ sys.path.insert(0, str(BASE_DIR))
 try:
     from backend import db
     from backend import directive_guard
+    from backend import jules_worker
 except ImportError:
     import db
     import directive_guard
+    import jules_worker
 
 MCP_SERVER_INFO = {
     "name": "gen-workplace",
@@ -294,6 +296,21 @@ TOOLS = [
                     "default": 60
                 }
             }
+        }
+    },
+
+    {
+        "name": "assign_to_jules",
+        "description": "Giao 1 task cho Google Jules (worker CHỈ MỞ PR, không merge). Mặc định tắt: cần Jules API key (màn MCP & Kết nối → Jules) và repo nằm trong allowlist GW_JULES_REPOS; tối đa GW_JULES_MAX_CONCURRENT phiên cùng lúc. Jules luôn phải được người duyệt kế hoạch (kế hoạch ghi vào phiên của task, duyệt bằng nút Duyệt trên thẻ task) rồi mới làm; xong ghi link PR về phiên. Trả dispatch_id để chờ bằng wait_worker_result. Boss hoặc Claude điều phối kiểm và merge PR theo quy trình bình thường.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "task_id": {"type": "string", "description": "Mã task Kanban (vd 'TSK-12')."},
+                "repo": {"type": "string", "description": "Repo GitHub ('gen-workplace' hoặc 'owner/repo'); bỏ trống = repo đầu tiên trong allowlist."},
+                "branch": {"type": "string", "description": "Nhánh xuất phát; bỏ trống = nhánh mặc định của repo."},
+                "author": {"type": "string", "description": "Người giao (ghi vào phiên của task).", "default": "AI Agent"}
+            },
+            "required": ["task_id"]
         }
     },
 
@@ -757,6 +774,7 @@ TOOL_META = {
     "post_warroom_message": _m("warroom", "swarm", False, "Đăng tin vào Phòng giao ban; có @vai là giao việc cho agy."),
     "send_worker_directive": _m("warroom", "swarm", False, "Gửi lệnh hoặc phím thẳng vào terminal của worker."),
     "manage_worker_lifecycle": _m("warroom", "swarm", False, "Tạm dừng, tiếp tục, ngủ đông hoặc đánh thức worker."),
+    "assign_to_jules": _m("warroom", "swarm", False, "Giao task cho Google Jules: chỉ mở PR, người phải duyệt kế hoạch."),
     # Phiên & ghi chú
     "list_conversations": _m("session", "chat", True, "Xem danh sách phiên làm việc."),
     "get_conversation_messages": _m("session", "chat", True, "Đọc toàn bộ tin nhắn của một phiên."),
@@ -1003,6 +1021,14 @@ def execute_tool(name: str, args: dict) -> dict:
                                         args.get("timeout_sec", db.WAIT_WORKER_DEFAULT_SEC))
             is_err = res.get("status") in ("error", "not_found")
             return {"content": [{"type": "text", "text": json.dumps(res, ensure_ascii=False, indent=2)}], "isError": is_err}
+
+        # 10c. assign_to_jules (#43): chỉ tạo phiên Jules chờ duyệt kế hoạch; không có tool duyệt / merge qua MCP
+        if name == "assign_to_jules":
+            res = jules_worker.assign_task(str(args.get("task_id") or args.get("todo_id") or ""), str(args.get("repo") or ""),
+                                           str(args.get("branch") or ""), author=str(args.get("author") or "AI Agent"),
+                                           project_id=args.get("project_id", "PRJ-GEN-WORKPLACE"))
+            res.pop("http", None)
+            return {"content": [{"type": "text", "text": json.dumps(res, ensure_ascii=False, indent=2)}], "isError": "error" in res}
 
         # 11. list_kanban_tasks
         if name == "list_kanban_tasks":
