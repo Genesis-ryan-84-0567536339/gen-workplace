@@ -649,7 +649,10 @@ def init_db():
                               # chế độ Làm (#45, kind='build'): worktree + nhánh wt/TSK-n, commit SHA mới nhất, kết quả test (JSON),
                               # kết quả push (JSON), link compare GitHub
                               ("worktree_dir", "TEXT DEFAULT ''"), ("build_branch", "TEXT DEFAULT ''"), ("build_commit", "TEXT DEFAULT ''"),
-                              ("build_tests", "TEXT DEFAULT ''"), ("build_push", "TEXT DEFAULT ''"), ("compare_url", "TEXT DEFAULT ''")]:
+                              ("build_tests", "TEXT DEFAULT ''"), ("build_push", "TEXT DEFAULT ''"), ("compare_url", "TEXT DEFAULT ''"),
+                              # cơ chế sandbox đã chạy py_compile + test của lần Làm (#54): 'bwrap 0.9.0' | 'podman 5.x' |
+                              # 'sandbox_unavailable' (test không chạy) | 'none-unsandboxed (...)' (GW_ALLOW_UNSANDBOXED_TESTS=1)
+                              ("sandbox", "TEXT DEFAULT ''")]:
             try:
                 cursor.execute(f"ALTER TABLE dispatch_log ADD COLUMN {col} {col_type};")
             except Exception:
@@ -4542,10 +4545,14 @@ def ensure_agy_plan_permissions(p_dir, cwd, extra_dirs=()):
 # ---------------------------------------------------------------------------
 # Quyền agy cho chế độ "Làm" (build, Issue #45): agy -p ở chế độ mặc định (không --mode plan) trong worktree riêng của task
 # ---------------------------------------------------------------------------
-# Lệnh thêm cho chế độ Làm (ngoài lệnh chỉ đọc): biên dịch thử, chạy test của repo, git trong worktree (cwd của agy).
+# Lệnh thêm cho chế độ Làm (ngoài lệnh chỉ đọc): git trong worktree (cwd của agy).
 # echo: agy hay nối "&& echo OK" sau lệnh kiểm (dispatch:13 bị chặn vì thiếu echo, #47)
-AGY_BUILD_EXTRA_COMMANDS = ["python3 -m py_compile", "git add", "git commit", "echo"]
-AGY_BUILD_EXTRA_REGEX = [r"python3 scripts/test_[A-Za-z0-9_]+\.py"]
+# py_compile / scripts/test_*.py KHÔNG còn chạy thẳng (#54): chỉ qua sandbox — agy_build_sandbox_rules (bản wrapper của APP,
+# đúng worktree của task, đường dẫn tuyệt đối như dispatch:15 #49).
+AGY_BUILD_EXTRA_COMMANDS = ["git add", "git commit", "echo"]
+AGY_BUILD_EXTRA_REGEX = []
+# Rule chế độ Làm các bản trước từng ghi (chạy thẳng python3 ngoài sandbox): vẫn nhận là rule chế độ Làm để gỡ nếu còn sót.
+AGY_BUILD_RETIRED_RULES = ["command(python3 -m py_compile)", r"command(regex:python3 scripts/test_[A-Za-z0-9_]+\.py)"]
 # Lệnh cấm hẳn (khớp tiền tố token, Deny > Allow): đẩy / đổi remote, mạng, quyền root, cài gói
 AGY_BUILD_DENY_COMMANDS = [
     "git push", "git remote", "git fetch", "git pull", "git clone", "git ls-remote", "git submodule", "git worktree",
@@ -4564,6 +4571,21 @@ AGY_BUILD_DENY_FLAGS = [
     ("git", r"(-C|-c|--git-dir(=.*)?|--work-tree(=.*)?|--exec-path(=.*)?|--namespace(=.*)?)"),
     ("rm", r"(-[a-zA-Z]*[rRf][a-zA-Z]*|--recursive|--force|/.*|~.*|\$.*|.*\.\..*)"),
 ]
+# Token cấm ở MỌI vị trí (#54): ghi file bằng chuyển hướng / chạy lệnh con bằng thay thế lệnh — shell của agy làm việc
+# này NGOÀI sandbox (vd `<wrapper> <wt> python3 scripts/test_x.py > ~/.bashrc`, `echo $(python3 evil.py)`, `echo \`...\``).
+# Chuyển hướng ghi = token BẮT ĐẦU bằng >, &…>, số…> (grep "=>" / "<div" không bị chặn); riêng `2>&1` vẫn cho (vô hại).
+AGY_BUILD_DENY_TOKENS = [
+    r"(>.*|&.*>.*|[013-9][0-9]*>.*|2[0-9]+>.*|2>([^&].*)?|2>&([^1].*)?|2>&1.+)",
+    r"(.*(\$\(|`).*|\$)",
+]
+# Lệnh (token đầu) cấm: chạy thẳng python / shell / trình thông dịch, chạy file theo đường dẫn tương đối (./x, scripts/x —
+# gồm cả scripts/gw-sandbox-run bản trong worktree mà agy sửa được), công cụ tự dựng sandbox / đổi giới hạn.
+AGY_BUILD_DENY_FIRST = [
+    r"python[0-9.]*", r"/.*/python[0-9.]*", r"(ba|da|z|k|c|tc|fi)?sh", r"/.*/(ba|da|z|k|c|tc|fi)?sh",
+    r"env", r"/.*/env", r"exec", r"eval", r"source", r"\.", r"nohup", r"timeout", r"nice", r"setsid", r"stdbuf", r"xargs",
+    r"perl", r"ruby", r"node", r"bwrap", r"unshare", r"podman", r"docker", r"chmod", r"ln",
+    r"\./.*", r"[^/].*/.*",
+]
 # Không chặn `cd`: agy hay cd tới đường dẫn tuyệt đối của chính worktree (#47); commit / push sai chỗ đã có hook pre-commit /
 # pre-push + kiểm sau khi chạy (detect_violations), ghi file ngoài worktree bị write_file deny.
 # Rule chỉ chế độ Làm ghi (để nhận ra và gỡ khi không còn lần build nào dùng hồ sơ đó)
@@ -4577,20 +4599,40 @@ def agy_build_command_allow_rules():
             + [f"command(regex:{r})" for r in AGY_BUILD_EXTRA_REGEX])
 
 
-def agy_build_test_path_rules(worktree):
-    """python3 <đường dẫn tuyệt đối của worktree>/scripts/test_*.py (agy hay gọi test bằng đường dẫn tuyệt đối, dispatch:15, #49).
-    Chỉ đúng worktree của task (không mở test của repo khác); đường dẫn có khoảng trắng → bỏ (rule tách token theo khoảng trắng)."""
+def agy_sandbox_wrapper():
+    """Wrapper sandbox của APP (không phải bản trong worktree — agy sửa được bản đó)."""
+    return os.path.realpath(os.path.join(str(BASE_DIR), "scripts", "gw-sandbox-run"))
+
+
+def agy_build_sandbox_rules(worktree):
+    """
+    Allow chạy kiểm QUA SANDBOX (#54): <wrapper của app> <worktree> python3 -m py_compile ... | python3 scripts/test_*.py |
+    python3 <worktree>/scripts/test_*.py. Chỉ đúng worktree của task (đường dẫn thật + dạng abspath), đường dẫn có khoảng
+    trắng → bỏ (rule tách token theo khoảng trắng).
+    """
+    w = agy_sandbox_wrapper()
+    if re.search(r"\s", w):
+        return []
     out = []
     for p in dict.fromkeys([os.path.realpath(str(worktree)), os.path.abspath(str(worktree))]):
-        if p and not re.search(r"\s", p):
-            out.append(f"command(regex:python3 {re.escape(p)}/scripts/test_[A-Za-z0-9_]+\\.py)")
+        if not p or re.search(r"\s", p):
+            continue
+        pre = f"command(regex:{re.escape(w)} {re.escape(p)} python3"
+        out += [f"{pre} -m py_compile)", f"{pre} scripts/test_[A-Za-z0-9_]+\\.py)",
+                f"{pre} {re.escape(p)}/scripts/test_[A-Za-z0-9_]+\\.py)"]
     return out
 
 
+def agy_build_test_path_rules(worktree):
+    """Tên cũ (#49) — nay là agy_build_sandbox_rules: test chỉ chạy qua sandbox."""
+    return agy_build_sandbox_rules(worktree)
+
+
 def agy_build_allow_rules(worktree):
-    """Allow-rule chế độ Làm cho worktree của task: đọc + GHI file trong worktree, lệnh chỉ đọc, test, git add/commit."""
+    """Allow-rule chế độ Làm cho worktree của task: đọc + GHI file trong worktree, lệnh chỉ đọc, git add/commit, echo,
+    test / py_compile CHỈ qua wrapper sandbox của app (#54)."""
     wt = os.path.realpath(str(worktree))
-    return [f"read_file({wt})", f"write_file({wt})"] + agy_build_command_allow_rules() + agy_build_test_path_rules(worktree)
+    return [f"read_file({wt})", f"write_file({wt})"] + agy_build_command_allow_rules() + agy_build_sandbox_rules(worktree)
 
 
 def _agy_build_protected_dirs(worktree, repo="", p_dir=""):
@@ -4620,6 +4662,14 @@ def agy_build_deny_rules(worktree, repo="", p_dir=""):
     for cmd, flag in AGY_BUILD_DENY_FLAGS:
         for k in range(AGY_PLAN_DENY_MAX_POS + 1):
             rules.append(f"command(regex:{' '.join([cmd] + ['.*'] * k + ['(' + flag + ')'])})")
+    for tok in AGY_BUILD_DENY_TOKENS:
+        for k in range(AGY_PLAN_DENY_MAX_POS + 1):
+            rules.append(f"command(regex:{' '.join(['.*'] * k + ['(' + tok + ')'])})")
+    rules += [f"command(regex:({r}))" for r in AGY_BUILD_DENY_FIRST]
+    # chạy file bất kỳ trong worktree theo đường dẫn tuyệt đối (vd <worktree>/scripts/gw-sandbox-run đã bị agy sửa)
+    for p in dict.fromkeys([os.path.realpath(str(worktree)), os.path.abspath(str(worktree))]):
+        if p and not re.search(r"\s", p):
+            rules.append(f"command(regex:{re.escape(p)}/.*)")
     rules += [f"write_file({d})" for d in _agy_build_protected_dirs(worktree, repo, p_dir)]
     return list(dict.fromkeys(rules))
 
@@ -4632,9 +4682,12 @@ def is_agy_build_rule(rule):
         root = os.path.realpath(_worktree_root())
         target = os.path.realpath(rule[len("write_file("):-1] or "/")
         return target == root or target.startswith(root + os.sep)
-    extra = {f"command({c})" for c in AGY_BUILD_EXTRA_COMMANDS} | {f"command(regex:{r})" for r in AGY_BUILD_EXTRA_REGEX}
+    extra = ({f"command({c})" for c in AGY_BUILD_EXTRA_COMMANDS} | {f"command(regex:{r})" for r in AGY_BUILD_EXTRA_REGEX}
+             | set(AGY_BUILD_RETIRED_RULES))
     if rule.startswith("command(regex:python3 /") and rule.endswith("/scripts/test_[A-Za-z0-9_]+\\.py)"):
-        return True   # agy_build_test_path_rules
+        return True   # rule test đường dẫn tuyệt đối cũ (#49), nay chỉ qua sandbox
+    if rule.startswith(f"command(regex:{re.escape(agy_sandbox_wrapper())} "):
+        return True   # agy_build_sandbox_rules
     return rule in extra
 
 
@@ -5455,7 +5508,7 @@ def build_dispatch_fields(d):
     return {"mode": "build" if d.get("kind") == "build" else ("review" if d.get("kind") in ("warroom", "tmux") else ""),
             "worktree_dir": d.get("worktree_dir") or "", "build_branch": d.get("build_branch") or "",
             "build_commit": d.get("build_commit") or "", "build_tests": _j(d.get("build_tests")),
-            "build_push": _j(d.get("build_push")), "compare_url": d.get("compare_url") or ""}
+            "build_push": _j(d.get("build_push")), "compare_url": d.get("compare_url") or "", "sandbox": d.get("sandbox") or ""}
 
 
 def format_build_lines(bf):
@@ -5465,12 +5518,21 @@ def format_build_lines(bf):
         out.append(f"Nhánh: {bf['build_branch']}" + (f" (worktree {bf['worktree_dir']})" if bf.get("worktree_dir") else ""))
     out.append(f"Commit: {bf.get('build_commit') or '(không có commit mới)'}")
     t = bf.get("build_tests") or {}
-    if t:
+    sb = t.get("sandbox") if isinstance(t.get("sandbox"), dict) else {}
+    if t and sb.get("status") == "sandbox_unavailable":
+        out.append(f"Test: CHƯA CHẠY — sandbox_unavailable (không có bwrap / podman dùng được, không chạy test ngoài sandbox). "
+                   "Cài: sudo dnf install -y bubblewrap")
+    elif t:
         failed = [x.get("name") for x in t.get("tests") or [] if not x.get("ok")]
         pc = t.get("py_compile") or {}
         out.append(f"Test: {'PASS' if t.get('ok') else 'FAIL'} — py_compile {'ok' if pc.get('ok') else 'LỖI'}, "
                    f"{t.get('passed', 0)}/{t.get('total', 0)} file test pass"
                    + (f"; lỗi: {', '.join(failed[:10])}" if failed else "") + (f"; {t['note']}" if t.get("note") else ""))
+    sb_text = bf.get("sandbox") or ""
+    if not sb_text and sb.get("mechanism"):
+        sb_text = f"{sb.get('mechanism')} {sb.get('version') or ''}".strip()
+    if t and sb_text:
+        out.append(f"Sandbox test: {sb_text}" + (" — CẢNH BÁO: chạy NGOÀI sandbox" if "unsandboxed" in sb_text else ""))
     p = bf.get("build_push") or {}
     if p:
         out.append("Push: " + (f"đã đẩy {p.get('ref') or bf.get('build_branch')} lên origin" if p.get("ok")

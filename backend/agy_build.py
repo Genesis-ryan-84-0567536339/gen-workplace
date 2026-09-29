@@ -13,7 +13,8 @@ Luồng 1 lần giao (POST /api/task/assign mode="build", mặc định của n�
      core.hooksPath → hook pre-commit (chỉ commit được trên wt/TSK-n trong đúng worktree) + pre-push (chặn mọi push),
      remote.origin.pushurl → URL hỏng. Tiến trình git của app không mang các biến này.
   4. Sau khi agy xong, APP (không phải agy) làm tiếp: kiểm có commit mới trên wt/TSK-n và main / repo app không bị đổi;
-     chạy py_compile + toàn bộ scripts/test_*.py (trừ GW_BUILD_TEST_EXCLUDE) trong worktree; push wt/TSK-n lên origin bằng
+     chạy py_compile + toàn bộ scripts/test_*.py (trừ GW_BUILD_TEST_EXCLUDE) trong worktree QUA SANDBOX (scripts/gw-sandbox-run
+     của app, #54: bwrap → podman; không có thì không chạy test, ghi sandbox_unavailable); push wt/TSK-n lên origin bằng
      credential git sẵn có (lỗi thì ghi rõ, không crash); ghi nhánh, SHA, kết quả test, link compare vào dispatch_log, tin
      war-room và phiên của task. Có GITHUB_TOKEN thì tạo PR NHÁP; không có thì chỉ ghi link compare. KHÔNG bao giờ merge.
   5. Task done (complete_task) hoặc bị xóa → `git worktree remove` worktree của task; nhánh (local + remote) giữ nguyên.
@@ -24,17 +25,16 @@ import os
 import re
 import shutil
 import subprocess
-import sys
-import tempfile
 import threading
 import time
 import urllib.error
 import urllib.request
 
 try:
-    from backend import db
+    from backend import db, sandbox
 except ImportError:
     import db
+    import sandbox
 
 KIND = "build"
 TASK_ID_RE = re.compile(r"^TSK-[0-9]{1,9}$")
@@ -42,7 +42,8 @@ REMOTE = "origin"
 DEFAULT_SOP = """# SOP chế độ "Làm" (build)
 1. Hiểu yêu cầu: đọc tiêu đề, mô tả, checklist, viec_ref; đọc code liên quan trước khi sửa.
 2. Sửa code: thay đổi nhỏ nhất đủ làm xong checklist, giữ phong cách code sẵn có.
-3. Chạy test liên quan: python3 -m py_compile <file>; python3 scripts/test_<liên quan>.py.
+3. Chạy test liên quan QUA SANDBOX (lệnh chính xác ở mục CHẾ ĐỘ LÀM bên dưới): <wrapper> <worktree> python3 -m py_compile <file>;
+   <wrapper> <worktree> python3 scripts/test_<liên quan>.py. Không gọi thẳng python3.
 4. Commit với message rõ ràng (git add + git commit). Không push.
 5. Báo cáo ngắn: đã đổi gì, test nào pass, rủi ro."""
 _GITHUB_URL_RE = re.compile(r"github\.com[:/]+([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+?)(?:\.git)?/?$")
@@ -275,18 +276,29 @@ def load_sop():
 def build_prompt(task_id, session_id, worktree, branch, project_id="PRJ-GEN-WORKPLACE", pending=None):
     """Prompt chế độ Làm: SOP roles/build.md + khối THÔNG TIN VIỆC (tiêu đề, viec_ref, mô tả, checklist) + luật quyền."""
     task_block = db.build_task_prompt_block(task_id, project_id)
+    sb = sandbox.wrapper_path()
+    worktree = os.path.realpath(worktree)
     rules = (
         "[CHẾ ĐỘ LÀM — agy sửa code thật, không ai duyệt quyền giữa chừng]\n"
         f"- Bạn đang ở worktree riêng của việc: {worktree} (nhánh {branch}, tạo từ {REMOTE}/{base_branch()}). "
         "CHỈ tạo/sửa file trong thư mục này; không cd ra ngoài; sửa file bằng công cụ sửa file của agy "
         "(không dùng sed -i, echo >, tee, cat >).\n"
-        f"- Lệnh shell được phép: lệnh chỉ đọc ({db.agy_plan_allowed_summary()}); python3 -m py_compile <file>; "
-        "python3 scripts/test_<tên>.py; git status, git diff, git add <file>, git commit -m \"<message>\".\n"
+        f"- Lệnh shell được phép: lệnh chỉ đọc ({db.agy_plan_allowed_summary()}); "
+        "git status, git diff, git add <file>, git commit -m \"<message>\"; echo; và chạy kiểm QUA SANDBOX (bên dưới).\n"
+        f"- Chạy kiểm CHỈ qua sandbox của app (không mạng, không đọc $HOME, chỉ ghi được worktree). Gõ ĐÚNG NGUYÊN DẠNG, "
+        "đường dẫn tuyệt đối, mỗi lệnh riêng:\n"
+        f"    {sb} {worktree} python3 -m py_compile <file.py> [file.py ...]\n"
+        f"    {sb} {worktree} python3 scripts/test_<tên>.py\n"
+        f"  KHÔNG gọi thẳng `python3 ...`, `python3 -m py_compile`, `./scripts/...`, `scripts/gw-sandbox-run` (bản trong worktree) "
+        "— hệ thống TỪ CHỐI. Wrapper báo `sandbox_unavailable` (mã 97) thì máy chưa có sandbox: KHÔNG tìm cách chạy khác, "
+        "ghi vào báo cáo, vẫn commit.\n"
         "- Cấm (hệ thống TỪ CHỐI): git push / remote / fetch / pull / checkout main / switch / reset --hard / -C / -c / "
         "commit --no-verify / --amend, rm -rf, xóa hay sửa file ngoài worktree, curl / wget / ssh / lệnh mạng, sudo, "
-        "pip / npm / apt. Không dùng $(...), dấu `...`, python3 -c, bash -c, xargs, awk.\n"
-        "- Chạy TỪNG lệnh riêng, đơn giản (vd `python3 -m py_compile backend/db.py`, rồi `python3 scripts/test_x.py`); "
-        "không nối thêm `&& echo …`, `;`, `||`. Một lệnh bị từ chối là lần chạy dừng luôn, việc chưa commit sẽ mất lượt.\n"
+        "pip / npm / apt. Không dùng $(...), dấu `...`, python3 -c, bash -c, sh, env, xargs, awk.\n"
+        "- Chạy TỪNG lệnh riêng, đơn giản (vd `" + f"{sb} {worktree} python3 -m py_compile backend/db.py" + "`); "
+        "không nối thêm `&& echo …`, `;`, `||`, không chuyển hướng `>` / `>>` / `2>&1` (wrapper đã gộp stderr vào stdout), không dùng dấu "
+        "backtick hay $(...) ở bất kỳ đâu, kể cả trong message commit. Một lệnh bị từ chối là lần chạy dừng luôn, việc chưa "
+        "commit sẽ mất lượt.\n"
         f"- BẮT BUỘC có ít nhất 1 commit trên {branch} trước khi kết thúc; không commit thì việc bị tính là chưa làm. "
         "KHÔNG push: app tự chạy py_compile + toàn bộ test rồi push nhánh sau khi bạn xong.\n"
         "- Bị chặn quyền: KHÔNG dừng im lặng — làm tiếp phần còn lại, ghi dòng \"CẦN QUYỀN: <lệnh> — <lý do>\" trong báo cáo."
@@ -306,56 +318,70 @@ def build_prompt(task_id, session_id, worktree, branch, project_id="PRJ-GEN-WORK
 # ---------------------------------------------------------------------------
 def run_tests(worktree, budget_sec=None):
     """
-    py_compile mọi file .py đang theo dõi + chạy từng scripts/test_*.py (trừ GW_BUILD_TEST_EXCLUDE) trong worktree, HOME tạm,
-    không ghi __pycache__ vào worktree. Trả {ok, py_compile: {ok, files, output}, tests: [{name, ok, rc, sec, tail}], passed,
-    total, skipped, note, sec}.
+    py_compile mọi file .py đang theo dõi + chạy từng scripts/test_*.py (trừ GW_BUILD_TEST_EXCLUDE) trong worktree — TẤT CẢ
+    qua sandbox (scripts/gw-sandbox-run của APP, #54): chỉ worktree ghi được, không $HOME, không mạng, timeout + ulimit.
+    Không có sandbox → KHÔNG chạy test (sandbox.status = sandbox_unavailable), trừ khi GW_ALLOW_UNSANDBOXED_TESTS=1.
+    Trả {ok, py_compile: {ok, files, output}, tests: [{name, ok, rc, sec, tail}], passed, total, skipped, note, sec,
+    sandbox: {mechanism, version, status, hint?}}.
     """
     t0 = time.time()
     budget = budget_sec if budget_sec is not None else db.AGY_BUILD_POST_SEC - 120
     per_test = _env_int("GW_BUILD_TEST_TIMEOUT_SEC", 300)
-    tmp = tempfile.mkdtemp(prefix="gw-build-test-")
-    env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": os.path.join(tmp, "home"), "LANG": "C.UTF-8",
-           "LC_ALL": "C.UTF-8", "PYTHONDONTWRITEBYTECODE": "1", "PYTHONPYCACHEPREFIX": os.path.join(tmp, "pycache"),
-           "TMPDIR": tmp, "GW_AUTO_UPDATE": "0", "PYTHONIOENCODING": "utf-8"}
-    os.makedirs(env["HOME"], exist_ok=True)
+    wt = os.path.realpath(worktree)
     res = {"ok": False, "py_compile": {"ok": False, "files": 0, "output": ""}, "tests": [], "passed": 0, "total": 0,
-           "skipped": [], "note": "", "sec": 0.0}
+           "skipped": [], "note": "", "sec": 0.0, "sandbox": {"mechanism": "", "version": "", "status": ""}}
+
+    def _sandbox_seen(r):
+        sb = res["sandbox"]
+        if r.get("status") == "sandbox_unavailable":
+            res["sandbox"] = {"mechanism": "none", "version": "", "status": "sandbox_unavailable", "hint": r.get("hint") or ""}
+            return False
+        if r.get("mechanism") and not sb.get("mechanism"):
+            sb.update(mechanism=r["mechanism"], version=r.get("version") or "",
+                      status="unsandboxed" if r["mechanism"] == "none-unsandboxed" else "ok")
+        return True
+
     try:
-        files = [f for f in _out(_git(["ls-files", "*.py"], cwd=worktree)).splitlines() if f.strip()]
-        res["py_compile"]["files"] = len(files)
-        if files:
-            try:
-                p = subprocess.run([sys.executable, "-m", "py_compile"] + files, cwd=worktree, capture_output=True, text=True,
-                                   timeout=120, env=env)
-                res["py_compile"].update(ok=p.returncode == 0, output=((p.stderr or "") + (p.stdout or "")).strip()[-800:])
-            except subprocess.TimeoutExpired:
-                res["py_compile"]["output"] = "py_compile quá 120s"
-        else:
-            res["py_compile"].update(ok=True, output="không có file .py")
-        sdir = os.path.join(worktree, "scripts")
-        names = sorted(n for n in (os.listdir(sdir) if os.path.isdir(sdir) else [])
+        files = [f for f in _out(_git(["ls-files", "*.py"], cwd=wt)).splitlines() if f.strip()]
+        sdir = os.path.join(wt, "scripts")
+        names = sorted(n for n in (os.listdir(sdir) if os.path.isdir(sdir) and not os.path.islink(sdir) else [])
                        if re.match(r"^test_[A-Za-z0-9_]+\.py$", n))
         excl = test_exclude()
         res["skipped"] = [n for n in names if n in excl]
         todo = [n for n in names if n not in excl]
         res["total"] = len(todo)
+        res["py_compile"]["files"] = len(files)
+        if files:
+            r = sandbox.run(wt, ["python3", "-m", "py_compile"] + files, timeout_sec=120)
+            if not _sandbox_seen(r):
+                res["py_compile"]["output"] = r["output"][-800:]
+                res["note"] = ("sandbox_unavailable: KHÔNG chạy py_compile / test (không có bwrap hay podman dùng được). "
+                               f"Cài: {sandbox.INSTALL_HINT}")
+                return res
+            if r["status"] == "timeout":
+                res["py_compile"]["output"] = "py_compile quá 120s"
+            else:
+                res["py_compile"].update(ok=r["rc"] == 0, output=r["output"][-800:])
+        else:
+            res["py_compile"].update(ok=True, output="không có file .py")
         for n in todo:
             left = budget - (time.time() - t0)
             if left < 10:
                 res["note"] = f"hết ngân sách thời gian test ({int(budget)}s): chưa chạy {len(todo) - len(res['tests'])} file"
                 break
-            s = time.time()
-            try:
-                p = subprocess.run([sys.executable, os.path.join("scripts", n)], cwd=worktree, capture_output=True, text=True,
-                                   timeout=min(per_test, left), env=env)
-                rc, tail = p.returncode, ((p.stdout or "") + "\n" + (p.stderr or "")).strip()[-800:]
-            except subprocess.TimeoutExpired:
-                rc, tail = -1, f"quá {int(min(per_test, left))}s"
-            res["tests"].append({"name": n, "ok": rc == 0, "rc": rc, "sec": round(time.time() - s, 1), "tail": tail if rc else tail[-200:]})
+            tmo = int(min(per_test, left))
+            r = sandbox.run(wt, ["python3", "scripts/" + n], timeout_sec=tmo)
+            if not _sandbox_seen(r):
+                res["note"] = f"sandbox_unavailable giữa chừng: chưa chạy {len(todo) - len(res['tests'])} file"
+                break
+            rc, tail = r["rc"], r["output"][-800:]
+            if r["status"] == "timeout":
+                rc, tail = -1, f"quá {tmo}s (sandbox đã dừng toàn bộ tiến trình)\n" + tail[-600:]
+            res["tests"].append({"name": n, "ok": rc == 0, "rc": rc, "sec": r["sec"], "tail": tail if rc else tail[-200:]})
         res["passed"] = sum(1 for t in res["tests"] if t["ok"])
-        res["ok"] = res["py_compile"]["ok"] and res["passed"] == res["total"] and not res["note"]
+        res["ok"] = (res["py_compile"]["ok"] and res["passed"] == res["total"] and not res["note"]
+                     and res["sandbox"].get("status") in ("ok", "unsandboxed", ""))
     finally:
-        shutil.rmtree(tmp, ignore_errors=True)
         res["sec"] = round(time.time() - t0, 1)
     return res
 
@@ -520,7 +546,8 @@ def _run_build(did, project_id):
         if token is None:
             ctx["perm_note"] = (f"không ghi được allow-rule chế độ Làm vào hồ sơ {pid} (chưa có {pdir}/antigravity-cli hoặc "
                                 "settings hỏng / GW_AGY_PLAN_ALLOW=0) — agy có thể bị từ chối quyền")
-        env = {**db._agy_env(pdir), **agy_git_env(hooks, sid)}
+        # agy chỉ được chạy test TRONG sandbox: bỏ GW_ALLOW_UNSANDBOXED_TESTS / GW_SANDBOX_DRY_RUN khỏi môi trường của agy (#54)
+        env = sandbox.agy_env({**db._agy_env(pdir), **agy_git_env(hooks, sid)})
         cmd = build_command(pdir, prompt, stream["ok"])
         ctx["cmd"], ctx["profile_used"] = cmd, pid
         _set_row(did, command=" ".join(cmd[:3] + ["<prompt>"] + cmd[4:]), profile_used=pid)
@@ -645,7 +672,8 @@ def _finish(did, row, ctx, wt, branch, wt_info, started_at, t0, project_id, acco
                     f"- `{t['command'][:500]}`" + (" — BỊ CHẶN" if t.get("denied") else "")
                     + (f" — lỗi: {t['error'][:300]}" if t.get("error") else "") for t in shell) + "\n\n")
             if tests:
-                f.write("## Kiểm của app\n\n" + f"- py_compile ({tests['py_compile']['files']} file): "
+                f.write("## Kiểm của app\n\n" + f"- Sandbox: {sandbox.describe(tests.get('sandbox')) or '(không rõ)'}\n"
+                        + f"- py_compile ({tests['py_compile']['files']} file): "
                         + ("ok" if tests["py_compile"]["ok"] else "LỖI\n```\n" + tests["py_compile"]["output"] + "\n```") + "\n")
                 for t in tests["tests"]:
                     f.write(f"- {t['name']}: {'pass' if t['ok'] else 'FAIL rc=' + str(t['rc'])} ({t['sec']}s)\n")
@@ -682,7 +710,7 @@ def _finish(did, row, ctx, wt, branch, wt_info, started_at, t0, project_id, acco
                  worktree_dir=wt, build_branch=branch, build_commit=bf["build_commit"],
                  build_tests=json.dumps(tests, ensure_ascii=False) if tests else "",
                  build_push=json.dumps(push, ensure_ascii=False) if push else "", compare_url=ctx["compare"],
-                 pr_url=ctx["pr_url"])
+                 pr_url=ctx["pr_url"], sandbox=sandbox.describe((tests or {}).get("sandbox")))
         db.report_dispatch_to_task(did, project_id)
     finally:
         db._notify_dispatch_change()

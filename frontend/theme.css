@@ -382,6 +382,9 @@ td.emptyState { border: 0; text-align: left; }
 .mcpHead { display: flex; justify-content: space-between; flex-wrap: wrap; }
 .mcpHint { color: var(--muted2); font-size: 12px; line-height: 1.5; }
 .mcpHint code { color: var(--muted); }
+/* Dòng trạng thái sandbox test chế độ Làm (#54) */
+.sandboxLine { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 10px 0 4px; }
+.sandboxLine #sandboxText { flex: 1 1 320px; min-width: 0; }
 .mcpSkeleton { color: var(--muted2); font-size: 12.5px; padding: 18px 14px; border: 1px dashed var(--line2); border-radius: var(--radius-sm); }
 .mcpBanner { display: flex; align-items: center; gap: 10px; justify-content: space-between; flex-wrap: wrap;
   margin-bottom: 12px; padding: 10px 12px; border-radius: var(--radius-sm); font-size: 12.5px;

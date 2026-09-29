@@ -1,0 +1,420 @@
+#!/bin/bash -p
+# gw-sandbox-run — chạy 1 lệnh (py_compile / test do agy viết) trong sandbox cho chế độ "Làm" (Issue #54).
+#
+#   gw-sandbox-run <worktree> [--] <lệnh> [đối số...]   chạy <lệnh> trong sandbox, cwd = <worktree>
+#   gw-sandbox-run --probe                              in JSON: cơ chế khả dụng, phiên bản, giới hạn (không chạy gì)
+#
+# Cơ chế, theo thứ tự (GW_SANDBOX_MECHANISMS chỉ được BỚT / đổi thứ tự, không thêm được cách chạy ngoài sandbox):
+#   1. bubblewrap (bwrap): /usr, /lib*, /bin, /sbin và vài file /etc cần thiết mount CHỈ ĐỌC; CHỈ <worktree> ghi được;
+#      --tmpfs /tmp, --proc /proc, --dev /dev; unshare user/pid/net/ipc/uts/cgroup; --die-with-parent --new-session;
+#      --cap-drop ALL; --clearenv (chỉ đặt PATH, HOME giả, LANG, PYTHON*); KHÔNG mount $HOME (không thấy ~/.ssh,
+#      ~/.agy-profiles, DB app, repo app); gốc (/) remount chỉ đọc; <worktree>/.git thay bằng bản chỉ đọc.
+#   2. podman rootless: --network=none --read-only --cap-drop=all, chỉ mount <worktree>; KHÔNG tự pull image.
+#   3. Không có cả hai → KHÔNG chạy, thoát 97 + "sandbox_unavailable" + hướng dẫn cài.
+#      Chỉ chạy ngoài sandbox khi GW_ALLOW_UNSANDBOXED_TESTS=1 (mặc định tắt; app KHÔNG truyền biến này cho agy).
+# Giới hạn: timeout (GW_SANDBOX_TIMEOUT_SEC, mặc định 600s, tối đa 3600s) + ulimit trong sandbox (số tiến trình
+# GW_SANDBOX_NPROC=256, bộ nhớ ảo GW_SANDBOX_MEM_MB=4096/tiến trình, file tối đa 1 GiB, không core dump, 1024 fd),
+# output gộp stdout+stderr cắt ở 8 MiB.
+#
+# Kiểm đối số: <worktree> phải là đường dẫn tuyệt đối CHUẨN (không '..', '.', '//', symlink ở bất kỳ đoạn nào), là thư
+# mục nằm NGAY dưới thư mục worktree (GW_WORKTREE_ROOT, mặc định <thư mục cha của repo app>/gw-worktrees), thuộc user
+# hiện tại; <lệnh> là tên lệnh trần (không '/', không bắt đầu bằng '-'). Mọi thứ sau <lệnh> chỉ là đối số của lệnh,
+# không bao giờ tới bwrap/podman — không có đối số nào đổi được mount / namespace của sandbox.
+#
+# Mã thoát: mã của lệnh; 124 = quá thời gian; 97 = sandbox_unavailable; 98 = đối số sai; 99 = GW_SANDBOX_DRY_RUN
+# (chỉ in lệnh sandbox sẽ chạy, không chạy gì — dùng cho test).
+#
+# `#!/bin/bash -p`: không nhận hàm shell / BASH_ENV / SHELLOPTS từ môi trường của bên gọi.
+set -u
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
+IFS=$' \t\n'
+umask 022
+
+EXIT_UNAVAILABLE=97
+EXIT_BADARG=98
+EXIT_DRYRUN=99
+TAG="[gw-sandbox]"
+INSTALL_HINT="Cài bubblewrap: sudo dnf install -y bubblewrap (Fedora) · sudo apt-get install -y bubblewrap (Debian/Ubuntu)"
+
+SELF=$(realpath -e -- "${BASH_SOURCE[0]}" 2>/dev/null) || SELF=${BASH_SOURCE[0]}
+APP_DIR=$(dirname -- "$(dirname -- "$SELF")")
+
+bad() {
+    printf '%s đối số sai: %s\n' "$TAG" "$1" >&2
+    printf '%s cách dùng: gw-sandbox-run <worktree tuyệt đối dưới gw-worktrees/> [--] <lệnh> [đối số...] | --probe\n' "$TAG" >&2
+    exit "$EXIT_BADARG"
+}
+
+clamp_int() {   # clamp_int <giá trị> <mặc định> <min> <max>
+    local v=$1
+    [[ $v =~ ^[0-9]{1,7}$ ]] || v=$2
+    v=$((10#$v))
+    ((v < $3)) && v=$3
+    ((v > $4)) && v=$4
+    printf '%s' "$v"
+}
+
+json_str() {
+    local s
+    s=$(printf '%s' "$1" | tr -d '\000-\010\013-\037' | tr '\n\t' '  ')
+    s=${s//\\/\\\\}
+    s=${s//\"/\\\"}
+    printf '"%s"' "$s"
+}
+
+TIMEOUT_SEC=$(clamp_int "${GW_SANDBOX_TIMEOUT_SEC:-}" 600 1 3600)
+NPROC=$(clamp_int "${GW_SANDBOX_NPROC:-}" 256 16 4096)
+MEM_MB=$(clamp_int "${GW_SANDBOX_MEM_MB:-}" 4096 256 65536)
+FSIZE_KB=$((1024 * 1024))
+OUT_MAX=$((8 * 1024 * 1024))
+TMP_BYTES=$((512 * 1024 * 1024))
+PODMAN_IMAGE=${GW_SANDBOX_IMAGE:-docker.io/library/python:3.12-slim}
+[[ $PODMAN_IMAGE =~ ^[A-Za-z0-9][A-Za-z0-9._/:@-]*$ ]] || PODMAN_IMAGE=docker.io/library/python:3.12-slim
+DRY_RUN=0
+[ "${GW_SANDBOX_DRY_RUN:-}" = "1" ] && DRY_RUN=1
+ALLOW_UNSANDBOXED=0
+[ "${GW_ALLOW_UNSANDBOXED_TESTS:-}" = "1" ] && ALLOW_UNSANDBOXED=1
+
+MECHS=()
+for m in ${GW_SANDBOX_MECHANISMS:-bwrap podman}; do
+    case "$m" in bwrap | podman) MECHS+=("$m") ;; esac
+done
+
+# Chạy bên trong sandbox (chuỗi hằng, không chèn dữ liệu của bên gọi): đặt ulimit cả hard + soft (lệnh bên trong không
+# nâng lại được), chạy lệnh, gộp stdout+stderr và cắt ở OUT_MAX, trả mã thoát của lệnh.
+INNER='ulimit -c 0; ulimit -n 1024; if [ "$GW_SBX_NPROC" != skip ]; then ulimit -u "$GW_SBX_NPROC" || exit 96; fi
+ulimit -v "$GW_SBX_MEM_KB" || exit 96; ulimit -f "$GW_SBX_FSIZE_KB" || exit 96; o=$GW_SBX_OUT_MAX
+unset GW_SBX_NPROC GW_SBX_MEM_KB GW_SBX_FSIZE_KB GW_SBX_OUT_MAX
+"$@" 2>&1 | head -c "$o"; exit "${PIPESTATUS[0]}"'
+INNER_ENV=(PATH=/usr/local/bin:/usr/bin:/bin HOME=/tmp/home TMPDIR=/tmp USER=sandbox LOGNAME=sandbox
+    LANG=C.UTF-8 LC_ALL=C.UTF-8 PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/tmp/pycache PYTHONIOENCODING=utf-8
+    PYTHONNOUSERSITE=1 GW_IN_SANDBOX=1 GW_AUTO_UPDATE=0 GIT_CONFIG_NOSYSTEM=1 GIT_TERMINAL_PROMPT=0
+    "GW_SBX_NPROC=$NPROC" "GW_SBX_MEM_KB=$((MEM_MB * 1024))" "GW_SBX_FSIZE_KB=$FSIZE_KB" "GW_SBX_OUT_MAX=$OUT_MAX")
+
+# ---------------------------------------------------------------------------------------------------------------------
+# Phát hiện cơ chế
+# ---------------------------------------------------------------------------------------------------------------------
+BWRAP_BIN=$(command -v bwrap 2>/dev/null || true)
+BWRAP_VERSION=""
+BWRAP_ERR=""
+BWRAP_HELP=""
+PODMAN_BIN=$(command -v podman 2>/dev/null || true)
+PODMAN_VERSION=""
+PODMAN_ERR=""
+PODMAN_IMAGE_PRESENT=0
+
+bwrap_base_args() {   # namespace + cờ bảo mật chung (preflight và chạy thật)
+    BA=(--unshare-user --unshare-pid --unshare-net --unshare-ipc --unshare-uts --unshare-cgroup-try
+        --die-with-parent --new-session --cap-drop ALL --hostname gw-sandbox --clearenv)
+    case "$BWRAP_HELP" in *--disable-userns*) BA+=(--disable-userns) ;; esac
+    BA+=(--ro-bind /usr /usr)
+    local d
+    for d in /bin /sbin /lib /lib32 /lib64 /libx32; do
+        if [ -L "$d" ]; then
+            BA+=(--symlink "$(readlink -- "$d")" "$d")
+        elif [ -d "$d" ]; then
+            BA+=(--ro-bind "$d" "$d")
+        fi
+    done
+    BA+=(--proc /proc --dev /dev)
+}
+
+bwrap_check() {
+    [ -n "$BWRAP_BIN" ] || { BWRAP_ERR="không có lệnh bwrap"; return 1; }
+    BWRAP_VERSION=$("$BWRAP_BIN" --version 2>/dev/null | head -n1 | awk '{print $NF}')
+    BWRAP_HELP=$("$BWRAP_BIN" --help 2>&1 || true)
+    [ "$DRY_RUN" = "1" ] && return 0
+    local BA out
+    bwrap_base_args
+    if ! out=$(timeout 20 "$BWRAP_BIN" "${BA[@]}" --remount-ro / -- /usr/bin/true 2>&1); then
+        BWRAP_ERR="bwrap không tạo được sandbox (thiếu user namespace?): $(printf '%s' "$out" | head -c 300)"
+        return 1
+    fi
+    return 0
+}
+
+podman_check() {
+    [ -n "$PODMAN_BIN" ] || { PODMAN_ERR="không có lệnh podman"; return 1; }
+    [ "$DRY_RUN" = "1" ] && { PODMAN_IMAGE_PRESENT=1; return 0; }
+    PODMAN_VERSION=$(timeout 20 "$PODMAN_BIN" --version 2>/dev/null | awk '{print $NF}')
+    if [ "$(id -u)" = "0" ]; then
+        PODMAN_ERR="podman đang chạy bằng root (chỉ dùng podman rootless)"
+        return 1
+    fi
+    if ! timeout 30 "$PODMAN_BIN" image exists "$PODMAN_IMAGE" >/dev/null 2>&1; then
+        PODMAN_ERR="podman có nhưng chưa có image $PODMAN_IMAGE (không tự pull). Chạy: podman pull $PODMAN_IMAGE"
+        return 1
+    fi
+    PODMAN_IMAGE_PRESENT=1
+    return 0
+}
+
+MECH=""
+select_mechanism() {
+    local m
+    for m in "${MECHS[@]}"; do
+        case "$m" in
+        bwrap) if bwrap_check; then MECH=bwrap; return 0; fi ;;
+        podman) if podman_check; then MECH=podman; return 0; fi ;;
+        esac
+    done
+    MECH=""
+    return 1
+}
+
+unavailable_reason() {
+    local r=""
+    [ -n "$BWRAP_ERR" ] && r="bwrap: $BWRAP_ERR"
+    [ -n "$PODMAN_ERR" ] && r="${r:+$r; }podman: $PODMAN_ERR"
+    [ ${#MECHS[@]} -eq 0 ] && r="${r:+$r; }GW_SANDBOX_MECHANISMS không bật cơ chế nào"
+    printf '%s' "${r:-không có bwrap hay podman}"
+}
+
+# ---------------------------------------------------------------------------------------------------------------------
+# --probe
+# ---------------------------------------------------------------------------------------------------------------------
+if [ "${1:-}" = "--probe" ]; then
+    [ $# -eq 1 ] || bad "--probe không nhận thêm đối số"
+    DRY_RUN=0
+    select_mechanism || true
+    # thông tin phụ của cơ chế không được chọn (để màn hình hiện đủ)
+    [ -z "$BWRAP_VERSION" ] && [ -n "$BWRAP_BIN" ] && BWRAP_VERSION=$("$BWRAP_BIN" --version 2>/dev/null | head -n1 | awk '{print $NF}')
+    [ -z "$PODMAN_VERSION" ] && [ -n "$PODMAN_BIN" ] && PODMAN_VERSION=$(timeout 20 "$PODMAN_BIN" --version 2>/dev/null | awk '{print $NF}')
+    bw_usable=false; [ "$MECH" = "bwrap" ] && bw_usable=true
+    pm_usable=false; [ "$MECH" = "podman" ] && pm_usable=true
+    version=""
+    [ "$MECH" = "bwrap" ] && version=$BWRAP_VERSION
+    [ "$MECH" = "podman" ] && version=$PODMAN_VERSION
+    hint=""
+    [ -z "$MECH" ] && hint="$INSTALL_HINT. Lý do: $(unavailable_reason)"
+    root_raw=${GW_WORKTREE_ROOT:-$(dirname -- "$APP_DIR")/gw-worktrees}
+    printf '{"wrapper": %s, "available": %s, "mechanism": %s, "version": %s, ' "$(json_str "$SELF")" \
+        "$([ -n "$MECH" ] && echo true || echo false)" "$(json_str "${MECH:-none}")" "$(json_str "$version")"
+    printf '"status": %s, "hint": %s, "allow_unsandboxed": %s, "worktree_root": %s, ' \
+        "$(json_str "$([ -n "$MECH" ] && echo ok || echo sandbox_unavailable)")" "$(json_str "$hint")" \
+        "$([ "$ALLOW_UNSANDBOXED" = 1 ] && echo true || echo false)" "$(json_str "$root_raw")"
+    printf '"bwrap": {"path": %s, "version": %s, "usable": %s, "error": %s, "disable_userns": %s}, ' \
+        "$(json_str "$BWRAP_BIN")" "$(json_str "$BWRAP_VERSION")" "$bw_usable" "$(json_str "$BWRAP_ERR")" \
+        "$(case "$BWRAP_HELP" in *--disable-userns*) echo true ;; *) echo false ;; esac)"
+    printf '"podman": {"path": %s, "version": %s, "usable": %s, "error": %s, "image": %s, "image_present": %s}, ' \
+        "$(json_str "$PODMAN_BIN")" "$(json_str "$PODMAN_VERSION")" "$pm_usable" "$(json_str "$PODMAN_ERR")" \
+        "$(json_str "$PODMAN_IMAGE")" "$([ "$PODMAN_IMAGE_PRESENT" = 1 ] && echo true || echo false)"
+    printf '"limits": {"timeout_sec": %s, "nproc": %s, "mem_mb": %s, "file_mb": %s, "output_mb": %s, "tmp_mb": %s}}\n' \
+        "$TIMEOUT_SEC" "$NPROC" "$MEM_MB" "$((FSIZE_KB / 1024))" "$((OUT_MAX / 1048576))" "$((TMP_BYTES / 1048576))"
+    exit 0
+fi
+
+# ---------------------------------------------------------------------------------------------------------------------
+# Kiểm đối số
+# ---------------------------------------------------------------------------------------------------------------------
+[ $# -ge 2 ] || bad "thiếu <worktree> hoặc <lệnh>"
+WT=$1
+shift
+[ "${1:-}" = "--" ] && shift
+[ $# -ge 1 ] || bad "thiếu <lệnh>"
+CMD0=$1
+[[ $CMD0 =~ ^[A-Za-z0-9_][A-Za-z0-9._+-]*$ ]] || bad "lệnh phải là tên trần (không '/', không bắt đầu bằng '-'): '$CMD0'"
+
+[[ $WT == /* ]] || bad "worktree phải là đường dẫn tuyệt đối: '$WT'"
+[[ $WT =~ ^/[A-Za-z0-9._/@+-]+$ ]] || bad "worktree có ký tự không cho phép (khoảng trắng, xuống dòng...): '$WT'"
+[ "$WT" != "/" ] && WT=${WT%/}
+case "$WT/" in *"/../"* | *"/./"* | *"//"*) bad "worktree không được có '..', '.', '//': '$WT'" ;; esac
+[ -d "$WT" ] || bad "worktree không phải thư mục: '$WT'"
+[ -L "$WT" ] && bad "worktree là symlink: '$WT'"
+WT_REAL=$(realpath -e -- "$WT" 2>/dev/null) || bad "không đọc được worktree: '$WT'"
+[ "$WT_REAL" = "$WT" ] || bad "worktree đi qua symlink ('$WT' → '$WT_REAL'): hãy truyền đường dẫn thật"
+
+ROOT_RAW=${GW_WORKTREE_ROOT:-$(dirname -- "$APP_DIR")/gw-worktrees}
+ROOT=$(realpath -e -- "$ROOT_RAW" 2>/dev/null) || bad "chưa có thư mục worktree: '$ROOT_RAW'"
+REAL_HOME=$(getent passwd "$(id -u)" 2>/dev/null | cut -d: -f6)
+REAL_HOME=$(realpath -e -- "${REAL_HOME:-/nonexistent}" 2>/dev/null || printf '%s' "${REAL_HOME:-/nonexistent}")
+APP_REAL=$(realpath -e -- "$APP_DIR" 2>/dev/null || printf '%s' "$APP_DIR")
+case "$ROOT" in / | /usr | /usr/* | /etc | /etc/* | /proc | /proc/* | /sys | /sys/* | /dev | /dev/* | /run | /run/* | /boot | /boot/*)
+    bad "thư mục worktree không hợp lệ: '$ROOT'" ;;
+esac
+for guard in "$REAL_HOME" "$APP_REAL"; do
+    case "$guard/" in "$ROOT/"*) bad "thư mục worktree '$ROOT' chứa \$HOME hoặc repo app — từ chối" ;; esac
+done
+[ "$(dirname -- "$WT_REAL")" = "$ROOT" ] || bad "worktree phải nằm ngay dưới $ROOT: '$WT_REAL'"
+WT_NAME=$(basename -- "$WT_REAL")
+[[ $WT_NAME =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || bad "tên worktree không hợp lệ: '$WT_NAME'"
+[ -O "$WT_REAL" ] || bad "worktree không thuộc user hiện tại: '$WT_REAL'"
+
+# .git của worktree: file "gitdir: ..." → trong sandbox thay bằng bản CHỈ ĐỌC (đọc nội dung trước rồi kiểm dạng, nên
+# symlink / đổi file giữa chừng cũng không đưa được nội dung khác vào sandbox). Lệnh trong sandbox không sửa được .git để
+# cài core.fsmonitor / hook cho các lệnh git app chạy sau đó ngoài sandbox.
+GIT_DATA=""
+if [ -L "$WT_REAL/.git" ]; then
+    bad "$WT_REAL/.git là symlink — từ chối"
+elif [ -d "$WT_REAL/.git" ]; then
+    bad "$WT_REAL/.git là thư mục (không phải git worktree) — từ chối"
+elif [ -e "$WT_REAL/.git" ]; then
+    [ -f "$WT_REAL/.git" ] || bad "$WT_REAL/.git không phải file thường"
+    GIT_DATA=$(head -c 4096 -- "$WT_REAL/.git" 2>/dev/null)
+    [[ $GIT_DATA =~ ^gitdir:\ /[^$'\n']+$ ]] || bad "$WT_REAL/.git không đúng dạng 'gitdir: <đường dẫn>'"
+fi
+
+# Git CHỈ ĐỌC của đúng worktree này (test cần `git rev-parse HEAD`, `git cat-file`...): chỉ khi .git trỏ tới
+# <repo>/.git/worktrees/<tên>, <repo> là repo app (hoặc GW_DISPATCH_REPO) và file gitdir trong đó trỏ ngược về đúng
+# <worktree>/.git. Chỉ mount objects / refs / packed-refs / HEAD + thư mục worktrees/<tên>; config thay bằng bản lọc
+# (chỉ core.repositoryformatversion + extensions.*: KHÔNG remote URL / credential / hook / fsmonitor). Sai bất kỳ điều
+# kiện nào → không mount (lệnh git trong sandbox báo lỗi, không lộ gì thêm).
+GIT_RO=()
+GIT_CONFIG_DATA=""
+GIT_CONFIG_PATH=""
+GIT_NOTE=""
+git_view() {
+    local gd common cdir back name cand ok=0 fmt ext
+    [ -n "$GIT_DATA" ] || return 0
+    gd=${GIT_DATA#gitdir: }
+    gd=$(realpath -e -- "$gd" 2>/dev/null) || { GIT_NOTE="không thấy gitdir"; return 0; }
+    [ -d "$gd" ] && [ ! -L "$gd" ] || { GIT_NOTE="gitdir không hợp lệ"; return 0; }
+    name=$(basename -- "$gd")
+    [[ $name =~ ^${WT_NAME//./\\.}[0-9]*$ ]] || { GIT_NOTE="gitdir không khớp tên worktree"; return 0; }
+    [ "$(basename -- "$(dirname -- "$gd")")" = worktrees ] || { GIT_NOTE="gitdir không nằm trong worktrees/"; return 0; }
+    common=$(dirname -- "$(dirname -- "$gd")")
+    cdir=$(head -n1 -- "$gd/commondir" 2>/dev/null)
+    [ -n "$cdir" ] && [ "$(cd -- "$gd" 2>/dev/null && realpath -e -- "$cdir" 2>/dev/null)" = "$common" ] \
+        || { GIT_NOTE="commondir không khớp"; return 0; }
+    for cand in "$APP_REAL/.git" ${GW_DISPATCH_REPO:+"$(realpath -e -- "$GW_DISPATCH_REPO" 2>/dev/null)/.git"}; do
+        [ "$(realpath -e -- "$cand" 2>/dev/null)" = "$common" ] && ok=1
+    done
+    [ "$ok" = 1 ] || { GIT_NOTE="repo của worktree không phải repo app"; return 0; }
+    back=$(head -n1 -- "$gd/gitdir" 2>/dev/null)
+    [ "$back" = "$WT_REAL/.git" ] || { GIT_NOTE="gitdir không trỏ ngược về worktree"; return 0; }
+    [ -d "$common/objects" ] && [ ! -L "$common/objects" ] && [ -f "$common/HEAD" ] || { GIT_NOTE="repo thiếu objects/HEAD"; return 0; }
+    GIT_RO=("$gd" "$common/objects" "$common/HEAD")
+    [ -d "$common/refs" ] && [ ! -L "$common/refs" ] && GIT_RO+=("$common/refs")
+    [ -f "$common/packed-refs" ] && [ ! -L "$common/packed-refs" ] && GIT_RO+=("$common/packed-refs")
+    [ -f "$common/shallow" ] && [ ! -L "$common/shallow" ] && GIT_RO+=("$common/shallow")
+    GIT_CONFIG_PATH="$common/config"
+    fmt=$(git config --file "$common/config" --get core.repositoryformatversion 2>/dev/null)
+    [[ $fmt =~ ^[01]$ ]] || fmt=0
+    GIT_CONFIG_DATA=$'[core]\n\trepositoryformatversion = '"$fmt"$'\n\tbare = false\n'
+    ext=$(git config --file "$common/config" --get-regexp '^extensions\.' 2>/dev/null |
+        grep -E '^extensions\.[A-Za-z]+ [A-Za-z0-9_.-]+$' | sed -E 's/^extensions\.([A-Za-z]+) (.*)$/\t\1 = \2/')
+    [ -n "$ext" ] && GIT_CONFIG_DATA+=$'[extensions]\n'"$ext"$'\n'
+    return 0
+}
+git_view
+
+# ---------------------------------------------------------------------------------------------------------------------
+# Chạy
+# ---------------------------------------------------------------------------------------------------------------------
+run_logged() {   # run_logged <tên cơ chế> <argv...>: chạy (hoặc in khi DRY_RUN), báo quá thời gian
+    local mech=$1
+    shift
+    if [ "$DRY_RUN" = "1" ]; then
+        printf '%s DRY-RUN mechanism=%s\n' "$TAG" "$mech"
+        printf '%s\n' "$@"
+        exit "$EXIT_DRYRUN"
+    fi
+    "$@" </dev/null 3<<<"$PASSWD_DATA" 4<<<"$GROUP_DATA" 5<<<"$GIT_DATA" 6<<<"$GIT_CONFIG_DATA"
+    local rc=$?
+    if [ "$rc" = 124 ] || [ "$rc" = 137 ]; then
+        printf '%s quá thời gian %ss — đã dừng toàn bộ tiến trình trong sandbox (rc=%s)\n' "$TAG" "$TIMEOUT_SEC" "$rc" >&2
+    fi
+    return "$rc"
+}
+
+UID_NOW=$(id -u)
+GID_NOW=$(id -g)
+PASSWD_DATA="sandbox:x:$UID_NOW:$GID_NOW:gw sandbox:/tmp/home:/bin/sh"
+[ "$UID_NOW" != 0 ] && PASSWD_DATA="root:x:0:0:root:/root:/sbin/nologin"$'\n'"$PASSWD_DATA"
+GROUP_DATA="sandbox:x:$GID_NOW:"
+[ "$GID_NOW" != 0 ] && GROUP_DATA="root:x:0:"$'\n'"$GROUP_DATA"
+
+if select_mechanism; then
+    case "$MECH" in
+    bwrap)
+        bwrap_base_args
+        A=("${BA[@]}")
+        A+=(--dir /etc --ro-bind-data 3 /etc/passwd --ro-bind-data 4 /etc/group)
+        for f in ld.so.cache ld.so.conf ld.so.conf.d localtime nsswitch.conf host.conf hosts alternatives ssl pki \
+            crypto-policies mime.types; do
+            [ -e "/etc/$f" ] && A+=(--ro-bind "/etc/$f" "/etc/$f")
+        done
+        for f in /etc/python3*; do
+            [ -d "$f" ] && A+=(--ro-bind "$f" "$f")
+        done
+        case "$BWRAP_HELP" in *--size*) A+=(--size "$TMP_BYTES" --tmpfs /tmp --size $((64 * 1024 * 1024)) --tmpfs /dev/shm) ;;
+            *) A+=(--tmpfs /tmp --tmpfs /dev/shm) ;; esac
+        A+=(--dir /tmp/home --dir /tmp/pycache)
+        A+=(--bind "$WT_REAL" "$WT_REAL")
+        [ -n "$GIT_DATA" ] && A+=(--ro-bind-data 5 "$WT_REAL/.git")
+        for g in "${GIT_RO[@]}"; do
+            A+=(--ro-bind "$g" "$g")
+        done
+        [ ${#GIT_RO[@]} -gt 0 ] && A+=(--ro-bind-data 6 "$GIT_CONFIG_PATH")
+        A+=(--remount-ro / --chdir "$WT_REAL")
+        for kv in "${INNER_ENV[@]}"; do
+            A+=(--setenv "${kv%%=*}" "${kv#*=}")
+        done
+        printf '%s mechanism=bwrap version=%s timeout=%ss nproc=%s mem=%sMB worktree=%s git=%s\n' "$TAG" "$BWRAP_VERSION" \
+            "$TIMEOUT_SEC" "$NPROC" "$MEM_MB" "$WT_REAL" "$([ ${#GIT_RO[@]} -gt 0 ] && echo ro || echo "none${GIT_NOTE:+ ($GIT_NOTE)}")" >&2
+        run_logged bwrap timeout --kill-after=5 "$TIMEOUT_SEC" "$BWRAP_BIN" "${A[@]}" -- /bin/bash -c "$INNER" gw-sandbox "$@"
+        exit $?
+        ;;
+    podman)
+        NAME="gw-sbx-$$-$RANDOM"
+        GITF=""
+        GITC=""
+        P=(run --rm --pull=never --name "$NAME" --network=none --read-only --read-only-tmpfs=false --cap-drop=all
+            --security-opt=no-new-privileges --security-opt=label=disable --userns=keep-id --pids-limit="$NPROC"
+            --memory="${MEM_MB}m" --ulimit=nofile=1024:1024 --ulimit=core=0 --hostname gw-sandbox --init
+            --tmpfs "/tmp:rw,size=$((TMP_BYTES / 1048576))m,mode=1777" -v "$WT_REAL:$WT_REAL:rw" -w "$WT_REAL")
+        if [ -n "$GIT_DATA" ]; then
+            if [ "$DRY_RUN" = "1" ]; then
+                GITF="<tệp tạm .git>"
+            else
+                GITF=$(mktemp) || exit 1
+                printf '%s\n' "$GIT_DATA" >"$GITF"
+                chmod 444 "$GITF"
+            fi
+            P+=(-v "$GITF:$WT_REAL/.git:ro")
+        fi
+        for g in "${GIT_RO[@]}"; do
+            P+=(-v "$g:$g:ro")
+        done
+        if [ ${#GIT_RO[@]} -gt 0 ]; then
+            if [ "$DRY_RUN" = "1" ]; then
+                GITC="<tệp tạm config>"
+            else
+                GITC=$(mktemp) || exit 1
+                printf '%s' "$GIT_CONFIG_DATA" >"$GITC"
+                chmod 444 "$GITC"
+            fi
+            P+=(-v "$GITC:$GIT_CONFIG_PATH:ro")
+        fi
+        for kv in "${INNER_ENV[@]}"; do
+            P+=(-e "$kv")
+        done
+        P+=(-e HOME=/tmp)
+        printf '%s mechanism=podman version=%s image=%s timeout=%ss worktree=%s\n' "$TAG" "$PODMAN_VERSION" "$PODMAN_IMAGE" \
+            "$TIMEOUT_SEC" "$WT_REAL" >&2
+        run_logged podman timeout --kill-after=5 "$TIMEOUT_SEC" "$PODMAN_BIN" "${P[@]}" "$PODMAN_IMAGE" /bin/bash -c "$INNER" gw-sandbox "$@"
+        rc=$?
+        [ "$rc" = 124 ] || [ "$rc" = 137 ] && timeout 30 "$PODMAN_BIN" rm -f "$NAME" >/dev/null 2>&1
+        [ -n "$GITF" ] && [ "$DRY_RUN" != 1 ] && rm -f -- "$GITF"
+        [ -n "$GITC" ] && [ "$DRY_RUN" != 1 ] && rm -f -- "$GITC"
+        exit "$rc"
+        ;;
+    esac
+fi
+
+if [ "$ALLOW_UNSANDBOXED" = "1" ]; then
+    printf '%s mechanism=none-unsandboxed — CẢNH BÁO: GW_ALLOW_UNSANDBOXED_TESTS=1, chạy NGOÀI sandbox (%s)\n' "$TAG" \
+        "$(unavailable_reason)" >&2
+    H=$(mktemp -d) || exit 1
+    cd -- "$WT_REAL" || exit 1
+    run_logged none-unsandboxed timeout --kill-after=5 "$TIMEOUT_SEC" env -i "${INNER_ENV[@]}" "HOME=$H" "TMPDIR=$H" \
+        "PYTHONPYCACHEPREFIX=$H/pycache" GW_SBX_NPROC=skip /bin/bash -c "$INNER" gw-sandbox "$@"
+    rc=$?
+    rm -rf -- "$H"
+    exit "$rc"
+fi
+
+printf '%s sandbox_unavailable: không chạy "%s" — không có sandbox dùng được (%s). %s. Không chạy ngoài sandbox (chỉ khi đặt GW_ALLOW_UNSANDBOXED_TESTS=1).\n' \
+    "$TAG" "$CMD0" "$(unavailable_reason)" "$INSTALL_HINT" >&2
+exit "$EXIT_UNAVAILABLE"

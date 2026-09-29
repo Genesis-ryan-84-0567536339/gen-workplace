@@ -28,13 +28,14 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 # Tự động nạp SQLite DB Module & MCP Core
 sys.path.insert(0, str(BASE_DIR))
 try:
-    from backend import db, mcp_core, directive_guard, auto_update, jules_worker
+    from backend import db, mcp_core, directive_guard, auto_update, jules_worker, sandbox
 except ImportError:
     import db
     import mcp_core
     import directive_guard
     import auto_update
     import jules_worker
+    import sandbox
 
 auto_update.set_busy_checker(db.running_dispatches_for_update)   # hoãn tự cập nhật khi còn việc chạy (VIEC-12)
 RUNNING_COMMIT = auto_update.current_commit(BASE_DIR)  # commit của code đang chạy (đổi sau khi tự cập nhật execv)
@@ -292,6 +293,16 @@ class SwarmHandler(SimpleHTTPRequestHandler):
         #       giới hạn, số phiên đang chạy; check=1 gọi Jules GET /sources để kiểm key (state connected | error) + danh sách repo
         if path == "/api/jules/status":
             self._send_json(200, jules_worker.status(check=query.get("check", ["0"])[0] in ("1", "true")))
+            return
+
+        # 0.87. Sandbox chạy test chế độ Làm (#54): GET /api/sandbox/status[?refresh=1] → cơ chế (bwrap | podman | none),
+        #       phiên bản, giới hạn, tự kiểm thật (ghi được worktree; KHÔNG đọc ~/.ssh / hồ sơ agy / DB; KHÔNG mạng;
+        #       KHÔNG ghi ngoài worktree). Cache 60s.
+        if path == "/api/sandbox/status":
+            try:
+                self._send_json(200, sandbox.status(refresh=query.get("refresh", ["0"])[0] in ("1", "true")))
+            except Exception as e:
+                self._send_json(500, {"error": f"{type(e).__name__}: {e}"})
             return
 
         # 0.9. Nhật ký allowlist lệnh gửi vào tmux (audit)

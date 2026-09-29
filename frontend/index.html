@@ -5572,6 +5572,13 @@ body.resizing-active, body.resizing-active * {
           </div>
         </div>
 
+        <!-- Sandbox chạy test chế độ Làm (#54): 1 dòng trạng thái từ GET /api/sandbox/status -->
+        <div class="sandboxLine mcpHint" id="sandboxLine" aria-live="polite">
+          <span class="mcpDotLg wait" id="sandboxDot"></span>
+          <span id="sandboxText" data-state="">Sandbox test (chế độ Làm): đang kiểm…</span>
+          <button class="btn small" id="sandboxCheckBtn" onclick="sandboxLoadStatus(true)" title="Chạy lại tự kiểm sandbox">Kiểm lại</button>
+        </div>
+
         <div class="mcpTabs" role="tablist" aria-label="Các phần của MCP">
           <button class="mcpTab active" role="tab" id="mcpTab-connect" aria-controls="mcpPane-connect" aria-selected="true" onclick="mcpSwitchTab('connect')">Kết nối</button>
           <button class="mcpTab" role="tab" id="mcpTab-tools" aria-controls="mcpPane-tools" aria-selected="false" tabindex="-1" onclick="mcpSwitchTab('tools')">Tool <span class="mcpTabCount" id="mcpTabToolsCount"></span></button>
@@ -12778,7 +12785,47 @@ function mcpUiRpc(method, params) {
   return mcpFetchJson('/api/mcp/ui/rpc', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-GW-UI': '1' }, body: JSON.stringify(body) });
 }
 
+// ---------- Sandbox chạy test chế độ Làm (#54) ----------
+async function sandboxLoadStatus(refresh) {
+  const txt = $('sandboxText'), dot = $('sandboxDot'), btn = $('sandboxCheckBtn');
+  if (!txt) return null;
+  if (btn) { btn.disabled = true; btn.textContent = 'Đang kiểm…'; }
+  let d = null;
+  try {
+    const res = await fetch('/api/sandbox/status' + (refresh ? '?refresh=1' : ''));
+    if (res.ok) d = await res.json();
+  } catch (e) {
+    console.warn('[Sandbox] Không tải được trạng thái:', e);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Kiểm lại'; }
+  }
+  let cls = 'bad', label = 'Sandbox test (chế độ Làm): không đọc được trạng thái', state = 'error';
+  if (d) {
+    const st = d.self_test || null;
+    const checks = (st && st.checks) || [];
+    const failed = checks.filter(c => !c.ok);
+    const name = `${d.mechanism}${d.version ? ' ' + d.version : ''}`;
+    if (!d.available) {
+      state = 'unavailable';
+      label = `Sandbox test (chế độ Làm): KHÔNG có sandbox — test sau khi agy Làm sẽ không chạy. Cài: ${d.install_hint || 'sudo dnf install -y bubblewrap'}`
+        + (d.allow_unsandboxed ? ' · ĐANG BẬT GW_ALLOW_UNSANDBOXED_TESTS=1 (chạy ngoài sandbox)' : '');
+    } else if (d.ok) {
+      cls = 'ok'; state = 'ok';
+      label = `Sandbox test (chế độ Làm): ${name} · tự kiểm đạt ${checks.length}/${checks.length} (ghi được worktree; không đọc ~/.ssh, hồ sơ agy, DB; không mạng; không ghi ngoài worktree)`;
+    } else {
+      state = 'selftest_failed';
+      label = `Sandbox test (chế độ Làm): ${name} · TỰ KIỂM KHÔNG ĐẠT: `
+        + (failed.length ? failed.map(c => c.name + (c.detail ? ` (${c.detail})` : '')).join('; ') : ((st && st.error) || 'không rõ'));
+    }
+  }
+  dot.className = 'mcpDotLg ' + cls;
+  txt.textContent = label;
+  txt.dataset.state = state;
+  return d;
+}
+
 async function mcpLoadAll() {
+  sandboxLoadStatus(false);
   if (mcpState.loading) return;
   mcpState.loading = true;
   const btn = $('mcpRefreshBtn');

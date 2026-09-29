@@ -58,6 +58,7 @@ try:
 except Exception:
     perms = {{}}
 log.write(json.dumps({{"cwd": os.getcwd(), "env_hooks": os.environ.get("GIT_CONFIG_VALUE_0", ""),
+                      "env_unsandboxed": os.environ.get("GW_ALLOW_UNSANDBOXED_TESTS", ""),
                       "allow": perms.get("allow", []), "deny": perms.get("deny", [])}}) + "\\n")
 m = re.search(r"THÔNG TIN VIỆC (TSK-[0-9]+)", prompt)
 tid = m.group(1) if m else "TSK-0"
@@ -139,8 +140,19 @@ os.environ["FAKE_REPO"] = REPO
 for k in ("GW_AGY_WRITE_ROLES", "GW_WARROOM_SKIP_PERMISSIONS", "GW_AGY_PLAN_ALLOW", "GW_AGY_NO_STREAM", "FAKE_AGY_MODE",
           "GITHUB_TOKEN", "GW_GITHUB_API_URL", "GW_BUILD_TEST_EXCLUDE", "GW_BUILD_BASE", "GW_PUBLIC_ORIGIN"):
     os.environ.pop(k, None)
+for k in ("GW_ALLOW_UNSANDBOXED_TESTS", "GW_SANDBOX_MECHANISMS", "GW_SANDBOX_DRY_RUN"):
+    os.environ.pop(k, None)
 os.makedirs(os.environ["DATA_DIR"])
 os.makedirs(os.path.dirname(SETTINGS))
+os.makedirs(os.environ["GW_WORKTREE_ROOT"])
+# Test chạy qua sandbox (#54). Không có sandbox dùng được (vd đang chạy TRONG sandbox của chính app: bwrap lồng bị
+# --disable-userns chặn) → cho phép chạy ngoài sandbox CHỈ cho repo giả của test này, và kiểm cơ chế tương ứng.
+_probe = json.loads(subprocess.run([os.path.join(ROOT, "scripts", "gw-sandbox-run"), "--probe"], capture_output=True, text=True,
+                                   env={"PATH": "/usr/bin:/bin", "GW_WORKTREE_ROOT": os.environ["GW_WORKTREE_ROOT"]}).stdout or "{}")
+SANDBOX_MECH = _probe.get("mechanism") if _probe.get("available") else "none-unsandboxed"
+if SANDBOX_MECH == "none-unsandboxed":
+    os.environ["GW_ALLOW_UNSANDBOXED_TESTS"] = "1"
+print(f"(sandbox cho test: {SANDBOX_MECH})")
 with open(SETTINGS, "w") as f:
     json.dump({"theme": "terminal", "permissions": {"allow": ["read_url(github.com)"], "deny": ["command(sudo)"]}}, f)
 sys.path.insert(0, ROOT)
@@ -258,17 +270,21 @@ check("allow có read_file + write_file(worktree của việc)", f"read_file({wt
 check("allow chỉ 1 write_file (không ghi chỗ khác)", sum(1 for r in ALLOW if r.startswith("write_file(")) == 1)
 check("allow giữ mọi lệnh chỉ đọc cũ", all(r in ALLOW for r in db.agy_plan_allow_rules()))
 check("không rule wildcard / skip-permissions", "command(*)" not in ALLOW and not any("dangerously" in r for r in ALLOW + DENY))
-OK_CMDS = ["python3 -m py_compile backend/app.py backend/feature.py", "python3 scripts/test_agy_build.py",
-           "python3 scripts/test_task_hub.py", "git status", "git status --short", "git diff", "git diff --stat HEAD",
+SB = os.path.realpath(os.path.join(ROOT, "scripts", "gw-sandbox-run"))
+WTR = os.path.realpath(WT_X)
+OK_CMDS = [f"{SB} {WTR} python3 -m py_compile backend/app.py backend/feature.py", f"{SB} {WTR} python3 scripts/test_agy_build.py",
+           f"{SB} {WTR} python3 scripts/test_task_hub.py", f"cd {WTR} && {SB} {WTR} python3 scripts/test_task_hub.py",
+           f"{SB} {WTR} python3 scripts/test_task_hub.py && echo xong", f"{SB} {WTR} python3 scripts/test_x.py | tail -20",
+           f"{SB} {WTR} python3 {WTR}/scripts/test_no_fake_reply.py", "git status", "git status --short", "git diff", "git diff --stat HEAD",
            "git add backend/feature.py", "git add -A", 'git commit -m "TSK-1: thêm tinh_nang"', "git log --oneline -3",
            "grep -rn tinh_nang backend", "cd backend && ls", "sed -n 1,20p backend/app.py", "git show HEAD --stat",
            "git branch --show-current", "find scripts -name 'test_*.py'",
            # dispatch:13 (#47): agy nối echo sau lệnh kiểm; cd tới đường dẫn tuyệt đối của worktree
-           'python3 -m py_compile backend/db.py && echo "py_compile OK"', "echo xong",
+           f'{SB} {WTR} python3 -m py_compile backend/db.py && echo "py_compile OK"', "echo xong",
            f"cd {os.path.realpath(WT_X)} && git status", "cd .. && ls",
-           # dispatch:15 (#49): agy gọi test bằng đường dẫn tuyệt đối của worktree
-           f"python3 {os.path.realpath(WT_X)}/scripts/test_no_fake_reply.py",
-           f"python3 -m py_compile {os.path.realpath(WT_X)}/backend/db.py"]
+           # dispatch:15 (#49): agy gọi test bằng đường dẫn tuyệt đối của worktree — nay qua sandbox
+           f"{SB} {WTR} python3 -m py_compile {os.path.realpath(WT_X)}/backend/db.py",
+           'grep -n "=>" frontend/index.html', 'grep -rn "<button" frontend', 'git commit -m "TSK-1: a -> b"']
 for c in OK_CMDS:
     check(f"cho phép: {c}", agy_allows(c, ALLOW, DENY))
 BAD_CMDS = ["git push", "git push origin wt/TSK-1", "git push --force origin HEAD:main", "git remote add x http://x",
@@ -285,6 +301,24 @@ BAD_CMDS = ["git push", "git push origin wt/TSK-1", "git push --force origin HEA
             f"python3 {REPO}/scripts/test_ok.py", f"python3 {os.path.realpath(WT_X)}/scripts/../evil.py",
             f"python3 {os.path.realpath(WT_X)}/evil.py",
             "python3 scripts/../evil.py", "python3 evil.py", "git status && git push",
+            # #54: không chạy thẳng python (test / py_compile chỉ qua sandbox của app)
+            "python3 -m py_compile backend/app.py", "python3 scripts/test_agy_build.py", "python3 scripts/test_ok.py",
+            f"python3 {WTR}/scripts/test_no_fake_reply.py", f"python3 -m py_compile {WTR}/backend/db.py",
+            "python scripts/test_x.py", "/usr/bin/python3 scripts/test_x.py", "python3.12 scripts/test_x.py",
+            'python3 -m py_compile backend/db.py && echo "py_compile OK"', "cd backend && python3 app.py",
+            "./scripts/test_x.py", "scripts/test_x.py", f"{WTR}/scripts/test_x.py", "backend/app.py",
+            # bản wrapper trong worktree (agy sửa được) / wrapper app với worktree khác / chạy trình thông dịch khác
+            f"scripts/gw-sandbox-run {WTR} python3 scripts/test_x.py", f"./scripts/gw-sandbox-run {WTR} python3 scripts/test_x.py",
+            f"{WTR}/scripts/gw-sandbox-run {WTR} python3 scripts/test_x.py", f"bash scripts/gw-sandbox-run {WTR} python3 x",
+            f"{SB} {REPO} python3 scripts/test_ok.py", f"{SB} {os.path.dirname(WTR)}/TSK-1 python3 scripts/test_ok.py",
+            f"{SB} {WTR} bash -c id", f"{SB} {WTR} python3 evil.py", f"{SB} {WTR} python3 -c 'print(1)'",
+            f"{SB} --probe", "sh -c ls", "env python3 x.py", "bwrap --bind / / sh", "timeout 5 python3 x.py", "perl -e 1",
+            "node -e 1", "chmod +x scripts/x.sh", "ln -s ~/.ssh k", ". scripts/x.sh", "source scripts/x.sh",
+            # chuyển hướng / thay thế lệnh chạy NGOÀI sandbox bởi shell
+            f"{SB} {WTR} python3 scripts/test_x.py > ~/.bashrc", f"{SB} {WTR} python3 scripts/test_x.py >> /tmp/x",
+            f"{SB} {WTR} python3 scripts/test_x.py 2>/tmp/e", f"{SB} {WTR} python3 scripts/test_x.py &>/tmp/e",
+            "echo x > ~/.bashrc", "echo x >~/.bashrc", "echo $(python3 evil.py)", "echo `python3 evil.py`",
+            'git commit -m "TSK-1: sửa `x`"', f"{SB} {WTR} python3 scripts/test_$(id).py",
             "ls | xargs rm", "find . -delete"]
 for c in BAD_CMDS:
     check(f"chặn: {c}", not agy_allows(c, ALLOW, DENY))
@@ -370,6 +404,15 @@ tests = json.loads(row["build_tests"])
 check("test: py_compile ok + test_ok pass, test_mcp_suite bị loại", tests["ok"] and tests["py_compile"]["ok"] and tests["total"] == 1
       and tests["tests"][0]["name"] == "test_ok.py" and "test_mcp_suite.py" in tests["skipped"], str(tests)[:300])
 check("không để __pycache__ trong worktree", not any("__pycache__" in dp for dp, _, _ in os.walk(WT1)))
+check(f"test chạy qua sandbox ({SANDBOX_MECH}) — ghi vào build_tests + dispatch_log.sandbox + summary",
+      (tests.get("sandbox") or {}).get("mechanism") == SANDBOX_MECH and row["sandbox"].startswith(SANDBOX_MECH)
+      and f"Sandbox test: {SANDBOX_MECH}" in row["summary"], f"{tests.get('sandbox')} | {row['sandbox']} | {row['summary'][:300]}")
+check("agy KHÔNG nhận GW_ALLOW_UNSANDBOXED_TESTS (chỉ chạy test trong sandbox)", rl and rl[0].get("env_unsandboxed") == "", str(rl[:1])[:200])
+check("lúc agy chạy: allow chỉ chạy test qua wrapper app + đúng worktree, không python3 thẳng",
+      rl and any(r.startswith("command(regex:" + re.escape(SB) + " " + re.escape(os.path.realpath(WT1))) for r in rl[0]["allow"])
+      and "command(python3 -m py_compile)" not in rl[0]["allow"] and "command(regex:(python[0-9.]*))" in rl[0]["deny"], str(rl[:1])[:300])
+check("prompt đưa đúng lệnh wrapper app + worktree, cấm python3 thẳng",
+      f"{SB} {os.path.realpath(WT1)} python3 scripts/test_<tên>.py" in prompt and "KHÔNG gọi thẳng `python3" in prompt, prompt[-2500:])
 push = json.loads(row["build_push"])
 check("build_push ok", push["ok"] and push["sha"] == sha, str(push))
 check("compare_url đúng dạng", row["compare_url"] == f"https://github.com/chu-so-huu/gen-workplace/compare/main...wt/{T1}", row["compare_url"])
@@ -395,6 +438,32 @@ check("không sinh thêm dispatch war-room (plan) cho task", n_warroom == 0, n_w
 brief = [t for t in db.get_all_session_todos() if t["id"] == T1][0]["last_dispatch"]
 check("/api/state: last_dispatch có mode + nhánh + commit + compare", brief["mode"] == "build" and brief["build_commit"] == sha
       and brief["compare_url"], str(brief)[:300])
+
+print("[3b] Không có sandbox → KHÔNG chạy test, ghi sandbox_unavailable; chỉ GW_ALLOW_UNSANDBOXED_TESTS=1 mới chạy ngoài (#54)")
+_saved_env = {k: os.environ.get(k) for k in ("GW_SANDBOX_MECHANISMS", "GW_ALLOW_UNSANDBOXED_TESTS")}
+os.environ["GW_SANDBOX_MECHANISMS"] = "none"
+os.environ.pop("GW_ALLOW_UNSANDBOXED_TESTS", None)
+MARK = os.path.join(TMP, "marker-da-chay")
+MARK_TEST = os.path.join(WT1, "scripts", "test_marker.py")
+with open(MARK_TEST, "w") as f:
+    f.write(f"open({MARK!r}, 'w').write('x')\n")
+r = agy_build.run_tests(WT1)
+check("sandbox_unavailable: không chạy py_compile / test nào, ok=false, note rõ", (r.get("sandbox") or {}).get("status") == "sandbox_unavailable"
+      and not r["ok"] and r["tests"] == [] and "sandbox_unavailable" in r["note"] and not os.path.exists(MARK), str(r)[:400])
+lines = "\n".join(db.format_build_lines({"build_tests": r, "build_branch": "wt/x"}))
+check("tin kết quả: Test CHƯA CHẠY + hướng dẫn cài bubblewrap", "Test: CHƯA CHẠY" in lines and "dnf install -y bubblewrap" in lines, lines)
+os.environ["GW_ALLOW_UNSANDBOXED_TESTS"] = "1"
+r = agy_build.run_tests(WT1)
+check("GW_ALLOW_UNSANDBOXED_TESTS=1 → chạy ngoài sandbox, ghi rõ none-unsandboxed", os.path.exists(MARK)
+      and (r.get("sandbox") or {}).get("mechanism") == "none-unsandboxed" and r["ok"], str(r)[:400])
+lines = "\n".join(db.format_build_lines({"build_tests": r}))
+check("tin kết quả cảnh báo chạy NGOÀI sandbox", "CẢNH BÁO: chạy NGOÀI sandbox" in lines, lines)
+os.remove(MARK_TEST)
+for k, v in _saved_env.items():
+    if v is None:
+        os.environ.pop(k, None)
+    else:
+        os.environ[k] = v
 
 print("[4] Bằng chứng: commit trong worktree + đóng thay người giữ bằng SHA; dọn worktree khi done")
 ok, by, msg = db.verify_evidence_ref(sha, task_id=T1)
