@@ -4303,8 +4303,8 @@ body.resizing-active, body.resizing-active * {
 
     <div class="topRight">
       <span class="topmeta" id="syncState">Git: main</span>
-      <button class="btn ghost" id="topMcpBadge" onclick="openMcpModal()" title="Cổng MCP cho AI agent: xem tool và lấy cấu hình kết nối">
-        <span class="mcpDot">●</span> MCP <span class="badge subtle" id="topMcpToolBadge">… tools</span>
+      <button class="btn ghost" id="topMcpBadge" onclick="go('mcp')" title="MCP &amp; Kết nối: trạng thái, cấu hình client, tool và token">
+        <span class="mcpDot">●</span> MCP <span class="badge subtle" id="topMcpToolBadge">… tool</span>
       </button>
       <button class="btn ghost" id="topOwnerBadge" onclick="openOwnerProfileModal()" title="Hồ sơ chủ sở hữu">
         <span class="ownerDisplayName" id="topOwnerDisplayName">Ryan</span>
@@ -4348,8 +4348,8 @@ body.resizing-active, body.resizing-active * {
         <button class="navItem" data-nav="data" onclick="go('data', this)">
           <span class="navIcon">▧</span><span>Trung tâm dữ liệu</span>
         </button>
-        <button class="navItem" onclick="openMcpModal()" title="Cổng MCP cho AI agent">
-          <span class="navIcon">◎</span><span>MCP server</span>
+        <button class="navItem" data-nav="mcp" onclick="go('mcp', this)" title="MCP &amp; Kết nối: cổng cho agy, Claude và agent khác">
+          <span class="navIcon">◎</span><span>MCP &amp; Kết nối</span>
           <span class="badge subtle" id="sideMcpToolBadge">…</span>
         </button>
       </div>
@@ -5819,6 +5819,143 @@ body.resizing-active, body.resizing-active * {
       <!-- ========================================================================= -->
       <!-- 4. TRUNG TÂM DỮ LIỆU (DỮ LIỆU THẬT CỦA REPO GEN-WORKPLACE) -->
       <!-- ========================================================================= -->
+      <!-- ========================================================================= -->
+      <!-- MCP & KẾT NỐI (#28): trạng thái cổng MCP, cấu hình client, danh sách tool + chạy thử, token, bootstrap -->
+      <!-- ========================================================================= -->
+      <section class="screen" id="mcp" aria-labelledby="mcpTitle">
+        <div class="pageHead mcpHead">
+          <div>
+            <h1 id="mcpTitle">MCP &amp; Kết nối</h1>
+            <p>Cổng để agy CLI, Claude và các agent khác dùng tool của gen-workplace.</p>
+          </div>
+          <div class="actions">
+            <button class="btn" id="mcpRefreshBtn" onclick="mcpLoadAll()" title="Tải lại trạng thái, tool và token">↻ Làm mới</button>
+          </div>
+        </div>
+
+        <div class="mcpBanner" id="mcpErrorBanner" role="alert" hidden></div>
+
+        <div class="mcpStatusGrid" id="mcpStatusGrid" aria-live="polite">
+          <div class="mcpStat">
+            <div class="mcpStatLabel">Trạng thái</div>
+            <div class="mcpStatValue"><span class="mcpDotLg" id="mcpStDot"></span><span id="mcpStText">Đang kiểm tra…</span></div>
+            <div class="mcpStatSub" id="mcpStSub">&nbsp;</div>
+          </div>
+          <div class="mcpStat mcpStatUrl">
+            <div class="mcpStatLabel">URL kết nối</div>
+            <div class="mcpStatValue mcpUrlRow">
+              <code id="mcpStUrl">—</code>
+              <button class="btn small" onclick="mcpCopy(mcpState.endpoint, 'URL kết nối')" aria-label="Copy URL kết nối">Copy</button>
+            </div>
+            <div class="mcpStatSub" id="mcpStAuth">&nbsp;</div>
+          </div>
+          <div class="mcpStat">
+            <div class="mcpStatLabel">Tool</div>
+            <div class="mcpStatValue" id="mcpStTools">—</div>
+            <div class="mcpStatSub" id="mcpStToolsSub">&nbsp;</div>
+          </div>
+          <div class="mcpStat">
+            <div class="mcpStatLabel">Token / agent</div>
+            <div class="mcpStatValue" id="mcpStTokens">—</div>
+            <div class="mcpStatSub" id="mcpStTokensSub">&nbsp;</div>
+          </div>
+        </div>
+
+        <div class="mcpTabs" role="tablist" aria-label="Các phần của MCP">
+          <button class="mcpTab active" role="tab" id="mcpTab-connect" aria-controls="mcpPane-connect" aria-selected="true" onclick="mcpSwitchTab('connect')">Kết nối</button>
+          <button class="mcpTab" role="tab" id="mcpTab-tools" aria-controls="mcpPane-tools" aria-selected="false" tabindex="-1" onclick="mcpSwitchTab('tools')">Tool <span class="mcpTabCount" id="mcpTabToolsCount"></span></button>
+          <button class="mcpTab" role="tab" id="mcpTab-tokens" aria-controls="mcpPane-tokens" aria-selected="false" tabindex="-1" onclick="mcpSwitchTab('tokens')">Token <span class="mcpTabCount" id="mcpTabTokensCount"></span></button>
+          <button class="mcpTab" role="tab" id="mcpTab-bootstrap" aria-controls="mcpPane-bootstrap" aria-selected="false" tabindex="-1" onclick="mcpSwitchTab('bootstrap')">Bootstrap</button>
+        </div>
+
+        <!-- TAB: KẾT NỐI -->
+        <div class="mcpPane" id="mcpPane-connect" role="tabpanel" aria-labelledby="mcpTab-connect">
+          <div class="mcpConnect">
+            <div class="mcpClientList" role="radiogroup" aria-label="Chọn client" id="mcpClientList"></div>
+            <div class="mcpClientBody">
+              <div class="mcpTokenPick">
+                <label for="mcpConnTokenSelect">Token trong cấu hình</label>
+                <select id="mcpConnTokenSelect" onchange="mcpOnConnTokenChange(this.value)"></select>
+                <button class="btn small" id="mcpConnRevealBtn" onclick="mcpToggleConnReveal()" aria-pressed="false">Hiện</button>
+              </div>
+              <div class="mcpHint" id="mcpConnAuthNote"></div>
+              <div id="mcpClientDetail"><div class="mcpSkeleton">Đang tải cấu hình…</div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB: TOOL -->
+        <div class="mcpPane" id="mcpPane-tools" role="tabpanel" aria-labelledby="mcpTab-tools" hidden>
+          <div class="mcpToolbar">
+            <input type="search" id="mcpToolSearch" placeholder="Tìm tool theo tên hoặc mô tả…" aria-label="Tìm tool" oninput="mcpRenderTools()">
+            <div class="mcpSeg" role="group" aria-label="Lọc theo loại">
+              <button class="mcpSegBtn active" data-filter="all" aria-pressed="true" onclick="mcpSetToolFilter('all')">Tất cả</button>
+              <button class="mcpSegBtn" data-filter="ro" aria-pressed="false" onclick="mcpSetToolFilter('ro')">Chỉ đọc</button>
+              <button class="mcpSegBtn" data-filter="rw" aria-pressed="false" onclick="mcpSetToolFilter('rw')">Có tác dụng phụ</button>
+            </div>
+          </div>
+          <div id="mcpToolGroups"><div class="mcpSkeleton">Đang tải danh sách tool…</div></div>
+        </div>
+
+        <!-- TAB: TOKEN -->
+        <div class="mcpPane" id="mcpPane-tokens" role="tabpanel" aria-labelledby="mcpTab-tokens" hidden>
+          <div class="mcpToolbar">
+            <button class="btn primary" id="mcpNewTokenBtn" onclick="mcpToggleTokenForm(true)">+ Tạo token</button>
+            <label class="mcpSwitch" title="Bật thì mọi agent kết nối phải có token hợp lệ">
+              <input type="checkbox" id="mcpStrictToggle" onchange="mcpOnStrictToggle(this)">
+              <span class="mcpSwitchTrack" aria-hidden="true"></span>
+              <span>Bắt buộc token khi kết nối</span>
+            </label>
+          </div>
+
+          <form class="mcpCard mcpTokenForm" id="mcpTokenForm" onsubmit="mcpSubmitToken(event)" novalidate hidden>
+            <div class="mcpCardHead"><strong>Tạo token mới</strong></div>
+            <div class="mcpFormGrid">
+              <div class="mcpField">
+                <label for="mcpTokName">Tên agent <span class="mcpReq">bắt buộc</span></label>
+                <input id="mcpTokName" autocomplete="off" placeholder="vd: agy máy Boss, Claude Code, Gen-hub" required maxlength="80">
+              </div>
+              <div class="mcpField">
+                <label for="mcpTokExpires">Hết hạn sau</label>
+                <select id="mcpTokExpires">
+                  <option value="30">30 ngày</option>
+                  <option value="90" selected>90 ngày</option>
+                  <option value="365">1 năm</option>
+                  <option value="0">Không hết hạn</option>
+                </select>
+              </div>
+            </div>
+            <fieldset class="mcpScopeSet">
+              <legend>Quyền (scope)</legend>
+              <div class="mcpScopeGrid" id="mcpScopeGrid"></div>
+            </fieldset>
+            <div class="mcpFormErr" id="mcpTokFormErr" role="alert" hidden></div>
+            <div class="mcpFormActions">
+              <button type="button" class="btn" onclick="mcpToggleTokenForm(false)">Hủy</button>
+              <button type="submit" class="btn primary" id="mcpTokSubmit">Tạo token</button>
+            </div>
+          </form>
+
+          <div class="mcpCard mcpCreated" id="mcpCreatedCard" hidden></div>
+          <div id="mcpTokenList"><div class="mcpSkeleton">Đang tải token…</div></div>
+        </div>
+
+        <!-- TAB: BOOTSTRAP -->
+        <div class="mcpPane" id="mcpPane-bootstrap" role="tabpanel" aria-labelledby="mcpTab-bootstrap" hidden>
+          <div class="mcpCard">
+            <div class="mcpCardHead">
+              <div>
+                <strong>Hướng dẫn agent nhận khi kết nối</strong>
+                <div class="mcpHint">Gửi trong <code>initialize.instructions</code>. Chỉ đọc: sửa ở <code>backend/mcp_instructions.md</code>, app tự nạp lại khi khởi động.</div>
+              </div>
+              <button class="btn small" onclick="mcpCopy(mcpState.status && mcpState.status.instructions, 'bootstrap')">Copy</button>
+            </div>
+            <div class="mcpBootstrap" id="mcpBootstrap"><div class="mcpSkeleton">Đang tải…</div></div>
+            <div class="mcpBootMeta" id="mcpBootMeta"></div>
+          </div>
+        </div>
+      </section>
+
       <section class="screen" id="data">
         <div class="pageHead">
           <div>
@@ -6506,311 +6643,46 @@ body.resizing-active, body.resizing-active * {
   </div>
 </div>
 
-<!-- MODAL MCP SERVER CONTROL PLANE (GEN-HUB STANDARD LINKS & AUTH) -->
-<div class="modal" id="mcpModal">
-  <div class="modalBox" style="max-width:960px;width:95vw;max-height:92vh;display:flex;flex-direction:column;background:#0b0f17;border:1px solid var(--green);box-shadow:0 16px 50px rgba(0,0,0,0.85), 0 0 35px rgba(16,185,129,0.2)">
-    <!-- Modal Head -->
-    <div class="modalHead" style="border-bottom:1px solid rgba(16,185,129,0.3);padding:14px 20px;display:flex;align-items:center;justify-content:space-between">
-      <div style="display:flex;align-items:center;gap:10px">
-        <span style="font-size:24px"></span>
-        <div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <strong style="font-size:15px;color:var(--text)">Model Context Protocol (MCP) Server & Auth Gateway</strong>
-            <span class="badge" style="background:#064e3b;color:var(--green);font-weight:700;font-size:9.5px;padding:2px 7px;border-radius:4px" id="mcpModalStatusBadge">v1.0.0 · Online</span>
-          </div>
-          <div style="font-size:11px;color:var(--muted)">Cổng cấp link MCP, quản lý xác thực Bearer token và kiểm soát quyền truy cập cho AI Agents như Gen-hub</div>
-        </div>
-      </div>
-      <button class="iconBtn" onclick="closeMcpModal()" style="font-size:18px">×</button>
+<!-- MCP & KẾT NỐI: ngăn chạy thử tool + hộp xác nhận (#28) -->
+<div class="mcpDrawerBackdrop" id="mcpDrawerBackdrop" hidden onclick="mcpCloseRunner()"></div>
+<aside class="mcpDrawer" id="mcpDrawer" role="dialog" aria-modal="true" aria-labelledby="mcpRunTitle" hidden>
+  <div class="mcpDrawerHead">
+    <div class="mcpDrawerTitle">
+      <code id="mcpRunTitle"></code>
+      <span id="mcpRunBadge"></span>
     </div>
-
-    <!-- Main Navigation Tabs -->
-    <div style="display:flex;gap:4px;padding:8px 20px;background:#080c14;border-bottom:1px solid #1a2333">
-      <button class="btn small" onclick="switchMcpMainTab('links')" id="btnMcpMainTab-links" style="background:var(--panel3);color:var(--accent);font-weight:600;font-size:11px;padding:4px 12px;border-radius:5px">
-        Lấy Links & Xác Thực Agent
-      </button>
-      <button class="btn small" onclick="switchMcpMainTab('tools')" id="btnMcpMainTab-tools" style="background:transparent;color:var(--muted);font-size:11px;padding:4px 12px;border-radius:5px">
-        <span id="mcpToolsTabLabel">MCP Tools</span> & Test Console
-      </button>
-      <button class="btn small" onclick="switchMcpMainTab('configs')" id="btnMcpMainTab-configs" style="background:transparent;color:var(--muted);font-size:11px;padding:4px 12px;border-radius:5px">
-        Cấu Hình Client (Antigravity / Claude / Cursor)
-      </button>
-    </div>
-
-    <div class="modalBody" style="padding:16px 20px;overflow-y:auto;display:flex;flex-direction:column;gap:14px">
-      <!-- ================= TAB 1: LINKS & AUTHENTICATION ================= -->
-      <div id="mcpPane-links" style="display:flex;flex-direction:column;gap:14px">
-        
-        <!-- 1.1 Khung Chọn Token & Lấy Links Kết Nối -->
-        <div style="background:#0d131f;border:1px solid #1e2d42;border-radius:8px;padding:14px;display:flex;flex-direction:column;gap:10px">
-          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-            <div style="display:flex;align-items:center;gap:6px">
-              <span style="font-size:14px"></span>
-              <strong style="font-size:12.5px;color:var(--text)">Đường Dẫn Kết Nối MCP & Khóa Xác Thực (Authenticated Links)</strong>
-            </div>
-            <div style="display:flex;align-items:center;gap:8px">
-              <span style="font-size:11px;color:var(--muted)">Gắn khóa Token:</span>
-              <select id="mcpTokenSelect" onchange="onMcpTokenSelectChange()" style="font-size:11px;padding:3px 8px;background:#090d16;border:1px solid var(--line2);color:var(--accent);border-radius:5px;max-width:280px">
-                <!-- Dynamically populated tokens -->
-              </select>
-            </div>
-          </div>
-
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-            <!-- Link HTTP Authenticated -->
-            <div style="background:#080c14;border:1px solid #1a2436;border-radius:6px;padding:10px">
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
-                <span style="font-size:11px;font-weight:700;color:var(--accent)">MCP HTTP URL (Gắn Sẵn Token)</span>
-                <span class="badge" style="background:#0369a1;color:#fff;font-size:8px">Streamable HTTP</span>
-              </div>
-              <div style="display:flex;gap:6px">
-                <input type="text" id="mcpFieldAuthUrl" readonly class="input mono" style="font-size:11px;flex:1;background:#02050b;color:var(--text);padding:5px 8px;border:1px solid var(--line2);border-radius:4px" value="">
-                <button type="button" class="btn small" style="color:var(--accent);padding:4px 8px;font-size:10px" onclick="copyMcpField('mcpFieldAuthUrl', 'Link MCP Authenticated')">Copy</button>
-              </div>
-              <div style="font-size:9.5px;color:var(--muted);margin-top:4px">Được xác thực trực tiếp qua query <code style="color:var(--accent)">?token=...</code></div>
-            </div>
-
-            <!-- Link Stdio CLI -->
-            <div style="background:#080c14;border:1px solid #1a2436;border-radius:6px;padding:10px">
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
-                <span style="font-size:11px;font-weight:700;color:var(--green)">Stdio CLI Executable Bridge</span>
-                <span class="badge" style="background:#065f46;color:#fff;font-size:8px">Zero Latency</span>
-              </div>
-              <div style="display:flex;gap:6px">
-                <input type="text" id="mcpFieldStdio" readonly class="input mono" style="font-size:11px;flex:1;background:#02050b;color:var(--text);padding:5px 8px;border:1px solid var(--line2);border-radius:4px" value="~/.local/bin/gen-workplace-mcp">
-                <button type="button" class="btn small" style="color:var(--green);padding:4px 8px;font-size:10px" onclick="copyMcpField('mcpFieldStdio', 'Đường dẫn Stdio CLI')">Copy</button>
-              </div>
-              <div style="font-size:9.5px;color:var(--muted);margin-top:4px">Kênh stdin/stdout chuyên dụng cho Antigravity CLI & Claude</div>
-            </div>
-
-            <!-- Link SSE Stream -->
-            <div style="background:#080c14;border:1px solid #1a2436;border-radius:6px;padding:10px">
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
-                <span style="font-size:11px;font-weight:700;color:var(--purple)">Server-Sent Events (SSE) Stream</span>
-                <span class="badge" style="background:#5b21b6;color:#fff;font-size:8px">SSE Stream</span>
-              </div>
-              <div style="display:flex;gap:6px">
-                <input type="text" id="mcpFieldSseUrl" readonly class="input mono" style="font-size:11px;flex:1;background:#02050b;color:var(--text);padding:5px 8px;border:1px solid var(--line2);border-radius:4px" value="">
-                <button type="button" class="btn small" style="color:var(--purple);padding:4px 8px;font-size:10px" onclick="copyMcpField('mcpFieldSseUrl', 'Link SSE Stream')">Copy</button>
-              </div>
-              <div style="font-size:9.5px;color:var(--muted);margin-top:4px">Hỗ trợ MCP client giao tiếp qua chuẩn Server-Sent Events</div>
-            </div>
-
-            <!-- Bearer Token Thô -->
-            <div style="background:#080c14;border:1px solid #1a2436;border-radius:6px;padding:10px">
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
-                <span style="font-size:11px;font-weight:700;color:var(--yellow)">Khóa Bearer Token (API Key)</span>
-                <span class="badge" style="background:#78350f;color:#fcd34d;font-size:8px">Bearer Auth</span>
-              </div>
-              <div style="display:flex;gap:6px">
-                <input type="text" id="mcpFieldBearerToken" readonly class="input mono" style="font-size:11px;flex:1;background:#02050b;color:var(--yellow);padding:5px 8px;border:1px solid var(--line2);border-radius:4px" value="">
-                <button type="button" class="btn small" id="btnMcpRevealToken" style="color:var(--yellow);padding:4px 8px;font-size:10px" onclick="toggleMcpTokenReveal()" title="Hiện / che token">Hiện</button>
-                <button type="button" class="btn small" style="color:var(--yellow);padding:4px 8px;font-size:10px" onclick="copyMcpField('mcpFieldBearerToken', 'Khóa Bearer Token')">Copy</button>
-              </div>
-              <div style="font-size:9.5px;color:var(--muted);margin-top:4px">Dùng trong Header: <code style="color:var(--yellow)">Authorization: Bearer &lt;token&gt;</code></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 1.2 Khung Quản Trị Xác Thực & Bật/Tắt Chế Độ Nghiêm Ngặt -->
-        <div style="background:#090e18;border:1px solid #1a2538;border-radius:8px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
-          <div>
-            <div style="display:flex;align-items:center;gap:8px">
-              <strong style="font-size:12px;color:var(--text)">Cơ Chế Kiểm Soát Quyền Truy Cập (Access Control Policy)</strong>
-              <span id="mcpStrictAuthBadge" class="badge" style="font-size:9px;padding:2px 7px;border-radius:4px;background:var(--panel3);color:var(--muted)">Đang kiểm tra...</span>
-            </div>
-            <div style="font-size:10.5px;color:var(--muted);margin-top:2px">
-              Khi bật <b style="color:var(--text)">Strict Auth</b>, mọi agent gọi HTTP bắt buộc phải có Token hợp lệ; nếu không sẽ bị từ chối 401 như Gen-hub.
-            </div>
-          </div>
-          <div style="display:flex;gap:8px">
-            <button class="btn small" id="btnToggleMcpAuth" onclick="toggleMcpStrictAuth()" style="font-size:10.5px;padding:4px 10px">
-              Bật/Tắt Strict Auth
-            </button>
-            <button class="btn small primary" onclick="toggleMcpCreateForm()" style="background:#047857;border-color:var(--green);color:#fff;font-weight:700;font-size:10.5px;padding:4px 12px">
-              Kết Nối Agent / Tạo Token Mới
-            </button>
-          </div>
-        </div>
-
-        <!-- 1.3 Form Tạo Agent Token Mới (Collapsible) -->
-        <div id="mcpCreateTokenFormCard" style="display:none;background:#050912;border:1px solid #059669;border-radius:8px;padding:14px;box-shadow:0 8px 25px rgba(5,150,105,0.15)">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-            <div style="display:flex;align-items:center;gap:6px">
-              <span style="font-size:16px"></span>
-              <strong style="font-size:13px;color:var(--green)">Tạo Token Xác Thực Cho Agent Mới (Chuẩn Gen-hub)</strong>
-            </div>
-            <button class="iconBtn" onclick="toggleMcpCreateForm(false)" style="font-size:14px;width:22px;height:22px">×</button>
-          </div>
-
-          <form id="formCreateMcpToken" onsubmit="submitCreateMcpToken(event)" style="display:flex;flex-direction:column;gap:10px">
-            <div style="display:grid;grid-template-columns:2fr 1fr;gap:10px">
-              <div class="field" style="margin-bottom:0">
-                <label style="font-size:10.5px;font-weight:700;color:var(--text)">Tên Gợi Nhớ Cho Agent *</label>
-                <input type="text" id="mcpNewAgentName" placeholder="vd: Claude Code CLI, Codex Security, Subagent Tester" required style="font-size:11.5px;padding:5px 9px;background:#0d131f;border:1px solid var(--line2);color:var(--text);border-radius:5px">
-              </div>
-              <div class="field" style="margin-bottom:0">
-                <label style="font-size:10.5px;font-weight:700;color:var(--text)">Hạn Dùng Token</label>
-                <select id="mcpNewAgentExpires" style="font-size:11.5px;padding:5px 9px;background:#0d131f;border:1px solid var(--line2);color:var(--text);border-radius:5px">
-                  <option value="90" selected>90 ngày (Khuyên dùng như Gen-hub)</option>
-                  <option value="30">30 ngày</option>
-                  <option value="365">1 năm</option>
-                  <option value="0">Không hết hạn (Vĩnh viễn)</option>
-                </select>
-              </div>
-            </div>
-
-            <!-- Tool Permissions Scopes -->
-            <div style="background:#090f1a;border:1px solid #1a2538;border-radius:6px;padding:10px">
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-                <label style="font-size:10.5px;font-weight:700;color:var(--accent);margin-bottom:0">CẤP QUYỀN CÔNG CỤ (TOOL SCOPES)</label>
-                <label style="font-size:10px;color:var(--muted);cursor:pointer;display:flex;align-items:center;gap:4px">
-                  <input type="checkbox" id="mcpCheckAllPerms" checked onchange="toggleAllPermChecks(this.checked)"> Chọn tất cả tool
-                </label>
-              </div>
-              <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(160px, 1fr));gap:6px" id="mcpPermOptionsContainer">
-                <label style="font-size:10.5px;color:var(--text);display:flex;align-items:center;gap:5px;cursor:pointer">
-                  <input type="checkbox" class="mcpPermCheck" value="quota" checked> Quota & Google Accounts
-                </label>
-                <label style="font-size:10.5px;color:var(--text);display:flex;align-items:center;gap:5px;cursor:pointer">
-                  <input type="checkbox" class="mcpPermCheck" value="swarm" checked> Swarm Workers & War Room
-                </label>
-                <label style="font-size:10.5px;color:var(--text);display:flex;align-items:center;gap:5px;cursor:pointer">
-                  <input type="checkbox" class="mcpPermCheck" value="kanban" checked> Kanban Tasks & Checklists
-                </label>
-                <label style="font-size:10.5px;color:var(--text);display:flex;align-items:center;gap:5px;cursor:pointer">
-                  <input type="checkbox" class="mcpPermCheck" value="chat" checked> Chat & Progressive Compaction
-                </label>
-                <label style="font-size:10.5px;color:var(--text);display:flex;align-items:center;gap:5px;cursor:pointer">
-                  <input type="checkbox" class="mcpPermCheck" value="files" checked> Notes, Files & Status
-                </label>
-              </div>
-            </div>
-
-            <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:4px">
-              <button type="button" class="btn small" onclick="toggleMcpCreateForm(false)">Hủy</button>
-              <button type="submit" class="btn small primary" style="background:#059669;border-color:var(--green)">
-                Xác Nhận Tạo Agent & Token
-              </button>
-            </div>
-          </form>
-        </div>
-
-        <!-- 1.4 Khung Hiển Thị Kết Quả Sau Khi Tạo Token (Gen-hub Snippet Card) -->
-        <div id="mcpCreatedResultCard" style="display:none;background:#030712;border:1px solid var(--green);border-radius:8px;padding:14px;box-shadow:0 8px 30px rgba(16,185,129,0.25)">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-            <div style="display:flex;align-items:center;gap:6px">
-              <span style="font-size:16px"></span>
-              <strong style="font-size:13px;color:var(--green)" id="mcpCreatedTitle">Đã Tạo Token Thành Công!</strong>
-            </div>
-            <button class="iconBtn" onclick="document.getElementById('mcpCreatedResultCard').style.display='none'" style="font-size:14px;width:22px;height:22px">×</button>
-          </div>
-          <p style="font-size:11px;color:var(--muted);line-height:1.4;margin:0 0 8px 0">
-            Sao chép cả khối này — đủ endpoint + key + ví dụ để đưa cho app hoặc agent khác dùng ngay. Xem lại được bất cứ lúc nào qua bảng bên dưới.
-          </p>
-          <div style="display:flex;flex-direction:column;gap:8px">
-            <textarea id="mcpCreatedSnippetArea" readonly rows="5" class="input mono" style="font-size:11px;background:#010409;color:#a7f3d0;padding:8px 10px;border:1px solid var(--panel3);border-radius:5px;white-space:pre"></textarea>
-            <div style="display:flex;gap:8px;flex-wrap:wrap">
-              <button type="button" class="btn small primary" onclick="copyCreatedMcpSnippet()" style="font-size:10px">
-                Sao Chép Cả Khối cURL
-              </button>
-              <button type="button" class="btn small" onclick="copyCreatedMcpUrl()" style="font-size:10px;color:var(--accent)">
-                Sao Chép Link URL
-              </button>
-              <button type="button" class="btn small" onclick="copyCreatedMcpTokenOnly()" style="font-size:10px;color:var(--yellow)">
-                Sao Chép Riêng Token
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <!-- 1.5 Bảng Quản Lý Agent & Quyền Đã Cấp (Agents & Grants Table) -->
-        <div style="background:#090d16;border:1px solid #1a2538;border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:8px">
-          <div style="display:flex;align-items:center;justify-content:space-between">
-            <div style="display:flex;align-items:center;gap:6px">
-              <strong style="font-size:12px;color:var(--text)">Danh Sách Agent & Quyền Đã Cấp (Agents & Grants)</strong>
-              <span class="badge" style="background:var(--panel3);color:var(--accent);font-size:9px" id="mcpTokensCountBadge">1 Tokens</span>
-            </div>
-            <button class="btn small" onclick="loadMcpTokensAndAuth()" style="font-size:9.5px;padding:2px 7px;color:var(--muted)">
-              Tải Lại
-            </button>
-          </div>
-
-          <div style="overflow-x:auto;max-height:220px">
-            <table style="width:100%;border-collapse:collapse;font-size:11px;text-align:left">
-              <thead>
-                <tr style="border-bottom:1px solid var(--panel3);color:var(--muted);font-size:10px">
-                  <th style="padding:6px 8px">AGENT & ID</th>
-                  <th style="padding:6px 8px">KHÓA TOKEN</th>
-                  <th style="padding:6px 8px">QUYỀN HẠN</th>
-                  <th style="padding:6px 8px">HẠN DÙNG</th>
-                  <th style="padding:6px 8px">LẦN GỌI GẦN NHẤT</th>
-                  <th style="padding:6px 8px">LƯỢT GỌI</th>
-                  <th style="padding:6px 8px">TRẠNG THÁI</th>
-                  <th style="padding:6px 8px;text-align:right">THAO TÁC</th>
-                </tr>
-              </thead>
-              <tbody id="mcpTokensTableBody">
-                <!-- Dynamically populated tokens rows -->
-              </tbody>
-            </table>
-          </div>
-        </div>
+    <button class="iconBtn" onclick="mcpCloseRunner()" aria-label="Đóng (Esc)">×</button>
+  </div>
+  <div class="mcpDrawerBody">
+    <p class="mcpRunSummary" id="mcpRunSummary"></p>
+    <details class="mcpRunDesc"><summary>Mô tả đầy đủ</summary><div id="mcpRunDesc"></div></details>
+    <form id="mcpRunForm" onsubmit="event.preventDefault(); mcpRunTool();" novalidate>
+      <div class="mcpRunFields" id="mcpRunFields"></div>
+      <div class="mcpRunActions">
+        <button type="submit" class="btn primary" id="mcpRunBtn">Chạy</button>
+        <span class="mcpHint" id="mcpRunHint"></span>
       </div>
-
-      <!-- ================= TAB 2: MCP TOOLS & TEST CONSOLE ================= -->
-      <div id="mcpPane-tools" style="display:none;flex-direction:column;gap:12px">
-        <div style="display:flex;align-items:center;justify-content:space-between">
-          <div style="display:flex;align-items:center;gap:6px">
-            <strong style="font-size:12px;color:var(--text)">Danh mục công cụ MCP</strong>
-            <span class="badge" style="background:#064e3b;color:var(--green);font-size:8.5px" id="mcpToolsTotalBadge">đang tải…</span>
-            <span style="font-size:10px;color:var(--muted)">Test gọi thẳng tool chỉ đọc; tool có tác dụng phụ phải nhập tham số và xác nhận.</span>
-          </div>
-          <input type="text" id="mcpToolSearchInput" placeholder="Lọc tool theo tên hoặc chức năng..." oninput="filterMcpTools(this.value)" style="font-size:11px;padding:3px 8px;border-radius:5px;width:240px;background:#090d15;border:1px solid var(--panel3);color:var(--text)">
-        </div>
-
-        <div id="mcpToolsListContainer" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;max-height:280px;overflow-y:auto;padding-right:4px">
-          <!-- Dynamically populated tool cards with live Test button -->
-        </div>
-
-        <!-- Interactive Tool Test Console -->
-        <div id="mcpLiveTestSection" style="display:none;background:#040711;border:1px solid var(--panel3);border-radius:8px;padding:12px">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-            <strong style="font-size:11.5px;color:var(--accent)" id="mcpTestToolTitle">Test Tool Trực Tiếp</strong>
-            <button class="iconBtn" onclick="document.getElementById('mcpLiveTestSection').style.display='none'" style="width:20px;height:20px;font-size:12px">×</button>
-          </div>
-          <pre id="mcpLiveTestOutput" style="background:#02050b;border:1px solid #1a2233;border-radius:5px;padding:8px 10px;font-family:var(--mono);font-size:10.5px;color:#a7f3d0;max-height:160px;overflow-y:auto;margin:0"></pre>
-        </div>
-      </div>
-
-      <!-- ================= TAB 3: CLIENT CONFIGURATIONS ================= -->
-      <div id="mcpPane-configs" style="display:none;flex-direction:column;gap:12px">
-        <div style="background:#0d131f;border:1px solid #1e2d42;border-radius:8px;padding:14px">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-            <span style="font-size:12px;font-weight:700;color:var(--text)">Cấu Hình Tích Hợp 1-Click (Tự Động Điền Token Đang Chọn)</span>
-            <div style="display:flex;gap:6px">
-              <button class="btn small" onclick="switchMcpConfigTab('antigravity')" id="btnMcpTab-antigravity" style="font-size:9.5px;padding:2px 8px;background:var(--panel3);color:var(--accent)">Antigravity / agy</button>
-              <button class="btn small" onclick="switchMcpConfigTab('claude')" id="btnMcpTab-claude" style="font-size:9.5px;padding:2px 8px;background:transparent;color:var(--muted)">Claude Desktop</button>
-              <button class="btn small" onclick="switchMcpConfigTab('cursor')" id="btnMcpTab-cursor" style="font-size:9.5px;padding:2px 8px;background:transparent;color:var(--muted)">Cursor / VS Code</button>
-            </div>
-          </div>
-          <div style="position:relative">
-            <pre id="mcpConfigSnippet" style="background:#040711;border:1px solid var(--panel3);border-radius:6px;padding:10px 12px;font-family:var(--mono);font-size:11px;color:var(--text);margin:0;max-height:150px;overflow-y:auto"></pre>
-            <button class="btn small primary" style="position:absolute;top:6px;right:8px;font-size:9.5px;padding:3px 8px" onclick="copyCurrentMcpSnippet()">Copy JSON</button>
-          </div>
-          <div style="font-size:10px;color:var(--muted);margin-top:6px" id="mcpConfigSnippetPathHelp">
-            Tệp đích: <code style="color:var(--accent)">~/.gemini/config/mcp_config.json</code>
-          </div>
-        </div>
+    </form>
+    <div class="mcpConfirmBox" id="mcpRunConfirm" role="alertdialog" aria-labelledby="mcpRunConfirmTitle" hidden>
+      <strong id="mcpRunConfirmTitle">Chạy thật tool có tác dụng phụ?</strong>
+      <p id="mcpRunConfirmText"></p>
+      <pre class="mcpPre" id="mcpRunConfirmArgs"></pre>
+      <div class="mcpFormActions">
+        <button type="button" class="btn" id="mcpRunConfirmCancel" onclick="mcpCancelRunConfirm()">Hủy</button>
+        <button type="button" class="btn mcpDanger" id="mcpRunConfirmOk" onclick="mcpRunTool(true)">Xác nhận chạy</button>
       </div>
     </div>
+    <div class="mcpResult" id="mcpRunResult" aria-live="polite"></div>
+  </div>
+</aside>
 
-    <!-- Modal Foot -->
-    <div class="modalFoot" style="padding:10px 20px;border-top:1px solid #1a2333;display:flex;align-items:center;justify-content:space-between">
-      <div style="font-size:11px;color:var(--muted)">
-        Hệ thống tự động liên kết với <code style="color:var(--accent)">~/.gemini/config/mcp_config.json</code>
-      </div>
-      <button class="btn" onclick="closeMcpModal()">Đóng</button>
+<div class="modal" id="mcpConfirmModal" role="alertdialog" aria-modal="true" aria-labelledby="mcpConfirmTitle" aria-describedby="mcpConfirmText">
+  <div class="modalBox" style="max-width:440px">
+    <div class="modalHead"><strong id="mcpConfirmTitle"></strong></div>
+    <div class="modalBody"><p id="mcpConfirmText" class="mcpConfirmText"></p></div>
+    <div class="modalFoot">
+      <button class="btn" id="mcpConfirmCancel" onclick="mcpConfirmDone(false)">Hủy</button>
+      <button class="btn mcpDanger" id="mcpConfirmOk" onclick="mcpConfirmDone(true)"></button>
     </div>
   </div>
 </div>
@@ -6890,6 +6762,8 @@ function scrollToTarget(selector) {
 
 // Navigation Screen Switching
 function go(id, el) {
+  const prevScreen = document.querySelector('.screen.active')?.id;
+  if (id === 'mcp' && prevScreen && prevScreen !== 'mcp') mcpState.prevScreen = prevScreen;
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   $(id)?.classList.add('active');
   document.querySelectorAll('.navItem').forEach(n => n.classList.remove('active'));
@@ -6924,6 +6798,8 @@ function go(id, el) {
     refreshHubTasks();
   } else if (id === 'data') {
     switchData('repo');
+  } else if (id === 'mcp') {
+    mcpOpen();
   }
 }
 
@@ -14223,593 +14099,855 @@ setInterval(async () => {
 }, 5000);
 
 // ==========================================
-// MCP SERVER CONTROL PLANE JAVASCRIPT
+// MÀN MCP & KẾT NỐI (#28)
+// Mọi số liệu lấy từ API thật: GET /api/mcp/status (tool + metadata nhóm/scope/chỉ đọc từ mcp_core.TOOL_META),
+// GET /api/mcp/tokens, POST /mcp (ping + tools/call). Không có danh sách tool / phân loại nào ghi ở frontend.
 // ==========================================
-let mcpMainActiveTab = 'links';
-let mcpActiveTab = 'antigravity';
-let mcpCachedTools = [];
-let mcpTokensList = [];
-let mcpAuthStatus = { require_auth: false, active_tokens: 0, total_tokens: 0 };
-let mcpSelectedToken = null;
-let mcpLastCreatedTokenData = null;
-let mcpTokenRevealed = false;      // token master mặc định bị che (••••), bấm "Hiện" mới thấy
-let mcpSnippetReal = null;
-let mcpReadOnlyTools = new Set();
-function maskToken(tok) { return tok ? `${String(tok).slice(0, 8)}••••••••` : ''; }
-function toggleMcpTokenReveal() {
-  mcpTokenRevealed = !mcpTokenRevealed;
-  const b = document.getElementById('btnMcpRevealToken');
-  if (b) b.textContent = mcpTokenRevealed ? 'Che' : 'Hiện';
-  updateMcpLinkFields();
+const mcpState = {
+  status: null, tools: [], groups: [], scopes: [], tokens: [], auth: null,
+  endpoint: '', ping: null, loadError: '', loading: false, loadedOnce: false,
+  tab: 'connect', client: 'agy', connTokenId: '', connReveal: false, codeCopies: [],
+  toolFilter: 'all', revealed: new Set(), runTool: null, lastResult: null, lastCreated: null,
+  suggest: {}, prevScreen: null, lastFocus: null
+};
+
+const MCP_CLIENTS = [
+  { id: 'agy', name: 'agy CLI (Antigravity)', sub: 'Worker agy chạy trên máy chủ này' },
+  { id: 'claude-code', name: 'Claude Code', sub: 'Một lệnh claude mcp add' },
+  { id: 'claude-ai', name: 'Claude.ai / Gen-hub', sub: 'Connector: URL + token' },
+  { id: 'json', name: 'JSON chung', sub: 'Cursor, VS Code, client khác' }
+];
+
+// Nút cũ gọi openMcpModal() / closeMcpModal() → dẫn tới màn mới
+function openMcpModal() { go('mcp'); }
+function closeMcpModal() { mcpLeave(); }
+
+function mcpLeave() {
+  const prev = mcpState.prevScreen && mcpState.prevScreen !== 'mcp' ? mcpState.prevScreen : 'gen_workplace';
+  go(prev);
 }
 
-function switchMcpMainTab(tab) {
-  mcpMainActiveTab = tab;
-  ['links', 'tools', 'configs'].forEach(t => {
-    const btn = document.getElementById(`btnMcpMainTab-${t}`);
-    const pane = document.getElementById(`mcpPane-${t}`);
-    if (btn) {
-      if (t === tab) {
-        btn.style.background = 'var(--panel3)';
-        btn.style.color = 'var(--accent)';
-        btn.style.fontWeight = '600';
-      } else {
-        btn.style.background = 'transparent';
-        btn.style.color = 'var(--muted)';
-        btn.style.fontWeight = 'normal';
-      }
-    }
-    if (pane) {
-      pane.style.display = (t === tab) ? 'flex' : 'none';
-    }
-  });
-
-  if (tab === 'configs') {
-    switchMcpConfigTab(mcpActiveTab);
-  }
+function mcpOpen() {
+  mcpSwitchTab(mcpState.tab, false);
+  mcpLoadAll();
 }
 
-function updateMcpConfigSnippets() {
-  // Token trong snippet chỉ hiện khi đã bấm "Hiện"; Copy JSON luôn lấy bản có token thật
-  const rawTok = (mcpSelectedToken && mcpSelectedToken.token_raw) ? mcpSelectedToken.token_raw : '';
-  const tokVal = rawTok ? (mcpTokenRevealed ? rawTok : maskToken(rawTok)) : 'gw_live_your_token_here';
-  const urlWithTok = `${location.origin}/mcp?token=${tokVal}`;
-  mcpSnippetReal = null;
-
-  const mcpConfigs = {
-    antigravity: `{
-  "mcpServers": {
-    "gen-workplace": {
-      "command": "~/.local/bin/gen-workplace-mcp"
-    }
-  }
-}`,
-    claude: `{
-  "mcpServers": {
-    "gen-workplace": {
-      "command": "~/.local/bin/gen-workplace-mcp"
-    }
-  }
-}`,
-    cursor: `{
-  "mcpServers": {
-    "gen-workplace": {
-      "url": "${urlWithTok}"
-    }
-  }
-}`
-  };
-
-  const snippetEl = document.getElementById('mcpConfigSnippet');
-  if (snippetEl) {
-    snippetEl.textContent = mcpConfigs[mcpActiveTab] || '';
-  }
-  mcpSnippetReal = rawTok ? (mcpConfigs[mcpActiveTab] || '').split(tokVal).join(rawTok) : null;
-
-  const helpEl = document.getElementById('mcpConfigSnippetPathHelp');
-  if (helpEl) {
-    if (mcpActiveTab === 'antigravity') {
-      helpEl.innerHTML = 'Tệp đích: <code style="color:var(--accent)">~/.gemini/config/mcp_config.json</code> (Đã đăng ký sẵn)';
-    } else if (mcpActiveTab === 'claude') {
-      helpEl.innerHTML = 'Tệp đích: <code style="color:var(--accent)">~/.claude.json</code> hoặc <code style="color:var(--accent)">~/Library/Application Support/Claude/claude_desktop_config.json</code>';
-    } else {
-      helpEl.innerHTML = 'Tệp đích: <code style="color:var(--accent)">.cursor/mcp.json</code> trong thư mục dự án Cursor';
-    }
-  }
+function mcpNorm(s) {
+  return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase();
 }
 
-function switchMcpConfigTab(tab) {
-  mcpActiveTab = tab;
-  ['antigravity', 'claude', 'cursor'].forEach(t => {
-    const btn = document.getElementById(`btnMcpTab-${t}`);
-    if (btn) {
-      if (t === tab) {
-        btn.style.background = 'var(--panel3)';
-        btn.style.color = 'var(--accent)';
-      } else {
-        btn.style.background = 'transparent';
-        btn.style.color = 'var(--muted)';
-      }
-    }
-  });
-  updateMcpConfigSnippets();
+function mcpFmtTime(s) {
+  // "2026-09-29 10:12:03" → "10:12 29/09/2026"; chuỗi không phải thời gian (vd "Chưa sử dụng") → null
+  const m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/.exec(String(s || ''));
+  return m ? `${m[4]}:${m[5]} ${m[3]}/${m[2]}/${m[1]}` : null;
 }
 
-function copyCurrentMcpSnippet() {
-  const snippetEl = document.getElementById('mcpConfigSnippet');
-  if (snippetEl) {
-    copyText(mcpSnippetReal || snippetEl.textContent);
-    showToast(`Đã copy JSON cấu hình MCP cho ${mcpActiveTab.toUpperCase()}!`);
-  }
-}
+function mcpMask(tok) { return tok ? `${String(tok).slice(0, 12)}••••••••` : ''; }
 
-async function loadMcpTokensAndAuth() {
-  try {
-    const res = await fetch('/api/mcp/tokens');
-    if (res.ok) {
-      const data = await res.json();
-      mcpTokensList = data.tokens || [];
-      mcpAuthStatus = data.auth_status || { require_auth: false };
-      renderMcpTokensUI();
-    }
-  } catch (err) {
-    console.error('Lỗi tải token MCP:', err);
-  }
-}
-
-function renderMcpTokensUI() {
-  // 1. Cập nhật Badge Strict Auth
-  const badgeEl = document.getElementById('mcpStrictAuthBadge');
-  const btnToggle = document.getElementById('btnToggleMcpAuth');
-  if (badgeEl) {
-    if (mcpAuthStatus.require_auth) {
-      badgeEl.textContent = 'Bắt buộc xác thực (Strict Auth: ON)';
-      badgeEl.style.background = '#7f1d1d';
-      badgeEl.style.color = 'var(--red)';
-      if (btnToggle) btnToggle.textContent = 'Tắt Strict Auth';
-    } else {
-      badgeEl.textContent = 'Xác thực tùy chọn (Strict Auth: OFF)';
-      badgeEl.style.background = '#14532d';
-      badgeEl.style.color = '#86efac';
-      if (btnToggle) btnToggle.textContent = 'Bật Strict Auth';
-    }
-  }
-
-  // 2. Điền danh sách chọn token
-  const selectEl = document.getElementById('mcpTokenSelect');
-  if (selectEl) {
-    const activeTokens = mcpTokensList.filter(t => t.status === 'active');
-    if (activeTokens.length > 0) {
-      selectEl.innerHTML = activeTokens.map((t, idx) => 
-        `<option value="${escapeHtml(t.id)}" ${idx === 0 ? 'selected' : ''}>${escapeHtml(t.name)} (${escapeHtml(t.token_masked)})</option>`
-      ).join('');
-      mcpSelectedToken = activeTokens[0];
-    } else {
-      selectEl.innerHTML = '<option value="">(Chưa có token nào)</option>';
-      mcpSelectedToken = null;
-    }
-    updateMcpLinkFields();
-  }
-
-  // 3. Render bảng Agents & Grants
-  const tableBody = document.getElementById('mcpTokensTableBody');
-  const countBadge = document.getElementById('mcpTokensCountBadge');
-  if (countBadge) {
-    countBadge.textContent = `${mcpTokensList.length} Token${mcpTokensList.length > 1 ? 's' : ''}`;
-  }
-
-  if (tableBody) {
-    if (mcpTokensList.length === 0) {
-      tableBody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:16px">Chưa có Token xác thực nào. Hãy tạo token đầu tiên bên trên.</td></tr>';
-      return;
-    }
-
-    tableBody.innerHTML = mcpTokensList.map(t => {
-      const isAct = (t.status === 'active');
-      const statusBadge = isAct 
-        ? '<span class="badge" style="background:#064e3b;color:var(--green);font-size:8.5px">Active</span>'
-        : '<span class="badge" style="background:var(--line2);color:var(--muted);font-size:8.5px">Revoked</span>';
-
-      const permBadge = (t.permissions.includes('all') || t.permissions.includes('*'))
-        ? `<span class="badge" style="background:#0369a1;color:#bae6fd;font-size:8.5px">Toàn quyền (${mcpCachedTools.length || 'mọi'} tool)</span>`
-        : `<span class="badge" style="background:var(--panel3);color:var(--accent);font-size:8.5px">${t.permissions.join(', ')}</span>`;
-
-      const revokeBtn = isAct
-        ? `<button class="btn small" style="color:var(--red);border-color:#7f1d1d;font-size:9px;padding:1px 6px" onclick="revokeMcpToken('${t.id}', '${t.name}')">Thu hồi</button>`
-        : '<span style="color:var(--muted2);font-size:9px">Đã thu hồi</span>';
-
-      return `
-        <tr style="border-bottom:1px solid #141c2b">
-          <td style="padding:6px 8px">
-            <strong style="color:var(--text)">${escapeHtml(t.name)}</strong>
-            <div style="font-size:9px;color:var(--muted2);font-family:var(--mono)">${t.id} · ${t.client}</div>
-          </td>
-          <td style="padding:6px 8px">
-            <div style="display:flex;align-items:center;gap:4px">
-              <code style="color:var(--yellow);font-size:10px">${t.token_masked}</code>
-              <button class="btn small" style="font-size:8.5px;padding:1px 5px;color:var(--yellow)" onclick="copyMcpTokenById('${escapeHtml(t.id)}')" title="Sao chép toàn bộ Token">Copy</button>
-            </div>
-          </td>
-          <td style="padding:6px 8px">${permBadge}</td>
-          <td style="padding:6px 8px;color:var(--text);font-size:10px">${t.expires_at}</td>
-          <td style="padding:6px 8px;color:var(--muted);font-size:10px">${t.last_used_at}</td>
-          <td style="padding:6px 8px;color:var(--text);font-size:10.5px">${t.calls_count}</td>
-          <td style="padding:6px 8px">${statusBadge}</td>
-          <td style="padding:6px 8px;text-align:right">${revokeBtn}</td>
-        </tr>
-      `;
-    }).join('');
-  }
-}
-
-function copyMcpTokenById(id) {
-  const t = mcpTokensList.find(x => x.id === id);
-  if (t) copyText(t.token_raw);
-}
-
-function onMcpTokenSelectChange() {
-  const selectEl = document.getElementById('mcpTokenSelect');
-  if (!selectEl) return;
-  const tid = selectEl.value;
-  mcpSelectedToken = mcpTokensList.find(t => t.id === tid) || null;
-  updateMcpLinkFields();
-}
-
-function updateMcpLinkFields() {
-  const rawToken = (mcpSelectedToken && mcpSelectedToken.token_raw) ? mcpSelectedToken.token_raw : '';
-  const authUrlField = document.getElementById('mcpFieldAuthUrl');
-  const sseUrlField = document.getElementById('mcpFieldSseUrl');
-  const bearerField = document.getElementById('mcpFieldBearerToken');
-
-  // Host thật mà trình duyệt đang mở (không ghi cứng localhost:8888); ô hiển thị che token, dataset.real giữ bản đầy đủ để Copy
-  const baseOrigin = location.origin;
-  const shown = mcpTokenRevealed ? rawToken : maskToken(rawToken);
-  const setField = (el, real, display) => { if (!el) return; el.value = display; el.dataset.real = real; };
-  setField(authUrlField, rawToken ? `${baseOrigin}/mcp?token=${rawToken}` : `${baseOrigin}/mcp`, rawToken ? `${baseOrigin}/mcp?token=${shown}` : `${baseOrigin}/mcp`);
-  setField(sseUrlField, rawToken ? `${baseOrigin}/sse?token=${rawToken}` : `${baseOrigin}/sse`, rawToken ? `${baseOrigin}/sse?token=${shown}` : `${baseOrigin}/sse`);
-  setField(bearerField, rawToken, rawToken ? shown : '(chưa có token)');
-  updateMcpConfigSnippets();
-}
-
-function copyMcpField(inputId, label) {
-  const el = document.getElementById(inputId);
-  if (!el) return;
-  const v = el.dataset.real !== undefined ? el.dataset.real : el.value;
-  if (!v) { showToast('Chưa có token để sao chép'); return; }
-  copyText(v);
-  showToast(`Đã copy ${label}!`);
-}
-
-async function toggleMcpStrictAuth() {
-  const nextVal = !mcpAuthStatus.require_auth;
-  try {
-    const res = await fetch('/api/mcp/auth/toggle', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ require_auth: nextVal })
-    });
-    if (res.ok) {
-      mcpAuthStatus = await res.json();
-      renderMcpTokensUI();
-      showToast(nextVal ? 'Đã BẬT chế độ bắt buộc xác thực token MCP' : 'Đã chuyển sang chế độ xác thực tùy chọn');
-    }
-  } catch (err) {
-    showToast('Lỗi khi thay đổi chế độ xác thực: ' + err.message);
-  }
-}
-
-function toggleMcpCreateForm(show) {
-  const card = document.getElementById('mcpCreateTokenFormCard');
-  if (!card) return;
-  const isShown = (show !== undefined) ? show : (card.style.display !== 'none');
-  card.style.display = isShown ? 'none' : 'block';
-  if (!isShown) {
-    setTimeout(() => {
-      const nameInput = document.getElementById('mcpNewAgentName');
-      if (nameInput) nameInput.focus();
-    }, 100);
-  }
-}
-
-function toggleAllPermChecks(checked) {
-  const checks = document.querySelectorAll('.mcpPermCheck');
-  checks.forEach(c => { c.checked = checked; });
-}
-
-async function submitCreateMcpToken(e) {
-  if (e) e.preventDefault();
-  const nameEl = document.getElementById('mcpNewAgentName');
-  const expEl = document.getElementById('mcpNewAgentExpires');
-  const allCheck = document.getElementById('mcpCheckAllPerms');
-
-  const name = nameEl ? nameEl.value.trim() : '';
-  if (!name) {
-    showToast('⚠️ Vui lòng nhập tên gợi nhớ cho Agent');
-    return;
-  }
-  const expiresDays = expEl ? parseInt(expEl.value) : 90;
-
-  let perms = [];
-  if (allCheck && allCheck.checked) {
-    perms = ['all'];
+function mcpCopy(text, label) {
+  if (!text) { showToast('Chưa có nội dung để copy'); return; }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(String(text))
+      .then(() => showToast(`Đã copy ${label || ''}`.trim()))
+      .catch(() => showToast('Trình duyệt không cho phép copy'));
   } else {
-    document.querySelectorAll('.mcpPermCheck:checked').forEach(c => {
-      perms.push(c.value);
-    });
-    if (perms.length === 0) perms = ['all'];
+    showToast('Trình duyệt không hỗ trợ copy');
   }
+}
 
+async function mcpFetchJson(url, opts) {
+  const res = await fetch(url, opts);
+  let data = null;
+  try { data = await res.json(); } catch (e) { data = null; }
+  return { res, data };
+}
+
+// Token dùng khi màn này tự gọi /mcp: chỉ gửi khi đang bắt buộc token (tránh cộng lượt gọi giả vào token của agent)
+function mcpUiToken() {
+  if (!mcpState.auth || !mcpState.auth.require_auth) return '';
+  const act = mcpState.tokens.filter(t => t.status === 'active');
+  const full = act.find(t => (t.permissions || []).some(p => p === 'all' || p === '*'));
+  return (full || act[0] || {}).token_raw || '';
+}
+
+async function mcpLoadAll() {
+  if (mcpState.loading) return;
+  mcpState.loading = true;
+  const btn = $('mcpRefreshBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Đang tải…'; }
+  if (!mcpState.loadedOnce) mcpRenderHeader();
+  const errs = [];
   try {
-    const res = await fetch('/api/mcp/tokens/create', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: name,
-        permissions: perms,
-        expires_days: expiresDays,
-        client: 'Manual Connect'
-      })
-    });
-
-    const data = await res.json();
-    if (res.ok && data.ok) {
-      mcpLastCreatedTokenData = data;
-      toggleMcpCreateForm(false);
-      if (nameEl) nameEl.value = '';
-
-      // Hiển thị Card kết quả chuẩn Gen-hub
-      const resCard = document.getElementById('mcpCreatedResultCard');
-      const snippetArea = document.getElementById('mcpCreatedSnippetArea');
-      const titleEl = document.getElementById('mcpCreatedTitle');
-      if (resCard && snippetArea) {
-        resCard.style.display = 'block';
-        if (titleEl) titleEl.textContent = `Đã Tạo Token Cho "${data.name}"!`;
-        snippetArea.value = data.curl_snippet;
-      }
-
-      await loadMcpTokensAndAuth();
-      showToast(`Đã tạo thành công Token MCP cho ${data.name}!`);
+    const [st, tk] = await Promise.allSettled([mcpFetchJson('/api/mcp/status'), mcpFetchJson('/api/mcp/tokens')]);
+    if (st.status === 'fulfilled' && st.value.res.ok && st.value.data) {
+      const d = st.value.data;
+      mcpState.status = d;
+      mcpState.tools = d.tools || [];
+      mcpState.groups = d.groups || [];
+      mcpState.scopes = d.scopes || [];
+      mcpState.auth = d.auth || null;
+      mcpState.endpoint = (d.auth && d.auth.endpoint) || `${location.origin}/mcp`;
     } else {
-      showToast(`Lỗi tạo token: ${data.error || 'Thao tác không thành công'}`);
+      errs.push(st.status === 'fulfilled' ? `Trạng thái MCP trả HTTP ${st.value.res.status}` : `Không gọi được /api/mcp/status (${st.reason && st.reason.message})`);
+      mcpState.status = null;
     }
-  } catch (err) {
-    showToast(`Lỗi kết nối máy chủ: ${err.message}`);
+    if (tk.status === 'fulfilled' && tk.value.res.ok && tk.value.data) {
+      mcpState.tokens = tk.value.data.tokens || [];
+      if (tk.value.data.auth_status) mcpState.auth = tk.value.data.auth_status;
+    } else {
+      errs.push(tk.status === 'fulfilled' ? `Danh sách token trả HTTP ${tk.value.res.status}` : 'Không tải được danh sách token');
+    }
+    await mcpPing();
+  } finally {
+    mcpState.loading = false;
+    mcpState.loadedOnce = true;
+    mcpState.loadError = errs.join(' · ');
+    if (btn) { btn.disabled = false; btn.textContent = '↻ Làm mới'; }
+  }
+  mcpRenderAll();
+}
+
+async function mcpPing() {
+  const t0 = performance.now();
+  try {
+    const headers = { 'Content-Type': 'application/json' };
+    const tok = mcpUiToken();
+    if (tok) headers.Authorization = `Bearer ${tok}`;
+    const { res, data } = await mcpFetchJson('/mcp', { method: 'POST', headers, body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method: 'ping' }) });
+    const ms = Math.round(performance.now() - t0);
+    if (res.ok && data && !data.error) mcpState.ping = { ok: true, ms };
+    else mcpState.ping = { ok: false, ms, http: res.status, msg: (data && data.error && data.error.message) || `HTTP ${res.status}` };
+  } catch (e) {
+    mcpState.ping = { ok: false, msg: e.message };
   }
 }
 
-function copyCreatedMcpSnippet() {
-  if (!mcpLastCreatedTokenData) return;
-  copyText(mcpLastCreatedTokenData.curl_snippet);
-  showToast('Đã copy toàn bộ khối lệnh cURL mẫu!');
+function mcpRenderAll() {
+  mcpRenderHeader();
+  mcpRenderBadges();
+  mcpRenderConnect();
+  mcpRenderTools();
+  mcpRenderTokens();
+  mcpRenderBootstrap();
 }
 
-function copyCreatedMcpUrl() {
-  if (!mcpLastCreatedTokenData) return;
-  copyText(mcpLastCreatedTokenData.auth_url);
-  showToast('Đã copy URL MCP Authenticated!');
+function mcpRenderBadges() {
+  const n = mcpState.tools.length;
+  if ($('topMcpToolBadge')) $('topMcpToolBadge').textContent = n ? `${n} tool` : '—';
+  if ($('sideMcpToolBadge')) $('sideMcpToolBadge').textContent = n ? String(n) : '—';
+  const dot = document.querySelector('#topMcpBadge .mcpDot');
+  if (dot) dot.style.color = (mcpState.ping && mcpState.ping.ok) ? 'var(--green)' : (mcpState.status ? 'var(--yellow)' : 'var(--red)');
+  if ($('mcpTabToolsCount')) $('mcpTabToolsCount').textContent = n ? String(n) : '';
+  const act = mcpState.tokens.filter(t => t.status === 'active').length;
+  if ($('mcpTabTokensCount')) $('mcpTabTokensCount').textContent = mcpState.loadedOnce ? String(act) : '';
 }
 
-function copyCreatedMcpTokenOnly() {
-  if (!mcpLastCreatedTokenData) return;
-  copyText(mcpLastCreatedTokenData.token);
-  showToast('Đã copy khóa Bearer Token!');
+function mcpRenderHeader() {
+  const banner = $('mcpErrorBanner');
+  if (banner) {
+    if (mcpState.loadError) {
+      banner.hidden = false;
+      banner.innerHTML = `<span><b>Không tải đủ dữ liệu MCP.</b> ${escapeHtml(mcpState.loadError)}</span><button class="btn small" onclick="mcpLoadAll()">Thử lại</button>`;
+    } else banner.hidden = true;
+  }
+  const dot = $('mcpStDot'), txt = $('mcpStText'), sub = $('mcpStSub');
+  if (!dot) return;
+  const st = mcpState.status, p = mcpState.ping;
+  if (!mcpState.loadedOnce) {
+    dot.className = 'mcpDotLg wait'; txt.textContent = 'Đang kiểm tra…'; sub.innerHTML = '&nbsp;';
+  } else if (st && p && p.ok) {
+    dot.className = 'mcpDotLg ok'; txt.textContent = 'Đang chạy';
+    sub.textContent = `Phản hồi ${p.ms} ms · v${(st.serverInfo && st.serverInfo.version) || '?'}`;
+    sub.title = `${st.serverInfo ? st.serverInfo.name : ''} · giao thức MCP ${st.protocolVersion || ''}`;
+  } else if (st && p && p.http === 401) {
+    dot.className = 'mcpDotLg wait'; txt.textContent = 'Đang chạy, cần token';
+    sub.textContent = 'Bắt buộc token nhưng chưa có token hoạt động để thử';
+  } else {
+    dot.className = 'mcpDotLg bad'; txt.textContent = 'Không phản hồi';
+    sub.textContent = (p && p.msg) || 'Không gọi được máy chủ MCP';
+  }
+  const a = mcpState.auth;
+  $('mcpStUrl').textContent = mcpState.endpoint || '—';
+  $('mcpStUrl').title = mcpState.endpoint || '';
+  $('mcpStAuth').textContent = a ? (a.require_auth ? 'Xác thực: bắt buộc token' : 'Xác thực: không bắt buộc token') : ' ';
+  const tools = mcpState.tools, ro = tools.filter(t => t.read_only).length;
+  $('mcpStTools').innerHTML = tools.length ? `${tools.length} <small>tool</small>` : '—';
+  $('mcpStToolsSub').textContent = tools.length ? `${ro} chỉ đọc · ${tools.length - ro} có tác dụng phụ` : ' ';
+  $('mcpStTokens').innerHTML = a ? `${a.active_tokens} <small>token hoạt động</small>` : '—';
+  $('mcpStTokensSub').textContent = a ? `${a.used_24h ?? 0} agent dùng trong 24 giờ · ${a.total_tokens} token đã cấp` : ' ';
 }
 
-async function revokeMcpToken(id, name) {
-  if (!confirm(`Bạn có chắc muốn thu hồi quyền truy cập của Agent "${name}"? Token này sẽ bị vô hiệu hóa ngay lập tức.`)) {
+// ---------- Tab ----------
+const MCP_TABS = ['connect', 'tools', 'tokens', 'bootstrap'];
+function mcpSwitchTab(tab, focus) {
+  if (!MCP_TABS.includes(tab)) tab = 'connect';
+  mcpState.tab = tab;
+  MCP_TABS.forEach(t => {
+    const b = $(`mcpTab-${t}`), p = $(`mcpPane-${t}`);
+    const on = t === tab;
+    if (b) { b.classList.toggle('active', on); b.setAttribute('aria-selected', on ? 'true' : 'false'); b.tabIndex = on ? 0 : -1; if (on && focus) b.focus(); }
+    if (p) p.hidden = !on;
+  });
+}
+
+// ---------- Kết nối ----------
+function mcpActiveTokens() { return mcpState.tokens.filter(t => t.status === 'active'); }
+
+function mcpConnToken() {
+  const act = mcpActiveTokens();
+  let t = act.find(x => x.id === mcpState.connTokenId);
+  if (!t) t = act.find(x => (x.permissions || []).some(p => p === 'all' || p === '*')) || act[0] || null;
+  mcpState.connTokenId = t ? t.id : '';
+  return t;
+}
+
+function mcpOnConnTokenChange(id) { mcpState.connTokenId = id; mcpRenderConnect(); }
+function mcpToggleConnReveal() { mcpState.connReveal = !mcpState.connReveal; mcpRenderConnect(); }
+function mcpPickClient(id, focus) {
+  mcpState.client = id;
+  mcpRenderConnect();
+  if (focus) document.querySelector(`.mcpClientBtn[data-client="${id}"]`)?.focus();
+}
+function mcpClientKey(e) {
+  const i = MCP_CLIENTS.findIndex(c => c.id === mcpState.client);
+  let j = null;
+  if (e.key === 'ArrowDown' || e.key === 'ArrowRight') j = (i + 1) % MCP_CLIENTS.length;
+  if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') j = (i - 1 + MCP_CLIENTS.length) % MCP_CLIENTS.length;
+  if (j !== null) { e.preventDefault(); mcpPickClient(MCP_CLIENTS[j].id, true); }
+}
+
+// Nội dung hướng dẫn từng client. tok = chuỗi token sẽ in (bản che hoặc bản thật). Trả {steps:[{title, text, codes:[{label, code}], verify}], note}
+function mcpClientSpec(client, tok) {
+  const E = mcpState.endpoint || `${location.origin}/mcp`;
+  const st = (mcpState.status && mcpState.status.stdio) || {};
+  const T = tok || '<TOKEN>';
+  const hasTok = !!tok;
+  const stdioEntry = st.wrapper_exists ? { command: st.wrapper } : { command: st.python || 'python3', args: [st.script || 'backend/mcp_server.py'], env: { DATA_DIR: st.data_dir || '' } };
+  const j = o => JSON.stringify(o, null, 2);
+  if (client === 'agy') {
+    return {
+      steps: [
+        { title: 'Mở file cấu hình MCP của agy', text: 'Hồ sơ chính: <code>~/.gemini/config/mcp_config.json</code>. Hồ sơ phụ: <code>~/.agy-profiles/profileN/config/mcp_config.json</code>. App tự tạo file này khi thêm hồ sơ mới.' },
+        { title: 'Thêm khối gen-workplace vào mcpServers, rồi mở lại agy', text: st.wrapper_exists ? 'Máy chủ đã có lệnh bọc <code>gen-workplace-mcp</code>.' : 'Chạy thẳng <code>mcp_server.py</code> qua stdio, dùng chung cơ sở dữ liệu với app nhờ <code>DATA_DIR</code>.', codes: [{ code: j({ mcpServers: { 'gen-workplace': stdioEntry } }) }] }
+      ],
+      note: 'agy nối qua stdio trên cùng máy nên không cần token. agy ở máy khác thì dùng cấu hình HTTP trong mục “JSON chung”.'
+    };
+  }
+  if (client === 'claude-code') {
+    const hdr = hasTok || (mcpState.auth && mcpState.auth.require_auth) ? ` \\\n  --header "Authorization: Bearer ${T}"` : '';
+    const envPart = st.wrapper_exists ? '' : ` -e DATA_DIR=${st.data_dir || ''}`;
+    const cmdPart = st.wrapper_exists ? st.wrapper : `${st.python || 'python3'} ${st.script || 'backend/mcp_server.py'}`;
+    return {
+      steps: [
+        { title: 'Chạy lệnh này trong terminal', text: 'Thêm gen-workplace cho mọi dự án (<code>--scope user</code>).', codes: [{ code: `claude mcp add --transport http --scope user gen-workplace ${E}${hdr}` }] },
+        { title: 'Kiểm tra kết nối', text: 'Dòng <code>gen-workplace</code> phải báo đã kết nối. Nếu báo lỗi HTTP, dùng cách stdio bên dưới (chỉ khi Claude Code chạy trên cùng máy với app).', verify: true,
+          codes: [{ code: 'claude mcp list' }, { label: 'Cách stdio (cùng máy)', code: `claude mcp add --scope user gen-workplace${envPart} -- ${cmdPart}` }] }
+      ]
+    };
+  }
+  if (client === 'claude-ai') {
+    const withTok = hasTok ? `${E}?token=${T}` : E;
+    return {
+      steps: [
+        { title: 'Claude.ai: Cài đặt → Connectors → Thêm connector tùy chỉnh', text: 'Dán URL dưới đây. Claude.ai không gửi header riêng, nên token nằm luôn trong URL. Claude.ai chỉ nối được URL HTTPS công khai; IP nội bộ hoặc localhost sẽ không dùng được.', verify: true, codes: [{ code: withTok }] },
+        { title: 'Gen-hub: Kết nối → MCP tùy chỉnh', text: 'Dán URL và Bearer token vào hai ô riêng. URL là IP nội bộ thì bật “cho phép mạng riêng”.', codes: [{ label: 'URL', code: E }, { label: 'Bearer token', code: T }] }
+      ]
+    };
+  }
+  const cfg = { mcpServers: { 'gen-workplace': hasTok ? { url: E, headers: { Authorization: `Bearer ${T}` } } : { url: E } } };
+  return {
+    steps: [
+      { title: 'Dán vào file cấu hình MCP của client', text: 'Ví dụ Cursor: <code>.cursor/mcp.json</code>. Tên khóa (<code>url</code>, <code>headers</code>) có thể khác tùy client.', verify: true, codes: [{ code: j(cfg) }] },
+      { title: 'Thử kết nối bằng curl', text: 'Trả về danh sách tool là kết nối được.', codes: [{ code: `curl -s ${E} \\\n  -H "Content-Type: application/json"${hasTok ? ` \\\n  -H "Authorization: Bearer ${T}"` : ''} \\\n  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'` }] }
+    ]
+  };
+}
+
+function mcpRenderConnect() {
+  const list = $('mcpClientList'), body = $('mcpClientDetail');
+  if (!list || !body) return;
+  list.onkeydown = mcpClientKey;
+  list.innerHTML = MCP_CLIENTS.map(c => {
+    const on = c.id === mcpState.client;
+    return `<button class="mcpClientBtn" role="radio" data-client="${c.id}" aria-checked="${on}" tabindex="${on ? 0 : -1}" onclick="mcpPickClient('${c.id}')"><b>${escapeHtml(c.name)}</b><span>${escapeHtml(c.sub)}</span></button>`;
+  }).join('');
+  if (!mcpState.status) {
+    body.innerHTML = mcpState.loadedOnce
+      ? '<div class="mcpEmpty"><b>Chưa lấy được thông tin máy chủ MCP.</b><br>Bấm “Làm mới” để thử lại.</div>'
+      : '<div class="mcpSkeleton">Đang tải cấu hình…</div>';
     return;
   }
-  try {
-    const res = await fetch('/api/mcp/tokens/revoke', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: id })
-    });
-    if (res.ok) {
-      showToast(`Đã thu hồi quyền của Agent ${name}`);
-      await loadMcpTokensAndAuth();
-    }
-  } catch (err) {
-    showToast(`Lỗi thu hồi: ${err.message}`);
+  // chọn token
+  const sel = $('mcpConnTokenSelect'), act = mcpActiveTokens(), cur = mcpConnToken();
+  if (sel) {
+    sel.innerHTML = act.length
+      ? act.map(t => `<option value="${escapeHtml(t.id)}" ${cur && cur.id === t.id ? 'selected' : ''}>${escapeHtml(t.name)} · ${escapeHtml(mcpScopeText(t.permissions))}</option>`).join('')
+      : '<option value="">Chưa có token hoạt động (tạo ở tab Token)</option>';
+    sel.disabled = !act.length;
   }
+  const rb = $('mcpConnRevealBtn');
+  if (rb) { rb.textContent = mcpState.connReveal ? 'Che' : 'Hiện'; rb.setAttribute('aria-pressed', String(mcpState.connReveal)); rb.disabled = !cur; }
+  const req = mcpState.auth && mcpState.auth.require_auth;
+  $('mcpConnAuthNote').innerHTML = req
+    ? 'Đang bắt buộc token: mọi kết nối HTTP phải kèm token hợp lệ.'
+    : 'Đang không bắt buộc token: agent không có token vẫn gọi được. Nên dùng token để biết agent nào đang gọi, và bật “Bắt buộc token” ở tab Token trước khi mở cổng ra Internet.';
+  const raw = cur ? cur.token_raw : '';
+  const shown = raw ? (mcpState.connReveal ? raw : mcpMask(raw)) : '';
+  const view = mcpClientSpec(mcpState.client, shown), real = mcpClientSpec(mcpState.client, raw);
+  mcpState.codeCopies = [];
+  const steps = view.steps.map((s, si) => {
+    const codes = (s.codes || []).map((c, ci) => {
+      const idx = mcpState.codeCopies.push(real.steps[si].codes[ci].code) - 1;
+      return `${c.label ? `<div class="mcpCodeLabel">${escapeHtml(c.label)}</div>` : ''}<div class="mcpCode"><pre>${escapeHtml(c.code)}</pre><button class="btn small" onclick="mcpCopyCode(${idx})" aria-label="Copy ${escapeHtml(c.label || s.title)}">Copy</button></div>`;
+    }).join('');
+    return `<li><div class="mcpStepTitle">${escapeHtml(s.title)}${s.verify ? '<span class="mcpVerify" title="Chưa kiểm chứng được trong repo, hãy thử và kiểm tra lại">Kiểm tra lại</span>' : ''}</div>${s.text ? `<div class="mcpStepText">${s.text}</div>` : ''}${codes}</li>`;
+  }).join('');
+  body.innerHTML = `<ol class="mcpSteps">${steps}</ol>${view.note ? `<div class="mcpNote">${escapeHtml(view.note)}</div>` : ''}`;
 }
 
-async function openMcpModal() {
-  const modal = document.getElementById('mcpModal');
-  if (!modal) return;
-  // CSS chỉ hiện modal khi có class "show" (giống mọi modal khác) — trước đây thêm "active" nên bấm không mở gì
-  modal.classList.add('show');
-  switchMcpMainTab('links');
-
-  // Nạp danh sách tokens và trạng thái auth
-  await loadMcpTokensAndAuth();
-
-  // Nạp danh sách tools mới nhất từ backend
-  try {
-    const res = await fetch('/mcp/tools');
-    if (res.ok) {
-      const data = await res.json();
-      mcpCachedTools = data.tools || [];
-      mcpReadOnlyTools = new Set(data.read_only_tools || mcpCachedTools.filter(t => t.annotations && t.annotations.readOnlyHint).map(t => t.name));
-      const totalBadge = document.getElementById('mcpToolsTotalBadge');
-      const topBadge = document.getElementById('topMcpToolBadge');
-      const sideBadge = document.getElementById('sideMcpToolBadge');
-      const countText = `${mcpCachedTools.length} tool · ${mcpReadOnlyTools.size} chỉ đọc`;
-      if (totalBadge) totalBadge.textContent = countText;
-      const tabLabel = document.getElementById('mcpToolsTabLabel');
-      if (tabLabel) tabLabel.textContent = `${mcpCachedTools.length} MCP Tools`;
-      if (topBadge) topBadge.textContent = `${mcpCachedTools.length} Tools`;
-      if (sideBadge) sideBadge.textContent = `${mcpCachedTools.length} Tools`;
-      renderMcpToolsList(mcpCachedTools);
-    }
-  } catch (err) {
-    console.error('Lỗi nạp tools MCP:', err);
-  }
+function mcpCopyCode(i) {
+  const name = (MCP_CLIENTS.find(c => c.id === mcpState.client) || {}).name || '';
+  mcpCopy(mcpState.codeCopies[i], `cấu hình ${name}`);
 }
 
-function closeMcpModal() {
-  const modal = document.getElementById('mcpModal');
-  if (modal) modal.classList.remove('show');
+// ---------- Tool ----------
+function mcpSetToolFilter(f) {
+  mcpState.toolFilter = f;
+  document.querySelectorAll('.mcpSegBtn').forEach(b => { const on = b.dataset.filter === f; b.classList.toggle('active', on); b.setAttribute('aria-pressed', String(on)); });
+  mcpRenderTools();
 }
 
-function renderMcpToolsList(tools) {
-  const container = document.getElementById('mcpToolsListContainer');
-  if (!container) return;
+function mcpRoBadge(ro) { return ro ? '<span class="chip done">Chỉ đọc</span>' : '<span class="chip wait">Có tác dụng phụ</span>'; }
 
-  if (!tools || tools.length === 0) {
-    container.innerHTML = '<div style="color:var(--muted);font-size:11px;grid-column:1/-1;text-align:center;padding:16px">Không tìm thấy công cụ MCP nào</div>';
+function mcpRenderTools() {
+  const box = $('mcpToolGroups');
+  if (!box) return;
+  if (!mcpState.loadedOnce) { box.innerHTML = '<div class="mcpSkeleton">Đang tải danh sách tool…</div>'; return; }
+  if (!mcpState.tools.length) {
+    box.innerHTML = `<div class="mcpEmpty"><b>${mcpState.status ? 'Máy chủ không khai báo tool nào.' : 'Chưa tải được danh sách tool.'}</b>${mcpState.status ? '' : '<br><button class="btn small" onclick="mcpLoadAll()">Thử lại</button>'}</div>`;
     return;
   }
-
-  container.innerHTML = tools.map(t => {
-    const props = (t.inputSchema && t.inputSchema.properties) ? Object.keys(t.inputSchema.properties) : [];
-    const propsTag = props.length > 0 ? props.slice(0, 4).map(p => `<span style="font-size:9px;color:var(--accent2);background:#172554;padding:1px 4px;border-radius:3px">${escapeHtml(p)}</span>`).join(' ') : '<span style="font-size:9px;color:var(--muted)">Không cần tham số</span>';
-    const ro = mcpReadOnlyTools.has(t.name);
-    return `
-      <div style="background:#090d16;border:1px solid #1a2436;border-radius:6px;padding:9px 11px;display:flex;flex-direction:column;justify-content:space-between;gap:6px">
-        <div>
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px;gap:6px">
-            <span style="font-family:var(--mono);font-size:11px;font-weight:700;color:var(--accent)">${escapeHtml(t.name)}</span>
-            <span style="display:flex;align-items:center;gap:4px">
-              <span class="badge" style="font-size:8.5px;${ro ? 'background:#064e3b;color:var(--green)' : 'background:#7c2d12;color:#fdba74'}">${ro ? 'chỉ đọc' : 'có tác dụng phụ'}</span>
-              <button class="btn small" data-mcp-test="${escapeHtml(t.name)}" style="font-size:9px;padding:2px 7px;color:${ro ? 'var(--green)' : 'var(--yellow)'};border-color:${ro ? '#065f46' : '#78350f'}" onclick="testMcpTool('${escapeHtml(t.name)}')" title="${ro ? 'Gọi thật (tool chỉ đọc)' : 'Mở form tham số; chỉ gọi sau khi xác nhận'}">${ro ? 'Test' : 'Test…'}</button>
-            </span>
-          </div>
-          <div style="font-size:10.5px;color:var(--text);line-height:1.35;margin-bottom:5px">${escapeHtml(t.description || '')}</div>
-        </div>
-        <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap">
-          <span style="font-size:9px;color:var(--muted2)">Params:</span>
-          ${propsTag}
-        </div>
-      </div>
-    `;
+  const qRaw = ($('mcpToolSearch') && $('mcpToolSearch').value || '').trim();
+  const q = mcpNorm(qRaw), f = mcpState.toolFilter;
+  const glabel = Object.fromEntries(mcpState.groups.map(g => [g.id, g.label]));
+  const hits = mcpState.tools.filter(t => (f === 'all' || (f === 'ro') === !!t.read_only) &&
+    (!q || mcpNorm(`${t.name} ${t.name.replace(/_/g, ' ')} ${t.summary} ${t.description} ${glabel[t.group] || ''}`).includes(q)));
+  if (!hits.length) {
+    box.innerHTML = `<div class="mcpEmpty">Không có tool nào khớp${qRaw ? ` “<b>${escapeHtml(qRaw)}</b>”` : ''}${f !== 'all' ? ` trong nhóm “${f === 'ro' ? 'Chỉ đọc' : 'Có tác dụng phụ'}”` : ''}.<br><button class="btn small" onclick="mcpClearToolSearch()">Xóa bộ lọc</button></div>`;
+    return;
+  }
+  const groups = mcpState.groups.length ? mcpState.groups : [...new Set(hits.map(t => t.group))].map(id => ({ id, label: id }));
+  box.innerHTML = groups.map(g => {
+    const items = hits.filter(t => t.group === g.id);
+    if (!items.length) return '';
+    return `<section class="mcpGroup" aria-label="${escapeHtml(g.label)}"><h3 class="mcpGroupHead">${escapeHtml(g.label)} <span class="mcpTabCount">${items.length}</span></h3><div class="mcpGroupList">${items.map(t => `
+      <button class="mcpTool" data-tool="${escapeHtml(t.name)}" onclick="mcpOpenRunner('${escapeHtml(t.name)}')" aria-label="Thử tool ${escapeHtml(t.name)}">
+        <div class="mcpToolMain"><div class="mcpToolName">${escapeHtml(t.name)}</div><div class="mcpToolSum">${escapeHtml(t.summary || t.description || '')}</div></div>
+        <div class="mcpToolSide">${mcpRoBadge(t.read_only)}<span class="mcpToolRun">Thử →</span></div>
+      </button>`).join('')}</div></section>`;
   }).join('');
 }
 
-function filterMcpTools(query) {
-  const q = (query || '').toLowerCase().trim();
-  if (!q) {
-    renderMcpToolsList(mcpCachedTools);
-    return;
-  }
-  const filtered = mcpCachedTools.filter(t => 
-    t.name.toLowerCase().includes(q) || 
-    (t.description && t.description.toLowerCase().includes(q))
-  );
-  renderMcpToolsList(filtered);
+function mcpClearToolSearch() {
+  if ($('mcpToolSearch')) $('mcpToolSearch').value = '';
+  mcpSetToolFilter('all');
+  $('mcpToolSearch')?.focus();
 }
 
-// Tham số mặc định an toàn cho tool chỉ đọc
-function mcpDefaultArgs(toolName) {
-  const a = {};
-  if (toolName === 'get_live_quota') { a.profile_id = 'owner_default'; a.force_refresh = false; }
-  if (toolName === 'list_kanban_tasks' || toolName === 'get_conversation_messages') a.conv_id = (typeof genState !== 'undefined' && genState.currentConvId) || '';
-  if (toolName === 'read_workspace_file') a.file_path = 'README.md';
-  if (toolName === 'get_worker_terminal_output') { a.session_id = state.selectedTmuxSessionId || 'gw-lead-agy'; a.lines = 20; }
-  if (toolName === 'wait_worker_result') a.timeout_sec = 1;
-  return a;
-}
+// Gợi ý giá trị cho tham số theo tên (lấy từ API thật, nạp khi cần)
+const MCP_SUGGEST_SRC = {
+  conv_id: ['/api/gen/conversations', d => (d.conversations || []).slice(0, 8).map(c => ({ v: c.id, l: c.title }))],
+  task_id: ['/api/tasks', d => (d.tasks || []).slice(0, 8).map(t => ({ v: t.id, l: t.title }))],
+  session_id: ['/api/tmux/sessions', d => (d.sessions || []).slice(0, 8).map(s => ({ v: s.id, l: s.role_name }))],
+  profile_id: ['/api/oauth/profiles', d => (d.profiles || []).slice(0, 8).map(p => ({ v: p.id, l: p.email || p.name || '' }))],
+  dispatch_id: ['/api/dispatch/log?limit=8', d => (d.items || []).map(i => ({ v: String(i.id), l: `${i.session_id} · ${i.status}` }))]
+};
+MCP_SUGGEST_SRC.account_id = MCP_SUGGEST_SRC.profile_id;
 
-// Nút Test: tool CHỈ ĐỌC → gọi thật ngay với tham số mặc định (và hiện form để chạy lại).
-// Tool CÓ TÁC DỤNG PHỤ → chỉ mở form tham số; bấm "Chạy thật" + xác nhận mới gọi (không bao giờ tự gửi {}).
-function testMcpTool(toolName) {
-  const tool = mcpCachedTools.find(t => t.name === toolName);
-  const testSec = document.getElementById('mcpLiveTestSection');
-  const titleEl = document.getElementById('mcpTestToolTitle');
-  const outEl = document.getElementById('mcpLiveTestOutput');
-  if (!tool || !testSec || !titleEl || !outEl) return;
-  const ro = mcpReadOnlyTools.has(toolName);
-  const schema = tool.inputSchema || {};
-  const props = schema.properties || {};
-  const required = new Set(schema.required || []);
-  const defaults = ro ? mcpDefaultArgs(toolName) : {};
-  testSec.style.display = 'block';
-  titleEl.innerHTML = `${ro ? 'Tool chỉ đọc' : '<span style="color:var(--yellow)">Tool có tác dụng phụ — nhập tham số rồi xác nhận</span>'}: <code style="color:var(--yellow)">${escapeHtml(toolName)}</code>`;
-  let form = document.getElementById('mcpTestForm');
-  if (!form) {
-    form = document.createElement('div');
-    form.id = 'mcpTestForm';
-    form.style.cssText = 'display:grid;grid-template-columns:160px 1fr;gap:4px 8px;margin:6px 0;font-size:10.5px;align-items:center';
-    outEl.parentNode.insertBefore(form, outEl);
-  }
-  form.dataset.tool = toolName;
-  form.innerHTML = Object.keys(props).map(k => {
-    const p = props[k] || {};
-    const v = defaults[k] !== undefined ? defaults[k] : (ro && p.default !== undefined ? p.default : '');
-    const isObj = p.type === 'array' || p.type === 'object';
-    return `<label style="color:var(--muted);font-family:var(--mono)" title="${escapeHtml(p.description || '')}">${escapeHtml(k)}${required.has(k) ? ' *' : ''} <span style="color:var(--muted2)">(${escapeHtml(p.type || 'string')})</span></label>
-      <input class="mcpTestArg" data-key="${escapeHtml(k)}" data-type="${escapeHtml(p.type || 'string')}" value="${escapeHtml(typeof v === 'object' ? JSON.stringify(v) : String(v))}" placeholder="${escapeHtml((p.description || '').slice(0, 90))}${isObj ? ' (JSON)' : ''}" style="font-size:10.5px;padding:3px 6px;background:#090d16;border:1px solid var(--line2);color:var(--text);border-radius:4px;font-family:var(--mono)">`;
-  }).join('') + `<span></span><div style="display:flex;gap:6px;align-items:center">
-      <button class="btn small ${ro ? '' : 'primary'}" id="mcpTestRunBtn" onclick="runMcpToolFromForm()" style="font-size:10px">${ro ? 'Chạy lại' : 'Chạy thật…'}</button>
-      <span style="font-size:9.5px;color:var(--muted)">${Object.keys(props).length ? '* = bắt buộc' : 'Không có tham số'}</span></div>`;
-  if (ro) {
-    runMcpToolFromForm();
-  } else {
-    outEl.textContent = 'Chưa gọi. Tool này thay đổi dữ liệu / chạy lệnh thật: điền tham số, bấm "Chạy thật…" và xác nhận.';
-  }
-}
-
-async function runMcpToolFromForm() {
-  const form = document.getElementById('mcpTestForm');
-  const titleEl = document.getElementById('mcpTestToolTitle');
-  const outEl = document.getElementById('mcpLiveTestOutput');
-  if (!form || !outEl) return;
-  const toolName = form.dataset.tool;
-  const tool = mcpCachedTools.find(t => t.name === toolName) || {};
-  const required = new Set((tool.inputSchema || {}).required || []);
-  const ro = mcpReadOnlyTools.has(toolName);
-  const args = {};
-  const missing = [];
-  for (const inp of form.querySelectorAll('.mcpTestArg')) {
-    const k = inp.dataset.key, type = inp.dataset.type, raw = inp.value.trim();
-    if (!raw) { if (required.has(k)) missing.push(k); continue; }
-    try {
-      if (type === 'integer' || type === 'number') args[k] = Number(raw);
-      else if (type === 'boolean') args[k] = ['true', '1', 'yes', 'có'].includes(raw.toLowerCase());
-      else if (type === 'array' || type === 'object') args[k] = JSON.parse(raw);
-      else args[k] = raw;
-    } catch (e) {
-      outEl.textContent = `Tham số ${k} phải là JSON hợp lệ: ${e.message}`;
-      return;
-    }
-  }
-  if (missing.length) {
-    outEl.textContent = `Thiếu tham số bắt buộc: ${missing.join(', ')} — chưa gọi tool.`;
-    return;
-  }
-  if (!ro && !confirm(`Gọi THẬT tool "${toolName}" (có tác dụng phụ) với tham số:\n${JSON.stringify(args, null, 2)}\n\nTiếp tục?`)) {
-    outEl.textContent = 'Đã hủy — không gọi tool.';
-    return;
-  }
-  outEl.textContent = 'Đang gửi JSON-RPC tools/call tới /mcp...';
+async function mcpLoadSuggest(key) {
+  const src = MCP_SUGGEST_SRC[key];
+  if (!src) return [];
+  if (mcpState.suggest[key]) return mcpState.suggest[key];
   try {
-    const tok = (mcpSelectedToken && mcpSelectedToken.token_raw) ? mcpSelectedToken.token_raw : '';
+    const { res, data } = await mcpFetchJson(src[0]);
+    mcpState.suggest[key] = res.ok && data ? src[1](data) : [];
+  } catch (e) { mcpState.suggest[key] = []; }
+  return mcpState.suggest[key];
+}
+
+function mcpFieldHtml(key, p, required) {
+  const type = p.type || 'string';
+  const id = `mcpArg-${key}`;
+  const help = [];
+  if (p.description) help.push(escapeHtml(p.description.length > 220 ? p.description.slice(0, 217) + '…' : p.description));
+  if (p.default !== undefined) help.push(`Mặc định: <code>${escapeHtml(JSON.stringify(p.default))}</code>`);
+  let input;
+  if (Array.isArray(p.enum)) {
+    input = `<select id="${id}" data-key="${escapeHtml(key)}" data-type="${type}">${required ? '' : '<option value="">— không gửi —</option>'}${p.enum.map(v => `<option value="${escapeHtml(String(v))}">${escapeHtml(String(v))}</option>`).join('')}</select>`;
+  } else if (type === 'boolean') {
+    input = `<select id="${id}" data-key="${escapeHtml(key)}" data-type="boolean"><option value="">— ${p.default !== undefined ? `mặc định (${p.default})` : 'không gửi'} —</option><option value="true">true</option><option value="false">false</option></select>`;
+  } else if (type === 'array' || type === 'object') {
+    const ex = type === 'array' ? ((p.items && p.items.type === 'object') ? '[{ … }]' : '["mục 1", "mục 2"]') : '{ "khóa": "giá trị" }';
+    input = `<textarea id="${id}" data-key="${escapeHtml(key)}" data-type="${type}" placeholder="${escapeHtml(ex)}" spellcheck="false"></textarea>`;
+    help.push('Nhập dạng JSON.');
+  } else {
+    const num = type === 'integer' || type === 'number';
+    input = `<input id="${id}" data-key="${escapeHtml(key)}" data-type="${type}" ${num ? `type="number" ${type === 'integer' ? 'step="1"' : 'step="any"'}` : 'type="text"'} autocomplete="off" spellcheck="false" placeholder="${p.default !== undefined ? escapeHtml(String(p.default)) : ''}">`;
+  }
+  return `<div class="mcpField" data-field="${escapeHtml(key)}">
+    <label for="${id}"><code>${escapeHtml(key)}</code>${required ? '<span class="mcpReq">bắt buộc</span>' : ''}<span class="mcpType">${escapeHtml(type)}</span></label>
+    ${input}
+    <div class="mcpSuggest" id="mcpSug-${escapeHtml(key)}"></div>
+    ${help.length ? `<div class="mcpFieldHelp">${help.join(' ')}</div>` : ''}
+    <div class="mcpFieldErr" hidden></div>
+  </div>`;
+}
+
+function mcpOpenRunner(name) {
+  const t = mcpState.tools.find(x => x.name === name);
+  if (!t) return;
+  mcpState.runTool = t;
+  mcpState.lastFocus = document.activeElement;
+  const schema = t.inputSchema || {}, props = schema.properties || {}, req = new Set(schema.required || []);
+  $('mcpRunTitle').textContent = t.name;
+  $('mcpRunBadge').innerHTML = mcpRoBadge(t.read_only);
+  $('mcpRunSummary').textContent = t.summary || '';
+  $('mcpRunDesc').textContent = t.description || '';
+  const keys = Object.keys(props).sort((a, b) => (req.has(b) - req.has(a)));
+  $('mcpRunFields').innerHTML = keys.length ? keys.map(k => mcpFieldHtml(k, props[k] || {}, req.has(k))).join('') : '<div class="mcpHint">Tool này không cần tham số.</div>';
+  $('mcpRunBtn').textContent = t.read_only ? 'Chạy' : 'Chạy thật…';
+  $('mcpRunBtn').className = t.read_only ? 'btn primary' : 'btn mcpDanger';
+  $('mcpRunBtn').disabled = false;
+  $('mcpRunHint').textContent = t.read_only ? 'Tool chỉ đọc: chạy ngay, không đổi dữ liệu.' : 'Có tác dụng phụ: sẽ hỏi xác nhận trước khi gọi.';
+  $('mcpRunConfirm').hidden = true;
+  $('mcpRunResult').innerHTML = '';
+  $('mcpDrawer').hidden = false;
+  $('mcpDrawerBackdrop').hidden = false;
+  // gợi ý giá trị
+  keys.forEach(async k => {
+    const list = await mcpLoadSuggest(k);
+    const box = $(`mcpSug-${k}`);
+    if (!box || !list.length || mcpState.runTool !== t) return;
+    box.innerHTML = `<span class="mcpHint">Gợi ý:</span> ${list.slice(0, 4).map(s => `<button type="button" class="mcpSugBtn" title="${escapeHtml(s.l || '')}" onclick="mcpFillArg('${escapeHtml(k)}', this.dataset.v)" data-v="${escapeHtml(s.v)}">${escapeHtml(s.v)}${s.l ? ` <span>${escapeHtml(String(s.l).slice(0, 28))}</span>` : ''}</button>`).join('')}`;
+  });
+  const first = $('mcpRunFields').querySelector('input, select, textarea');
+  (first || $('mcpRunBtn')).focus();
+  // Tool chỉ đọc không có tham số bắt buộc → chạy ngay
+  if (t.read_only && !req.size) mcpRunTool();
+}
+
+function mcpFillArg(k, v) {
+  const el = $(`mcpArg-${k}`);
+  if (el) { el.value = v; el.dispatchEvent(new Event('input')); el.focus(); }
+}
+
+function mcpCloseRunner() {
+  if ($('mcpDrawer').hidden) return;
+  $('mcpDrawer').hidden = true;
+  $('mcpDrawerBackdrop').hidden = true;
+  mcpState.runTool = null;
+  const back = mcpState.lastFocus;
+  if (back && document.contains(back)) back.focus();
+}
+
+function mcpCollectArgs() {
+  const t = mcpState.runTool, req = new Set((t.inputSchema || {}).required || []);
+  const args = {};
+  let firstBad = null;
+  document.querySelectorAll('#mcpRunFields [data-key]').forEach(el => {
+    const k = el.dataset.key, type = el.dataset.type, raw = el.value.trim();
+    const wrap = el.closest('.mcpField'), err = wrap.querySelector('.mcpFieldErr');
+    let msg = '';
+    if (!raw) { if (req.has(k)) msg = 'Trường này bắt buộc.'; }
+    else if (type === 'integer' || type === 'number') {
+      const n = Number(raw);
+      if (!Number.isFinite(n) || (type === 'integer' && !Number.isInteger(n))) msg = type === 'integer' ? 'Cần một số nguyên.' : 'Cần một số.';
+      else args[k] = n;
+    } else if (type === 'boolean') args[k] = raw === 'true';
+    else if (type === 'array' || type === 'object') {
+      try {
+        const v = JSON.parse(raw);
+        if (type === 'array' ? !Array.isArray(v) : (typeof v !== 'object' || v === null || Array.isArray(v))) msg = type === 'array' ? 'Cần một mảng JSON, vd ["a", "b"].' : 'Cần một object JSON.';
+        else args[k] = v;
+      } catch (e) { msg = `JSON chưa hợp lệ: ${e.message}`; }
+    } else args[k] = raw;
+    wrap.classList.toggle('invalid', !!msg);
+    err.hidden = !msg; err.textContent = msg;
+    el.setAttribute('aria-invalid', msg ? 'true' : 'false');
+    if (msg && !firstBad) firstBad = el;
+  });
+  if (firstBad) { firstBad.focus(); return null; }
+  return args;
+}
+
+function mcpCancelRunConfirm() {
+  $('mcpRunConfirm').hidden = true;
+  $('mcpRunResult').innerHTML = '<div class="mcpHint">Đã hủy, chưa gọi tool.</div>';
+  $('mcpRunBtn').focus();
+}
+
+async function mcpRunTool(confirmed) {
+  const t = mcpState.runTool;
+  if (!t) return;
+  const args = mcpCollectArgs();
+  if (!args) { $('mcpRunConfirm').hidden = true; return; }
+  if (!t.read_only && !confirmed) {
+    $('mcpRunConfirmText').textContent = `${t.summary || t.name} Thao tác này đổi dữ liệu hoặc chạy lệnh thật và không tự hoàn tác. Tham số gửi đi:`;
+    $('mcpRunConfirmArgs').textContent = JSON.stringify(args, null, 2);
+    $('mcpRunConfirm').hidden = false;
+    $('mcpRunResult').innerHTML = '';
+    $('mcpRunConfirmCancel').focus();
+    return;
+  }
+  $('mcpRunConfirm').hidden = true;
+  const btn = $('mcpRunBtn');
+  btn.disabled = true;
+  $('mcpRunResult').innerHTML = '<div class="mcpSkeleton">Đang gọi tools/call…</div>';
+  const t0 = performance.now();
+  let out;
+  try {
     const headers = { 'Content-Type': 'application/json' };
-    if (tok) headers['Authorization'] = `Bearer ${tok}`;
-    const res = await fetch('/mcp', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method: 'tools/call', params: { name: toolName, arguments: args } })
-    });
-    const data = await res.json();
-    titleEl.innerHTML = `Kết quả <code style="color:var(--green)">${escapeHtml(toolName)}</code> ${ro ? '(chỉ đọc)' : '(đã xác nhận)'}`;
-    outEl.textContent = JSON.stringify(data, null, 2);
-  } catch (err) {
-    titleEl.innerHTML = `Lỗi thực thi công cụ: <code style="color:var(--red)">${escapeHtml(toolName)}</code>`;
-    outEl.textContent = String(err);
+    const tok = mcpUiToken();
+    if (tok) headers.Authorization = `Bearer ${tok}`;
+    const { res, data } = await mcpFetchJson('/mcp', { method: 'POST', headers, body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method: 'tools/call', params: { name: t.name, arguments: args } }) });
+    const ms = Math.round(performance.now() - t0);
+    if (!res.ok || !data || data.error) {
+      out = { ok: false, ms, err: `${res.ok ? '' : `HTTP ${res.status}: `}${(data && data.error && (data.error.message || JSON.stringify(data.error))) || 'Máy chủ không trả JSON hợp lệ'}`, payload: data };
+    } else {
+      const r = data.result || {};
+      const text = (r.content || []).filter(c => c.type === 'text').map(c => c.text).join('\n');
+      let parsed = null;
+      try { parsed = JSON.parse(text); } catch (e) { parsed = null; }
+      out = { ok: !r.isError, ms, payload: parsed !== null ? parsed : (text ? null : r), text: parsed === null ? text : '', err: r.isError ? (parsed && (parsed.error || parsed.message)) || text || 'Tool báo lỗi' : '' };
+    }
+  } catch (e) {
+    out = { ok: false, ms: Math.round(performance.now() - t0), err: `Không gọi được máy chủ: ${e.message}` };
+  }
+  btn.disabled = false;
+  if (mcpState.runTool !== t) return;
+  mcpState.lastResult = out;
+  mcpRenderResult();
+  $('mcpRunResult').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
+function mcpRenderResult() {
+  const o = mcpState.lastResult, box = $('mcpRunResult');
+  if (!o || !box) return;
+  const hasTree = o.payload !== null && o.payload !== undefined && typeof o.payload === 'object';
+  box.innerHTML = `
+    <div class="mcpResHead">
+      ${o.ok ? '<span class="chip done">Thành công</span>' : '<span class="chip bad">Lỗi</span>'}
+      <span class="mcpResTime">${o.ms} ms</span>
+      <span class="mcpResTools">
+        ${hasTree ? '<button class="btn small" onclick="mcpJsonToggleAll(true)">Mở hết</button><button class="btn small" onclick="mcpJsonToggleAll(false)">Gập hết</button>' : ''}
+        <button class="btn small" onclick="mcpCopyResult()">Copy</button>
+      </span>
+    </div>
+    ${o.err ? `<div class="mcpResErr" role="alert"><b>Lỗi:</b> ${escapeHtml(typeof o.err === 'string' ? o.err : JSON.stringify(o.err))}</div>` : ''}
+    ${hasTree ? `<div class="mcpJson">${mcpJsonNode(null, o.payload, 0)}</div>` : (o.text ? `<pre class="mcpPre">${escapeHtml(o.text)}</pre>` : '')}`;
+}
+
+function mcpCopyResult() {
+  const o = mcpState.lastResult;
+  if (!o) return;
+  mcpCopy(o.payload != null ? JSON.stringify(o.payload, null, 2) : (o.text || o.err || ''), 'kết quả');
+}
+
+function mcpJsonToggleAll(open) {
+  document.querySelectorAll('#mcpRunResult .mcpJson details').forEach(d => { d.open = open; });
+}
+
+function mcpJsonNode(key, val, depth) {
+  const k = key === null ? '' : `<span class="mcpJsonK">${escapeHtml(JSON.stringify(key))}</span>: `;
+  if (val === null) return `<div class="mcpJsonRow">${k}<span class="mcpJsonNull">null</span></div>`;
+  if (typeof val !== 'object') {
+    const cls = typeof val === 'string' ? 'mcpJsonS' : typeof val === 'number' ? 'mcpJsonN' : 'mcpJsonB';
+    return `<div class="mcpJsonRow">${k}<span class="${cls}">${escapeHtml(JSON.stringify(val))}</span></div>`;
+  }
+  const isArr = Array.isArray(val);
+  const entries = isArr ? val.map((v, i) => [i, v]) : Object.entries(val);
+  const [o, c] = isArr ? ['[', ']'] : ['{', '}'];
+  if (!entries.length) return `<div class="mcpJsonRow">${k}${o}${c}</div>`;
+  const shown = entries.slice(0, 300);
+  const kids = shown.map(([ck, cv]) => mcpJsonNode(isArr ? null : ck, cv, depth + 1)).join('') +
+    (entries.length > shown.length ? `<div class="mcpJsonRow mcpJsonPeek">… còn ${entries.length - shown.length} mục (dùng Copy để xem đủ)</div>` : '');
+  const label = !isArr && ['id', 'name', 'title', 'session_id'].map(x => val[x]).find(x => typeof x === 'string' || typeof x === 'number');
+  const peek = `<span class="mcpJsonPeek"> ${label !== undefined ? `<span class="mcpJsonS">${escapeHtml(JSON.stringify(label).slice(0, 60))}</span> · ` : ''}${entries.length} ${isArr ? 'mục' : 'khóa'} ${c}</span>`;
+  return `<details ${depth < 2 ? 'open' : ''}><summary>${k}${o}${peek}</summary>${kids}<div>${c}</div></details>`;
+}
+
+// ---------- Token ----------
+function mcpScopeText(perms) {
+  const p = perms || [];
+  if (p.includes('all') || p.includes('*')) return 'Toàn quyền';
+  const lab = Object.fromEntries(mcpState.scopes.map(s => [s.id, s.label]));
+  return p.map(x => lab[x] || x).join(', ') || 'Không có quyền';
+}
+
+function mcpRenderScopeGrid() {
+  const g = $('mcpScopeGrid');
+  if (!g) return;
+  g.innerHTML = mcpState.scopes.map(s => {
+    const n = s.id === 'all' ? mcpState.tools.length : mcpState.tools.filter(t => t.scope === s.id).length;
+    return `<label class="mcpScope"><input type="checkbox" name="mcpScope" value="${escapeHtml(s.id)}" ${s.id === 'all' ? 'checked' : ''} onchange="mcpOnScopeChange(this)"><div><b>${escapeHtml(s.label)}</b><span>${escapeHtml(s.hint || '')} · ${n} tool</span></div></label>`;
+  }).join('') || '<div class="mcpHint">Chưa tải được danh sách scope.</div>';
+  mcpOnScopeChange();
+}
+
+function mcpOnScopeChange(el) {
+  const boxes = [...document.querySelectorAll('input[name="mcpScope"]')];
+  const all = boxes.find(b => b.value === 'all');
+  if (el && el.value !== 'all' && el.checked && all) all.checked = false;
+  if (el && el.value === 'all' && el.checked) boxes.forEach(b => { if (b !== el) b.checked = false; });
+}
+
+function mcpToggleTokenForm(show) {
+  const f = $('mcpTokenForm');
+  if (!f) return;
+  f.hidden = !show;
+  $('mcpNewTokenBtn').setAttribute('aria-expanded', String(!!show));
+  if (show) {
+    $('mcpTokFormErr').hidden = true;
+    mcpRenderScopeGrid();
+    $('mcpTokName').focus();
+  } else {
+    f.reset();
+    $('mcpNewTokenBtn').focus();
   }
 }
 
-// Tự động kiểm tra trạng thái MCP khi trang tải
-setTimeout(() => {
-  fetch('/mcp/tools').then(r => r.json()).then(d => {
-    if (d && d.tools_count) {
-      const topBadge = document.getElementById('topMcpToolBadge');
-      const sideBadge = document.getElementById('sideMcpToolBadge');
-      if (topBadge) topBadge.textContent = `${d.tools_count} Tools`;
-      if (sideBadge) sideBadge.textContent = `${d.tools_count} Tools`;
+async function mcpSubmitToken(e) {
+  e.preventDefault();
+  const name = $('mcpTokName').value.trim();
+  const perms = [...document.querySelectorAll('input[name="mcpScope"]:checked')].map(b => b.value);
+  const err = $('mcpTokFormErr');
+  const fail = (m, focusEl) => { err.textContent = m; err.hidden = false; (focusEl || $('mcpTokName')).focus(); };
+  if (!name) return fail('Nhập tên agent để sau này biết token này của ai.');
+  if (!perms.length) return fail('Chọn ít nhất một quyền.', document.querySelector('input[name="mcpScope"]'));
+  const btn = $('mcpTokSubmit');
+  btn.disabled = true; btn.textContent = 'Đang tạo…';
+  try {
+    const { res, data } = await mcpFetchJson('/api/mcp/tokens/create', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, permissions: perms, expires_days: parseInt($('mcpTokExpires').value, 10) || 0, client: 'Tạo trên màn MCP' }) });
+    if (!res.ok || !data || !data.ok) return fail(`Không tạo được token: ${(data && data.error) || `HTTP ${res.status}`}`);
+    mcpState.lastCreated = data;
+    mcpState.revealed.delete('__created');
+    $('mcpTokenForm').hidden = true;
+    $('mcpTokenForm').reset();
+    showToast(`Đã tạo token cho ${data.name}`);
+    await mcpLoadAll();
+    $('mcpCreatedCard').querySelector('button')?.focus();
+  } catch (ex) {
+    fail(`Không gọi được máy chủ: ${ex.message}`);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Tạo token';
+  }
+}
+
+function mcpRenderCreated() {
+  const c = $('mcpCreatedCard'), d = mcpState.lastCreated;
+  if (!c) return;
+  if (!d) { c.hidden = true; return; }
+  const rev = mcpState.revealed.has('__created');
+  c.hidden = false;
+  c.innerHTML = `<div class="mcpCardHead"><div><strong>Đã tạo token cho “${escapeHtml(d.name)}”</strong><div class="mcpHint">${escapeHtml(mcpScopeText(d.permissions))} · hết hạn: ${escapeHtml(mcpFmtTime(d.expires_at) || 'không hết hạn')}</div></div>
+    <button class="iconBtn small" onclick="mcpState.lastCreated=null; mcpRenderCreated(); $('mcpNewTokenBtn').focus()" aria-label="Đóng thông báo">×</button></div>
+    <div class="mcpTokVal"><code>${escapeHtml(rev ? d.token : mcpMask(d.token))}</code>
+      <button class="btn small" onclick="mcpToggleReveal('__created')" aria-pressed="${rev}">${rev ? 'Che' : 'Hiện'}</button>
+      <button class="btn small primary" onclick="mcpCopy(mcpState.lastCreated.token, 'token')">Copy token</button>
+      <button class="btn small" onclick="mcpUseTokenInConnect('${escapeHtml(d.id)}')">Dùng trong tab Kết nối</button></div>`;
+}
+
+function mcpUseTokenInConnect(id) {
+  mcpState.connTokenId = id;
+  mcpSwitchTab('connect', true);
+  mcpRenderConnect();
+}
+
+function mcpToggleReveal(id) {
+  if (mcpState.revealed.has(id)) mcpState.revealed.delete(id); else mcpState.revealed.add(id);
+  if (id === '__created') mcpRenderCreated(); else mcpRenderTokens();
+  document.querySelector(`[data-reveal="${id}"]`)?.focus();
+}
+
+function mcpTokenRow(t) {
+  const on = t.status === 'active';
+  const rev = mcpState.revealed.has(t.id);
+  const statusChip = on ? '<span class="chip done">Hoạt động</span>' : t.status === 'expired' ? '<span class="chip wait">Hết hạn</span>' : '<span class="chip bad">Đã thu hồi</span>';
+  const last = mcpFmtTime(t.last_used_at);
+  const exp = mcpFmtTime(t.expires_at);
+  const perms = t.permissions || [];
+  const scopes = (perms.includes('all') || perms.includes('*')) ? '<span class="chip live">Toàn quyền</span>'
+    : perms.map(p => `<span class="chip">${escapeHtml(mcpScopeText([p]))}</span>`).join('');
+  return `<div class="mcpTok ${on ? '' : 'off'}">
+    <div><div class="mcpTokName">${escapeHtml(t.name)}</div><div class="mcpTokMeta">Tạo ${escapeHtml(mcpFmtTime(t.created_at) || t.created_at || '')}${t.client ? ` · ${escapeHtml(t.client)}` : ''}</div></div>
+    <div><div class="mcpTokVal"><code>${escapeHtml(rev ? t.token_raw : mcpMask(t.token_raw))}</code>
+      <button class="btn small" data-reveal="${escapeHtml(t.id)}" onclick="mcpToggleReveal('${escapeHtml(t.id)}')" aria-pressed="${rev}" aria-label="${rev ? 'Che' : 'Hiện'} token ${escapeHtml(t.name)}">${rev ? 'Che' : 'Hiện'}</button>
+      <button class="btn small" onclick="mcpCopyToken('${escapeHtml(t.id)}')" aria-label="Copy token ${escapeHtml(t.name)}">Copy</button></div>
+      <div class="mcpTokScopes">${scopes}</div></div>
+    <div class="mcpTokUse">${statusChip}<br>${t.calls_count ? `<b>${t.calls_count}</b> lượt gọi · lần cuối ${escapeHtml(last || t.last_used_at)}` : 'Chưa dùng lần nào'}<br>${exp ? `Hết hạn ${escapeHtml(exp)}` : 'Không hết hạn'}</div>
+    <div class="mcpTokActions">${on ? `<button class="btn small mcpRevoke" onclick="mcpRevokeToken('${escapeHtml(t.id)}')">Thu hồi</button>` : ''}</div>
+  </div>`;
+}
+
+function mcpCopyToken(id) {
+  const t = mcpState.tokens.find(x => x.id === id);
+  if (t) mcpCopy(t.token_raw, `token ${t.name}`);
+}
+
+function mcpRenderTokens() {
+  const sw = $('mcpStrictToggle');
+  if (sw && mcpState.auth) sw.checked = !!mcpState.auth.require_auth;
+  mcpRenderCreated();
+  const box = $('mcpTokenList');
+  if (!box) return;
+  if (!mcpState.loadedOnce) { box.innerHTML = '<div class="mcpSkeleton">Đang tải token…</div>'; return; }
+  const live = mcpState.tokens.filter(t => t.status !== 'revoked');
+  const dead = mcpState.tokens.filter(t => t.status === 'revoked');
+  if (!mcpState.tokens.length) {
+    box.innerHTML = '<div class="mcpEmpty"><b>Chưa có token nào.</b><br>Tạo token để agent kết nối an toàn và biết agent nào đang gọi.<br><button class="btn small primary" onclick="mcpToggleTokenForm(true)">+ Tạo token đầu tiên</button></div>';
+    return;
+  }
+  box.innerHTML = (live.length ? `<div class="mcpTokList">${live.map(mcpTokenRow).join('')}</div>` : '<div class="mcpEmpty">Không còn token nào hoạt động.</div>') +
+    (dead.length ? `<details class="mcpRevoked"><summary>Đã thu hồi (${dead.length})</summary><div class="mcpTokList">${dead.map(mcpTokenRow).join('')}</div></details>` : '');
+}
+
+async function mcpRevokeToken(id) {
+  const t = mcpState.tokens.find(x => x.id === id);
+  if (!t) return;
+  const ok = await mcpConfirm({ title: 'Thu hồi token?', ok: 'Thu hồi',
+    html: `Token <b>${escapeHtml(t.name)}</b> sẽ bị vô hiệu ngay. Agent đang dùng token này sẽ bị từ chối. Không hoàn tác được.` });
+  if (!ok) return;
+  try {
+    const { res, data } = await mcpFetchJson('/api/mcp/tokens/revoke', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) });
+    if (!res.ok || !data || !data.ok) { showToast(`Không thu hồi được: ${(data && data.error) || `HTTP ${res.status}`}`, 4000); return; }
+    showToast(`Đã thu hồi token ${t.name}`);
+    if (mcpState.lastCreated && mcpState.lastCreated.id === id) mcpState.lastCreated = null;
+    await mcpLoadAll();
+    $('mcpNewTokenBtn')?.focus();
+  } catch (e) {
+    showToast(`Lỗi thu hồi: ${e.message}`, 4000);
+  }
+}
+
+async function mcpOnStrictToggle(el) {
+  const want = el.checked;
+  el.checked = !want; // chỉ đổi khi server xác nhận
+  const ok = await mcpConfirm(want
+    ? { title: 'Bắt buộc token khi kết nối?', ok: 'Bật', html: 'Agent kết nối qua HTTP mà không có token hợp lệ sẽ bị từ chối ngay. Worker agy nối qua stdio trên máy này không bị ảnh hưởng.' }
+    : { title: 'Tắt bắt buộc token?', ok: 'Tắt', html: 'Ai mở được URL kết nối cũng gọi được mọi tool, kể cả tool có tác dụng phụ.' });
+  if (!ok) { el.focus(); return; }
+  try {
+    const { res, data } = await mcpFetchJson('/api/mcp/auth/toggle', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ require_auth: want }) });
+    if (!res.ok || !data) { showToast(`Không đổi được chế độ xác thực: HTTP ${res.status}`, 4000); return; }
+    showToast(want ? 'Đã bật bắt buộc token' : 'Đã tắt bắt buộc token');
+    await mcpLoadAll();
+  } catch (e) {
+    showToast(`Lỗi: ${e.message}`, 4000);
+  }
+  el.focus();
+}
+
+// ---------- Bootstrap ----------
+function mcpRenderBootstrap() {
+  const box = $('mcpBootstrap'), meta = $('mcpBootMeta');
+  if (!box) return;
+  const st = mcpState.status;
+  if (!st) {
+    box.innerHTML = mcpState.loadedOnce ? '<div class="mcpEmpty">Chưa tải được nội dung bootstrap. <button class="btn small" onclick="mcpLoadAll()">Thử lại</button></div>' : '<div class="mcpSkeleton">Đang tải…</div>';
+    if (meta) meta.innerHTML = '';
+    return;
+  }
+  const lines = String(st.instructions || '').split('\n').filter(l => l.trim());
+  if (!lines.length) { box.innerHTML = '<div class="mcpEmpty">Máy chủ không gửi hướng dẫn nào.</div>'; return; }
+  const names = mcpState.tools.map(t => t.name).sort((a, b) => b.length - a.length);
+  const re = names.length ? new RegExp(`\\b(${names.join('|')})\\b`, 'g') : null;
+  box.innerHTML = lines.map((l, i) => {
+    let h = escapeHtml(l);
+    if (re) h = h.replace(re, '<code>$1</code>');
+    return `<div class="mcpBootLine"><span class="n">${i + 1}</span><div>${h}</div></div>`;
+  }).join('');
+  if (meta) meta.innerHTML = `<span><b>Máy chủ:</b> ${escapeHtml(st.serverInfo ? `${st.serverInfo.name} v${st.serverInfo.version}` : '—')}</span><span><b>Giao thức:</b> MCP ${escapeHtml(st.protocolVersion || '—')}</span><span><b>Tool:</b> ${st.tools_count}</span><span><b>Resource:</b> ${(st.resources || []).length}</span><span><b>Prompt:</b> ${(st.prompts || []).length}</span>`;
+}
+
+// ---------- Hộp xác nhận ----------
+let _mcpConfirmResolve = null;
+function mcpConfirm({ title, html, ok }) {
+  $('mcpConfirmTitle').textContent = title;
+  $('mcpConfirmText').innerHTML = html;
+  $('mcpConfirmOk').textContent = ok || 'Đồng ý';
+  $('mcpConfirmModal').classList.add('show');
+  $('mcpConfirmCancel').focus();
+  return new Promise(r => { _mcpConfirmResolve = r; });
+}
+function mcpConfirmDone(v) {
+  $('mcpConfirmModal').classList.remove('show');
+  const r = _mcpConfirmResolve;
+  _mcpConfirmResolve = null;
+  if (r) r(v);
+}
+
+// ---------- Bàn phím ----------
+document.addEventListener('keydown', e => {
+  // hộp xác nhận: Esc = hủy, Tab xoay vòng giữa 2 nút
+  if (_mcpConfirmResolve) {
+    if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); mcpConfirmDone(false); }
+    else if (e.key === 'Tab') {
+      const a = $('mcpConfirmCancel'), b = $('mcpConfirmOk');
+      e.preventDefault();
+      (document.activeElement === a ? b : a).focus();
     }
-  }).catch(() => {});
+    return;
+  }
+  const drawer = $('mcpDrawer');
+  if (drawer && !drawer.hidden) {
+    if (e.key === 'Escape') {
+      e.preventDefault(); e.stopImmediatePropagation();
+      if (!$('mcpRunConfirm').hidden) mcpCancelRunConfirm(); else mcpCloseRunner();
+    } else if (e.key === 'Tab') {
+      const f = [...drawer.querySelectorAll('button, input, select, textarea, summary, [tabindex]:not([tabindex="-1"])')].filter(x => !x.disabled && x.offsetParent !== null);
+      if (f.length) {
+        const i = f.indexOf(document.activeElement);
+        if (e.shiftKey && i <= 0) { e.preventDefault(); f[f.length - 1].focus(); }
+        else if (!e.shiftKey && i === f.length - 1) { e.preventDefault(); f[0].focus(); }
+      }
+    }
+    return;
+  }
+  const scr = $('mcp');
+  if (!scr || !scr.classList.contains('active')) return;
+  if (document.querySelector('.modal.show')) return; // modal khác đang mở → để handler của modal đó xử lý
+  const ae = document.activeElement;
+  if (e.key === 'Escape') {
+    if (ae && ae.id === 'mcpToolSearch' && ae.value) { e.preventDefault(); ae.value = ''; mcpRenderTools(); return; }
+    if (!$('mcpTokenForm').hidden) { e.preventDefault(); mcpToggleTokenForm(false); return; }
+    e.preventDefault(); e.stopImmediatePropagation();
+    mcpLeave();
+    return;
+  }
+  if (e.key === '/' && mcpState.tab === 'tools' && !(ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName))) {
+    e.preventDefault(); $('mcpToolSearch').focus();
+  }
+  if ((e.key === 'ArrowRight' || e.key === 'ArrowLeft') && ae && ae.classList && ae.classList.contains('mcpTab')) {
+    const i = MCP_TABS.indexOf(mcpState.tab);
+    const j = (i + (e.key === 'ArrowRight' ? 1 : -1) + MCP_TABS.length) % MCP_TABS.length;
+    e.preventDefault();
+    mcpSwitchTab(MCP_TABS[j], true);
+  }
+}, true);
+
+// Badge MCP ở thanh trên + thanh bên lấy số tool thật khi trang tải
+setTimeout(() => {
+  mcpFetchJson('/api/mcp/status').then(({ res, data }) => {
+    if (!res.ok || !data) return;
+    if (mcpState.loadedOnce) return;
+    const n = (data.tools || []).length;
+    if ($('topMcpToolBadge')) $('topMcpToolBadge').textContent = `${n} tool`;
+    if ($('sideMcpToolBadge')) $('sideMcpToolBadge').textContent = String(n);
+  }).catch(() => {
+    const dot = document.querySelector('#topMcpBadge .mcpDot');
+    if (dot) dot.style.color = 'var(--red)';
+  });
 }, 1200);
 
 </script>

@@ -708,17 +708,107 @@ TOOLS = [
     }
 ]
 
-# Map tool names to fast lookup
-# Tool CHỈ ĐỌC (không đổi dữ liệu, không chạy agy, không gửi gì vào tmux): nút Test trên màn MCP chỉ gọi thẳng các tool này.
-# Tool còn lại có tác dụng phụ → màn MCP bắt nhập tham số + hộp xác nhận trước khi gọi (#24).
-READ_ONLY_TOOLS = {
-    "get_live_quota", "list_google_accounts", "list_swarm_workers", "get_worker_terminal_output", "get_warroom_messages",
-    "wait_worker_result", "list_kanban_tasks", "list_conversations", "get_conversation_messages", "list_notes",
-    "read_workspace_file", "list_workspace_files", "get_system_status",
+# ==========================================
+# 1b. METADATA TOOL — NGUỒN DUY NHẤT (#28)
+# ==========================================
+# Mỗi tool khai báo đúng 1 lần: nhóm chức năng (màn MCP & Kết nối), scope token được gọi, chỉ đọc hay có tác dụng phụ,
+# mô tả tiếng Việt ngắn. READ_ONLY_TOOLS, annotations.readOnlyHint, quyền token theo scope (db.verify_mcp_request_auth)
+# và UI đều suy ra từ bảng này — không lặp danh sách ở nơi khác.
+# Tool CHỈ ĐỌC: không đổi dữ liệu, không chạy agy, không gửi gì vào tmux → UI chạy thử ngay.
+# Tool CÓ TÁC DỤNG PHỤ → UI bắt nhập tham số + xác nhận trước khi gọi.
+
+TOOL_GROUPS = [
+    {"id": "kanban", "label": "Việc & Kanban"},
+    {"id": "warroom", "label": "Giao ban & Worker"},
+    {"id": "session", "label": "Phiên & ghi chú"},
+    {"id": "files", "label": "File"},
+    {"id": "account", "label": "Tài khoản & quota"},
+    {"id": "system", "label": "Hệ thống"},
+]
+
+# Scope của token MCP (permissions_json). "all" = mọi tool. Tool có scope None chỉ token toàn quyền gọi được.
+TOKEN_SCOPES = [
+    {"id": "all", "label": "Toàn quyền", "hint": "Gọi được mọi tool"},
+    {"id": "kanban", "label": "Việc & Kanban", "hint": "Tạo, nhận, cập nhật và nghiệm thu task"},
+    {"id": "swarm", "label": "Giao ban & Worker", "hint": "Giao việc cho agy, đọc terminal, điều khiển worker"},
+    {"id": "chat", "label": "Phiên chat", "hint": "Tạo phiên, ghi tiến độ, đọc tin, chat với Gen"},
+    {"id": "files", "label": "Ghi chú, file & trạng thái", "hint": "Ghi chú, đọc/ghi file workspace, trạng thái hệ thống"},
+    {"id": "quota", "label": "Tài khoản & quota", "hint": "Xem quota, đổi tài khoản Google, đăng nhập OAuth"},
+]
+
+
+def _m(group, scope, read_only, summary):
+    return {"group": group, "scope": scope, "read_only": read_only, "summary": summary}
+
+
+TOOL_META = {
+    # Việc & Kanban
+    "list_kanban_tasks": _m("kanban", "kanban", True, "Xem các task Kanban của một phiên, kèm trạng thái và checklist."),
+    "create_kanban_task": _m("kanban", "kanban", False, "Tạo task Kanban mới gắn mã VIEC, có checklist và độ ưu tiên."),
+    "claim_task": _m("kanban", "kanban", False, "Nhận (khóa) một task cho worker trước khi làm."),
+    "complete_task": _m("kanban", "kanban", False, "Nghiệm thu task xong, bắt buộc có bằng chứng kiểm được."),
+    "update_task_checklist": _m("kanban", "kanban", False, "Tick hoặc bỏ tick một mục checklist của task."),
+    # Giao ban & Worker
+    "list_swarm_workers": _m("warroom", "swarm", True, "Xem danh sách worker agy, vai trò và trạng thái."),
+    "get_worker_terminal_output": _m("warroom", "swarm", True, "Đọc màn hình terminal gần nhất của một worker."),
+    "get_warroom_messages": _m("warroom", "swarm", True, "Đọc tin mới nhất trong Phòng giao ban."),
+    "wait_worker_result": _m("warroom", "swarm", True, "Chờ worker làm xong một lần giao việc rồi trả kết quả."),
+    "post_warroom_message": _m("warroom", "swarm", False, "Đăng tin vào Phòng giao ban; có @vai là giao việc cho agy."),
+    "send_worker_directive": _m("warroom", "swarm", False, "Gửi lệnh hoặc phím thẳng vào terminal của worker."),
+    "manage_worker_lifecycle": _m("warroom", "swarm", False, "Tạm dừng, tiếp tục, ngủ đông hoặc đánh thức worker."),
+    # Phiên & ghi chú
+    "list_conversations": _m("session", "chat", True, "Xem danh sách phiên làm việc."),
+    "get_conversation_messages": _m("session", "chat", True, "Đọc toàn bộ tin nhắn của một phiên."),
+    "list_notes": _m("session", "files", True, "Xem ghi chú nhanh của dự án hoặc một phiên."),
+    "create_conversation": _m("session", "chat", False, "Tạo phiên mới (hoặc dùng lại phiên cùng tên)."),
+    "log_session_message": _m("session", "chat", False, "Ghi 1 tin tiến độ vào phiên, không gọi AI."),
+    "gen_chat": _m("session", "chat", False, "Gửi tin cho Gen trong phiên và chờ AI trả lời."),
+    "compact_conversation": _m("session", "chat", False, "Nén ngữ cảnh phiên thành bản tóm tắt."),
+    "save_note": _m("session", "files", False, "Tạo mới hoặc sửa một ghi chú nhanh."),
+    "delete_note": _m("session", "files", False, "Xóa một ghi chú nhanh."),
+    # File
+    "list_workspace_files": _m("files", "files", True, "Xem cây thư mục và file trong workspace."),
+    "read_workspace_file": _m("files", "files", True, "Đọc nội dung một file trong workspace."),
+    "create_workspace_file": _m("files", "files", False, "Tạo hoặc ghi đè file / thư mục trong workspace của phiên."),
+    # Tài khoản & quota
+    "get_live_quota": _m("account", "quota", True, "Xem quota 5 giờ và quota tuần của tài khoản đang dùng."),
+    "list_google_accounts": _m("account", "quota", True, "Xem các tài khoản Google / hồ sơ agy và trạng thái đăng nhập."),
+    "probe_quota": _m("account", None, False, "Chạy 1 lệnh agy nhỏ để đo quota thật (tốn 1 lượt gọi)."),
+    "switch_google_account": _m("account", "quota", False, "Đổi tài khoản Google cho một worker."),
+    "get_oauth_login_url": _m("account", "quota", False, "Tạo link đăng nhập Google để thêm tài khoản."),
+    # Hệ thống
+    "get_system_status": _m("system", "files", True, "Xem trạng thái máy chủ, cơ sở dữ liệu và dự án."),
 }
+
+_missing_meta = sorted({t["name"] for t in TOOLS} ^ set(TOOL_META))
+if _missing_meta:
+    raise RuntimeError(f"TOOL_META lệch với TOOLS: {_missing_meta}")
+
+READ_ONLY_TOOLS = {n for n, m in TOOL_META.items() if m["read_only"]}
+TOOL_SCOPES = {n: m["scope"] for n, m in TOOL_META.items()}
 for _t in TOOLS:
     # MCP tool annotations (spec 2025-03-26): client biết tool nào chỉ đọc
     _t["annotations"] = {"readOnlyHint": _t["name"] in READ_ONLY_TOOLS, "destructiveHint": False}
+
+# db.verify_mcp_request_auth đọc scope của tool từ đây (db không import mcp_core để tránh vòng import)
+db.MCP_TOOL_SCOPES.clear()
+db.MCP_TOOL_SCOPES.update(TOOL_SCOPES)
+
+
+def tool_catalog():
+    """Danh sách tool cho màn MCP & Kết nối: tool gốc (name, description, inputSchema, annotations) + group, scope,
+    read_only, summary từ TOOL_META, theo thứ tự nhóm trong TOOL_GROUPS."""
+    order = {g["id"]: i for i, g in enumerate(TOOL_GROUPS)}
+    items = [dict(t, **TOOL_META[t["name"]]) for t in TOOLS]
+    return sorted(items, key=lambda t: (order.get(t["group"], 99), not t["read_only"]))
+
+
+def valid_token_permissions(perms):
+    """Scope hợp lệ cho token: id trong TOKEN_SCOPES, '*' hoặc tên tool có thật. Trả (ok, danh sách lạ)."""
+    known = {s["id"] for s in TOKEN_SCOPES} | {"*"} | set(TOOL_META)
+    bad = [p for p in (perms or []) if not isinstance(p, str) or p not in known]
+    return (not bad, bad)
+
 
 TOOL_LOOKUP = {t["name"]: t for t in TOOLS}
 

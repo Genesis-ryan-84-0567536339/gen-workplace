@@ -270,3 +270,21 @@ Task thật nằm ở bảng `gen_session_todos` (MCP `create_kanban_task`, `cla
 ```bash
 python3 scripts/test_task_hub.py   # #24: /api/task/assign, lọc dispatch log, TSK trong tin, ghi kết quả về phiên, switch_google_account, quota None
 ```
+
+### 3.11. Issue #28: màn MCP & Kết nối
+
+Modal MCP cũ được thay bằng màn riêng **MCP & Kết nối** (thanh bên, mục "Tri thức & dữ liệu"; nút `MCP` trên thanh trên cũng mở màn này; `openMcpModal()` cũ chuyển thẳng tới màn mới). Màn có header trạng thái (ping `/mcp` thật + thời gian phản hồi, URL kết nối, số tool, số token hoạt động và số agent dùng trong 24 giờ) và 4 tab: **Kết nối** (cấu hình copy được cho agy CLI, Claude Code, Claude.ai / Gen-hub, JSON chung; token bị che, bấm Copy lấy bản thật), **Tool** (nhóm theo chức năng, tìm không dấu, lọc Chỉ đọc / Có tác dụng phụ, ngăn chạy thử sinh form từ `inputSchema`), **Token** (tạo theo scope, che/hiện, copy, thu hồi có xác nhận, bật/tắt bắt buộc token có xác nhận), **Bootstrap** (nội dung `initialize.instructions`, chỉ đọc). Esc đóng hộp xác nhận → ngăn chạy thử → màn (quay về màn trước đó).
+
+**Metadata tool — nguồn duy nhất:** `mcp_core.TOOL_META[name] = {group, scope, read_only, summary}`. Từ bảng này suy ra `READ_ONLY_TOOLS`, `annotations.readOnlyHint`, scope kiểm quyền token (`db.MCP_TOOL_SCOPES`, do `mcp_core` điền lúc import — thay cho `domain_map` ghi cứng trong `db.verify_mcp_request_auth`) và dữ liệu cho UI. Thêm tool mới mà thiếu dòng trong `TOOL_META` → app báo lỗi ngay khi khởi động. Nhóm: `TOOL_GROUPS`; scope token: `TOKEN_SCOPES` (`all`, `kanban`, `swarm`, `chat`, `files`, `quota`). Phân quyền giữ nguyên như trước; `probe_quota` (chạy agy) chỉ token toàn quyền gọi được.
+
+| API | Hợp đồng |
+|---|---|
+| `GET /api/mcp/status` (cũng `/api/mcp/tools`, `/mcp/tools`) | `tools[]` thêm `group`, `scope`, `read_only`, `summary` (xếp theo nhóm); thêm `groups`, `scopes`, `stdio: {wrapper, wrapper_exists, python, script, data_dir}` (lệnh chạy MCP qua stdio trên máy chủ); `auth.used_24h` = số token hoạt động được dùng trong 24 giờ. MCP `tools/list` không đổi. |
+| `GET /api/mcp/tokens` | Token quá hạn mà chưa ai gọi hiện `status: "expired"`; `auth_status.used_24h`. |
+| `POST /api/mcp/tokens/create` | `permissions` chỉ nhận id trong `TOKEN_SCOPES`, `*` hoặc tên tool có thật; giá trị lạ → **400** `{"error": "Scope không hợp lệ: ..."}`. |
+
+Màn này chỉ gửi token khi gọi `/mcp` nếu đang bắt buộc token (để không cộng lượt gọi giả vào token của agent). Chỗ nào cú pháp client chưa kiểm chứng được trong repo (Claude Code qua HTTP, Claude.ai cần URL HTTPS công khai, tên khóa `url`/`headers` của từng client) có nhãn **Kiểm tra lại** trên màn.
+
+```bash
+python3 scripts/test_mcp_ui_api.py   # #28: TOOL_META đủ/hợp lệ, /api/mcp/status, quyền theo scope, scope lạ 400, expired, used_24h
+```
