@@ -841,7 +841,7 @@ class SwarmHandler(SimpleHTTPRequestHandler):
                 self._send_json(400, {"error": "Missing session_id or todo_id (or task_id)"})
             return
 
-        # 14b. Giao task cho 1 vai (#24): POST /api/task/assign {todo_id, session_id: "qa" | "gw-qa-agy", author?, channel_id?}
+        # 14b. Giao task cho 1 vai (#24, #45): POST /api/task/assign {todo_id, session_id: "qa" | "gw-qa-agy", mode?: "build"|"review", author?, channel_id?}
         #      → claim task cho worker + war-room "@vai Thực hiện TSK-n" (prompt kèm tiêu đề, checklist, viec_ref) → {dispatch_id, ...}
         #      400 thiếu/sai tham số · 404 không có task · 409 task đã done / người khác đang giữ
         if path == "/api/task/assign":
@@ -854,9 +854,12 @@ class SwarmHandler(SimpleHTTPRequestHandler):
                 self._send_json(res.pop("http", 200) if "error" in res else 200, res)
                 return
             session_id = str(data.get("session_id") or data.get("role") or "").strip()
+            # mode (#45): "build" (mặc định, "Làm": agy sửa code trong worktree ../gw-worktrees/TSK-n, app test + push nhánh wt/TSK-n)
+            #             | "review" ("Rà soát": như war-room, agy --mode plan chỉ đọc)
             res = db.assign_task_to_role(todo_id, session_id, data.get("project_id", "PRJ-GEN-WORKPLACE"),
-                                         author=str(data.get("author") or "Ryan (Owner)"), channel_id=str(data.get("channel_id") or "war_room"))
-            code = {"bad_request": 400, "not_found": 404, "already_done": 409, "locked": 409, "retry": 409}.get(res.get("code"), 400) \
+                                         author=str(data.get("author") or "Ryan (Owner)"), channel_id=str(data.get("channel_id") or "war_room"),
+                                         mode=str(data.get("mode") or "build"))
+            code = {"bad_request": 400, "not_found": 404, "already_done": 409, "locked": 409, "retry": 409, "busy": 409}.get(res.get("code"), 400) \
                 if "error" in res else 200
             if res.get("error") == "Task not found":
                 code = 404

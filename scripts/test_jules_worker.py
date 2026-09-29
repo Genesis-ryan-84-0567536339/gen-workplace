@@ -373,12 +373,22 @@ check("automationMode duy nhất là AUTO_CREATE_PR", jules_worker.AUTOMATION_MO
       and not any(re.search(r"AUTO_MERGE|automerge|auto_merge", c, re.I) for c in consts))
 MERGE_RX = [r"/pulls/[^\"'\s]*/merge", r"\bgh\s+pr\s+merge", r"merge_pull_request", r"enable_pr_auto_merge", r"auto[-_]?merge",
             r"\[\s*['\"]git['\"][^\]]*['\"]push['\"]", r"_git\(\s*\w+\s*,\s*['\"]push['\"]", r"['\"]git push"]
+PUSH_RX = MERGE_RX[-3:]
 hits = []
 for fn in os.listdir(os.path.join(ROOT, "backend")):
     if fn.endswith(".py"):
         text = open(os.path.join(ROOT, "backend", fn), encoding="utf-8").read()
-        hits += [f"{fn}: {rx}" for rx in MERGE_RX if re.search(rx, text, re.I)]
-check("backend không có lệnh merge PR / auto-merge / git push", not hits, str(hits))
+        if fn == "db.py":   # danh sách lệnh CẤM agy chạy ở chế độ Làm (#45) không phải lệnh push
+            text = re.sub(r"AGY_BUILD_DENY_COMMANDS = \[.*?\n\]", "", text, flags=re.S)
+        # chế độ Làm (#45, Boss chốt): app được push đúng nhánh wt/TSK-n của task (agy_build.push_branch), không merge
+        rxs = [rx for rx in MERGE_RX if rx not in PUSH_RX] if fn == "agy_build.py" else MERGE_RX
+        hits += [f"{fn}: {rx}" for rx in rxs if re.search(rx, text, re.I)]
+check("backend không có lệnh merge PR / auto-merge; git push chỉ ở agy_build", not hits, str(hits))
+from backend import agy_build  # noqa: E402
+_ab = open(os.path.join(ROOT, "backend", "agy_build.py"), encoding="utf-8").read()
+_push_calls = re.findall(r"_git\(\[\s*\"push\"[^\]]*\]", _ab)
+check("agy_build chỉ 1 lệnh push, đích refs/heads/<nhánh wt/TSK-n>", len(_push_calls) == 1 and "HEAD:refs/heads/{branch}" in _push_calls[0]
+      and "--force" not in _push_calls[0] and agy_build.task_branch("TSK-7") == "wt/TSK-7", str(_push_calls))
 st, js = call("POST", "/api/jules/merge", {"dispatch_id": D1})
 check("không có endpoint /api/jules/merge", st == 404 or (js or {}).get("status") != "merged", f"{st} {js}")
 check("MCP không có tool merge / duyệt kế hoạch Jules", not any("merge" in t["name"] or t["name"] in ("jules_approve", "approve_plan")

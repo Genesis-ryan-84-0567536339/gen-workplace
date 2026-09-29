@@ -106,6 +106,12 @@ google-chrome --headless=new --virtual-time-budget=3000 --dump-dom http://localh
 | `GW_AGY_PLAN_ALLOW` | `1` | War-room tự thêm quy tắc chỉ đọc vào `permissions.allow` của hồ sơ agy (xem 3.6). `0` = không đụng settings. |
 | `GW_WARROOM_SKIP_PERMISSIONS` | `0` | Lối thoát cuối nếu agy thật vẫn auto-denied dù đã có quy tắc: thêm `--dangerously-skip-permissions` cho lệnh war-room (`--mode plan`), **chỉ khi cwd là worktree riêng của vai**. Đánh đổi: lệnh shell agy chạy không bị hỏi. |
 | `GW_TMUX_WATCH_MAX_SEC` | `7200` | Thời gian tối đa thread nền theo dõi 1 lệnh giao qua tmux chờ dòng `=== XONG exit=N ===`. |
+| `GW_AGY_BUILD_TIMEOUT_SEC` | `1800` | Chế độ Làm (3.6c): thời gian tối đa 1 lần agy sửa code. Dòng `dispatch_log` build còn `running` quá mức này + 20 phút (ngân sách test/push) thì bị coi là mất thread. |
+| `GW_BUILD_BASE` | `main` | Chế độ Làm: nhánh gốc, worktree tạo từ `origin/<GW_BUILD_BASE>`, link compare `compare/<GW_BUILD_BASE>...wt/TSK-n`. |
+| `GW_BUILD_TEST_EXCLUDE` | `test_mcp_suite.py` | Chế độ Làm: file `scripts/test_*.py` app KHÔNG chạy sau khi agy xong (phân cách bằng dấu phẩy). |
+| `GW_BUILD_TEST_TIMEOUT_SEC` / `GW_BUILD_PUSH_TIMEOUT_SEC` | `300` / `120` | Chế độ Làm: giới hạn 1 file test / lệnh `git push` của app. |
+| `GW_BUILD_GITHUB_REPO` | (suy từ `git remote get-url origin`) | Chế độ Làm: `owner/repo` cho link compare / PR nháp khi remote không phải GitHub. |
+| `GITHUB_TOKEN` | (rỗng) | Chế độ Làm: có token thì app tạo **PR nháp** `wt/TSK-n → main` sau khi push (không bao giờ merge); không có thì chỉ ghi link compare. |
 
 ### 3.2. OAuth callback
 - Server callback cổng 8085 chỉ bind `127.0.0.1`; route dự phòng `/oauth2callback` trên cổng chính dùng chung `handle_oauth_callback()`.
@@ -158,6 +164,47 @@ Tin trong War Room có `@backend|@devops|@qa|@lead` → thread nền chạy (`@s
 - agy thoát 0 nhưng output ngắn có `no output produced` / `auto-denied` (hoặc rỗng / stream-json không có câu trả lời) → **failed**
   (tin trả lời ghi `exit=0 (failed: agy bị từ chối quyền, không có kết quả)`).
 
+### 3.6c. Chế độ "Làm" (build) — agy sửa code thật (Issue #45)
+Boss chốt 29/09 (VIEC-12): agy được code thật, nhưng chỉ trong worktree riêng của task; app (không phải agy) test, push, ghi kết quả.
+- **Giao**: `POST /api/task/assign {todo_id, session_id, mode}` — `mode` ∈ `build` ("Làm", **mặc định**) | `review` ("Rà soát").
+  Thẻ task có ô chọn chế độ (mặc định "Làm") cạnh ô chọn vai. **Tin war-room `@vai` luôn là Rà soát** (`--mode plan`, 3.6).
+  Response build thêm `mode: "build"`, `branch`, `worktree_dir`; task đang có lần Làm chạy → 409 `code: busy`.
+- **Worktree**: `<GW_WORKTREE_ROOT>/TSK-n` (mặc định `../gw-worktrees/TSK-n`), nhánh `wt/TSK-n`, tạo bằng
+  `git fetch origin main` + `git worktree add --no-track -b wt/TSK-n <dir> origin/main`. Giao lại cùng task → dùng lại worktree / nhánh.
+- **Lệnh**: `agy --gemini_dir=<hồ sơ> -p <prompt> --output-format stream-json`, cwd = worktree: chế độ mặc định của agy
+  (KHÔNG `--mode plan`), KHÔNG `--model` (agy dùng model mặc định), không có cờ bỏ hỏi quyền. Hồ sơ: `select_agy_profile_for_run`
+  (hồ sơ của vai, hết quota thì hồ sơ khác còn quota; mỗi lần 429 thử hồ sơ tiếp theo). Tác giả commit = `gw-<vai>-agy (agy)`.
+- **Quyền** (`ensure_agy_build_permissions`, ghi vào `<hồ sơ>/antigravity-cli/settings.json` trước khi chạy, **gỡ sau khi chạy**
+  — đếm theo lần build nên 2 lần build song song trên cùng hồ sơ không gỡ của nhau; rule người dùng có sẵn giữ nguyên;
+  không chép sang hồ sơ khác khi fallback quota; chế độ Rà soát tự gỡ rule Làm còn sót nếu app khởi động lại giữa chừng):
+  - allow: `read_file(<worktree>)`, `write_file(<worktree>)`, mọi lệnh chỉ đọc của 3.6, `python3 -m py_compile`,
+    `python3 scripts/test_<tên>.py` (regex), `git add`, `git commit` (git status/diff/log đã có).
+  - deny: cờ ghi của 3.6 + `git push|remote|fetch|pull|clone|ls-remote|submodule|worktree|update-ref|symbolic-ref|config|switch|clean|reflog|gc`,
+    `git -C|-c|--git-dir|--work-tree` (mọi vị trí), `git checkout main|master|origin/*|-b|-B|--detach|-f`, `git reset --hard|--merge|--keep`,
+    `git commit -n|--no-verify|--amend`, `rm -r/-f` và `rm` đường dẫn tuyệt đối / `..` / `~`, `cd` ra ngoài (`/`, `..`, `~`, `$`, `-`),
+    `curl|wget|ssh|scp|sftp|rsync|nc|telnet|ftp|socat|gh`, `sudo|su|doas`, `pip|pip3|python3 -m pip|npm|npx|yarn|pnpm|apt|apt-get|dpkg|brew|gem|cargo`,
+    `write_file(...)` cho repo app, hồ sơ agy, `~/.ssh`, `~/.config`, `~/.gitconfig`, `~/.git-credentials`, `~/gw-reports`, `DATA_DIR`, `/etc`, `/usr`...
+  - Lớp chặn thứ hai (chỉ cho tiến trình agy, qua `GIT_CONFIG_*`): `core.hooksPath` → hook `pre-commit` chỉ cho commit trên `wt/TSK-n`
+    trong đúng worktree, `pre-push` / `pre-rebase` chặn; `remote.origin.pushurl` hỏng. Hook nằm ở `DATA_DIR/agy-build-hooks/TSK-n`.
+- **Prompt**: SOP `roles/build.md` (hiểu yêu cầu → sửa code → chạy test liên quan → commit message rõ ràng → báo cáo ngắn: đã đổi gì,
+  test nào pass, rủi ro) + khối `[THÔNG TIN VIỆC TSK-n]` (tiêu đề, `viec_ref`, mô tả, checklist) + luật quyền (worktree, lệnh được / cấm, bắt buộc commit, không push).
+- **Sau khi agy xong, app làm tiếp**: (1) kiểm commit mới trên `wt/TSK-n`; main local / HEAD repo app đổi sang commit không có trên
+  `origin/main` hoặc worktree rời nhánh → **VI PHẠM**, failed, không push; (2) `py_compile` mọi file `.py` + chạy từng `scripts/test_*.py`
+  (trừ `GW_BUILD_TEST_EXCLUDE`) trong worktree, HOME tạm, không ghi `__pycache__`; (3) `git push origin HEAD:refs/heads/wt/TSK-n` bằng
+  credential git sẵn có (không hỏi mật khẩu; lỗi thì ghi rõ, không crash); (4) ghi vào `dispatch_log` (`worktree_dir`, `build_branch`,
+  `build_commit`, `build_tests` JSON, `build_push` JSON, `compare_url`, `pr_url`), tin war-room của vai, báo cáo `~/gw-reports/build-TSK-n-<ts>-<id>.md`
+  và tin kết quả trong phiên của task (nhánh, commit, test, push, `https://github.com/<owner>/<repo>/compare/main...wt/TSK-n`).
+  Có `GITHUB_TOKEN` → PR **nháp**; không thì chỉ link compare. **App không bao giờ merge**; Claude điều phối tạo PR, review, merge.
+- **Trạng thái**: `done` khi agy có ít nhất 1 commit mới và không vi phạm (test FAIL / push lỗi vẫn `done` nhưng ghi rõ trong summary,
+  `build_tests.ok=false` / `build_push.ok=false`); `failed` khi không có commit, agy lỗi / bị chặn quyền không ra kết quả, hết quota, vi phạm.
+- **Nghiệm thu**: bằng chứng gợi ý là commit SHA trên `wt/TSK-n` (`verify_evidence_ref` tìm trong repo app và `GW_DISPATCH_REPO`; worktree
+  dùng chung kho object nên commit trong worktree được nhận, kể cả sau khi dọn). SHA của lần Làm đã done của người giữ task đóng thay được
+  như `dispatch:<id>` (audit `holder_dispatch`). Sau khi merge PR thì đóng bằng SHA merge.
+- **Dọn**: task done (`complete_task`) hoặc bị xóa → `git worktree remove --force` + `git worktree prune` + xóa hook; nhánh local và remote
+  giữ nguyên. Task đang có lần Làm chạy thì không gỡ.
+- Rủi ro còn lại: `python3 scripts/test_*.py` chạy mã trong worktree (agy có thể viết file test rồi chạy nó); chuyển hướng ghi
+  (`cat a > /x`) vẫn khớp tiền tố lệnh đọc — prompt cấm, hook + kiểm sau chạy bắt commit/push sai chỗ nhưng không bắt được ghi file ngoài worktree bằng shell.
+
 ### 3.6b. Phiên tmux của vai (Issue #7)
 - `ensure_real_tmux_sessions` / `wake_tmux_session` mở phiên `gw-<vai>-agy` trong worktree riêng `<GW_WORKTREE_ROOT>/<session_id>`
   (nhánh `wt/<session_id>`, cùng hàm `ensure_role_worktree` với war-room), không mở trong repo app. Chỉ tạo worktree khi `tmux -V` chạy được.
@@ -183,6 +230,7 @@ python3 scripts/test_agy_permissions.py    # #7: alias không skip-permissions, 
 python3 scripts/test_agy_readonly_dispatch.py  # #26: allow/deny-rule chỉ đọc, prompt chỉ đọc, ghi lệnh bị chặn (stream-json)
 python3 scripts/test_mcp_instructions.py   # #19: initialize.instructions (HTTP + stdio), log_session_message chỉ lưu, create_conversation reuse
 python3 scripts/test_task_hub.py           # #24: task ↔ war-room ↔ worker, kết quả ghi về phiên, kiểm tham số switch_google_account
+python3 scripts/test_agy_build.py          # #45: chế độ Làm — worktree, allow/deny, commit, test, push remote giả, chặn push/main, dọn worktree
 ```
 
 ### 3.8. Issue #12 — gỡ toàn bộ dữ liệu / phản hồi giả (hợp đồng API cho frontend)
@@ -253,7 +301,7 @@ Task thật nằm ở bảng `gen_session_todos` (MCP `create_kanban_task`, `cla
 | API / tool | Hợp đồng |
 |---|---|
 | `GET /api/tasks?project=` | `{tasks: [...], count}`: mọi task của dự án, checklist đã parse, `total_items`/`done_items`, `holder` (= `claimed_by`), `conversation_title`, `dispatch_count`, `last_dispatch: {id, session_id, status, request_msg_id, reply_msg_id, report_path, profile_initial, profile_used, fallback, fallback_reason, channel_id, task_msg_id, ...}` (lần giao gần nhất). `/api/state` có cùng danh sách ở khóa `gen_session_todos`; `GET /api/gen/session/todos` cũng kèm `last_dispatch`. |
-| `POST /api/task/assign {todo_id, session_id, author?, channel_id?}` | `session_id` nhận `qa`, `@qa` hoặc `gw-qa-agy`. Claim task cho worker (như `claim_task`), gửi war-room `@qa Thực hiện TSK-n (VIEC-m): <tiêu đề>` + checklist; prompt agy kèm khối `[THÔNG TIN VIỆC TSK-n]` (tiêu đề, `viec_ref`, mô tả, checklist có id mục). Trả `{status: "assigned", task_id, session_id, role, viec_ref, dispatch_id, request_msg_id, channel_id, claim, message}`. 400 thiếu/sai vai · 404 không có task · 409 task đã done (`already_done`) hoặc người khác đang giữ (`locked`, kèm `held_by`). |
+| `POST /api/task/assign {todo_id, session_id, mode?, author?, channel_id?}` | `mode` = `build` (mặc định, chế độ Làm — xem 3.6c) hoặc `review`; mô tả dưới đây là `review`. `session_id` nhận `qa`, `@qa` hoặc `gw-qa-agy`. Claim task cho worker (như `claim_task`), gửi war-room `@qa Thực hiện TSK-n (VIEC-m): <tiêu đề>` + checklist; prompt agy kèm khối `[THÔNG TIN VIỆC TSK-n]` (tiêu đề, `viec_ref`, mô tả, checklist có id mục). Trả `{status: "assigned", task_id, session_id, role, viec_ref, dispatch_id, request_msg_id, channel_id, claim, message}`. 400 thiếu/sai vai · 404 không có task · 409 task đã done (`already_done`) hoặc người khác đang giữ (`locked`, kèm `held_by`). |
 | `GET /api/dispatch/log?limit=&task_id=&session_id=` | Lọc đúng giá trị (bỏ trống = không lọc, 2 tham số cùng lúc = AND). `status` luôn đã chuẩn hóa (`running\|done\|failed`), thêm `fallback` (bool). `limit` sai → 50. |
 | `post_warroom_message` / `POST /api/warroom/send {..., task_id?}` | Task của lần giao việc: `task_id` truyền vào > mã `TSK-n` đầu tiên **có thật** trong nội dung tin > `current_task_id` của worker. `dispatches[]` thêm `task_id`; response thêm `task_id`. `@Gen`, `@Toàn Đội`, `@all` không giao việc (chỉ lưu, `note` nói rõ). |
 | Kết quả giao việc ghi về task | Dispatch gắn task kết thúc (war-room hoặc tmux) → 1 tin `log_gen_message` trong phiên (`conversation_id`) của task, tác giả `<worker> (agy)`: trạng thái XONG/LỖI + exit, "đã chuyển hồ sơ" nếu fallback, tóm tắt, `Báo cáo: <report_path>`, `Tin war-room: #<id>`, `Link: dispatch:<id>`, và `Bằng chứng nghiệm thu gợi ý: dispatch:<id>` khi done. Ghi đúng 1 lần (`dispatch_log.task_msg_id`), trước khi `wait_worker_result` trả về. Worker ghi `[KANBAN_UPDATE: TSK-n \| CHECK: <id mục>]` trong output → mục checklist đó được tick (chỉ task của lần giao đó). |
@@ -305,7 +353,7 @@ curl -s http://<host>:8888/mcp -H "Authorization: Bearer $GW_TOKEN" -H 'Content-
 | Việc | REST |
 |---|---|
 | Ghi tiến độ vào phiên | `POST /api/gen/conversations/log {conv_id, content, author}` |
-| Giao task cho vai | `POST /api/task/assign {todo_id, session_id: "qa"}` (hoặc `POST /api/warroom/send {message: "@qa ...", task_id}`) |
+| Giao task cho vai | `POST /api/task/assign {todo_id, session_id: "backend", mode: "build"}` (sửa code, 3.6c) · `mode: "review"` hoặc `POST /api/warroom/send {message: "@qa ...", task_id}` (chỉ đọc) |
 | Chờ kết quả | `POST /api/dispatch/wait {dispatch_id, timeout_sec}` (tối đa 120 giây; gọi từ `workplace_exec` thì để dưới 60 giây) |
 | Nhận / đóng task | `POST /api/task/claim`, `POST /api/task/complete {session_id, todo_id, evidence_ref}` |
 
