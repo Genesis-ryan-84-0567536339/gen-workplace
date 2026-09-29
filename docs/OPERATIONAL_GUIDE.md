@@ -238,7 +238,7 @@ Agent kết nối MCP gen-workplace (HTTP `POST /mcp` hoặc stdio `backend/mcp_
 
 **UI:** màn Gen Workplace poll `/api/gen/conversations` mỗi 5 giây (khi đang mở màn đó và không có tin đang gửi). Phiên mới do agent tạo hiện ngay trong danh sách. Nếu phiên đang mở có thêm tin (`msg_count` đổi) thì UI tải lại tin và Kanban của phiên. Tin có `model` rỗng (tin log) hiển thị tên `author` thay cho "Gen Core (model)".
 
-Kiểm thử thật trên cổng phụ (không đụng app chính):
+Kiểm thử thật trên cổng phụ (không đụng app chính). DB mới có `require_auth = 0` nên gọi được không token; khi bắt buộc token (mặc định trên app thật, xem 3.12) thì mỗi lệnh `curl /mcp` phải thêm `-H "Authorization: Bearer $TOKEN"`:
 ```bash
 PORT=18899 DATA_DIR=$(mktemp -d) GW_AUTO_UPDATE=0 python3 backend/main.py &   # tắt: kill $!  (KHÔNG dùng pkill -f)
 curl -s localhost:18899/mcp -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}'
@@ -273,7 +273,7 @@ python3 scripts/test_task_hub.py   # #24: /api/task/assign, lọc dispatch log, 
 
 ### 3.11. Issue #28: màn MCP & Kết nối
 
-Modal MCP cũ được thay bằng màn riêng **MCP & Kết nối** (thanh bên, mục "Tri thức & dữ liệu"; nút `MCP` trên thanh trên cũng mở màn này; `openMcpModal()` cũ chuyển thẳng tới màn mới). Màn có header trạng thái (ping `/mcp` thật + thời gian phản hồi, URL kết nối, số tool, số token hoạt động và số agent dùng trong 24 giờ) và 4 tab: **Kết nối** (cấu hình copy được cho agy CLI, Claude Code, Claude.ai / Gen-hub, JSON chung; token bị che, bấm Copy lấy bản thật), **Tool** (nhóm theo chức năng, tìm không dấu, lọc Chỉ đọc / Có tác dụng phụ, ngăn chạy thử sinh form từ `inputSchema`), **Token** (tạo theo scope, che/hiện, copy, thu hồi có xác nhận, bật/tắt bắt buộc token có xác nhận), **Bootstrap** (nội dung `initialize.instructions`, chỉ đọc). Esc đóng hộp xác nhận → ngăn chạy thử → màn (quay về màn trước đó).
+Modal MCP cũ được thay bằng màn riêng **MCP & Kết nối** (thanh bên, mục "Tri thức & dữ liệu"; nút `MCP` trên thanh trên cũng mở màn này; `openMcpModal()` cũ chuyển thẳng tới màn mới). Màn có header trạng thái (ping `/mcp` thật + thời gian phản hồi, URL kết nối, số tool, số token hoạt động và số agent dùng trong 24 giờ) và 4 tab: **Kết nối** (cấu hình copy được cho agy CLI, Claude Code, Claude.ai / Gen-hub, JSON chung; token vừa tạo điền sẵn, token cũ in `<TOKEN>` để tự thay — xem 3.12), **Tool** (nhóm theo chức năng, tìm không dấu, lọc Chỉ đọc / Có tác dụng phụ, ngăn chạy thử sinh form từ `inputSchema`), **Token** (tạo theo scope, token đầy đủ hiện 1 lần ngay sau khi tạo, danh sách chỉ có bản che, thu hồi có xác nhận, bật/tắt bắt buộc token có xác nhận; tắt cần token admin), **Bootstrap** (nội dung `initialize.instructions`, chỉ đọc). Esc đóng hộp xác nhận → ngăn chạy thử → màn (quay về màn trước đó).
 
 **Metadata tool — nguồn duy nhất:** `mcp_core.TOOL_META[name] = {group, scope, read_only, summary}`. Từ bảng này suy ra `READ_ONLY_TOOLS`, `annotations.readOnlyHint`, scope kiểm quyền token (`db.MCP_TOOL_SCOPES`, do `mcp_core` điền lúc import — thay cho `domain_map` ghi cứng trong `db.verify_mcp_request_auth`) và dữ liệu cho UI. Thêm tool mới mà thiếu dòng trong `TOOL_META` → app báo lỗi ngay khi khởi động. Nhóm: `TOOL_GROUPS`; scope token: `TOKEN_SCOPES` (`all`, `kanban`, `swarm`, `chat`, `files`, `quota`). Phân quyền giữ nguyên như trước; `probe_quota` (chạy agy) chỉ token toàn quyền gọi được.
 
@@ -283,8 +283,48 @@ Modal MCP cũ được thay bằng màn riêng **MCP & Kết nối** (thanh bên
 | `GET /api/mcp/tokens` | Token quá hạn mà chưa ai gọi hiện `status: "expired"`; `auth_status.used_24h`. |
 | `POST /api/mcp/tokens/create` | `permissions` chỉ nhận id trong `TOKEN_SCOPES`, `*` hoặc tên tool có thật; giá trị lạ → **400** `{"error": "Scope không hợp lệ: ..."}`. |
 
-Màn này chỉ gửi token khi gọi `/mcp` nếu đang bắt buộc token (để không cộng lượt gọi giả vào token của agent). Chỗ nào cú pháp client chưa kiểm chứng được trong repo (Claude Code qua HTTP, Claude.ai cần URL HTTPS công khai, tên khóa `url`/`headers` của từng client) có nhãn **Kiểm tra lại** trên màn.
+Màn này không gọi `/mcp` trực tiếp mà gọi `POST /api/mcp/ui/rpc` cùng origin, không cần token (xem 3.12), nên không đọc token của agent và không cộng lượt gọi giả vào token. Chỗ nào cú pháp client chưa kiểm chứng được trong repo (Claude Code qua HTTP, Claude.ai cần URL HTTPS công khai, tên khóa `url`/`headers` của từng client) có nhãn **Kiểm tra lại** trên màn.
 
 ```bash
 python3 scripts/test_mcp_ui_api.py   # #28: TOOL_META đủ/hợp lệ, /api/mcp/status, quyền theo scope, scope lạ 400, expired, used_24h
+```
+
+### 3.12. Issue #41: siết bảo mật MCP, bắt buộc token
+
+**Gọi `/mcp` phải kèm Bearer.** Trên app thật, `require_auth` đang bật (bảng `mcp_auth_settings`). Khi đó `/mcp`, `/sse` và `/api/mcp` không có token hợp lệ đều trả **401**. Cách gửi token: header `Authorization: Bearer <token>`. Riêng connector Claude.ai không gửi được header nên dùng `?token=`. REST `/api/*` không bị ảnh hưởng.
+
+```bash
+curl -s http://<host>:8888/mcp -H "Authorization: Bearer $GW_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+```
+
+**Agent điều phối (sub agent chạy `workplace_exec` + `curl`) KHÔNG gọi `/mcp` không token.** Có hai cách thay:
+- Dùng tool MCP qua connector Gen-hub `mcp-06594`. Connector này đã gửi token `claude-orchestrator`.
+- Hoặc gọi REST `/api/*`, không cần token:
+
+| Việc | REST |
+|---|---|
+| Ghi tiến độ vào phiên | `POST /api/gen/conversations/log {conv_id, content, author}` |
+| Giao task cho vai | `POST /api/task/assign {todo_id, session_id: "qa"}` (hoặc `POST /api/warroom/send {message: "@qa ...", task_id}`) |
+| Chờ kết quả | `POST /api/dispatch/wait {dispatch_id, timeout_sec}` (tối đa 120 giây; gọi từ `workplace_exec` thì để dưới 60 giây) |
+| Nhận / đóng task | `POST /api/task/claim`, `POST /api/task/complete {session_id, todo_id, evidence_ref}` |
+
+| API | Hợp đồng |
+|---|---|
+| `GET /api/mcp/tokens` | **Không còn `token_raw`.** `token_masked` có dạng tiền tố + `••••` + 4 ký tự cuối (vd `gw_live_••••a1b2`). Token ngắn chỉ hiện `••••`. |
+| `POST /api/mcp/tokens/create` | Response là nơi **duy nhất** có `token` đầy đủ (`shown_once: true`). Token cũ không xem lại được: mất thì thu hồi rồi tạo mới. DB vẫn lưu token như trước, nên token đang dùng (vd `claude-orchestrator` của Gen-hub) không bị ảnh hưởng. |
+| `POST /api/mcp/auth/toggle {require_auth: true\|false}` | Bật: không cần token. **Đang bật mà muốn tắt** thì phải gửi `Authorization: Bearer <token>` còn hạn, có role `admin` hoặc quyền `all` / `*`. Không nhận `?token=`. Mã lỗi: thiếu, sai, hết hạn hoặc đã thu hồi → **401**; token hợp lệ nhưng thiếu quyền → **403**; thiếu `require_auth` → **400**. Mọi lần gọi, kể cả bị từ chối, đều ghi vào bảng `mcp_auth_audit`. |
+| `GET /api/mcp/auth/audit?limit=50` | `{items: [{created_at, action: enable\|disable, allowed, token_id, token_name, client_ip, reason}]}`. Không chứa token thô. |
+| `POST /api/mcp/ui/rpc` | JSON-RPC cho màn MCP cùng origin: `ping`, `initialize`, `tools/list`, `tools/call`, không cần token. Bắt buộc header `X-GW-UI: 1`; nếu có `Origin` thì phải trùng `Host`. Thiếu một trong hai → 403; method khác → 400. Endpoint này chặn trang web origin khác gọi qua trình duyệt, vì preflight CORS không cho header `X-GW-UI`. Nó **không** chặn được người đã vào được cổng app, giống như REST `/api/*`. |
+
+**UI (màn MCP & Kết nối):**
+- Tạo token xong, token đầy đủ hiện ngay kèm cảnh báo "Token chỉ hiện 1 lần" và nút Copy.
+- Danh sách token chỉ có bản che, không còn nút Hiện/Copy.
+- Tab Kết nối điền sẵn token vừa tạo. Token cũ in `<TOKEN>` để người dùng tự thay.
+- Tắt "Bắt buộc token" mở hộp xác nhận có ô nhập token admin. Token chỉ gửi trong header, không lưu lại.
+
+**Còn hở (ngoài phạm vi #41):** REST `/api/*` vẫn không cần token. Ai vào được cổng 8888 vẫn tạo được token mới qua `POST /api/mcp/tokens/create` và gọi tool qua `/api/mcp/ui/rpc`. Vì vậy vẫn không mở cổng app ra Internet.
+
+```bash
+python3 scripts/test_mcp_auth_security.py   # #41: danh sách không lộ token thô, toggle tắt thiếu token 401 / thiếu quyền 403, /mcp /sse /api/mcp 401 khi bật, audit, UI rpc
 ```

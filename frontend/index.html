@@ -12607,13 +12607,14 @@ setInterval(async () => {
 // ==========================================
 // MÀN MCP & KẾT NỐI (#28)
 // Mọi số liệu lấy từ API thật: GET /api/mcp/status (tool + metadata nhóm/scope/chỉ đọc từ mcp_core.TOOL_META),
-// GET /api/mcp/tokens, POST /mcp (ping + tools/call). Không có danh sách tool / phân loại nào ghi ở frontend.
+// GET /api/mcp/tokens (chỉ bản che, #41), POST /api/mcp/ui/rpc (ping + tools/call cùng origin, không cần token).
+// Không có danh sách tool / phân loại nào ghi ở frontend.
 // ==========================================
 const mcpState = {
   status: null, tools: [], groups: [], scopes: [], tokens: [], auth: null,
   endpoint: '', ping: null, loadError: '', loading: false, loadedOnce: false,
   tab: 'connect', client: 'agy', connTokenId: '', connReveal: false, codeCopies: [],
-  toolFilter: 'all', revealed: new Set(), runTool: null, lastResult: null, lastCreated: null,
+  toolFilter: 'all', runTool: null, lastResult: null, lastCreated: null,
   suggest: {}, prevScreen: null, lastFocus: null
 };
 
@@ -12648,7 +12649,15 @@ function mcpFmtTime(s) {
   return m ? `${m[4]}:${m[5]} ${m[3]}/${m[2]}/${m[1]}` : null;
 }
 
-function mcpMask(tok) { return tok ? `${String(tok).slice(0, 12)}••••••••` : ''; }
+// Cùng cách che với backend (db.mask_mcp_token): tiền tố + •••• + 4 ký tự cuối
+function mcpMask(tok) {
+  const t = String(tok || '');
+  if (!t) return '';
+  if (t.length < 16) return '••••';
+  const m = /^[A-Za-z0-9]{1,8}_(?:[A-Za-z0-9]{1,8}_)?/.exec(t);
+  const pre = m && t.length - m[0].length >= 12 ? m[0] : '';
+  return `${pre}••••${t.slice(-4)}`;
+}
 
 function mcpCopy(text, label) {
   if (!text) { showToast('Chưa có nội dung để copy'); return; }
@@ -12668,12 +12677,12 @@ async function mcpFetchJson(url, opts) {
   return { res, data };
 }
 
-// Token dùng khi màn này tự gọi /mcp: chỉ gửi khi đang bắt buộc token (tránh cộng lượt gọi giả vào token của agent)
-function mcpUiToken() {
-  if (!mcpState.auth || !mcpState.auth.require_auth) return '';
-  const act = mcpState.tokens.filter(t => t.status === 'active');
-  const full = act.find(t => (t.permissions || []).some(p => p === 'all' || p === '*'));
-  return (full || act[0] || {}).token_raw || '';
+// Màn này gọi MCP qua /api/mcp/ui/rpc (cùng origin, không cần token, #41): không đọc token của agent,
+// không cộng lượt gọi giả vào token, và vẫn chạy khi đang bắt buộc token.
+function mcpUiRpc(method, params) {
+  const body = { jsonrpc: '2.0', id: Date.now(), method };
+  if (params) body.params = params;
+  return mcpFetchJson('/api/mcp/ui/rpc', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-GW-UI': '1' }, body: JSON.stringify(body) });
 }
 
 async function mcpLoadAll() {
@@ -12716,10 +12725,7 @@ async function mcpLoadAll() {
 async function mcpPing() {
   const t0 = performance.now();
   try {
-    const headers = { 'Content-Type': 'application/json' };
-    const tok = mcpUiToken();
-    if (tok) headers.Authorization = `Bearer ${tok}`;
-    const { res, data } = await mcpFetchJson('/mcp', { method: 'POST', headers, body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method: 'ping' }) });
+    const { res, data } = await mcpUiRpc('ping');
     const ms = Math.round(performance.now() - t0);
     if (res.ok && data && !data.error) mcpState.ping = { ok: true, ms };
     else mcpState.ping = { ok: false, ms, http: res.status, msg: (data && data.error && data.error.message) || `HTTP ${res.status}` };
@@ -12891,15 +12897,20 @@ function mcpRenderConnect() {
       : '<option value="">Chưa có token hoạt động (tạo ở tab Token)</option>';
     sel.disabled = !act.length;
   }
+  // Token đầy đủ chỉ có ngay sau khi tạo (#41); token cũ chỉ còn bản che → cấu hình in <TOKEN> để tự thay
+  const raw = cur && mcpState.lastCreated && mcpState.lastCreated.id === cur.id ? mcpState.lastCreated.token : '';
   const rb = $('mcpConnRevealBtn');
-  if (rb) { rb.textContent = mcpState.connReveal ? 'Che' : 'Hiện'; rb.setAttribute('aria-pressed', String(mcpState.connReveal)); rb.disabled = !cur; }
+  if (rb) { rb.textContent = mcpState.connReveal ? 'Che' : 'Hiện'; rb.setAttribute('aria-pressed', String(mcpState.connReveal)); rb.disabled = !raw; }
   const req = mcpState.auth && mcpState.auth.require_auth;
-  $('mcpConnAuthNote').innerHTML = req
-    ? 'Đang bắt buộc token: mọi kết nối HTTP phải kèm token hợp lệ.'
-    : 'Đang không bắt buộc token: agent không có token vẫn gọi được. Nên dùng token để biết agent nào đang gọi, và bật “Bắt buộc token” ở tab Token trước khi mở cổng ra Internet.';
-  const raw = cur ? cur.token_raw : '';
-  const shown = raw ? (mcpState.connReveal ? raw : mcpMask(raw)) : '';
-  const view = mcpClientSpec(mcpState.client, shown), real = mcpClientSpec(mcpState.client, raw);
+  const oldTokNote = cur && !raw
+    ? ` Token “${escapeHtml(cur.name)}” (${escapeHtml(cur.token_masked || '')}) chỉ hiện 1 lần lúc tạo nên cấu hình dưới đây ghi <code>&lt;TOKEN&gt;</code>: thay bằng token bạn đã lưu, hoặc thu hồi rồi tạo token mới ở tab Token.`
+    : '';
+  $('mcpConnAuthNote').innerHTML = (req
+    ? 'Đang bắt buộc token: mọi kết nối HTTP phải kèm token hợp lệ (header <code>Authorization: Bearer</code>).'
+    : 'Đang không bắt buộc token: agent không có token vẫn gọi được. Nên dùng token để biết agent nào đang gọi, và bật “Bắt buộc token” ở tab Token trước khi mở cổng ra Internet.') + oldTokNote;
+  const realTok = raw || (cur ? '<TOKEN>' : '');
+  const shown = raw ? (mcpState.connReveal ? raw : mcpMask(raw)) : realTok;
+  const view = mcpClientSpec(mcpState.client, shown), real = mcpClientSpec(mcpState.client, realTok);
   mcpState.codeCopies = [];
   const steps = view.steps.map((s, si) => {
     const codes = (s.codes || []).map((c, ci) => {
@@ -13112,10 +13123,7 @@ async function mcpRunTool(confirmed) {
   const t0 = performance.now();
   let out;
   try {
-    const headers = { 'Content-Type': 'application/json' };
-    const tok = mcpUiToken();
-    if (tok) headers.Authorization = `Bearer ${tok}`;
-    const { res, data } = await mcpFetchJson('/mcp', { method: 'POST', headers, body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method: 'tools/call', params: { name: t.name, arguments: args } }) });
+    const { res, data } = await mcpUiRpc('tools/call', { name: t.name, arguments: args });
     const ms = Math.round(performance.now() - t0);
     if (!res.ok || !data || data.error) {
       out = { ok: false, ms, err: `${res.ok ? '' : `HTTP ${res.status}: `}${(data && data.error && (data.error.message || JSON.stringify(data.error))) || 'Máy chủ không trả JSON hợp lệ'}`, payload: data };
@@ -13237,7 +13245,7 @@ async function mcpSubmitToken(e) {
       body: JSON.stringify({ name, permissions: perms, expires_days: parseInt($('mcpTokExpires').value, 10) || 0, client: 'Tạo trên màn MCP' }) });
     if (!res.ok || !data || !data.ok) return fail(`Không tạo được token: ${(data && data.error) || `HTTP ${res.status}`}`);
     mcpState.lastCreated = data;
-    mcpState.revealed.delete('__created');
+    mcpState.connTokenId = data.id;
     $('mcpTokenForm').hidden = true;
     $('mcpTokenForm').reset();
     showToast(`Đã tạo token cho ${data.name}`);
@@ -13253,15 +13261,22 @@ async function mcpSubmitToken(e) {
 function mcpRenderCreated() {
   const c = $('mcpCreatedCard'), d = mcpState.lastCreated;
   if (!c) return;
-  if (!d) { c.hidden = true; return; }
-  const rev = mcpState.revealed.has('__created');
+  if (!d) { c.hidden = true; c.innerHTML = ''; return; }  // xóa hẳn token khỏi DOM, không chỉ ẩn
   c.hidden = false;
+  // Token đầy đủ hiện ngay, đúng 1 lần (#41): server không trả lại token thô ở danh sách
   c.innerHTML = `<div class="mcpCardHead"><div><strong>Đã tạo token cho “${escapeHtml(d.name)}”</strong><div class="mcpHint">${escapeHtml(mcpScopeText(d.permissions))} · hết hạn: ${escapeHtml(mcpFmtTime(d.expires_at) || 'không hết hạn')}</div></div>
-    <button class="iconBtn small" onclick="mcpState.lastCreated=null; mcpRenderCreated(); $('mcpNewTokenBtn').focus()" aria-label="Đóng thông báo">×</button></div>
-    <div class="mcpTokVal"><code>${escapeHtml(rev ? d.token : mcpMask(d.token))}</code>
-      <button class="btn small" onclick="mcpToggleReveal('__created')" aria-pressed="${rev}">${rev ? 'Che' : 'Hiện'}</button>
+    <button class="iconBtn small" onclick="mcpCloseCreated()" aria-label="Đóng thông báo">×</button></div>
+    <div class="mcpOnceWarn" role="alert"><b>Token chỉ hiện 1 lần.</b> Copy và lưu ngay. Đóng thẻ này hoặc tải lại trang thì không xem lại được; mất token thì thu hồi rồi tạo token mới.</div>
+    <div class="mcpTokVal"><code id="mcpCreatedToken">${escapeHtml(d.token)}</code>
       <button class="btn small primary" onclick="mcpCopy(mcpState.lastCreated.token, 'token')">Copy token</button>
       <button class="btn small" onclick="mcpUseTokenInConnect('${escapeHtml(d.id)}')">Dùng trong tab Kết nối</button></div>`;
+}
+
+function mcpCloseCreated() {
+  mcpState.lastCreated = null;
+  mcpRenderCreated();
+  mcpRenderConnect();
+  $('mcpNewTokenBtn').focus();
 }
 
 function mcpUseTokenInConnect(id) {
@@ -13270,15 +13285,8 @@ function mcpUseTokenInConnect(id) {
   mcpRenderConnect();
 }
 
-function mcpToggleReveal(id) {
-  if (mcpState.revealed.has(id)) mcpState.revealed.delete(id); else mcpState.revealed.add(id);
-  if (id === '__created') mcpRenderCreated(); else mcpRenderTokens();
-  document.querySelector(`[data-reveal="${id}"]`)?.focus();
-}
-
 function mcpTokenRow(t) {
   const on = t.status === 'active';
-  const rev = mcpState.revealed.has(t.id);
   const statusChip = on ? '<span class="chip done">Hoạt động</span>' : t.status === 'expired' ? '<span class="chip wait">Hết hạn</span>' : '<span class="chip bad">Đã thu hồi</span>';
   const last = mcpFmtTime(t.last_used_at);
   const exp = mcpFmtTime(t.expires_at);
@@ -13287,18 +13295,11 @@ function mcpTokenRow(t) {
     : perms.map(p => `<span class="chip">${escapeHtml(mcpScopeText([p]))}</span>`).join('');
   return `<div class="mcpTok ${on ? '' : 'off'}">
     <div><div class="mcpTokName">${escapeHtml(t.name)}</div><div class="mcpTokMeta">Tạo ${escapeHtml(mcpFmtTime(t.created_at) || t.created_at || '')}${t.client ? ` · ${escapeHtml(t.client)}` : ''}</div></div>
-    <div><div class="mcpTokVal"><code>${escapeHtml(rev ? t.token_raw : mcpMask(t.token_raw))}</code>
-      <button class="btn small" data-reveal="${escapeHtml(t.id)}" onclick="mcpToggleReveal('${escapeHtml(t.id)}')" aria-pressed="${rev}" aria-label="${rev ? 'Che' : 'Hiện'} token ${escapeHtml(t.name)}">${rev ? 'Che' : 'Hiện'}</button>
-      <button class="btn small" onclick="mcpCopyToken('${escapeHtml(t.id)}')" aria-label="Copy token ${escapeHtml(t.name)}">Copy</button></div>
+    <div><div class="mcpTokVal"><code title="Token chỉ hiện 1 lần lúc tạo; không xem lại được">${escapeHtml(t.token_masked || '••••')}</code></div>
       <div class="mcpTokScopes">${scopes}</div></div>
     <div class="mcpTokUse">${statusChip}<br>${t.calls_count ? `<b>${t.calls_count}</b> lượt gọi · lần cuối ${escapeHtml(last || t.last_used_at)}` : 'Chưa dùng lần nào'}<br>${exp ? `Hết hạn ${escapeHtml(exp)}` : 'Không hết hạn'}</div>
     <div class="mcpTokActions">${on ? `<button class="btn small mcpRevoke" onclick="mcpRevokeToken('${escapeHtml(t.id)}')">Thu hồi</button>` : ''}</div>
   </div>`;
-}
-
-function mcpCopyToken(id) {
-  const t = mcpState.tokens.find(x => x.id === id);
-  if (t) mcpCopy(t.token_raw, `token ${t.name}`);
 }
 
 function mcpRenderTokens() {
@@ -13339,13 +13340,22 @@ async function mcpRevokeToken(id) {
 async function mcpOnStrictToggle(el) {
   const want = el.checked;
   el.checked = !want; // chỉ đổi khi server xác nhận
+  // Tắt khi đang bật cần token admin / toàn quyền (#41): nhập vào hộp xác nhận, chỉ gửi trong header, không lưu lại
+  const needTok = !want && !!(mcpState.auth && mcpState.auth.require_auth);
   const ok = await mcpConfirm(want
     ? { title: 'Bắt buộc token khi kết nối?', ok: 'Bật', html: 'Agent kết nối qua HTTP mà không có token hợp lệ sẽ bị từ chối ngay. Worker agy nối qua stdio trên máy này không bị ảnh hưởng.' }
-    : { title: 'Tắt bắt buộc token?', ok: 'Tắt', html: 'Ai mở được URL kết nối cũng gọi được mọi tool, kể cả tool có tác dụng phụ.' });
+    : { title: 'Tắt bắt buộc token?', ok: 'Tắt', html: 'Ai mở được URL kết nối cũng gọi được mọi tool, kể cả tool có tác dụng phụ.' +
+        (needTok ? '<br><br><label for="mcpAdminTok"><b>Token admin hoặc toàn quyền</b> (bắt buộc để tắt)</label><br><input id="mcpAdminTok" class="mcpAdminTok" type="password" autocomplete="off" spellcheck="false" placeholder="gw_live_…" onkeydown="if(event.key===\'Enter\'){event.preventDefault();mcpConfirmDone(true)}">' : ''),
+        focus: needTok ? 'mcpAdminTok' : null });
+  const adminTok = needTok ? (($('mcpAdminTok') || {}).value || '').trim() : '';
+  if ($('mcpAdminTok')) $('mcpAdminTok').value = '';
   if (!ok) { el.focus(); return; }
+  if (needTok && !adminTok) { showToast('Cần token admin hoặc toàn quyền để tắt bắt buộc token', 4000); el.focus(); return; }
   try {
-    const { res, data } = await mcpFetchJson('/api/mcp/auth/toggle', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ require_auth: want }) });
-    if (!res.ok || !data) { showToast(`Không đổi được chế độ xác thực: HTTP ${res.status}`, 4000); return; }
+    const headers = { 'Content-Type': 'application/json' };
+    if (adminTok) headers.Authorization = `Bearer ${adminTok}`;
+    const { res, data } = await mcpFetchJson('/api/mcp/auth/toggle', { method: 'POST', headers, body: JSON.stringify({ require_auth: want }) });
+    if (!res.ok || !data) { showToast(`Không đổi được chế độ xác thực: ${(data && data.error) || `HTTP ${res.status}`}`, 5000); el.focus(); return; }
     showToast(want ? 'Đã bật bắt buộc token' : 'Đã tắt bắt buộc token');
     await mcpLoadAll();
   } catch (e) {
@@ -13378,12 +13388,12 @@ function mcpRenderBootstrap() {
 
 // ---------- Hộp xác nhận ----------
 let _mcpConfirmResolve = null;
-function mcpConfirm({ title, html, ok }) {
+function mcpConfirm({ title, html, ok, focus }) {
   $('mcpConfirmTitle').textContent = title;
   $('mcpConfirmText').innerHTML = html;
   $('mcpConfirmOk').textContent = ok || 'Đồng ý';
   $('mcpConfirmModal').classList.add('show');
-  $('mcpConfirmCancel').focus();
+  ((focus && $(focus)) || $('mcpConfirmCancel')).focus();
   return new Promise(r => { _mcpConfirmResolve = r; });
 }
 function mcpConfirmDone(v) {
@@ -13399,9 +13409,11 @@ document.addEventListener('keydown', e => {
   if (_mcpConfirmResolve) {
     if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); mcpConfirmDone(false); }
     else if (e.key === 'Tab') {
-      const a = $('mcpConfirmCancel'), b = $('mcpConfirmOk');
+      // xoay vòng trong hộp: ô nhập token (nếu có) → Hủy → Đồng ý
+      const f = [...$('mcpConfirmModal').querySelectorAll('input, button')].filter(x => !x.disabled);
+      const i = f.indexOf(document.activeElement);
       e.preventDefault();
-      (document.activeElement === a ? b : a).focus();
+      f[(i + (e.shiftKey ? -1 : 1) + f.length) % f.length].focus();
     }
     return;
   }

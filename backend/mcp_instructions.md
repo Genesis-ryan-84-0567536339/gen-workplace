@@ -5,3 +5,4 @@ BẮT BUỘC cho mọi agent dùng gen-workplace: ghi công việc lên app đ�
 4. Giao việc cho agy: post_warroom_message với @<vai> (@backend, @devops, @qa, @lead; @security và @frontend đã bỏ, việc giao diện giao cho @backend), rồi wait_worker_result(dispatch_id) để lấy kết quả. Ghi kết quả vào phiên (mục 3).
 5. Đóng việc: complete_task với evidence thật: commit SHA, URL PR có thật, dispatch:<id>, hoặc file trong ~/gw-reports/. Không có bằng chứng thì chưa được đóng.
 6. Quy trình đầy đủ nằm trong skill: repo Genesis-ryan-84-0567536339/Brain → skills/work-style/subskills/gen-workplace-dispatch/SKILL.md.
+7. Xác thực: gọi HTTP /mcp phải kèm header Authorization: Bearer <token> (app đang bắt buộc token; thiếu token → 401). Agent điều phối dùng tool qua connector Gen-hub mcp-06594 (đã gửi token), hoặc REST /api/* không cần token: POST /api/gen/conversations/log (ghi log), POST /api/task/assign (giao task), POST /api/dispatch/wait (chờ kết quả). Không curl /mcp không token.

@@ -99,11 +99,14 @@ Gen-workplace tích hợp sẵn **MCP Server v1.0.0** tuân thủ đặc tả gi
 {
   "mcpServers": {
     "gen-workplace": {
-      "url": "http://localhost:8888/sse?token=YOUR_AGENT_TOKEN"
+      "url": "http://localhost:8888/mcp",
+      "headers": { "Authorization": "Bearer YOUR_AGENT_TOKEN" }
     }
   }
 }
 ```
+
+> Khi bật "Bắt buộc token", `/mcp`, `/sse` và `/api/mcp` từ chối (401) mọi request không có `Authorization: Bearer <token>` hợp lệ. Token đầy đủ chỉ hiện 1 lần lúc tạo (màn MCP & Kết nối → Token). Xem `docs/OPERATIONAL_GUIDE.md` mục 3.12.
 
 #### 3. Bộ 27 MCP Tools Sẵn Sàng:
 | Phân hệ | Danh sách Tools |

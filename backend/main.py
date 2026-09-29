@@ -139,7 +139,7 @@ class SwarmHandler(SimpleHTTPRequestHandler):
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
         self.end_headers()
         self.wfile.write(json.dumps(payload, ensure_ascii=False).encode("utf-8"))
 
@@ -147,7 +147,7 @@ class SwarmHandler(SimpleHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
         self.end_headers()
 
     def _guarded(self, handler):
@@ -240,6 +240,14 @@ class SwarmHandler(SimpleHTTPRequestHandler):
 
         if path == "/api/mcp/auth/status":
             self._send_json(200, db.get_mcp_auth_status(self._request_origin()))
+            return
+
+        # Nhật ký bật / tắt bắt buộc token MCP (#41): GET /api/mcp/auth/audit?limit=50
+        if path == "/api/mcp/auth/audit":
+            try:
+                self._send_json(200, {"items": db.get_mcp_auth_audit(query.get("limit", ["50"])[0])})
+            except (TypeError, ValueError):
+                self._send_json(400, {"error": "limit phải là số nguyên"})
             return
 
         # 0.8. Nhật ký dispatch (agy thật chạy từ chatroom): GET /api/dispatch/log?limit=50&task_id=TSK-1&session_id=gw-qa-agy
@@ -541,11 +549,50 @@ class SwarmHandler(SimpleHTTPRequestHandler):
                 self._send_json(400, {"error": "Missing token id"})
             return
 
-        # 0.3 API Bật / Tắt Chế Độ Bắt Buộc Xác Thực MCP (Strict Auth)
+        # 0.3 API Bật / Tắt Chế Độ Bắt Buộc Xác Thực MCP (Strict Auth) — #41:
+        #     bật: ai cũng bật được (chỉ làm chặt hơn); đang bật mà muốn tắt: phải kèm Authorization: Bearer <token admin / toàn quyền>.
+        #     401 thiếu / sai token · 403 token không đủ quyền · 400 thiếu require_auth. Mọi lần gọi đều ghi mcp_auth_audit.
         if path == "/api/mcp/auth/toggle":
-            enabled = bool(data.get("require_auth", False))
-            res = db.set_mcp_strict_auth(enabled, origin=self._request_origin())
+            want = data.get("require_auth") if isinstance(data, dict) else None
+            if isinstance(want, str):
+                want = {"true": True, "1": True, "false": False, "0": False}.get(want.strip().lower())
+            elif isinstance(want, int) and not isinstance(want, bool) and want in (0, 1):
+                want = bool(want)
+            if not isinstance(want, bool):
+                self._send_json(400, {"error": "Thiếu hoặc sai require_auth (true / false)"})
+                return
+            client_ip = self.client_address[0] if self.client_address else ""
+            current = db.get_mcp_auth_status(self._request_origin())["require_auth"]
+            action = "enable" if want else "disable"
+            agent = None
+            if current and not want:
+                ok, agent, code, err = db.verify_mcp_admin_token(self.headers)
+                if not ok:
+                    db.log_mcp_auth_audit(action, False, (agent or {}).get("id", ""), (agent or {}).get("name", ""), client_ip, err)
+                    self._send_json(code, {"error": err, "require_auth": True})
+                    return
+            res = db.set_mcp_strict_auth(want, origin=self._request_origin())
+            note = "không đổi (đã ở trạng thái này)" if current == want else ("đã bật" if want else "đã tắt, kèm token admin")
+            db.log_mcp_auth_audit(action, True, (agent or {}).get("id", ""), (agent or {}).get("name", ""), client_ip, note)
             self._send_json(200, res)
+            return
+
+        # 0.4 JSON-RPC MCP cho màn "MCP & Kết nối" cùng origin (#41): ping / tools/list / tools/call không cần token,
+        #     để UI không phải đọc token từ /api/mcp/tokens. Chỉ nhận request có header X-GW-UI: 1 (header lạ → trình duyệt
+        #     ở origin khác bị chặn ở preflight vì CORS không cho phép header này) và Origin (nếu có) trùng Host.
+        #     Đây không phải lớp bảo vệ trước người vào được cổng app: REST /api/* vốn không cần token.
+        if path == "/api/mcp/ui/rpc":
+            origin_hdr = (self.headers.get("Origin") or "").strip().rstrip("/")
+            host = (self.headers.get("Host") or "").strip()
+            same_origin = not origin_hdr or urllib.parse.urlparse(origin_hdr).netloc == host
+            if self.headers.get("X-GW-UI") != "1" or not same_origin:
+                self._send_json(403, {"error": "Chỉ màn MCP của app (cùng origin, header X-GW-UI: 1) được gọi endpoint này"})
+                return
+            if not isinstance(data, dict) or data.get("method") not in ("ping", "initialize", "tools/list", "tools/call"):
+                self._send_json(400, {"error": "Chỉ nhận method ping / initialize / tools/list / tools/call"})
+                return
+            resp = mcp_core.handle_jsonrpc(data)
+            self._send_json(200, resp if resp is not None else {"jsonrpc": "2.0", "id": data.get("id"), "result": {}})
             return
 
         # 1. Thêm tin nhắn chat vào SQLite
