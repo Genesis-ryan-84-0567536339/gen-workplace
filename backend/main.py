@@ -36,6 +36,7 @@ except ImportError:
     import auto_update
     import jules_worker
 
+auto_update.set_busy_checker(db.running_dispatches_for_update)   # hoãn tự cập nhật khi còn việc chạy (VIEC-12)
 RUNNING_COMMIT = auto_update.current_commit(BASE_DIR)  # commit của code đang chạy (đổi sau khi tự cập nhật execv)
 
 def render_oauth_callback_html(status_code, title, desc, profile_id, email=None):

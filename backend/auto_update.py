@@ -12,6 +12,11 @@ Mỗi GW_AUTO_UPDATE_SEC giây (mặc định 120) thread nền:
      tiến trình bằng os.execv (giữ nguyên PID -> systemd/nohup đều ổn).
   5. Chạy thử hỏng -> quay về commit cũ, nhớ commit hỏng để không thử lại, ghi log.
 
+Hoãn khi đang có việc chạy (VIEC-12): trước bước 3, còn dispatch 'running' (agy build, review/war-room, tmux; Jules không
+tính vì chạy trên cloud) -> action=deferred, thử lại chu kỳ sau (restart lúc đó làm mất lần build). Hoãn quá
+GW_AUTO_UPDATE_MAX_DEFER_MIN phút (mặc định 60; 0 = không hoãn) -> vẫn cập nhật, ghi log cảnh báo (dispatch treo không
+chặn cập nhật mãi).
+
 Nhật ký: <DATA_DIR>/auto_update.log (JSON mỗi dòng). Tắt hẳn: GW_AUTO_UPDATE=0.
 """
 
@@ -30,7 +35,8 @@ from pathlib import Path
 
 LOG_NAME = "auto_update.log"
 _bad_shas = set()
-_state = {"last_check": None, "last_result": None}
+_state = {"last_check": None, "last_result": None, "defer": None}
+_busy_checker = None   # hàm trả list dispatch đang chạy (main.py gắn db.running_dispatches_for_update)
 
 
 def enabled():
@@ -42,6 +48,48 @@ def interval_sec():
         return max(30, int(os.environ.get("GW_AUTO_UPDATE_SEC", "120")))
     except ValueError:
         return 120
+
+
+def max_defer_min():
+    """Hoãn tối đa bao nhiêu phút khi còn việc chạy (GW_AUTO_UPDATE_MAX_DEFER_MIN, mặc định 60; 0 = không hoãn)."""
+    try:
+        return max(0, int(os.environ.get("GW_AUTO_UPDATE_MAX_DEFER_MIN", "60")))
+    except ValueError:
+        return 60
+
+
+def set_busy_checker(fn):
+    """Gắn hàm liệt kê việc đang chạy: fn() -> [{id, kind, session_id, task_id, started_at}, ...]."""
+    global _busy_checker
+    _busy_checker = fn
+
+
+def _busy_now(busy=None):
+    fn = busy if busy is not None else _busy_checker
+    if not fn:
+        return []
+    try:
+        return list(fn() or [])
+    except Exception as e:  # DB lỗi: không chặn cập nhật vì không đọc được
+        print(f"[auto-update] không đọc được việc đang chạy: {e}", flush=True)
+        return []
+
+
+def _describe_busy(items, limit=5):
+    parts = []
+    for x in items[:limit]:
+        parts.append(f"dispatch:{x.get('id')} {x.get('kind') or '?'} {x.get('session_id') or ''}"
+                     + (f" {x['task_id']}" if x.get("task_id") else "") + (f" từ {x['started_at']}" if x.get("started_at") else ""))
+    more = f" (+{len(items) - limit})" if len(items) > limit else ""
+    return "; ".join(p.strip() for p in parts) + more
+
+
+def _defer_view():
+    d = _state.get("defer")
+    if not d:
+        return None
+    return {"since": d["since_iso"], "waited_min": round((time.time() - d["since"]) / 60, 1), "target": d.get("target", "")[:7],
+            "busy": d.get("busy", []), "deferrals": d.get("count", 0)}
 
 
 def branch_name():
@@ -96,6 +144,10 @@ def status(repo_dir, data_dir):
         "commit": current_commit(repo_dir),
         "last_check": _state["last_check"],
         "last_result": _state["last_result"],
+        # hoãn khi đang có việc chạy: hạn tối đa, lần hoãn hiện tại (None = không hoãn), việc đang chạy lúc gọi
+        "max_defer_min": max_defer_min(),
+        "deferred": _defer_view(),
+        "busy_now": _busy_now(),
         "history": read_log(data_dir, 10),
     }
 
@@ -154,8 +206,9 @@ def smoke_test(repo_dir, data_dir, timeout=30):
         shutil.rmtree(tmp, ignore_errors=True)
 
 
-def run_cycle(repo_dir, data_dir, restart=None, branch=None, smoke=smoke_test):
-    """Một lượt kiểm tra. Trả dict {action, detail, ...}; action=updated thì đã gọi restart()."""
+def run_cycle(repo_dir, data_dir, restart=None, branch=None, smoke=smoke_test, busy=None):
+    """Một lượt kiểm tra. Trả dict {action, detail, ...}; action=updated thì đã gọi restart().
+    busy: hàm liệt kê việc đang chạy (mặc định hàm gắn bằng set_busy_checker); còn việc -> action=deferred."""
     branch = branch or branch_name()
     _state["last_check"] = time.strftime("%Y-%m-%dT%H:%M:%S")
 
@@ -171,11 +224,37 @@ def run_cycle(repo_dir, data_dir, restart=None, branch=None, smoke=smoke_test):
     head = _git(repo_dir, "rev-parse", "HEAD").stdout.strip()
     target = _git(repo_dir, "rev-parse", f"origin/{branch}").stdout.strip()
     if head == target:
+        _state["defer"] = None
         return {"action": "up_to_date", "detail": head[:7]}
     if target in _bad_shas:
         return {"action": "skip_bad", "detail": f"{target[:7]} đã chạy thử hỏng, chờ commit mới"}
     if _git(repo_dir, "merge-base", "--is-ancestor", target, head).returncode == 0:
         return {"action": "local_ahead", "detail": f"HEAD {head[:7]} đã chứa origin/{branch} {target[:7]}"}
+
+    # Còn việc đang chạy -> hoãn (restart giữa chừng làm mất lần build); quá hạn tối đa thì vẫn cập nhật
+    forced_note = ""
+    items = _busy_now(busy)
+    if items:
+        limit_min = max_defer_min()
+        now = time.time()
+        d = _state.get("defer")
+        first = not d
+        if first:
+            d = {"since": now, "since_iso": time.strftime("%Y-%m-%dT%H:%M:%S"), "count": 0}
+        d.update(target=target, busy=items, count=d.get("count", 0) + 1)
+        _state["defer"] = d
+        waited = now - d["since"]
+        desc = _describe_busy(items)
+        if waited < limit_min * 60:
+            res = {"action": "deferred", "to": target[:7], "busy": items, "deferred_since": d["since_iso"],
+                   "waited_min": round(waited / 60, 1), "max_defer_min": limit_min,
+                   "detail": f"hoãn cập nhật lên {target[:7]}: còn {len(items)} việc đang chạy ({desc}); thử lại chu kỳ sau "
+                             f"(đã chờ {int(waited // 60)}/{limit_min} phút)"}
+            return _log(data_dir, res) if first else res   # chỉ ghi log lần hoãn đầu, không lặp mỗi chu kỳ
+        forced_note = (f"; CẢNH BÁO: đã hoãn {int(waited // 60)} phút (quá GW_AUTO_UPDATE_MAX_DEFER_MIN={limit_min}) "
+                       f"mà vẫn còn việc chạy ({desc}) — vẫn cập nhật, việc đó có thể bị mất")
+        _log(data_dir, {"action": "defer_expired", "to": target[:7], "busy": items, "detail": forced_note[2:]})
+    _state["defer"] = None
 
     stash_note = ""
     if _git(repo_dir, "status", "--porcelain").stdout.strip():
@@ -197,8 +276,10 @@ def run_cycle(repo_dir, data_dir, restart=None, branch=None, smoke=smoke_test):
                                "detail": f"giữ {head[:7]}; {detail}{stash_note}"})
 
     subject = _git(repo_dir, "log", "-1", "--pretty=%s").stdout.strip()
-    entry = _log(data_dir, {"action": "updated", "from": head[:7], "to": target[:7],
-                            "detail": f"{subject} · {detail}{stash_note}"})
+    entry = {"action": "updated", "from": head[:7], "to": target[:7], "detail": f"{subject} · {detail}{stash_note}{forced_note}"}
+    if forced_note:
+        entry["forced"] = True
+    entry = _log(data_dir, entry)
     if restart:
         restart()
     return entry
@@ -211,7 +292,9 @@ def restart_process():
     os.execv(sys.executable, [sys.executable] + sys.argv)
 
 
-def start_worker(repo_dir, data_dir):
+def start_worker(repo_dir, data_dir, busy=None):
+    if busy is not None:
+        set_busy_checker(busy)
     if not enabled():
         print("  Tự cập nhật: TẮT (GW_AUTO_UPDATE=0)")
         return None
@@ -229,5 +312,6 @@ def start_worker(repo_dir, data_dir):
 
     t = threading.Thread(target=_loop, daemon=True, name="AutoUpdateWorker")
     t.start()
-    print(f"  Tự cập nhật: mỗi {interval}s từ origin/{branch_name()} (tắt: GW_AUTO_UPDATE=0)")
+    print(f"  Tự cập nhật: mỗi {interval}s từ origin/{branch_name()}, hoãn tối đa {max_defer_min()} phút khi đang có việc chạy "
+          "(tắt: GW_AUTO_UPDATE=0)")
     return t

@@ -135,6 +135,65 @@ def main():
     st = au.status(host, data)
     check("status có commit + history", st["commit"] and isinstance(st["history"], list), st)
 
+    # 10. Còn việc đang chạy (agy build...) -> hoãn, không checkout / restart; hết việc -> cập nhật
+    git(host, "checkout", "-q", "main")
+    git(host, "reset", "-q", "--hard", "origin/main")
+    before = git(host, "rev-parse", "HEAD")
+    v10 = push_commit(dev, GOOD_MAIN % "v10", "v10 tốt")
+    busy_items = [{"id": 7, "kind": "build", "session_id": "gw-backend-agy", "task_id": "TSK-9", "started_at": "2026-09-29 10:00:00"}]
+    n_restart = len(restarts)
+    n_log = len(au.read_log(data, 1000))
+    r = run(busy=lambda: busy_items)
+    check("deferred khi còn việc chạy", r["action"] == "deferred" and "dispatch:7 build gw-backend-agy TSK-9" in r["detail"], r)
+    check("deferred: HEAD giữ nguyên, không restart", git(host, "rev-parse", "HEAD") == before and len(restarts) == n_restart)
+    r2 = run(busy=lambda: busy_items)
+    check("deferred lần 2 (thử lại chu kỳ sau)", r2["action"] == "deferred" and r2["deferred_since"] == r["deferred_since"], r2)
+    log_new = au.read_log(data, 1000)[n_log:]
+    check("log chỉ ghi 1 dòng deferred (không lặp mỗi chu kỳ)", [e["action"] for e in log_new] == ["deferred"], log_new)
+    au.set_busy_checker(lambda: busy_items)
+    st = au.status(host, data)
+    check("status: max_defer_min + deferred + busy_now", st["max_defer_min"] == 60 and st["deferred"]
+          and st["deferred"]["deferrals"] == 2 and st["deferred"]["busy"][0]["id"] == 7 and st["busy_now"] == busy_items, st)
+    au.set_busy_checker(None)
+    r = run(busy=lambda: [])
+    check("hết việc chạy -> updated", r["action"] == "updated" and git(host, "rev-parse", "HEAD") == v10
+          and len(restarts) == n_restart + 1 and not r.get("forced"), r)
+    check("status: hết hoãn", au.status(host, data)["deferred"] is None)
+
+    # 11. Dispatch treo quá GW_AUTO_UPDATE_MAX_DEFER_MIN -> vẫn cập nhật + log cảnh báo
+    v11 = push_commit(dev, GOOD_MAIN % "v11", "v11 tốt")
+    os.environ["GW_AUTO_UPDATE_MAX_DEFER_MIN"] = "30"
+    r = run(busy=lambda: busy_items)
+    check("max 30 phút: lần đầu vẫn hoãn", r["action"] == "deferred" and r["max_defer_min"] == 30, r)
+    au._state["defer"]["since"] -= 31 * 60     # giả lập đã chờ 31 phút
+    n_log = len(au.read_log(data, 1000))
+    r = run(busy=lambda: busy_items)
+    check("quá hạn hoãn -> updated (forced) dù còn việc chạy", r["action"] == "updated" and r.get("forced")
+          and git(host, "rev-parse", "HEAD") == v11 and len(restarts) == n_restart + 2, r)
+    check("chi tiết cập nhật có CẢNH BÁO + việc treo", "CẢNH BÁO" in r["detail"] and "dispatch:7" in r["detail"], r)
+    log_new = [e["action"] for e in au.read_log(data, 1000)[n_log:]]
+    check("log có defer_expired rồi updated", log_new == ["defer_expired", "updated"], log_new)
+    check("hết hoãn sau khi cập nhật", au._state["defer"] is None)
+    os.environ["GW_AUTO_UPDATE_MAX_DEFER_MIN"] = "abc"
+    check("GW_AUTO_UPDATE_MAX_DEFER_MIN sai -> 60", au.max_defer_min() == 60)
+    os.environ.pop("GW_AUTO_UPDATE_MAX_DEFER_MIN")
+
+    # 12. Đã mới nhất thì không hoãn gì (không có bản mới để lên)
+    r = run(busy=lambda: busy_items)
+    check("up_to_date dù còn việc chạy", r["action"] == "up_to_date", r)
+
+    # 13. db.running_dispatches_for_update: build / warroom / tmux tính, Jules (cloud) và việc đã xong không tính
+    os.environ["DATA_DIR"] = str(tmp / "dbdata")
+    from backend import db
+    ids = {k: db.start_dispatch_log("gw-backend-agy", kind=k, task_id="TSK-1") for k in ("build", "warroom", "tmux", "jules")}
+    done = db.start_dispatch_log("gw-qa-agy", kind="build")
+    with db.get_connection() as conn:
+        conn.execute("UPDATE dispatch_log SET status = 'done' WHERE id = ?", (done,))
+        conn.commit()
+    got = db.running_dispatches_for_update()
+    check("running_dispatches_for_update: build + warroom + tmux, bỏ jules + done",
+          sorted(x["kind"] for x in got) == ["build", "tmux", "warroom"] and all(x["id"] != done for x in got), got)
+
     print(f"{total - failed}/{total} test pass")
     sys.exit(1 if failed else 0)
 

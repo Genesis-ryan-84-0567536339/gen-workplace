@@ -21,7 +21,10 @@ journalctl --user -u gen-workplace -f -n 50     # log runtime của Control Plan
 # TỰ CẬP NHẬT (#13, backend/auto_update.py): app tự kiểm origin/main mỗi 120s; có commit mới
 # thì chạy thử trên cổng phụ với bản sao DB, OK mới tự restart (os.execv), hỏng thì giữ bản cũ.
 # Chỉ chạy khi máy đang ở nhánh main. Xem trạng thái: curl localhost:8888/api/auto-update
-# Biến: GW_AUTO_UPDATE=0 (tắt) · GW_AUTO_UPDATE_SEC=120 · GW_AUTO_UPDATE_BRANCH=main
+# Đang có việc chạy trên máy (agy build / review / tmux; Jules không tính) -> action=deferred, thử lại chu kỳ sau;
+# hoãn quá GW_AUTO_UPDATE_MAX_DEFER_MIN phút (60) vẫn cập nhật + ghi cảnh báo (defer_expired).
+# /api/auto-update có max_defer_min, deferred (since, waited_min, busy), busy_now.
+# Biến: GW_AUTO_UPDATE=0 (tắt) · GW_AUTO_UPDATE_SEC=120 · GW_AUTO_UPDATE_BRANCH=main · GW_AUTO_UPDATE_MAX_DEFER_MIN=60
 # Nhật ký: data/auto_update.log
 
 # Cập nhật tay (thường không cần nữa) (scripts/gw-update.sh)
