@@ -5,6 +5,8 @@
 **Tiêu chuẩn áp dụng**: Genesis Brain Bootstrap (`Genesis-ryan-84-0567536339/Brain/BOOTSTRAP.md`) & Zero-Conflict Policy  
 **Trạng thái**: KHÓA BẤT BIẾN (SSOT ENFORCED)
 
+> **Cập nhật 29/09 (VIEC-12, #34):** Boss chốt **bỏ vai `gw-security-agy` (Security Auditor)**. Vai được đánh dấu `retired` trong DB (giữ lịch sử), không còn nhận việc; `@security` trong Phòng giao ban trả lỗi rõ ràng. Việc rà soát/kiểm thử giao cho `@qa`. Các phần dưới đã bỏ security; phần còn lại mô tả thiết kế gốc và sẽ được rút gọn tiếp ở các PR sau.
+
 ---
 
 ## I. CƠ CẤU ĐỘI NGŨ CHUẨN (STANDARD SWARM SQUAD ARCHITECTURE)
@@ -32,7 +34,6 @@ flowchart TD
 
     subgraph TIER4["TẦNG 4: KIỂM THẨM & BẢO VỆ (QUALITY & DEFENSE)"]
         QA["🧪 gw-qa-agy (QA Tester)<br/>• Kiểm thử tự động (Unit, API, E2E)<br/>• Xác minh Auto-Wake & Stress Test<br/>• Báo cáo nghiệm thu kỹ thuật"]
-        Sec["🛡️ gw-security-agy (Security Auditor)<br/>• Kiểm toán quyền hạn thư mục & API<br/>• Cô lập Token OAuth 2.0 PKCE<br/>• Quản trị Vault và Secret Boundary"]
     end
 
     Gen --> Lead
@@ -42,13 +43,12 @@ flowchart TD
     Backend -.-> QA
     Frontend -.-> QA
     DevOps -.-> QA
-    QA --> Sec
-    Sec --> Lead
+    QA --> Lead
 ```
 
 ---
 
-## II. HỒ SƠ 6 CHUYÊN GIA & RANH GIỚI THƯ MỤC CỨNG (0-CONFLICT POLICY)
+## II. HỒ SƠ 5 CHUYÊN GIA & RANH GIỚI THƯ MỤC CỨNG (0-CONFLICT POLICY)
 
 | Mã Định Danh | Tên Chuyên Môn | Vai Trò & Trách Nhiệm Cốt Lõi | 🛡️ Ranh Giới Whitelist (Được Sửa) | ⛔ Ranh Giới Blacklist (CẤM SỬA) | Tài Khoản / Profile OAuth |
 | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -57,7 +57,6 @@ flowchart TD
 | **`gw-frontend-agy`** | **Frontend Specialist** | Xây dựng Web UI (`frontend/index.html`), tương tác thời gian thực, Command Deck, thẻ chuyên gia và dashboard. | `frontend/**`, `assets/**` | `backend/**`, `data/**`, `Dockerfile` | Profile #2 (`claude.bot@genesis.local`) |
 | **`gw-devops-agy`** | **DevOps & Packaging** | Container hóa hệ thống, cấu hình volume live-mount SELinux `:z`, kịch bản cài đặt TUI và desktop shortcut. | `Dockerfile`, `docker-compose.yml`, `install.sh`, `installer_tui.py`, `*.desktop`, `scripts/**` | `backend/main.py`, `frontend/**` | Profile #3 (`shared.bot@genesis.local`) |
 | **`gw-qa-agy`** | **QA Tester** | Kiểm thử tự động bằng `scripts/test_*.py` (không cần agy/tmux), API regression test, đối soát tiêu chuẩn nghiệm thu của Roadmap. | `tests/**`, `qa_reports/**`, `fixtures/**` | `backend/**`, `frontend/**`, `Dockerfile` | Profile #4 (`shared.bot@genesis.local`) |
-| **`gw-security-agy`** | **Security Auditor** | Kiểm toán mã nguồn, bảo vệ bí mật OAuth/API key, phân quyền file, kiểm tra an toàn SELinux và Vault. | `vault/**`, `security_audits/**`, `.env.example` | `backend/**`, `frontend/**` | Mặc định Owner (`owner@genesis.local`) |
 
 ---
 
@@ -68,19 +67,18 @@ flowchart TD
 - **C (Consulted)**: Được tham vấn chuyên môn, phối hợp kỹ thuật.
 - **I (Informed)**: Được thông báo trạng thái tiến độ.
 
-| Nhiệm Vụ Trọng Tâm | Core Gen | Lead | Backend | Frontend | DevOps | QA | Security |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **1. Tiếp nhận đề bài & Khóa SSOT gốc** | **A** | **R** | I | I | I | I | C |
-| **2. Phân rã Roadmap & Khóa Chuỗi Todo DAG** | **A** | **R** | C | C | C | I | I |
-| **3. Thiết kế CSDL SQLite WAL & FTS5** | I | A | **R** | C | I | C | C |
-| **4. Xây dựng API Control Plane & Task Mutex** | I | A | **R** | C | I | C | C |
-| **5. Phát triển Giao diện Mission Control SPA** | I | A | C | **R** | I | C | I |
-| **6. Đóng gói Docker & Cấu hình Live Mount :z** | I | A | C | C | **R** | C | C |
-| **7. Viết Kịch bản TUI Installer & Desktop Icon** | I | A | C | I | **R** | C | I |
-| **8. Kiểm thử Tự Động & Thẩm Định Hồi Quy** | I | A | C | C | C | **R** | C |
-| **9. Kiểm toán Bảo Mật & Cô Lập Token OAuth** | I | A | C | C | C | C | **R** |
-| **10. Nghiệm thu Hoàn Tất (Evidence Sign-off)** | C | **A** | R (nộp) | R (nộp) | R (nộp) | C | C |
-| **11. Xuất xưởng Release & Báo Cáo Cho Owner** | **R/A** | C | I | I | C | I | I |
+| Nhiệm Vụ Trọng Tâm | Core Gen | Lead | Backend | Frontend | DevOps | QA |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| **1. Tiếp nhận đề bài & Khóa SSOT gốc** | **A** | **R** | I | I | I | I |
+| **2. Phân rã Roadmap & Khóa Chuỗi Todo DAG** | **A** | **R** | C | C | C | I |
+| **3. Thiết kế CSDL SQLite WAL & FTS5** | I | A | **R** | C | I | C |
+| **4. Xây dựng API Control Plane & Task Mutex** | I | A | **R** | C | I | C |
+| **5. Phát triển Giao diện Mission Control SPA** | I | A | C | **R** | I | C |
+| **6. Đóng gói Docker & Cấu hình Live Mount :z** | I | A | C | C | **R** | C |
+| **7. Viết Kịch bản TUI Installer & Desktop Icon** | I | A | C | I | **R** | C |
+| **8. Kiểm thử Tự Động & Thẩm Định Hồi Quy** | I | A | C | C | C | **R** |
+| **10. Nghiệm thu Hoàn Tất (Evidence Sign-off)** | C | **A** | R (nộp) | R (nộp) | R (nộp) | C |
+| **11. Xuất xưởng Release & Báo Cáo Cho Owner** | **R/A** | C | I | I | C | I |
 
 ---
 
@@ -95,7 +93,7 @@ sequenceDiagram
     participant Gen as 👑 Core Orchestrator (Gen)
     participant Lead as 👑 Lead Architect
     participant Builders as 🗄️ Backend / 🎨 Frontend / 🚢 DevOps
-    participant Verifiers as 🧪 QA / 🛡️ Security
+    participant Verifiers as 🧪 QA
 
     %% Stage 1
     rect rgb(20, 25, 35)
@@ -125,8 +123,8 @@ sequenceDiagram
     %% Stage 4
     rect rgb(35, 28, 20)
     Note over Builders, Lead: GIAI ĐOẠN 4: KIỂM THẨM 2 LỚP & NGHIỆM THU BẰNG CHỨNG
-    Builders->>Verifiers: Bàn giao artifact / commit cho QA & Security
-    Verifiers->>Verifiers: Chạy Test Suite, quét lỗ hổng token & quyền hạn
+    Builders->>Verifiers: Bàn giao artifact / commit cho QA
+    Verifiers->>Verifiers: Chạy Test Suite
     Verifiers-->>Builders: Chứng thư kiểm định (Pass 100%)
     Builders->>Gen: POST /api/task/complete (Nộp kèm Evidence/Commit Hash)
     Lead->>Lead: Kiểm chứng bằng chứng & Ký duyệt verified_by
@@ -170,11 +168,10 @@ sequenceDiagram
   - Code sạch, tuân thủ kiến trúc đã định nghĩa.
   - Không xảy ra merge conflict trên Git.
 
-#### 🟠 Giai Đoạn 4: Kiểm Thẩm Hai Lớp & Nghiệm Thu Bằng Chứng (Dual-Gate Verification)
+#### 🟠 Giai Đoạn 4: Kiểm Thử & Nghiệm Thu Bằng Chứng
 - **Đầu vào**: Mã nguồn đã hiện thực và các bài test.
 - **Thực thi**:
-  - **Lớp 1 (Security Gate)**: `gw-security-agy` rà soát secret leak, thẩm định token OAuth PKCE và quyền truy cập file.
-  - **Lớp 2 (QA Gate)**: `gw-qa-agy` thực hiện test tích hợp, kiểm thử lệnh CLI, kiểm tra độ ổn định của container và auto-wake.
+  - **QA Gate**: `gw-qa-agy` thực hiện test tích hợp, kiểm thử lệnh CLI, kiểm tra độ ổn định của container và auto-wake.
   - Worker gọi `POST /api/task/complete` nộp `evidence_ref` (bắt buộc phải có Git commit hash, artifact path hoặc test output log).
   - `gw-lead-agy` đối soát bằng chứng với SSOT gốc rồi mới ký duyệt (`verified_by`).
 - **Tiêu chuẩn nghiệm thu (Exit Criteria)**:
@@ -201,7 +198,7 @@ sequenceDiagram
 | **Backend → Frontend** | JSON Response schemas, SSE stream events | UI components, data binding, command deck view | Mã HTML/JS không lỗi cú pháp, visual verify |
 | **DevOps → All** | Yêu cầu môi trường, port, thư mục dữ liệu | Tiến trình `python3 backend/main.py` trên host (systemd --user `gen-workplace.service`), `DATA_DIR` | Healthcheck `curl -f /api/status` trả về 200 OK |
 | **Builders → QA** | Mã nguồn hoàn thiện, commit hash, kịch bản test | Bộ test suite tự động, test logs, bug reports | Test output log, exit code 0 |
-| **QA/Security → Lead** | Kết quả test và audit log bảo mật | Biên bản nghiệm thu (Sign-off Certificate) | Evidence hash lưu trong SQLite `todos.evidence_ref` |
+| **QA → Lead** | Kết quả test | Biên bản nghiệm thu (Sign-off Certificate) | Evidence hash lưu trong SQLite `todos.evidence_ref` |
 
 ---
 

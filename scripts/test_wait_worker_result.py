@@ -149,10 +149,10 @@ os.environ["FAKE_AGY_SLEEP"] = "0"
 
 print("[3] agy thoát 0 nhưng auto-denied → failed; exit 3 → failed")
 os.environ["GW_AGY_BIN"] = AGY_DENIED
-res = db.post_warroom_message(message="@security rà quyền", author="Ryan (Owner)", wait=True)
-w = db.wait_worker_result(dispatch_id=did_of(res, "gw-security-agy"), timeout_sec=5)
+res = db.post_warroom_message(message="@lead rà quyền", author="Ryan (Owner)", wait=True)
+w = db.wait_worker_result(dispatch_id=did_of(res, "gw-lead-agy"), timeout_sec=5)
 check("status failed dù exit_code 0", w["status"] == "failed" and w["exit_code"] == 0, str(w)[:300])
-ev = [e for e in EVENTS if e.get("event") == "dispatch_finished" and e.get("session_id") == "gw-security-agy"]
+ev = [e for e in EVENTS if e.get("event") == "dispatch_finished" and e.get("session_id") == "gw-lead-agy"]
 check("webhook dispatch_finished mang status failed", ev and ev[-1]["status"] == "failed" and ev[-1]["exit_code"] == 0, str(ev)[:200])
 check("summary nói rõ bị từ chối quyền", "từ chối quyền" in w["summary"] and "auto-denied" in w["summary"], w["summary"][:200])
 with db.get_connection() as conn:

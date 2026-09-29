@@ -159,7 +159,8 @@ Mỗi vai trò vận hành trong một phiên Tmux riêng biệt bên trong cont
 | `gw-frontend-agy` | **Frontend Specialist** | `Gemini CLI (agy)` | Giao diện console SPA (`frontend/index.html`), quản trị trạng thái 3 cột, stream terminal. |
 | `gw-devops-agy` | **DevOps & Packaging** | `Gemini CLI (agy --agent devops)` | Systemd unit, tmux, `scripts/gw-update.sh`, TUI installer, desktop icon launcher. |
 | `gw-qa-agy` | **QA Tester** | `Gemini CLI (agy)` | Kiểm thử bằng `scripts/test_*.py` (chạy không cần agy/tmux), test API /api/status, nghiệm thu có bằng chứng kiểm được. |
-| `gw-security-agy` | **Security Auditor** | `Codex Security CLI / agy` | Quét mã nguồn, bảo vệ Vault, cô lập token OAuth PKCE, kiểm toán lỗ hổng bảo mật. |
+
+> `gw-security-agy` (Security Auditor) đã bỏ từ 29/09 (VIEC-12, #34): `status='retired'` trong DB, giữ lịch sử, `@security` trả lỗi.
 
 ---
 

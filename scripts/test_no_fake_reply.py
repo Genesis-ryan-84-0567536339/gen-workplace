@@ -143,7 +143,7 @@ os.environ["GW_AGY_BIN"] = AGY_OK
 if os.path.exists(SENT_LOG):
     os.remove(SENT_LOG)
 res = db.dispatch_swarm_workflow()
-check("6 worker đều có kết quả", set(res.keys()) == {"gw-lead-agy", "gw-backend-agy", "gw-frontend-agy", "gw-devops-agy", "gw-qa-agy", "gw-security-agy"}, str(sorted(res.keys())))
+check("5 worker đều có kết quả (security đã bỏ)", set(res.keys()) == {"gw-lead-agy", "gw-backend-agy", "gw-frontend-agy", "gw-devops-agy", "gw-qa-agy"}, str(sorted(res.keys())))
 check("tất cả status=error 'không có task'", all(v["status"] == "error" and "không có task" in v["reason"] for v in res.values()), str(res)[:300])
 check("không gửi gì vào tmux", not os.path.exists(SENT_LOG))
 
