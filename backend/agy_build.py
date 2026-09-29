@@ -285,6 +285,8 @@ def build_prompt(task_id, session_id, worktree, branch, project_id="PRJ-GEN-WORK
         "- Cấm (hệ thống TỪ CHỐI): git push / remote / fetch / pull / checkout main / switch / reset --hard / -C / -c / "
         "commit --no-verify / --amend, rm -rf, xóa hay sửa file ngoài worktree, curl / wget / ssh / lệnh mạng, sudo, "
         "pip / npm / apt. Không dùng $(...), dấu `...`, python3 -c, bash -c, xargs, awk.\n"
+        "- Chạy TỪNG lệnh riêng, đơn giản (vd `python3 -m py_compile backend/db.py`, rồi `python3 scripts/test_x.py`); "
+        "không nối thêm `&& echo …`, `;`, `||`. Một lệnh bị từ chối là lần chạy dừng luôn, việc chưa commit sẽ mất lượt.\n"
         f"- BẮT BUỘC có ít nhất 1 commit trên {branch} trước khi kết thúc; không commit thì việc bị tính là chưa làm. "
         "KHÔNG push: app tự chạy py_compile + toàn bộ test rồi push nhánh sau khi bạn xong.\n"
         "- Bị chặn quyền: KHÔNG dừng im lặng — làm tiếp phần còn lại, ghi dòng \"CẦN QUYỀN: <lệnh> — <lý do>\" trong báo cáo."
@@ -561,7 +563,8 @@ def _run_build(did, project_id):
         log = _out(_git(["log", "--format=%H %s", f"{before_head}..HEAD"], cwd=wt)) if before_head else ""
         ctx["commits"] = [ln for ln in log.splitlines() if ln.strip()]
         ctx["head"] = _out(_git(["rev-parse", "HEAD"], cwd=wt))
-        ctx["dirty"] = [ln for ln in _out(_git(["status", "--porcelain"], cwd=wt)).splitlines() if ln.strip()][:30]
+        st = _git(["status", "--porcelain"], cwd=wt)   # không strip: dòng porcelain "XY path" bắt đầu bằng dấu cách (#47)
+        ctx["dirty"] = [ln for ln in (st.stdout or "").splitlines() if ln.strip()][:30] if st.returncode == 0 else []
         ctx["violations"] = detect_violations(repo, before_repo, wt, branch)
     tried_push = [t["command"] for t in (ctx["sinfo"].get("tools") or []) if re.search(r"\bgit\s+(.*\s)?push\b", t.get("command") or "")]
     if tried_push:

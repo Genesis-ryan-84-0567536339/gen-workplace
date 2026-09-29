@@ -178,10 +178,11 @@ Boss chốt 29/09 (VIEC-12): agy được code thật, nhưng chỉ trong worktr
   — đếm theo lần build nên 2 lần build song song trên cùng hồ sơ không gỡ của nhau; rule người dùng có sẵn giữ nguyên;
   không chép sang hồ sơ khác khi fallback quota; chế độ Rà soát tự gỡ rule Làm còn sót nếu app khởi động lại giữa chừng):
   - allow: `read_file(<worktree>)`, `write_file(<worktree>)`, mọi lệnh chỉ đọc của 3.6, `python3 -m py_compile`,
-    `python3 scripts/test_<tên>.py` (regex), `git add`, `git commit` (git status/diff/log đã có).
+    `python3 scripts/test_<tên>.py` (regex), `git add`, `git commit`, `echo` (git status/diff/log đã có). Prompt dặn chạy từng lệnh riêng:
+    một lệnh bị từ chối là agy `-p` dừng luôn (dispatch:13 dừng trước khi commit vì `&& echo`, #47).
   - deny: cờ ghi của 3.6 + `git push|remote|fetch|pull|clone|ls-remote|submodule|worktree|update-ref|symbolic-ref|config|switch|clean|reflog|gc`,
     `git -C|-c|--git-dir|--work-tree` (mọi vị trí), `git checkout main|master|origin/*|-b|-B|--detach|-f`, `git reset --hard|--merge|--keep`,
-    `git commit -n|--no-verify|--amend`, `rm -r/-f` và `rm` đường dẫn tuyệt đối / `..` / `~`, `cd` ra ngoài (`/`, `..`, `~`, `$`, `-`),
+    `git commit -n|--no-verify|--amend`, `rm -r/-f` và `rm` đường dẫn tuyệt đối / `..` / `~` (không chặn `cd`: commit/push sai chỗ đã có hook + kiểm sau khi chạy),
     `curl|wget|ssh|scp|sftp|rsync|nc|telnet|ftp|socat|gh`, `sudo|su|doas`, `pip|pip3|python3 -m pip|npm|npx|yarn|pnpm|apt|apt-get|dpkg|brew|gem|cargo`,
     `write_file(...)` cho repo app, hồ sơ agy, `~/.ssh`, `~/.config`, `~/.gitconfig`, `~/.git-credentials`, `~/gw-reports`, `DATA_DIR`, `/etc`, `/usr`...
   - Lớp chặn thứ hai (chỉ cho tiến trình agy, qua `GIT_CONFIG_*`): `core.hooksPath` → hook `pre-commit` chỉ cho commit trên `wt/TSK-n`
