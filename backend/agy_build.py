@@ -272,7 +272,7 @@ def load_sop():
     return DEFAULT_SOP
 
 
-def build_prompt(task_id, session_id, worktree, branch, project_id="PRJ-GEN-WORKPLACE"):
+def build_prompt(task_id, session_id, worktree, branch, project_id="PRJ-GEN-WORKPLACE", pending=None):
     """Prompt chế độ Làm: SOP roles/build.md + khối THÔNG TIN VIỆC (tiêu đề, viec_ref, mô tả, checklist) + luật quyền."""
     task_block = db.build_task_prompt_block(task_id, project_id)
     rules = (
@@ -291,6 +291,11 @@ def build_prompt(task_id, session_id, worktree, branch, project_id="PRJ-GEN-WORK
         "KHÔNG push: app tự chạy py_compile + toàn bộ test rồi push nhánh sau khi bạn xong.\n"
         "- Bị chặn quyền: KHÔNG dừng im lặng — làm tiếp phần còn lại, ghi dòng \"CẦN QUYỀN: <lệnh> — <lý do>\" trong báo cáo."
     )
+    if pending:
+        # Giao lại cùng task: worktree còn thay đổi chưa commit của lần trước (dispatch:15 agy tưởng việc đã có người làm, #49)
+        rules += ("\n- LƯU Ý: worktree đang có thay đổi CHƯA COMMIT do chính bạn làm ở lần trước (bị dừng giữa chừng): "
+                  + ", ".join(pending[:15]) + ". Đó là việc dang dở của bạn, không phải của người khác: xem `git diff`, "
+                  "làm nốt phần còn thiếu, chạy test rồi commit.")
     tail = (f"(Bạn là {session_id}. Làm trọn việc trong một lượt, không hỏi lại, không chỉ nêu kế hoạch. "
             "Kết thúc bằng báo cáo ngắn tiếng Việt theo mục 5 của SOP.)")
     return f"{load_sop()}\n\n" + (f"{task_block}\n\n" if task_block else f"[THÔNG TIN VIỆC {task_id}]\n\n") + f"{rules}\n\n{tail}"
@@ -494,7 +499,9 @@ def _run_build(did, project_id):
 
     before_repo = _repo_snapshot(repo)
     before_head = _out(_git(["rev-parse", "HEAD"], cwd=wt))
-    prompt = build_prompt(task_id, sid, wt, branch, project_id)
+    st0 = _git(["status", "--porcelain"], cwd=wt)
+    pending = [ln[3:] for ln in (st0.stdout or "").splitlines() if ln.strip()] if st0.returncode == 0 else []
+    prompt = build_prompt(task_id, sid, wt, branch, project_id, pending=pending)
     hooks = write_guard_hooks(task_id, wt, branch)
     stream = {"ok": not db._env_on("GW_AGY_NO_STREAM")}
     timeout = db.AGY_BUILD_TIMEOUT_SEC

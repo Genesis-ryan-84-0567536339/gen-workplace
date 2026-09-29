@@ -4605,10 +4605,20 @@ def agy_build_command_allow_rules():
             + [f"command(regex:{r})" for r in AGY_BUILD_EXTRA_REGEX])
 
 
+def agy_build_test_path_rules(worktree):
+    """python3 <đường dẫn tuyệt đối của worktree>/scripts/test_*.py (agy hay gọi test bằng đường dẫn tuyệt đối, dispatch:15, #49).
+    Chỉ đúng worktree của task (không mở test của repo khác); đường dẫn có khoảng trắng → bỏ (rule tách token theo khoảng trắng)."""
+    out = []
+    for p in dict.fromkeys([os.path.realpath(str(worktree)), os.path.abspath(str(worktree))]):
+        if p and not re.search(r"\s", p):
+            out.append(f"command(regex:python3 {re.escape(p)}/scripts/test_[A-Za-z0-9_]+\\.py)")
+    return out
+
+
 def agy_build_allow_rules(worktree):
     """Allow-rule chế độ Làm cho worktree của task: đọc + GHI file trong worktree, lệnh chỉ đọc, test, git add/commit."""
     wt = os.path.realpath(str(worktree))
-    return [f"read_file({wt})", f"write_file({wt})"] + agy_build_command_allow_rules()
+    return [f"read_file({wt})", f"write_file({wt})"] + agy_build_command_allow_rules() + agy_build_test_path_rules(worktree)
 
 
 def _agy_build_protected_dirs(worktree, repo="", p_dir=""):
@@ -4651,6 +4661,8 @@ def is_agy_build_rule(rule):
         target = os.path.realpath(rule[len("write_file("):-1] or "/")
         return target == root or target.startswith(root + os.sep)
     extra = {f"command({c})" for c in AGY_BUILD_EXTRA_COMMANDS} | {f"command(regex:{r})" for r in AGY_BUILD_EXTRA_REGEX}
+    if rule.startswith("command(regex:python3 /") and rule.endswith("/scripts/test_[A-Za-z0-9_]+\\.py)"):
+        return True   # agy_build_test_path_rules
     return rule in extra
 
 
