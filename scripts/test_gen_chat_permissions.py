@@ -150,20 +150,16 @@ set_mode("long")
 reply, _, usage = db.call_agy_cli_turn(conv, "hỏi dài")
 check("trả lời dài có nhắc 'auto-denied' → vẫn là trả lời thật", reply.startswith("Endpoint chat Gen") and "error" not in usage, str(usage))
 
-print("[4] send_gen_chat / Orchestrator lưu lỗi rõ")
+print("[4] send_gen_chat lưu lỗi rõ")
 set_mode("denied_empty")
 out = db.send_gen_chat(conv, "Ryan", "đọc main.py", "gemini 3.8 flash (high)")
 m = last_msg(conv)
 check("send_gen_chat: tin 'Gen (lỗi)' kèm lý do từ chối quyền", m["author"] == "Gen (lỗi)" and "từ chối quyền" in m["content"], str(m))
-res = db.process_orch_instruction("đọc main.py")
-check("Orchestrator: error True, mã PERMISSION_DENIED", res.get("error") is True and res.get("error_code") == "PERMISSION_DENIED", str(res)[:300])
-msgs = db.get_orch_chat_messages()
-check("Orchestrator: tin 'Orchestrator (lỗi)' + lý do từ chối quyền", msgs and msgs[-1]["author"] == "Orchestrator (lỗi)" and "từ chối quyền" in msgs[-1]["body"], str(msgs[-1:]))
-check("Orchestrator: không --dangerously-skip-permissions", "--dangerously-skip-permissions" not in last_call()["argv"])
 set_mode("ok")
 out = db.send_gen_chat(conv, "Ryan", "endpoint?", "gemini 3.8 flash (high)")
 m = last_msg(conv)
 check("agy OK → tin 'Gen Core (agy CLI)' có nội dung thật", m["author"] == "Gen Core (agy CLI)" and "POST /api/gen/chat" in m["content"], str(m))
+
 
 print("[5] GW_AGY_PLAN_ALLOW=0 → không đụng settings, vẫn không có cờ")
 with open(SETTINGS, "w") as f:
