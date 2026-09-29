@@ -288,7 +288,7 @@ os.environ["FAKE_AGY_MODE"] = "ok"
 open(PROMPT_LOG, "w").close()
 open(ARGS_LOG, "w").close()
 T1 = new_task("[THỬ] chỉ đọc 1")
-res = db.assign_task_to_role(T1, "qa", wait=True)
+res = db.assign_task_to_role(T1, "qa", wait=True, mode="review")
 did = res.get("dispatch_id")
 row = dispatch_row(did)
 prompt = open(PROMPT_LOG).read()
@@ -314,7 +314,7 @@ check("prompt war-room có khối chỉ đọc", "CHẾ ĐỘ CHỈ ĐỌC" in o
 print("[7] agy bị chặn: dispatch failed + ghi rõ lệnh bị chặn (trích từ stream-json)")
 os.environ["FAKE_AGY_MODE"] = "denied_stream"
 T2 = new_task("[THỬ] bị chặn")
-res = db.assign_task_to_role(T2, "qa", wait=True)
+res = db.assign_task_to_role(T2, "qa", wait=True, mode="review")
 row = dispatch_row(res["dispatch_id"])
 check("dispatch failed", row["status"] == "failed", row["status"])
 check("summary ghi 'Lệnh bị chặn: `python3 -c ...`'", "Lệnh bị chặn: `python3 -c 'import ast'`" in row["summary"], row["summary"][:400])
@@ -329,20 +329,20 @@ check("báo cáo: dòng lệnh bị chặn + đánh dấu BỊ CHẶN", "- Lện
 
 os.environ["FAKE_AGY_MODE"] = "denied_noerr"
 T3 = new_task("[THỬ] bị chặn 2")
-row = dispatch_row(db.assign_task_to_role(T3, "qa", wait=True)["dispatch_id"])
+row = dispatch_row(db.assign_task_to_role(T3, "qa", wait=True, mode="review")["dispatch_id"])
 check("tool step không có lỗi rõ → suy ra lệnh shell cuối", row["status"] == "failed"
       and "Lệnh bị chặn (suy ra: lệnh shell cuối agy gọi, output không nêu tên): `awk 'NR<=5' README.md`" in row["summary"], row["summary"][:300])
 
 os.environ["FAKE_AGY_MODE"] = "denied_named"
 T4 = new_task("[THỬ] bị chặn 3")
-row = dispatch_row(db.assign_task_to_role(T4, "qa", wait=True)["dispatch_id"])
+row = dispatch_row(db.assign_task_to_role(T4, "qa", wait=True, mode="review")["dispatch_id"])
 check("thông báo agy nêu rule cụ thể → trích 'npm test'", row["status"] == "failed" and "Lệnh bị chặn: `npm test`" in row["summary"], row["summary"][:300])
 check("không lấy mẫu command(<target>)", "<target>`" not in row["summary"].split("\n")[0])
 
 print("[8] agy trả lời được nhưng có lệnh bị chặn giữa chừng + CẦN QUYỀN")
 os.environ["FAKE_AGY_MODE"] = "partial"
 T5 = new_task("[THỬ] một phần")
-row = dispatch_row(db.assign_task_to_role(T5, "qa", wait=True)["dispatch_id"])
+row = dispatch_row(db.assign_task_to_role(T5, "qa", wait=True, mode="review")["dispatch_id"])
 check("dispatch done (có câu trả lời)", row["status"] == "done", row["status"])
 check("summary nêu lệnh bị chặn + dòng CẦN QUYỀN", "Lệnh bị chặn: `xargs cat`" in row["summary"]
       and "[agy báo cần quyền] command(xargs) — để đọc nhiều file một lần" in row["summary"], row["summary"][:400])
@@ -352,7 +352,7 @@ print("[9] agy cũ không nhận --output-format → chạy lại không cờ, v
 os.environ["FAKE_AGY_MODE"] = "old_agy"
 open(ARGS_LOG, "w").close()
 T6 = new_task("[THỬ] agy cũ")
-row = dispatch_row(db.assign_task_to_role(T6, "qa", wait=True)["dispatch_id"])
+row = dispatch_row(db.assign_task_to_role(T6, "qa", wait=True, mode="review")["dispatch_id"])
 calls = [json.loads(x) for x in open(ARGS_LOG).read().splitlines()]
 check("gọi 2 lần: có cờ rồi không cờ", len(calls) == 2 and "--output-format" in calls[0] and "--output-format" not in calls[1], str(calls)[:300])
 check("dispatch done, summary là trả lời agy cũ", row["status"] == "done" and row["summary"].startswith("Trả lời từ agy cũ."), str(row)[:300])

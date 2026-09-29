@@ -11,7 +11,9 @@ data/
 *.log
 .DS_Store
 Thumbs.db
-roles/
+# roles/: file vai do app sinh lúc chạy; riêng SOP chế độ Làm (roles/build.md) được theo dõi (#45)
+roles/*
+!roles/build.md
 *.sqlite
 *.db
 .env

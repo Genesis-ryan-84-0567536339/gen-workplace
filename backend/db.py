@@ -645,7 +645,11 @@ def init_db():
                               # worker ngoài (#43, Jules): engine ('' = agy), id phiên bên ngoài, trạng thái bên ngoài, link phiên,
                               # URL PR worker mở, id kế hoạch đã ghi về phiên của task (tránh ghi 2 lần)
                               ("engine", "TEXT DEFAULT ''"), ("ext_session_id", "TEXT DEFAULT ''"), ("ext_state", "TEXT DEFAULT ''"),
-                              ("ext_url", "TEXT DEFAULT ''"), ("pr_url", "TEXT DEFAULT ''"), ("ext_plan_id", "TEXT DEFAULT ''")]:
+                              ("ext_url", "TEXT DEFAULT ''"), ("pr_url", "TEXT DEFAULT ''"), ("ext_plan_id", "TEXT DEFAULT ''"),
+                              # chế độ Làm (#45, kind='build'): worktree + nhánh wt/TSK-n, commit SHA mới nhất, kết quả test (JSON),
+                              # kết quả push (JSON), link compare GitHub
+                              ("worktree_dir", "TEXT DEFAULT ''"), ("build_branch", "TEXT DEFAULT ''"), ("build_commit", "TEXT DEFAULT ''"),
+                              ("build_tests", "TEXT DEFAULT ''"), ("build_push", "TEXT DEFAULT ''"), ("compare_url", "TEXT DEFAULT ''")]:
             try:
                 cursor.execute(f"ALTER TABLE dispatch_log ADD COLUMN {col} {col_type};")
             except Exception:
@@ -3500,13 +3504,17 @@ def verify_evidence_ref(evidence_ref, task_id="", project_id="PRJ-GEN-WORKPLACE"
         ok, msg = _verify_github_pr(m.group(1), m.group(2), m.group(3))
         return ok, ("github:pr" if ok else ""), msg
     if EVIDENCE_SHA_RE.match(ev.lower()):
-        try:
-            res = subprocess.run(["git", "-C", str(BASE_DIR), "cat-file", "-e", f"{ev}^{{commit}}"], capture_output=True, timeout=5.0)
-            if res.returncode == 0:
-                return True, "git:commit", f"Commit {ev} tồn tại trong repo"
-        except Exception:
-            pass
-        return False, "", f"Commit {ev} không tồn tại trong repo {BASE_DIR}"
+        # Repo app + repo dispatch (worktree của vai / của task dùng chung kho object với repo gốc nên commit trên nhánh
+        # wt/TSK-n cũng thấy ở đây, kể cả sau khi đã dọn worktree vì nhánh local được giữ) (#45)
+        repos = list(dict.fromkeys(os.path.realpath(r) for r in (str(BASE_DIR), os.environ.get("GW_DISPATCH_REPO") or "") if r))
+        for repo in repos:
+            try:
+                res = subprocess.run(["git", "-C", repo, "cat-file", "-e", f"{ev}^{{commit}}"], capture_output=True, timeout=5.0)
+                if res.returncode == 0:
+                    return True, "git:commit", f"Commit {ev} tồn tại trong repo" + ("" if repo == os.path.realpath(str(BASE_DIR)) else f" {repo}")
+            except Exception:
+                pass
+        return False, "", f"Commit {ev} không tồn tại trong repo {', '.join(repos)}"
     ok, msg = _verify_evidence_file(ev, legacy=legacy)
     if ok:
         return True, "file", msg
@@ -3636,7 +3644,17 @@ def get_task_evidence_audit(task_id="", limit=50):
 _TASK_HOLDER_COL = {"todos": "assigned_session_id", "gen_session_todos": "claimed_by"}
 
 def _is_holder_dispatch_evidence(evidence_ref, todo_id, holder):
-    """evidence_ref = dispatch:<id> của chính holder, gắn đúng task todo_id, đã done."""
+    """evidence_ref = dispatch:<id> của chính holder, gắn đúng task todo_id, đã done; hoặc commit SHA mà lần build (chế độ Làm)
+    đã done của holder cho task này tạo ra (#45)."""
+    ev = (evidence_ref or "").strip().lower() if isinstance(evidence_ref, str) else ""
+    if holder and EVIDENCE_SHA_RE.match(ev):
+        try:
+            with get_connection() as conn:
+                rows = conn.execute("SELECT build_commit FROM dispatch_log WHERE kind = 'build' AND session_id = ? AND task_id = ? "
+                                    "AND status IN ('done', 'ok') AND build_commit != ''", (holder, todo_id)).fetchall()
+            return any((r["build_commit"] or "").lower().startswith(ev) for r in rows)
+        except Exception:
+            return False
     m = EVIDENCE_DISPATCH_RE.match((evidence_ref or "").strip()) if isinstance(evidence_ref, str) else None
     if not m or not holder:
         return False
@@ -3753,6 +3771,7 @@ def complete_task(session_id, todo_id, evidence_ref, verified_by="Lead Architect
             conn.execute("ROLLBACK")
             raise
 
+    cleanup = cleanup_task_worktree(todo_id)   # chế độ Làm (#45): task done → gỡ worktree ../gw-worktrees/TSK-n, giữ nhánh
     viec_ref = get_task_viec_ref(todo_id, project_id)
     webhook_sent = send_event_webhook("task_completed", project_id=project_id, viec_ref=viec_ref, task_id=todo_id,
                                       session_id=session_id, exit_code=None, report_path="", evidence_ref=evidence_ref, verified_by=verified_by)
@@ -3764,7 +3783,22 @@ def complete_task(session_id, todo_id, evidence_ref, verified_by="Lead Architect
         res["force_closed"] = {"held_by": old_holder, "reason": reason or ""}
     if acting_for:
         res["closed_for_holder"] = acting_for
+    if cleanup.get("removed"):
+        res["worktree_removed"] = cleanup["dir"]
     return res
+
+
+def cleanup_task_worktree(task_id):
+    """Gỡ worktree chế độ Làm của task (agy_build.cleanup_task_worktree). Không có / lỗi → {"removed": False, ...}, không ném."""
+    try:
+        try:
+            from backend import agy_build as _build
+        except ImportError:
+            import agy_build as _build
+        return _build.cleanup_task_worktree(task_id)
+    except Exception as e:
+        print(f"[build] Không dọn được worktree của {task_id}: {e}")
+        return {"removed": False, "error": str(e)}
 
 TASK_STATUS_ERROR_HTTP = {"not_found": 404, "already_done": 409, "not_holder": 409, "wrong_conversation": 404}
 
@@ -4217,7 +4251,8 @@ def _mark_stale_warroom(row):
         started = time.mktime(time.strptime(row.get("started_at") or "", "%Y-%m-%d %H:%M:%S"))
     except Exception:
         return False
-    if time.time() - started < WARROOM_DISPATCH_TIMEOUT_SEC + 120:
+    limit = AGY_BUILD_TIMEOUT_SEC + AGY_BUILD_POST_SEC if row.get("kind") == "build" else WARROOM_DISPATCH_TIMEOUT_SEC
+    if time.time() - started < limit + 120:
         return False
     with get_connection() as conn:
         cur = conn.execute("""
@@ -4343,6 +4378,8 @@ def wait_worker_result(dispatch_id=None, task_id="", session_id="", timeout_sec=
         "ext_state": row.get("ext_state") or "",
         "ext_url": row.get("ext_url") or "",
         "pr_url": row.get("pr_url") or "",
+        # chế độ Làm (#45): nhánh wt/TSK-n, commit SHA, kết quả py_compile + test, push, link compare
+        **build_dispatch_fields(row),
         "waited_sec": round(time.time() - t0, 1),
         "timeout_sec": timeout_sec,
     }
@@ -4366,6 +4403,9 @@ WARROOM_MENTION_RE = re.compile(r"@(backend|devops|qa|lead)\b", re.IGNORECASE)
 WARROOM_BROADCAST_RE = re.compile(r"@(gen|all|toàn\s*đội)(?![\w-])", re.IGNORECASE)
 TASK_REF_RE = re.compile(r"(?<![\w-])(TSK-\d+)(?![\w-])")
 WARROOM_DISPATCH_TIMEOUT_SEC = 15 * 60
+# Chế độ Làm (#45): 1 lần agy sửa code + app chạy test/push; quá hạn này (cộng 2 phút) mà dòng vẫn running → coi là mất thread
+AGY_BUILD_TIMEOUT_SEC = int(os.environ.get("GW_AGY_BUILD_TIMEOUT_SEC", str(30 * 60)) or 30 * 60)
+AGY_BUILD_POST_SEC = 20 * 60     # ngân sách thời gian app chạy py_compile + toàn bộ test + push sau khi agy xong
 
 def _worktree_root():
     """Thư mục chứa worktree riêng của từng vai (GW_WORKTREE_ROOT, mặc định <BASE_DIR>/../gw-worktrees)."""
@@ -4511,6 +4551,9 @@ def ensure_agy_plan_permissions(p_dir, cwd, extra_dirs=()):
             added = [r for r in rules if r not in allow]
             added_deny = [r for r in deny_rules if r not in deny]
             retired = [r for r in AGY_PLAN_RETIRED_RULES if r in allow]
+            # Rule chế độ Làm còn sót (app khởi động lại giữa lần build) mà hồ sơ không còn lần build nào chạy → gỡ (#45)
+            if not any(v > 0 for v in _AGY_BUILD_ACTIVE.get(path, {}).values()):
+                retired += [r for r in allow if is_agy_build_rule(r) and r not in retired]
             if not added and not added_deny and not retired:
                 return []
             allow[:] = [r for r in allow if r not in retired] + added
@@ -4523,6 +4566,199 @@ def ensure_agy_plan_permissions(p_dir, cwd, extra_dirs=()):
         except Exception as e:
             print(f"[agy-perm] Không cập nhật được {path}: {e}")
             return []
+
+# ---------------------------------------------------------------------------
+# Quyền agy cho chế độ "Làm" (build, Issue #45): agy -p ở chế độ mặc định (không --mode plan) trong worktree riêng của task
+# ---------------------------------------------------------------------------
+# Lệnh thêm cho chế độ Làm (ngoài lệnh chỉ đọc): biên dịch thử, chạy test của repo, git trong worktree (cwd của agy).
+AGY_BUILD_EXTRA_COMMANDS = ["python3 -m py_compile", "git add", "git commit"]
+AGY_BUILD_EXTRA_REGEX = [r"python3 scripts/test_[A-Za-z0-9_]+\.py"]
+# Lệnh cấm hẳn (khớp tiền tố token, Deny > Allow): đẩy / đổi remote, mạng, quyền root, cài gói
+AGY_BUILD_DENY_COMMANDS = [
+    "git push", "git remote", "git fetch", "git pull", "git clone", "git ls-remote", "git submodule", "git worktree",
+    "git update-ref", "git symbolic-ref", "git config", "git switch", "git -C", "git -c", "git --git-dir", "git --work-tree",
+    "git --exec-path", "git clean", "git filter-branch", "git gc", "git reflog",
+    "curl", "wget", "ssh", "scp", "sftp", "rsync", "nc", "ncat", "netcat", "telnet", "ftp", "socat", "gh",
+    "sudo", "su", "doas", "pkexec",
+    "pip", "pip3", "python3 -m pip", "python -m pip", "python3 -m venv", "python3 -m http.server",
+    "npm", "npx", "yarn", "pnpm", "apt", "apt-get", "dpkg", "snap", "brew", "gem", "cargo", "go install", "go get",
+]
+# Cờ / đích nguy hiểm ở mọi vị trí token (0..AGY_PLAN_DENY_MAX_POS token ở giữa): (lệnh, regex token)
+AGY_BUILD_DENY_FLAGS = [
+    ("git checkout", r"(main|master|origin/.*|refs/.*|-b|-B|--orphan|--detach|-f|--force)"),
+    ("git reset", r"(--hard|--merge|--keep)"),
+    ("git commit", r"(-[a-zA-Z]*n[a-zA-Z]*|--no-verify|--amend)"),
+    ("git", r"(-C|-c|--git-dir(=.*)?|--work-tree(=.*)?|--exec-path(=.*)?|--namespace(=.*)?)"),
+    ("rm", r"(-[a-zA-Z]*[rRf][a-zA-Z]*|--recursive|--force|/.*|~.*|\$.*|.*\.\..*)"),
+    ("cd", r"(/.*|~.*|\$.*|.*\.\..*|-)"),
+]
+# Rule chỉ chế độ Làm ghi (để nhận ra và gỡ khi không còn lần build nào dùng hồ sơ đó)
+_AGY_BUILD_ACTIVE = {}      # settings.json → {rule: số lần build đang dùng}
+_AGY_BUILD_OWNED = {}       # settings.json → {rule} do chế độ Làm thêm vào (không phải rule người dùng có sẵn)
+
+
+def agy_build_command_allow_rules():
+    """command(...) chế độ Làm: lệnh chỉ đọc + py_compile + scripts/test_*.py + git add/commit (không gồm read/write_file)."""
+    return (agy_plan_allow_rules() + [f"command({c})" for c in AGY_BUILD_EXTRA_COMMANDS]
+            + [f"command(regex:{r})" for r in AGY_BUILD_EXTRA_REGEX])
+
+
+def agy_build_allow_rules(worktree):
+    """Allow-rule chế độ Làm cho worktree của task: đọc + GHI file trong worktree, lệnh chỉ đọc, test, git add/commit."""
+    wt = os.path.realpath(str(worktree))
+    return [f"read_file({wt})", f"write_file({wt})"] + agy_build_command_allow_rules()
+
+
+def _agy_build_protected_dirs(worktree, repo="", p_dir=""):
+    """Thư mục cấm ghi (write_file deny): repo app, hồ sơ agy, cấu hình git / ssh / hệ thống; bỏ thư mục chứa worktree."""
+    wt = os.path.realpath(str(worktree))
+    cands = [repo or os.environ.get("GW_DISPATCH_REPO") or str(BASE_DIR), str(BASE_DIR), p_dir,
+             os.path.join(HOME_DIR, ".gemini"), os.path.join(HOME_DIR, ".agy-profiles"), os.path.join(HOME_DIR, ".ssh"),
+             os.path.join(HOME_DIR, ".config"), os.path.join(HOME_DIR, ".gitconfig"), os.path.join(HOME_DIR, ".git-credentials"),
+             os.path.join(HOME_DIR, ".bashrc"), os.path.join(HOME_DIR, ".profile"), os.path.join(HOME_DIR, ".local", "bin"),
+             os.path.join(HOME_DIR, "gw-reports"), str(DATA_DIR), "/etc", "/usr", "/bin", "/sbin", "/lib", "/opt", "/var"]
+    out = []
+    for d in cands:
+        if not d:
+            continue
+        real = os.path.realpath(os.path.expanduser(str(d)))
+        if wt == real or wt.startswith(real + os.sep):
+            continue   # worktree nằm trong thư mục này → deny sẽ chặn luôn worktree (Deny > Allow)
+        if real not in out:
+            out.append(real)
+    return out
+
+
+def agy_build_deny_rules(worktree, repo="", p_dir=""):
+    """Deny-rule chế độ Làm: cờ ghi của lệnh chỉ đọc + lệnh cấm (push, remote, mạng, sudo, cài gói) + cờ/đích nguy hiểm
+    (checkout main, reset --hard, commit --no-verify, rm -rf / xóa ngoài worktree, cd ra ngoài) + ghi file ngoài worktree."""
+    rules = agy_plan_deny_rules() + [f"command({c})" for c in AGY_BUILD_DENY_COMMANDS]
+    for cmd, flag in AGY_BUILD_DENY_FLAGS:
+        for k in range(AGY_PLAN_DENY_MAX_POS + 1):
+            rules.append(f"command(regex:{' '.join([cmd] + ['.*'] * k + ['(' + flag + ')'])})")
+    rules += [f"write_file({d})" for d in _agy_build_protected_dirs(worktree, repo, p_dir)]
+    return list(dict.fromkeys(rules))
+
+
+def is_agy_build_rule(rule):
+    """Rule chỉ chế độ Làm cấp (không chép sang hồ sơ khác khi fallback quota, gỡ khi không còn lần build nào dùng)."""
+    if not isinstance(rule, str):
+        return False
+    if rule.startswith("write_file(") and rule.endswith(")"):
+        root = os.path.realpath(_worktree_root())
+        target = os.path.realpath(rule[len("write_file("):-1] or "/")
+        return target == root or target.startswith(root + os.sep)
+    extra = {f"command({c})" for c in AGY_BUILD_EXTRA_COMMANDS} | {f"command(regex:{r})" for r in AGY_BUILD_EXTRA_REGEX}
+    return rule in extra
+
+
+def _agy_settings_path(p_dir):
+    cli_dir = os.path.join(p_dir or "", "antigravity-cli")
+    return os.path.join(cli_dir, "settings.json") if p_dir and os.path.isdir(cli_dir) else ""
+
+
+def _edit_agy_settings(path, fn):
+    """Đọc settings.json của hồ sơ agy, gọi fn(allow, deny) (sửa tại chỗ, trả True nếu có đổi), ghi nguyên tử. Lỗi → False."""
+    try:
+        data = {}
+        if os.path.exists(path):
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        if not isinstance(data, dict):
+            return False
+        perms = data.setdefault("permissions", {})
+        if not isinstance(perms, dict):
+            return False
+        allow = perms.setdefault("allow", [])
+        deny = perms.setdefault("deny", [])
+        if not isinstance(allow, list) or not isinstance(deny, list):
+            return False
+        if not fn(allow, deny):
+            return False
+        tmp = f"{path}.gw-tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+        os.replace(tmp, path)
+        return True
+    except Exception as e:
+        print(f"[agy-perm] Không cập nhật được {path}: {e}")
+        return False
+
+
+def ensure_agy_build_permissions(p_dir, worktree, repo=""):
+    """
+    Ghi allow + deny của chế độ Làm vào <p_dir>/antigravity-cli/settings.json trước 1 lần build (Issue #45) và đếm số lần build
+    đang dùng từng rule. Trả token {"path", "allow", "deny"} (các rule đã tính cho lần này) cho release_agy_build_permissions,
+    hoặc None nếu hồ sơ chưa có antigravity-cli/ / file hỏng (không đụng). Tắt ghi: GW_AGY_PLAN_ALLOW=0.
+    """
+    if (os.environ.get("GW_AGY_PLAN_ALLOW", "1") or "").strip().lower() in ("0", "false", "no", "off"):
+        return None
+    path = _agy_settings_path(p_dir)
+    if not path or not worktree:
+        return None
+    allow_rules = agy_build_allow_rules(worktree)
+    deny_rules = agy_build_deny_rules(worktree, repo, p_dir)
+    token = {"path": path, "allow": allow_rules, "deny": deny_rules, "added": []}
+    with _AGY_SETTINGS_LOCK:
+        owned = _AGY_BUILD_OWNED.setdefault(path, set())
+        active = _AGY_BUILD_ACTIVE.setdefault(path, {})
+
+        def _fn(allow, deny):
+            changed = False
+            for lst, rules in ((allow, allow_rules), (deny, deny_rules)):
+                for r in rules:
+                    if r not in lst:
+                        lst.append(r)
+                        owned.add(r)
+                        token["added"].append(r)
+                        changed = True
+            return changed
+
+        if not _edit_agy_settings(path, _fn) and token["added"]:
+            owned.difference_update(token["added"])   # ghi hỏng → không nhận là rule của mình
+            return None
+        # rule đã có sẵn (lần build khác đang dùng / người dùng tự thêm) vẫn đếm để không bị gỡ giữa chừng
+        for r in allow_rules + deny_rules:
+            active[r] = active.get(r, 0) + 1
+    return token
+
+
+def release_agy_build_permissions(token):
+    """Sau lần build: giảm đếm; rule do chế độ Làm thêm mà không còn lần build nào dùng → gỡ khỏi settings (rule có sẵn giữ nguyên)."""
+    if not token or not token.get("path"):
+        return []
+    path = token["path"]
+    removed = []
+    with _AGY_SETTINGS_LOCK:
+        active = _AGY_BUILD_ACTIVE.setdefault(path, {})
+        owned = _AGY_BUILD_OWNED.setdefault(path, set())
+        drop = set()
+        for r in token["allow"] + token["deny"]:
+            n = active.get(r, 0) - 1
+            if n > 0:
+                active[r] = n
+                continue
+            active.pop(r, None)
+            if r in owned:
+                drop.add(r)
+
+        def _fn(allow, deny):
+            before = len(allow) + len(deny)
+            allow[:] = [r for r in allow if r not in drop]
+            deny[:] = [r for r in deny if r not in drop]
+            return len(allow) + len(deny) != before
+
+        if drop and _edit_agy_settings(path, _fn):
+            removed = sorted(drop)
+        owned.difference_update(drop)
+    return removed
+
+
+def agy_build_active(p_dir):
+    """Hồ sơ đang có lần build chạy (còn rule chế độ Làm đang được đếm)."""
+    path = _agy_settings_path(p_dir)
+    return bool(path) and any(v > 0 for v in _AGY_BUILD_ACTIVE.get(path, {}).values())
+
 
 def copy_agy_allow_rules(src_dir, dst_dir):
     """
@@ -4557,7 +4793,9 @@ def copy_agy_allow_rules(src_dir, dst_dir):
             allow = perms.setdefault("allow", [])
             if not isinstance(allow, list):
                 return []
-            added = [r for r in src_allow if isinstance(r, str) and r not in allow and r not in AGY_PLAN_RETIRED_RULES]
+            # Không chép rule chế độ Làm (write_file, git commit…): chỉ cấp cho đúng hồ sơ + worktree của lần build (#45)
+            added = [r for r in src_allow if isinstance(r, str) and r not in allow and r not in AGY_PLAN_RETIRED_RULES
+                     and not is_agy_build_rule(r)]
             if not added:
                 return []
             allow.extend(added)
@@ -5087,6 +5325,9 @@ def report_dispatch_to_task(dispatch_id, project_id="PRJ-GEN-WORKPLACE"):
                          + (f" ({row.get('fallback_reason')})" if row.get("fallback_reason") else ""))
         if ticked:
             lines.append(f"Checklist đã tick theo báo cáo worker: {', '.join(ticked)}")
+        bf = build_dispatch_fields(row) if row.get("kind") == "build" else None
+        if bf:
+            lines.extend(format_build_lines(bf))
         lines.append("Tóm tắt:\n" + (summary or "(không có output)"))
         if row.get("report_path"):
             lines.append(f"Báo cáo: {row['report_path']}")
@@ -5094,7 +5335,11 @@ def report_dispatch_to_task(dispatch_id, project_id="PRJ-GEN-WORKPLACE"):
             lines.append(f"Tin war-room: #{row['reply_msg_id']}")
         lines.append(f"Link: dispatch:{row['id']}")
         if status in DISPATCH_OK_STATUSES:
-            lines.append(f"Bằng chứng nghiệm thu gợi ý: dispatch:{row['id']}")
+            if bf and bf["build_commit"]:
+                lines.append(f"Bằng chứng nghiệm thu gợi ý: {bf['build_commit']} (commit trên {bf['build_branch']}; "
+                             f"sau khi merge PR thì dùng SHA merge) hoặc dispatch:{row['id']}")
+            else:
+                lines.append(f"Bằng chứng nghiệm thu gợi ý: dispatch:{row['id']}")
         res = log_gen_message(task["conversation_id"], "\n".join(lines), "assistant", f"{row['session_id']} (agy)")
         msg_id = res.get("message_id")
         with get_connection() as conn:
@@ -5118,17 +5363,51 @@ def resolve_role_session(role_or_sid):
     return ""
 
 
-def assign_task_to_role(todo_id, session_id, project_id="PRJ-GEN-WORKPLACE", author="Ryan (Owner)", channel_id="war_room", wait=False):
+ASSIGN_MODES = ("build", "review")
+ASSIGN_MODE_LABELS = {"build": "Làm", "review": "Rà soát"}
+
+
+def normalize_assign_mode(mode, default="build"):
+    """'build' | 'review' (nhận cả 'lam'/'làm', 'plan'/'ra-soat'/'rà soát'); rỗng → default; giá trị lạ → ''."""
+    v = str(mode or "").strip().lower()
+    if not v:
+        return default
+    aliases = {"build": "build", "lam": "build", "làm": "build", "code": "build",
+               "review": "review", "plan": "review", "ra-soat": "review", "ra soat": "review", "rà soát": "review", "rasoat": "review"}
+    return aliases.get(v, "")
+
+
+def save_warroom_record(project_id, channel_id, author, body, tag="Assignment"):
+    """Lưu 1 tin vào kênh war-room mà KHÔNG giao việc (không quét @vai). Trả id tin."""
+    with get_connection() as conn:
+        cur = conn.execute("""
+        INSERT INTO chat_messages (project_id, runtime_id, author, created_time, tag, body, react_json, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (normalize_project_id(project_id), channel_id, author, time.strftime("%H:%M:%S"), tag, body,
+              json.dumps(["✅ đã ghi nhận"], ensure_ascii=False), _now_iso()))
+        conn.commit()
+        return cur.lastrowid
+
+
+def assign_task_to_role(todo_id, session_id, project_id="PRJ-GEN-WORKPLACE", author="Ryan (Owner)", channel_id="war_room", wait=False,
+                        mode="build"):
     """
-    Giao 1 task cho 1 vai (POST /api/task/assign): claim task cho worker, gửi war-room "@vai Thực hiện TSK-n …" (prompt agy kèm
-    tiêu đề, checklist, viec_ref của task), trả dispatch_id để theo dõi / chờ (wait_worker_result).
-    Lỗi: {"error", "code"}: bad_request (thiếu / sai vai), not_found, already_done, locked (người khác đang giữ).
+    Giao 1 task cho 1 vai (POST /api/task/assign): claim task cho worker rồi chạy agy, trả dispatch_id để theo dõi / chờ
+    (wait_worker_result). mode (#45):
+    - "build" (mặc định, "Làm"): agy -p chế độ mặc định sửa code trong worktree riêng của task (../gw-worktrees/TSK-n,
+      nhánh wt/TSK-n từ origin/main); app kiểm commit, chạy py_compile + test, push nhánh, ghi link compare (agy_build.py).
+    - "review" ("Rà soát"): như war-room — tin "@vai Thực hiện TSK-n …", agy --mode plan chỉ đọc trong worktree của vai.
+    Lỗi: {"error", "code"}: bad_request (thiếu / sai vai / sai mode), not_found, already_done, locked (người khác đang giữ).
     """
     project_id = normalize_project_id(project_id)
     todo_id = (todo_id or "").strip() if isinstance(todo_id, str) else ""
     sid = resolve_role_session(session_id)
     if not todo_id:
         return {"error": "Thiếu todo_id (vd TSK-12)", "code": "bad_request"}
+    mode_norm = normalize_assign_mode(mode)
+    if not mode_norm:
+        return {"error": f"mode không hợp lệ '{mode}' (build = Làm | review = Rà soát)", "code": "bad_request"}
+    mode = mode_norm
     retired = next((k for k, v in RETIRED_ROLES.items()
                     if str(session_id or "").strip().lstrip("@").lower() in (k, v["session_id"])), "")
     if retired:
@@ -5150,11 +5429,18 @@ def assign_task_to_role(todo_id, session_id, project_id="PRJ-GEN-WORKPLACE", aut
     chk = [c for c in task["checklist"] if isinstance(c, dict)]
     body = head + ("\nChecklist:\n" + "\n".join(f"- [{'x' if c.get('done') else ' '}] {c.get('text', '')}" for c in chk[:TASK_PROMPT_CHECKLIST_MAX])
                    if chk else "")
+    if mode == "build":
+        try:
+            from backend import agy_build as _build
+        except ImportError:
+            import agy_build as _build
+        return _build.assign_build(todo_id, sid, role, task, body, claim, project_id=project_id, author=author,
+                                   channel_id=channel_id, wait=wait)
     res = post_warroom_message(project_id, channel_id, author, body, "Assignment", wait=wait, task_id=todo_id)
     if "error" in res:
         return res
     d = (res.get("dispatches") or [{}])[0]
-    return {"status": "assigned", "task_id": todo_id, "session_id": sid, "role": role, "viec_ref": task["viec_ref"],
+    return {"status": "assigned", "mode": "review", "task_id": todo_id, "session_id": sid, "role": role, "viec_ref": task["viec_ref"],
             "dispatch_id": d.get("dispatch_id"), "request_msg_id": (res.get("user_message") or {}).get("id"),
             "channel_id": channel_id, "claim": claim, "message": body}
 
@@ -5169,7 +5455,47 @@ def _dispatch_brief(r):
             "fallback_reason": d.get("fallback_reason") or "", "channel_id": d.get("channel_id") or "",
             "task_msg_id": d.get("task_msg_id"),
             "engine": d.get("engine") or "", "ext_session_id": d.get("ext_session_id") or "", "ext_state": d.get("ext_state") or "",
-            "ext_url": d.get("ext_url") or "", "pr_url": d.get("pr_url") or ""}
+            "ext_url": d.get("ext_url") or "", "pr_url": d.get("pr_url") or "", **build_dispatch_fields(d)}
+
+
+def build_dispatch_fields(d):
+    """Trường chế độ Làm (#45) của 1 dòng dispatch_log: nhánh, commit, test, push, compare (dòng không phải build → rỗng)."""
+    def _j(v):
+        try:
+            x = json.loads(v or "null")
+            return x if isinstance(x, dict) else None
+        except Exception:
+            return None
+    return {"mode": "build" if d.get("kind") == "build" else ("review" if d.get("kind") in ("warroom", "tmux") else ""),
+            "worktree_dir": d.get("worktree_dir") or "", "build_branch": d.get("build_branch") or "",
+            "build_commit": d.get("build_commit") or "", "build_tests": _j(d.get("build_tests")),
+            "build_push": _j(d.get("build_push")), "compare_url": d.get("compare_url") or ""}
+
+
+def format_build_lines(bf):
+    """Các dòng mô tả kết quả chế độ Làm cho tin trong phiên / war-room: nhánh, commit, test, push, compare, PR nháp."""
+    out = []
+    if bf.get("build_branch"):
+        out.append(f"Nhánh: {bf['build_branch']}" + (f" (worktree {bf['worktree_dir']})" if bf.get("worktree_dir") else ""))
+    out.append(f"Commit: {bf.get('build_commit') or '(không có commit mới)'}")
+    t = bf.get("build_tests") or {}
+    if t:
+        failed = [x.get("name") for x in t.get("tests") or [] if not x.get("ok")]
+        pc = t.get("py_compile") or {}
+        out.append(f"Test: {'PASS' if t.get('ok') else 'FAIL'} — py_compile {'ok' if pc.get('ok') else 'LỖI'}, "
+                   f"{t.get('passed', 0)}/{t.get('total', 0)} file test pass"
+                   + (f"; lỗi: {', '.join(failed[:10])}" if failed else "") + (f"; {t['note']}" if t.get("note") else ""))
+    p = bf.get("build_push") or {}
+    if p:
+        out.append("Push: " + (f"đã đẩy {p.get('ref') or bf.get('build_branch')} lên origin" if p.get("ok")
+                               else f"LỖI — {p.get('error') or 'không rõ'}"))
+    if bf.get("compare_url"):
+        out.append(f"So sánh: {bf['compare_url']}")
+    if p.get("pr_url"):
+        out.append(f"PR nháp: {p['pr_url']}")
+    elif p.get("pr_error"):
+        out.append(f"PR nháp: không tạo được ({p['pr_error']})")
+    return out
 
 
 def attach_task_links(todos):
@@ -6769,7 +7095,13 @@ def delete_gen_session_todo(conv_id, todo_id):
         cursor = conn.cursor()
         cursor.execute("DELETE FROM gen_session_todos WHERE id = ? AND conversation_id = ?", (todo_id, conv_id))
         conn.commit()
-    return {"status": "deleted", "id": todo_id}
+        deleted = cursor.rowcount > 0
+    res = {"status": "deleted", "id": todo_id}
+    if deleted:   # task bị xóa (hủy) → gỡ worktree chế độ Làm, giữ nhánh (#45)
+        c = cleanup_task_worktree(todo_id)
+        if c.get("removed"):
+            res["worktree_removed"] = c["dir"]
+    return res
 
 def format_session_kanban_for_agent(conv_id, todos):
     """Định dạng bản tóm tắt Kanban & Checklist của phiên để nhồi vào prompt bắt buộc của Agent."""

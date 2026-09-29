@@ -135,7 +135,7 @@ check("task không có → 404", st == 404, f"{st} {res}")
 
 print("[2] POST /api/task/assign: giao TSK cho @qa")
 open(PROMPT_LOG, "w").close()
-st, res = call("POST", "/api/task/assign", {"todo_id": T1, "session_id": "qa"})
+st, res = call("POST", "/api/task/assign", {"todo_id": T1, "session_id": "qa", "mode": "review"})
 check("200 + dispatch_id", st == 200 and isinstance(res.get("dispatch_id"), int), f"{st} {res}")
 DID = res.get("dispatch_id")
 check("session_id chuẩn hóa gw-qa-agy", res.get("session_id") == "gw-qa-agy", str(res))
@@ -152,7 +152,7 @@ check("dispatch_log.task_id = task", w.get("task_id") == T1, str(w))
 prompt = open(PROMPT_LOG).read()
 check("prompt agy có tiêu đề + checklist (id mục) + viec_ref", f"THÔNG TIN VIỆC {T1}" in prompt and "Tiêu đề: Kiểm tra API giao việc" in prompt
       and "(chk-a) Đọc backend/main.py" in prompt and "VIEC-7" in prompt, prompt[:800])
-st, res2 = call("POST", "/api/task/assign", {"todo_id": T1, "session_id": "backend"})
+st, res2 = call("POST", "/api/task/assign", {"todo_id": T1, "session_id": "backend", "mode": "review"})
 check("giao lại cho vai khác khi qa đang giữ → 409 locked", st == 409 and res2.get("code") == "locked", f"{st} {res2}")
 
 print("[3] Kết quả dispatch tự ghi về phiên của task + tick checklist")
@@ -209,7 +209,7 @@ with db.get_connection() as c:
 check("task done, nhả khóa, evidence = dispatch", row == {"status": "done", "claimed_by": "", "evidence_ref": f"dispatch:{DID}"}, str(row))
 check("gw-qa-agy nhả current_task_id", cur_task == "", cur_task)
 check("audit action=holder_dispatch", aud and aud["action"] == "holder_dispatch" and aud["held_by"] == "gw-qa-agy", str(dict(aud) if aud else None))
-st, res = call("POST", "/api/task/assign", {"todo_id": T1, "session_id": "qa"})
+st, res = call("POST", "/api/task/assign", {"todo_id": T1, "session_id": "qa", "mode": "review"})
 check("giao task đã done → 409", st == 409 and res.get("code") == "already_done", f"{st} {res}")
 
 print("[7] /api/state có gen_session_todos kèm last_dispatch")

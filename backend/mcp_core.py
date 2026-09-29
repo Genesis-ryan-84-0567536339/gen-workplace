@@ -40,7 +40,7 @@ DEFAULT_MCP_INSTRUCTIONS = (
     "1. Mỗi việc = 1 phiên: list_conversations, đã có phiên \"VIEC-<n>: <tên việc>\" thì dùng lại; chưa có thì create_conversation(title=\"VIEC-<n>: <tên việc>\", reuse_existing=true).\n"
     "2. Chia bước thành task Kanban: create_kanban_task(conv_id, viec_ref=\"VIEC-<n>\" bắt buộc); claim_task trước khi làm, update_task_checklist khi tiến triển.\n"
     "3. Ghi tiến độ vào chatroom của phiên: log_session_message(conv_id, content, author) ở mỗi mốc (bắt đầu, giao việc, kết quả, bị chặn, xong), tin ngắn kèm link Issue/PR/commit. Chỉ lưu tin, không gọi AI (đừng dùng gen_chat để ghi log).\n"
-    "4. Giao việc cho agy: post_warroom_message với @<vai>, rồi wait_worker_result(dispatch_id).\n"
+    "4. Giao việc cho agy: post_warroom_message với @<vai> (chỉ đọc), rồi wait_worker_result(dispatch_id). Sửa code: POST /api/task/assign mode=\"build\" (mặc định): agy làm trong worktree ../gw-worktrees/TSK-n, app test + push nhánh wt/TSK-n; điều phối tạo PR, review rồi merge.\n"
     "5. Đóng việc: complete_task với evidence thật (commit SHA, URL PR có thật, dispatch:<id>, file trong ~/gw-reports/).\n"
     "6. Quy trình đầy đủ: repo Genesis-ryan-84-0567536339/Brain → skills/work-style/subskills/gen-workplace-dispatch/SKILL.md.\n"
     "7. Xác thực: gọi HTTP /mcp phải kèm Authorization: Bearer <token> (thiếu token → 401). Agent điều phối dùng connector Gen-hub mcp-06594, hoặc REST /api/* không cần token (POST /api/gen/conversations/log, /api/task/assign, /api/dispatch/wait)."

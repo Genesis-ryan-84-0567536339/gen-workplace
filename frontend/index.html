@@ -4258,6 +4258,13 @@ body.resizing-active, body.resizing-active * {
 .julesStrip .btn.small { font-size:9.5px; padding:1px 6px; }
 .julesStrip a { color:var(--accent); }
 .julesStrip .julesLabel { font-weight:600; color:var(--text); }
+/* Chế độ Làm (#45): nhánh wt/TSK-n, commit, test, push, compare trên thẻ task */
+.buildStrip { display:flex; flex-wrap:wrap; gap:4px; align-items:center; font-size:10px; padding:3px 6px; border-radius:4px; background:rgba(158,206,106,0.08); border:1px solid rgba(158,206,106,0.3); }
+.buildStrip a { color:var(--accent); }
+.buildStrip .buildLabel { font-weight:600; color:var(--text); }
+.buildStrip code { font-size:9.5px; }
+.buildStrip .bad { color:var(--red); }
+.buildStrip .good { color:var(--green); }
 .julesStatusRow { display:flex; align-items:center; gap:8px; font-weight:600; margin-bottom:6px; }
 .julesKeyForm { display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:10px 0 4px; }
 .julesKeyForm label { font-size:12px; color:var(--muted); }
@@ -12199,6 +12206,7 @@ const HUB_ROLE_TEAMS = [
 const HUB_SID_ROLE = Object.fromEntries(HUB_ROLE_TEAMS.map(r => [r.sid, r.key]));
 let hubPendingFocus = null;
 const hubAssignChoice = {};   // vai đã chọn ở ô "Giao cho" của từng thẻ (giữ qua các lần vẽ lại)
+const hubAssignMode = {};     // chế độ đã chọn ở từng thẻ: 'build' (Làm, mặc định) | 'review' (Rà soát) (#45)
 let hubWatching = {};   // dispatch_id → true (đang chờ kết quả để cập nhật thẻ)
 
 function hubTasks() { return Array.isArray(state.gen_session_todos) ? state.gen_session_todos : []; }
@@ -12237,6 +12245,8 @@ function dispatchStatusInfo(d) {
     : st === 'failed' ? { cls: 'bad', label: 'lỗi' } : st === 'cancelled' ? { cls: 'wait', label: 'đã hủy' } : { cls: 'wait', label: st };
   if (d.kind === 'jules') {
     base.label = 'Jules ' + (st === 'running' ? (d.ext_state === 'AWAITING_PLAN_APPROVAL' ? 'chờ duyệt' : 'đang làm') : base.label);
+  } else if (d.kind === 'build') {
+    base.label = 'Làm · ' + base.label;
   }
   if (d.fallback) base.label += ' · đã chuyển hồ sơ';
   return base;
@@ -12284,10 +12294,13 @@ function renderTaskLinkActions(t, ctx) {
   const sid = taskWorkerSid(t);
   const isDone = t.status === 'done';
   const opts = roles.map(r => `<option value="${r.key}" ${r.key === roleNow ? 'selected' : ''}>@${r.key}</option>`).join('');
+  const modeNow = hubAssignMode[key] || 'build';
+  const modeOpts = [['build', 'Làm'], ['review', 'Rà soát']].map(([v, l]) => `<option value="${v}" ${v === modeNow ? 'selected' : ''}>${l}</option>`).join('');
   return `
     <div class="taskLinkActions" onclick="event.stopPropagation()">
       ${isDone || roles.length ? '' : '<span class="hint" title="Đăng nhập hồ sơ Google cho vai ở màn Worker & terminal">Chưa vai nào đăng nhập để giao</span>'}
       ${isDone || !roles.length ? '' : `<select class="taskAssignSel" id="assignSel-${escapeHtml(key)}" onchange="hubAssignChoice['${escapeHtml(key)}']=this.value;document.getElementById('assignBtn-${escapeHtml(key)}').textContent='Giao cho @'+this.value" title="Chọn vai">${opts}</select>
+      <select class="taskAssignSel taskModeSel" id="assignMode-${escapeHtml(key)}" onchange="hubAssignMode['${escapeHtml(key)}']=this.value" title="Làm: agy sửa code trong worktree riêng của task (nhánh wt/${escapeHtml(t.id)}), app chạy test + push nhánh. Rà soát: agy chỉ đọc (--mode plan)">${modeOpts}</select>
       <button class="btn small taskAssignBtn" id="assignBtn-${escapeHtml(key)}" onclick="assignTaskFromCard('${escapeHtml(t.id)}','${escapeHtml(key)}')" title="Claim task cho vai + gửi war-room @vai kèm tiêu đề, checklist, viec_ref">Giao cho @${roleNow}</button>`}
       ${julesAssignBtnHtml(t)}
       ${msgId ? `<button class="btn small" onclick="openWarroomMessage(${Number(msgId)}, '${escapeHtml((d && d.channel_id) || 'war_room')}')" title="Mở phòng giao ban tại tin này">Tin #${Number(msgId)}</button>` : ''}
@@ -12310,6 +12323,7 @@ function renderHubTaskCard(t, ctx) {
       <div class="hubTaskTitle">${escapeHtml(t.title || '')}</div>
       ${renderTaskLinkMeta(t)}
       ${julesStripHtml(t)}
+      ${buildStripHtml(t)}
       ${t.evidence_ref ? `<div class="hubTaskEvidence" title="Bằng chứng nghiệm thu">Bằng chứng: ${escapeHtml(t.evidence_ref)}</div>` : ''}
       ${renderTaskLinkActions(t, ctx)}
     </div>`;
@@ -12335,15 +12349,36 @@ function rerenderHubViews() {
   if (active === 'runtimes') updateCommandDeck();
 }
 
+// Dải kết quả chế độ Làm trên thẻ task (#45): nhánh wt/TSK-n · commit · test · push · link compare / PR nháp
+function buildStripHtml(t) {
+  const d = t.last_dispatch;
+  if (!d || d.kind !== 'build') return '';
+  const tests = d.build_tests || null, push = d.build_push || null;
+  const label = d.status === 'running' ? 'agy đang làm…' : (d.status === 'done' ? 'xong' : 'lỗi');
+  const parts = [];
+  if (d.build_branch) parts.push(`<code class="buildBranch" title="${escapeHtml(d.worktree_dir || '')}">${escapeHtml(d.build_branch)}</code>`);
+  if (d.build_commit) parts.push(`<code class="buildCommit" title="${escapeHtml(d.build_commit)}">${escapeHtml(d.build_commit.slice(0, 10))}</code>`);
+  if (tests) {
+    const failed = (tests.tests || []).filter(x => !x.ok).map(x => x.name);
+    parts.push(`<span class="buildTests ${tests.ok ? 'good' : 'bad'}" title="${escapeHtml(failed.length ? 'Lỗi: ' + failed.join(', ') : 'py_compile + toàn bộ test')}">test ${tests.ok ? 'PASS' : 'FAIL'} ${Number(tests.passed || 0)}/${Number(tests.total || 0)}</span>`);
+  }
+  if (push) parts.push(`<span class="buildPush ${push.ok ? 'good' : 'bad'}" title="${escapeHtml(push.ok ? 'Đã push lên origin' : (push.error || ''))}">push ${push.ok ? 'ok' : 'lỗi'}</span>`);
+  if (d.compare_url) parts.push(`<a class="buildCompare" href="${escapeHtml(d.compare_url)}" target="_blank" rel="noopener" title="So sánh main...${escapeHtml(d.build_branch || '')} trên GitHub (Claude điều phối tạo PR và merge)">So sánh</a>`);
+  if (d.pr_url) parts.push(`<a href="${escapeHtml(d.pr_url)}" target="_blank" rel="noopener" title="PR nháp do app tạo">PR nháp</a>`);
+  return `<div class="buildStrip" data-build-state="${escapeHtml(d.status || '')}" onclick="event.stopPropagation()">
+      <span class="buildLabel">Làm · ${escapeHtml(label)}</span>${parts.join('')}</div>`;
+}
+
 async function assignTaskFromCard(todoId, key) {
   const role = $(`assignSel-${key}`)?.value || 'qa';
+  const mode = $(`assignMode-${key}`)?.value || hubAssignMode[key] || 'build';
   const btn = $(`assignBtn-${key}`);
   if (btn) { btn.disabled = true; btn.textContent = 'Đang giao…'; }
   try {
     const res = await fetch('/api/task/assign', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ todo_id: todoId, session_id: role, author: 'Ryan (Owner)' })
+      body: JSON.stringify({ todo_id: todoId, session_id: role, mode, author: 'Ryan (Owner)' })
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || data.error) {
@@ -12351,7 +12386,8 @@ async function assignTaskFromCard(todoId, key) {
       showToast(`Không giao được ${todoId}: ${data.error || res.status}${extra}`, 7000);
       return;
     }
-    showToast(`Đã giao ${todoId} cho @${role} · dispatch #${data.dispatch_id} · tin war-room #${data.request_msg_id}`, 5000);
+    const modeLabel = data.mode === 'build' ? `Làm · nhánh ${data.branch}` : 'Rà soát';
+    showToast(`Đã giao ${todoId} cho @${role} (${modeLabel}) · dispatch #${data.dispatch_id} · tin war-room #${data.request_msg_id}`, 5000);
     await refreshHubTasks();
     if (typeof genState !== 'undefined' && genState.currentConvId) loadGenSessionTodos();
     watchDispatch(data.dispatch_id);
@@ -12367,7 +12403,7 @@ async function watchDispatch(did) {
   if (!did || hubWatching[did]) return;
   hubWatching[did] = true;
   try {
-    for (let i = 0; i < 40; i++) {
+    for (let i = 0; i < 160; i++) {   // chế độ Làm có thể chạy tới ~50 phút (agy + test + push)
       const res = await fetch(`/api/dispatch/wait?dispatch_id=${encodeURIComponent(did)}&timeout_sec=20`);
       const data = await res.json().catch(() => ({}));
       if (data.status && data.status !== 'running') {
