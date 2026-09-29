@@ -179,14 +179,14 @@ TOOLS = [
     },
     {
         "name": "manage_worker_lifecycle",
-        "description": "Điều khiển vòng đời hoạt động của worker: pause (tạm dừng), resume (tiếp tục), hibernate (ngủ đông tiết kiệm tài nguyên), wake (đánh thức), sleep_all (ngủ đông tất cả), wake_all (đánh thức tất cả).",
+        "description": "Điều khiển vòng đời phiên tmux của worker: open (mở nếu đang ngủ, không khởi động lại phiên đang chạy), pause (tạm dừng), resume (tiếp tục), hibernate (ngủ đông), wake (khởi động lại phiên), sleep_all, wake_all. Phiên tự ngủ sau GW_TMUX_IDLE_MIN phút rảnh.",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "action": {
                     "type": "string",
-                    "description": "Hành động điều khiển: 'pause' | 'resume' | 'hibernate' | 'wake' | 'sleep_all' | 'wake_all'",
-                    "enum": ["pause", "resume", "hibernate", "wake", "sleep_all", "wake_all"]
+                    "description": "Hành động điều khiển: 'open' | 'pause' | 'resume' | 'hibernate' | 'wake' | 'sleep_all' | 'wake_all'",
+                    "enum": ["open", "pause", "resume", "hibernate", "wake", "sleep_all", "wake_all"]
                 },
                 "session_id": {
                     "type": "string",
@@ -935,6 +935,7 @@ def execute_tool(name: str, args: dict) -> dict:
             if not allowed:
                 return {"content": [{"type": "text", "text": json.dumps({"status": "rejected", "session_id": session_id, "reason": reason}, ensure_ascii=False, indent=2)}], "isError": True}
 
+            db.ensure_tmux_session_live(session_id)   # phiên đang ngủ → mở theo nhu cầu (#32)
             payload = key if key else command
             tmux_success = False
             try:

@@ -280,7 +280,9 @@ def init_db():
             ("allowed_paths_json", "TEXT DEFAULT '[]'"),
             ("blocked_paths_json", "TEXT DEFAULT '[]'"),
             ("current_task_id", "TEXT DEFAULT ''"),
-            ("last_heartbeat", "TEXT DEFAULT ''")
+            ("last_heartbeat", "TEXT DEFAULT ''"),
+            # epoch giây của lần dùng phiên gần nhất (gửi lệnh / mở terminal / wake) — thread dọn phiên rảnh (#32)
+            ("last_activity_at", "INTEGER DEFAULT 0")
         ]:
             try:
                 cursor.execute(f"ALTER TABLE tmux_sessions ADD COLUMN {col} {col_type};")
@@ -2217,9 +2219,10 @@ echo "==========================================================================
             conversation_id = ?,
             quota_gemini_json = ?,
             quota_anthropic_json = ?,
+            last_activity_at = ?,
             updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
-        """, (pane_pid, pane_pid, live_out, live_out, conv_id, json.dumps(quota_g, ensure_ascii=False), json.dumps(quota_a, ensure_ascii=False), sid))
+        """, (pane_pid, pane_pid, live_out, live_out, conv_id, json.dumps(quota_g, ensure_ascii=False), json.dumps(quota_a, ensure_ascii=False), int(time.time()), sid))
         conn.commit()
     if not pane_pid:
         return {"status": "error", "session_id": sid, "message": f"Không mở được phiên tmux {sid}"}
@@ -2248,8 +2251,112 @@ def ensure_real_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
         started.append(start_tmux_session(s["id"]))
     return started
 
+def tmux_idle_min():
+    """GW_TMUX_IDLE_MIN: số phút rảnh trước khi tự hibernate phiên (mặc định 15; <= 0 → tắt tự hibernate). Nhận số lẻ."""
+    try:
+        return float(os.environ.get("GW_TMUX_IDLE_MIN", "15"))
+    except ValueError:
+        return 15.0
+
+def touch_tmux_activity(session_id):
+    """Ghi mốc dùng phiên gần nhất (epoch giây) — thread dọn phiên dựa vào mốc này."""
+    with get_connection() as conn:
+        conn.execute("UPDATE tmux_sessions SET last_activity_at = ? WHERE id = ?", (int(time.time()), session_id))
+        conn.commit()
+
+def ensure_tmux_session_live(session_id):
+    """
+    Mở phiên theo nhu cầu (#32): tmux chưa chạy → wake_tmux_session; đang pause → resume. Luôn ghi last_activity_at.
+    Gọi trước khi gửi lệnh vào phiên, khi bấm "Mở terminal" hoặc attach. Trả {"status", "session_id", "action"}.
+    """
+    with get_connection() as conn:
+        row = conn.execute("SELECT status FROM tmux_sessions WHERE id = ?", (session_id,)).fetchone()
+    if not row:
+        return {"status": "error", "session_id": session_id, "message": f"Không tìm thấy phiên {session_id}"}
+    action = "none"
+    res = {"status": row["status"], "session_id": session_id}
+    if session_id not in tmux_live_sessions():
+        res = wake_tmux_session(session_id)
+        action = "wake"
+    elif row["status"] == "paused":
+        res = resume_tmux_session(session_id)
+        action = "resume"
+    elif row["status"] == "hibernated":   # tmux đang chạy nhưng DB lệch → sửa trạng thái cho đúng
+        with get_connection() as conn:
+            conn.execute("UPDATE tmux_sessions SET status = 'active' WHERE id = ?", (session_id,))
+            conn.commit()
+        res = {"status": "active", "session_id": session_id}
+    touch_tmux_activity(session_id)
+    out = dict(res)
+    out["action"] = action
+    return out
+
+def _tmux_session_activity():
+    """{tên phiên: (session_activity epoch, số client đang attach)} — 1 subprocess."""
+    info = {}
+    try:
+        res = subprocess.run(["tmux", "list-sessions", "-F", "#{session_name} #{session_activity} #{session_attached}"],
+                             capture_output=True, text=True, timeout=2.0)
+        if res.returncode == 0:
+            for line in res.stdout.splitlines():
+                parts = line.strip().rsplit(" ", 2)
+                if len(parts) == 3:
+                    act = int(parts[1]) if parts[1].isdigit() else 0
+                    att = int(parts[2]) if parts[2].isdigit() else 0
+                    info[parts[0]] = (act, att)
+    except Exception:
+        pass
+    return info
+
+def reap_idle_tmux_sessions(idle_min=None, now=None, project_id=None):
+    """
+    Thread dọn phiên (#32): hibernate phiên worker rảnh quá idle_min phút (mặc định GW_TMUX_IDLE_MIN).
+    Rảnh tính từ max(last_activity_at, #{session_activity} của tmux). KHÔNG đụng phiên đang có người attach
+    hoặc đang có dispatch tmux 'running'. Phiên DB ghi active/paused nhưng tmux không chạy → đánh dấu hibernated.
+    Trả {"hibernated": [...], "marked_stopped": [...], "kept": {sid: lý do}}.
+    """
+    idle_min = tmux_idle_min() if idle_min is None else float(idle_min)
+    out = {"hibernated": [], "marked_stopped": [], "kept": {}, "idle_min": idle_min}
+    if idle_min <= 0:
+        return out
+    now = int(now if now is not None else time.time())
+    live = _tmux_session_activity()
+    q = "SELECT id, status, COALESCE(last_activity_at, 0) AS last_act FROM tmux_sessions WHERE status != 'hibernated'"
+    args = ()
+    if project_id:
+        q += " AND project_id = ?"
+        args = (normalize_project_id(project_id),)
+    with get_connection() as conn:
+        rows = conn.execute(q, args).fetchall()
+        busy = {r["session_id"] for r in conn.execute(
+            "SELECT DISTINCT session_id FROM dispatch_log WHERE status = 'running' AND kind = 'tmux' "
+            "AND started_at >= ?", (time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(now - 86400)),)).fetchall()}
+    for r in rows:
+        sid = r["id"]
+        if sid not in live:
+            with get_connection() as conn:
+                conn.execute("UPDATE tmux_sessions SET status = 'hibernated', pid = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?", (sid,))
+                conn.commit()
+            out["marked_stopped"].append(sid)
+            continue
+        act, attached = live[sid]
+        if attached > 0:
+            out["kept"][sid] = "attached"
+            continue
+        if sid in busy:
+            out["kept"][sid] = "dispatch_running"
+            continue
+        last = max(int(r["last_act"] or 0), act)
+        if now - last >= idle_min * 60:
+            hibernate_tmux_session(sid)
+            out["hibernated"].append(sid)
+        else:
+            out["kept"][sid] = f"idle {now - last}s"
+    return out
+
 def seed_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
-    """Điền và đồng bộ cấu hình phiên worker trong SQLite Core DB. CHỈ ghi DB, không mở tmux (#30)."""
+    """Điền và đồng bộ cấu hình phiên worker trong SQLite Core DB. CHỈ ghi DB, không mở tmux (#30).
+    Phiên mới mặc định 'hibernated': chỉ mở khi cần (ensure_tmux_session_live, #32)."""
     project_id = normalize_project_id(project_id)
     with get_connection() as conn:
         cursor = conn.cursor()
@@ -2274,7 +2381,7 @@ def seed_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
                     id, project_id, role_name, cli_tool, account_type, account_label,
                     profile_dir, status, pid, cwd, terminal_output, conversation_id,
                     allowed_paths_json, blocked_paths_json, current_task_id
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'active', 0, '/workspace', '', ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'hibernated', 0, '/workspace', '', ?, ?, ?, ?)
                 """, (
                     sid, project_id, cfg["role_name"], cfg["cli_tool"], cfg["account_type"],
                     acc_label, profile_dir, cfg["conv_id"], allowed_p, blocked_p, task_id
@@ -2401,6 +2508,7 @@ def get_tmux_sessions(project_id="PRJ-GEN-WORKPLACE", output_sid=""):
                 "status": r["status"],
                 "pid": live.get(r["id"], 0),
                 "tmux_live": r["id"] in live,
+                "last_activity_at": (r["last_activity_at"] if "last_activity_at" in r.keys() else 0) or 0,
                 "cwd": r["cwd"],
                 "terminal_output": fresh_out.get(r["id"], r["terminal_output"]),
                 "conversation_id": r["conversation_id"] if "conversation_id" in r.keys() else f"conv-{r['id']}",
@@ -2718,9 +2826,9 @@ echo "==========================================================================
 
         cursor.execute("""
         UPDATE tmux_sessions 
-        SET status = 'active', pid = ?, terminal_output = ?, updated_at = CURRENT_TIMESTAMP
+        SET status = 'active', pid = ?, terminal_output = ?, last_activity_at = ?, updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
-        """, (pane_pid, live_out or prev_output, session_id))
+        """, (pane_pid, live_out or prev_output, int(time.time()), session_id))
         conn.commit()
 
     return {"status": "active", "session_id": session_id, "pid": pane_pid, "conversation_id": conv_id}
@@ -2742,6 +2850,9 @@ def manage_tmux_swarm_lifecycle(action, target_id="all", project_id="PRJ-GEN-WOR
             results.append(hibernate_tmux_session(sid))
         elif action == "wake_all" or (action in ("wake", "wake_up") and sid == target_id):
             results.append(wake_tmux_session(sid))
+        elif action == "open" and sid == target_id:
+            # "Mở terminal" / attach: chỉ mở khi phiên chưa chạy, không khởi động lại phiên đang chạy (#32)
+            results.append(ensure_tmux_session_live(sid))
         elif action == "pause_all" or (action == "pause" and sid == target_id):
             results.append(pause_tmux_session(sid))
         elif action == "resume_all" or (action == "resume" and sid == target_id):
@@ -3292,6 +3403,7 @@ def dispatch_swarm_workflow(project_id="PRJ-GEN-WORKPLACE", session_id=None):
             continue
         tmux_real = False
         try:
+            ensure_tmux_session_live(sid)   # phiên đang ngủ → mở trước khi gõ lệnh (#32)
             res = subprocess.run(["tmux", "send-keys", "-t", sid, cmd, "Enter"], capture_output=True, text=True, timeout=2.0)
             tmux_real = (res.returncode == 0)
         except Exception as e:

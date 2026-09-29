@@ -344,7 +344,7 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             # Chỉ đọc DB + 1 lần `tmux list-sessions`; capture-pane riêng phiên đang xem (?output=<sid>) (#30)
             output_sid = query.get("output", [""])[0].strip()
             sessions = db.get_tmux_sessions(prj_id, output_sid=output_sid)
-            self._send_json(200, {"sessions": sessions})
+            self._send_json(200, {"sessions": sessions, "idle_min": db.tmux_idle_min()})
             return
 
         # 5. API Kiểm tra Quota Live từ Google Cloud Code API của agy CLI
@@ -691,23 +691,13 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             command = data.get("command", "").strip()
             key = data.get("key", "").strip()
             if session_id and (command or key):
-                # Tự động đánh thức nếu phiên đang ngủ đông hoặc đóng băng
-                with db.get_connection() as conn:
-                    cursor = conn.cursor()
-                    cursor.execute("SELECT status FROM tmux_sessions WHERE id = ?", (session_id,))
-                    s_row = cursor.fetchone()
-                    if s_row and s_row["status"] == "hibernated":
-                        db.wake_tmux_session(session_id)
-                        time.sleep(0.2)
-                    elif s_row and s_row["status"] == "paused":
-                        db.resume_tmux_session(session_id)
-                        time.sleep(0.1)
-
                 allowed, reason = directive_guard.guard(session_id, command, key)
                 db.log_directive_audit(session_id, "http:/api/tmux/send", key or command, allowed, reason)
                 if not allowed:
                     self._send_json(403, {"status": "rejected", "session_id": session_id, "reason": reason})
                     return
+                # Phiên đang ngủ / tạm dừng → mở theo nhu cầu rồi mới gõ (#32)
+                db.ensure_tmux_session_live(session_id)
 
                 tmux_success = False
                 payload = key if key else command
@@ -1275,6 +1265,32 @@ def start_reclaim_worker():
     print(f"  Reclaim task treo: mỗi {interval}s (timeout {timeout}s)")
     return t
 
+def start_tmux_idle_reaper():
+    """Thread daemon mỗi GW_TMUX_REAP_SEC giây (mặc định 60) hibernate phiên tmux rảnh quá GW_TMUX_IDLE_MIN phút (#32)."""
+    try:
+        interval = max(1, int(os.environ.get("GW_TMUX_REAP_SEC", "60")))
+    except ValueError:
+        interval = 60
+    idle_min = db.tmux_idle_min()
+    if idle_min <= 0:
+        print("  Tự hibernate phiên tmux: TẮT (GW_TMUX_IDLE_MIN<=0)")
+        return None
+
+    def _loop():
+        while True:
+            time.sleep(interval)
+            try:
+                res = db.reap_idle_tmux_sessions()
+                if res.get("hibernated") or res.get("marked_stopped"):
+                    print(f"[tmux-idle] hibernate {res['hibernated']} · đã tắt sẵn {res['marked_stopped']}")
+            except Exception as e:
+                print(f"[tmux-idle] lỗi: {e}")
+
+    t = threading.Thread(target=_loop, daemon=True, name="TmuxIdleReaper")
+    t.start()
+    print(f"  Tự hibernate phiên tmux rảnh: sau {idle_min:g} phút (kiểm mỗi {interval}s)")
+    return t
+
 def main():
     print(f"==================================================")
     print(f"  GENESIS SWARM WORKPLACE - CONTROL PLANE DAEMON  ")
@@ -1284,8 +1300,8 @@ def main():
     print(f"  Database: SQLite 3 WAL + FTS5 Ready")
     start_oauth_callback_server(8085)
     start_reclaim_worker()
-    # Mở phiên worker chưa chạy đúng 1 lần lúc khởi động (trước đây chạy ở mỗi lượt poll /api/tmux/sessions, #30)
-    threading.Thread(target=db.ensure_real_tmux_sessions, daemon=True, name="TmuxStartup").start()
+    # Không mở tmux lúc khởi động: phiên mở khi cần và tự hibernate khi rảnh (#32)
+    start_tmux_idle_reaper()
     auto_update.start_worker(BASE_DIR, DATA_DIR)
     print(f"==================================================")
     server = ThreadedHTTPServer(("0.0.0.0", PORT), SwarmHandler)

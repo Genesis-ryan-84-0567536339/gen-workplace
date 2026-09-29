@@ -4,7 +4,7 @@ Test Issue #7: quyền agy trong tmux + worktree riêng cho từng vai; quy tắ
 Chạy không cần agy thật. tmux THẬT nếu máy có (socket riêng qua TMUX_TMPDIR, không đụng phiên đang chạy).
 - Alias agy/agy-run mặc định KHÔNG có --dangerously-skip-permissions; chỉ agy-run của vai trong GW_AGY_WRITE_ROLES
   VÀ đang ở worktree riêng của vai mới có cờ.
-- ensure_real_tmux_sessions / wake_tmux_session mở phiên trong <GW_WORKTREE_ROOT>/<sid> trên nhánh wt/<sid>;
+- ensure_tmux_session_live / wake_tmux_session mở phiên trong <GW_WORKTREE_ROOT>/<sid> trên nhánh wt/<sid>;
   gw-status in CWD + Branch.
 - directive_guard từ chối lệnh agy kèm --dangerously-skip-permissions.
 - Dispatch war-room: vẫn `agy --gemini_dir=... --mode plan -p` (không --sandbox, không skip-permissions mặc định);
@@ -162,10 +162,11 @@ if not shutil.which("tmux"):
     print("  (bỏ qua: máy không có tmux)")
 else:
     os.environ["GW_AGY_WRITE_ROLES"] = "backend"
-    # init_db lúc import đã tự mở 6 phiên (chưa có GW_AGY_WRITE_ROLES) → tắt để dựng lại theo cấu hình mới
+    # Phiên mặc định hibernated, chỉ mở khi cần (#32) → mở từng vai theo nhu cầu với cấu hình mới
     subprocess.run(["tmux", "kill-server"], capture_output=True)
     time.sleep(0.2)
-    db.ensure_real_tmux_sessions()
+    for _sid in db.SWARM_SESSION_IDS:
+        db.ensure_tmux_session_live(_sid)
     time.sleep(0.5)
 
     def pane_path(sid):
