@@ -302,8 +302,8 @@ class SwarmHandler(SimpleHTTPRequestHandler):
                 "timestamp": int(time.time()),
                 "docker_env": bool(os.environ.get("DOCKER_CONTAINER")),
                 "active_agents": len(state.get("roles", [])),
-                "runtimes_count": len(state.get("runtimes", [])),
-                "ssot_synced": True,
+                # số phiên tmux worker đang mở (theo DB; phiên mở khi cần, tự ngủ khi rảnh — #32)
+                "runtimes_count": db.count_active_tmux_sessions(),
                 "db_engine": "SQLite 3 WAL + FTS5",
                 "active_project": state.get("project", {}).get("name", "gen-workplace"),
                 "commit": RUNNING_COMMIT,
@@ -324,18 +324,6 @@ class SwarmHandler(SimpleHTTPRequestHandler):
                 self._send_json(200, state)
             else:
                 self._send_json(404, {"error": "Project not found"})
-            return
-
-        # 3. API Catalog Tra Cứu Nhanh (FTS5 Full-Text Search)
-        if path == "/api/catalog":
-            q = query.get("q", [""])[0]
-            prj_id = query.get("project", ["PRJ-GEN-WORKPLACE"])[0]
-            results = db.search_catalog_fts(q, prj_id)
-            self._send_json(200, {
-                "query": q,
-                "count": len(results),
-                "results": results
-            })
             return
 
         # 4. API Tmux Sessions (Phiên Nền Runtimes & Account Profiles)
@@ -361,13 +349,6 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             self._send_json(200, {"profiles": profiles})
             return
 
-        # 6. API Lịch sử tin nhắn Orchestrator Chat IDE
-        if path == "/api/orch/messages":
-            prj_id = query.get("project", ["PRJ-GEN-WORKPLACE"])[0]
-            messages = db.get_orch_chat_messages(prj_id)
-            self._send_json(200, {"messages": messages})
-            return
-
         # 7. API Tin nhắn War Room / Phòng Giao Ban Swarm
         if path == "/api/warroom/messages":
             channel_id = query.get("channel", ["war_room"])[0]
@@ -375,25 +356,6 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             limit = int(query.get("limit", [50])[0])
             messages = db.get_warroom_messages(channel_id, prj_id, limit)
             self._send_json(200, {"messages": messages, "channel_id": channel_id})
-            return
-
-        # 8. API Đọc toàn văn đặc tả SSOT nguyên bản của Ryan
-        if path == "/api/ssot/spec":
-            spec_file = BASE_DIR / "docs" / "SSOT_ORIGINAL_SPEC.md"
-            if spec_file.exists():
-                try:
-                    content = spec_file.read_text(encoding="utf-8")
-                    self._send_json(200, {
-                        "filename": "docs/SSOT_ORIGINAL_SPEC.md",
-                        "size_bytes": len(content.encode("utf-8")),
-                        "content": content,
-                        "status": "ok"
-                    })
-                    return
-                except Exception as e:
-                    self._send_json(500, {"error": str(e)})
-                    return
-            self._send_json(404, {"error": "SSOT spec file not found"})
             return
 
         # 9. API Git Commit History thật
@@ -426,12 +388,6 @@ class SwarmHandler(SimpleHTTPRequestHandler):
         if path == "/api/roles/sop":
             sop = db.get_roles_sop()
             self._send_json(200, {"roles": sop})
-            return
-
-        # 14. API Vault & Secrets Explorer
-        if path == "/api/vault/list":
-            vault = db.get_vault_list()
-            self._send_json(200, {"vault": vault})
             return
 
         # 15. API SSOT Events thẩm định thật từ SQLite
@@ -642,18 +598,6 @@ class SwarmHandler(SimpleHTTPRequestHandler):
                 self._send_json(400, {"error": "Missing id or instruction"})
             return
 
-        # 3b. Cập nhật Model AI cho Role
-        if path == "/api/role/model":
-            role_id = data.get("id") or data.get("role_id")
-            model = data.get("model") or data.get("model_name")
-            project_id = data.get("project_id", "PRJ-GEN-WORKPLACE")
-            if role_id and model:
-                success = db.update_role_model(role_id, model, project_id)
-                self._send_json(200, {"status": "model_updated", "id": role_id, "model": model, "success": success})
-            else:
-                self._send_json(400, {"error": "Missing id or model"})
-            return
-
         # 4. Điều phối lệnh thực thi (Execution Dispatcher)
         if path == "/api/execute":
             command = data.get("command", "")
@@ -737,11 +681,15 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             })
             return
 
-        # 6.2. "Chạy Task này" (session_id) / "Chạy Toàn Bộ Swarm" (không session_id): lệnh agy thật cho task đang gán,
+        # 6.2. "Chạy Task này" (session_id bắt buộc): lệnh agy thật cho task đang gán của 1 worker,
         #      qua allowlist directive_guard. results = {sid: {status: dispatched|error, task_id, command, reason, ...}}
         if path == "/api/swarm/dispatch":
             project_id = data.get("project_id", "PRJ-GEN-WORKPLACE")
             session_id = (data.get("session_id") or "").strip() or None
+            if not session_id:
+                # "Chạy toàn bộ Swarm" đã bỏ (VIEC-12): chỉ chạy task đang gán của đúng 1 worker
+                self._send_json(400, {"error": "Thiếu session_id: chỉ chạy task của 1 worker (bản chạy toàn bộ Swarm đã bỏ)"})
+                return
             results = db.dispatch_swarm_workflow(project_id, session_id)
             n_ok = sum(1 for r in results.values() if r.get("status") == "dispatched")
             self._send_json(200, {
@@ -825,31 +773,6 @@ class SwarmHandler(SimpleHTTPRequestHandler):
                 self._send_json(400, {"error": "Missing profile_id"})
             return
 
-        # 12. Gửi chỉ thị cho Orchestrator (Orchestrator Control Plane Chat)
-        if path == "/api/orch/chat":
-            message = data.get("message", "").strip()
-            project_id = data.get("project_id", "PRJ-GEN-WORKPLACE")
-            if message:
-                res = db.process_orch_instruction(message, project_id)
-                self._send_json(200, res)
-            else:
-                self._send_json(400, {"error": "Missing message"})
-            return
-
-        # 13. Sinh worker mới động (Dynamic Worker Spawning)
-        if path == "/api/orch/spawn":
-            role_name = data.get("role_name", "").strip()
-            project_id = data.get("project_id", "PRJ-GEN-WORKPLACE")
-            account_type = data.get("account_type", "owner_default")
-            mission = data.get("mission", "").strip()
-            scope = data.get("scope", "").strip()
-            if role_name:
-                res = db.spawn_worker(role_name, project_id, account_type, mission, scope)
-                self._send_json(200, res)
-            else:
-                self._send_json(400, {"error": "Missing role_name"})
-            return
-
         # 14. Khóa độc quyền nhiệm vụ (Anti-Chaos Task Claiming)
         if path == "/api/task/claim":
             session_id = data.get("session_id", "").strip()
@@ -918,51 +841,6 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             res = db.post_warroom_message(prj_id, channel_id, author, msg, tag, task_id=str(data.get("task_id") or "").strip())
             status_code = 400 if "error" in res else 200
             self._send_json(status_code, res)
-            return
-
-        # 18. Lưu chỉ thị / File Plan nguồn SSOT (Save SSOT Source Input)
-        if path == "/api/ssot/save":
-            content = data.get("content", "")
-            prj_id = data.get("project_id", "PRJ-GEN-WORKPLACE")
-            spec_file = BASE_DIR / "docs" / "SSOT_ORIGINAL_SPEC.md"
-            try:
-                if content:
-                    spec_file.write_text(content, encoding="utf-8")
-                with db.get_connection() as conn:
-                    cursor = conn.cursor()
-                    cursor.execute("""
-                    INSERT OR REPLACE INTO master_ssot (id, project_id, title, body, source_ref, verified_time)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                    """, ("SSOT-MASTER-INPUT", prj_id, "Chỉ Thị Tổng Thể & PRD Nguồn", content[:500] + "...", "Input Chat Tổng", time.strftime("%H:%M")))
-                    conn.commit()
-                self._send_json(200, {"status": "saved", "path": "docs/SSOT_ORIGINAL_SPEC.md", "time": time.strftime("%H:%M:%S")})
-            except Exception as e:
-                self._send_json(500, {"error": str(e)})
-            return
-
-        # 19. Lưu đặc tả SSOT làm nguồn cho các vai. KHÔNG sinh roadmap/todo (generated = 0), không tin War Room mẫu.
-        #     Frontend (generateFromSource) chỉ đọc key "state"; các key status/generated/note nói đúng việc đã làm.
-        if path == "/api/ssot/generate":
-            content = data.get("content", "")
-            prj_id = data.get("project_id", "PRJ-GEN-WORKPLACE")
-            res = db.generate_structure_from_ssot(content, prj_id)
-            if "error" in res:
-                self._send_json(400, res)
-                return
-            state = db.get_full_state(prj_id)
-            self._send_json(200, {**res, "state": state})
-            return
-
-        # 20. Thẩm định sự kiện SSOT Event
-        if path == "/api/events/verify":
-            event_id = data.get("id") or data.get("event_id")
-            status = data.get("status", "ssot")
-            project_id = data.get("project_id", "PRJ-GEN-WORKPLACE")
-            if event_id:
-                db.verify_ssot_event(event_id, status, project_id)
-                self._send_json(200, {"status": "verified", "id": event_id})
-            else:
-                self._send_json(400, {"error": "Missing event_id"})
             return
 
         # 21. Tạo dự án mới lưu trực tiếp vào SQLite

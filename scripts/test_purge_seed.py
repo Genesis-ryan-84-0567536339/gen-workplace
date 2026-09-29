@@ -62,10 +62,11 @@ check("không còn hàm seed cũ", not any(hasattr(db, n) for n in ("seed_ssot_e
 print("[2] API khi bảng trống: trả mảng rỗng, không lỗi")
 st = db.get_full_state()
 check("get_full_state không None", st is not None)
-check("roadmap/todos/nodes/runtimes/ssot/roleMemory/catalog/refs/events rỗng",
-      all(st[k] == [] for k in ("roadmap", "todos", "nodes", "runtimes", "ssot", "roleMemory", "catalog", "refs", "events")),
-      str({k: len(st[k]) for k in ("roadmap", "todos", "nodes", "runtimes", "ssot", "roleMemory", "catalog", "refs", "events")}))
-check("kanban 4 cột rỗng", all(v == [] for v in st["kanban"].values()))
+# VIEC-12: /api/state không còn gửi các khóa rỗng (bảng giữ nguyên trong DB, chỉ ngừng đọc)
+check("không còn khóa roadmap/todos/nodes/runtimes/kanban/ssot/roleMemory/catalog/refs/events/sourceText",
+      not any(k in st for k in ("roadmap", "todos", "nodes", "runtimes", "kanban", "ssot", "roleMemory", "catalog", "refs", "events", "sourceText")),
+      str(sorted(st.keys())))
+check("chỉ còn project/projects/roles/gen_session_todos", sorted(st.keys()) == ["gen_session_todos", "project", "projects", "roles"], str(sorted(st.keys())))
 check("roles 5", len(st["roles"]) == 5)
 check("get_gen_conversations rỗng", db.get_gen_conversations() == [])
 check("get_warroom_messages rỗng (không tự seed)", db.get_warroom_messages("war_room") == [] and db.get_warroom_messages("standup") == [] and count("chat_messages") == 0)

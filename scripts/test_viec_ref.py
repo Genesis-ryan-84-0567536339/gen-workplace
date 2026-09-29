@@ -135,14 +135,14 @@ check("list_kanban_tasks trả viec_ref", is_err is False and sorted(t["viec_ref
 schema = mcp_core.TOOL_LOOKUP["create_kanban_task"]["inputSchema"]
 check("schema MCP: viec_ref required", "viec_ref" in schema["properties"] and "viec_ref" in schema["required"])
 
-print("[5] /api/state: todos + kanban kèm viec_ref")
+print("[5] bảng todos cũ vẫn giữ (chỉ ngừng đọc ở /api/state), task roadmap có viec_ref")
 with db.get_connection() as conn:
     conn.execute("INSERT INTO roadmaps (id, project_id, title, description, todos_count, status, order_idx) VALUES ('RM-V', 'PRJ-GEN-WORKPLACE', 'RM viec', '', 1, 'queued', 1)")
     conn.execute("INSERT INTO todos (id, roadmap_id, project_id, title, assigned_role, status, viec_ref) VALUES ('TODO-V1', 'RM-V', 'PRJ-GEN-WORKPLACE', 'Task roadmap có mã', 'QA Tester', 'queued', 'VIEC-3')")
     conn.commit()
 st = db.get_full_state()
-check("todos[0][0].viec_ref = VIEC-3", st["todos"][0][0]["viec_ref"] == "VIEC-3", str(st["todos"]))
-check("kanban backlog item có viec_ref ở vị trí 4", st["kanban"]["backlog"][0][3] == "VIEC-3", str(st["kanban"]["backlog"]))
+check("/api/state không còn gửi todos/kanban (VIEC-12)", "todos" not in st and "kanban" not in st, str(sorted(st.keys())))
+check("get_task_viec_ref đọc được viec_ref của task bảng todos", db.get_task_viec_ref("TODO-V1") == "VIEC-3", db.get_task_viec_ref("TODO-V1"))
 
 print("[6] webhook task_completed khi complete_task thành công")
 os.environ["GW_EVENT_WEBHOOK_URL"] = HOOK_URL

@@ -675,7 +675,9 @@ def seed_real_project():
         cursor.execute("""
         INSERT OR IGNORE INTO projects (id, name, repo_path, branch, plan_file, source_text, meta, status)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, ('PRJ-GEN-WORKPLACE', 'gen-workplace', str(BASE_DIR), 'main', 'docs/SSOT_ORIGINAL_SPEC.md', source_text, '6 vai · SQLite WAL', 'active'))
+        """, ('PRJ-GEN-WORKPLACE', 'gen-workplace', str(BASE_DIR), 'main', 'docs/SSOT_ORIGINAL_SPEC.md', source_text, 'SQLite WAL', 'active'))
+        # Bỏ chữ "6 vai" (VIEC-12): chỉ UPDATE đúng giá trị seed cũ, chạy lại không đổi gì
+        cursor.execute("UPDATE projects SET meta = 'SQLite WAL' WHERE id = 'PRJ-GEN-WORKPLACE' AND meta = '6 vai · SQLite WAL'")
 
         roles = [
             ('ROLE-01', 'L', 'Lead Architect', 'Gemini CLI (agy --effort high)', 'Quản trị SSOT, điều phối toàn bộ tiến trình gen-workplace', 'Chịu trách nhiệm bảo toàn SSOT đặc tả gốc, thẩm định evidence từ các role và điều phối live workflow.'),
@@ -815,182 +817,19 @@ def get_full_state(project_id="PRJ-GEN-WORKPLACE"):
             "plan": p_row["plan_file"]
         }
 
-        # Roadmaps
-        cursor.execute("SELECT * FROM roadmaps WHERE project_id = ? ORDER BY order_idx ASC", (project_id,))
-        roadmaps = []
-        rm_ids = []
-        for r in cursor.fetchall():
-            roadmaps.append({
-                "id": r["id"],
-                "title": r["title"],
-                "desc": r["description"],
-                "todos": r["todos_count"],
-                "status": r["status"]
-            })
-            rm_ids.append(r["id"])
-
-        # Todos grouped by roadmap
-        todos = []
-        for rm_id in rm_ids:
-            cursor.execute("SELECT * FROM todos WHERE roadmap_id = ? ORDER BY id ASC", (rm_id,))
-            rm_todos = []
-            for t in cursor.fetchall():
-                rm_todos.append({
-                    "id": t["id"],
-                    "title": t["title"],
-                    "role": t["assigned_role"],
-                    "status": t["status"],
-                    "viec_ref": t["viec_ref"] or "",
-                    "evidence_ref": t["evidence_ref"] or ""
-                })
-            todos.append(rm_todos)
-
-        # Roles
+        # Vai (agent_roles, bỏ vai retired). Các bảng roadmaps/todos/workflow_nodes/agent_runtimes/master_ssot/role_memories/
+        # catalog_references/ssot_events GIỮ NGUYÊN trong DB nhưng không còn đọc ở đây (VIEC-12, #36): toàn rỗng mà vẫn gửi mỗi lượt poll.
         cursor.execute("SELECT * FROM agent_roles WHERE project_id = ? AND COALESCE(status, 'active') != 'retired' ORDER BY id ASC", (project_id,))
-        roles = []
-        for rl in cursor.fetchall():
-            m_name = rl["model_name"] if "model_name" in rl.keys() and rl["model_name"] else get_default_model_for_role(rl["name"])
-            roles.append({
-                "id": rl["id"],
-                "key": rl["role_key"],
-                "name": rl["name"],
-                "cli": rl["cli_tool"],
-                "model": m_name,
-                "scope": rl["scope"],
-                "instruction": rl["instruction"]
-            })
-
-        # Workflow Nodes
-        cursor.execute("SELECT * FROM workflow_nodes WHERE project_id = ? ORDER BY step_index ASC", (project_id,))
-        nodes = []
-        for n in cursor.fetchall():
-            nodes.append({
-                "id": n["id"],
-                "title": n["title"],
-                "role": n["role_name"],
-                "status": n["status"],
-                "x": n["coord_x"],
-                "y": n["coord_y"],
-                "input": n["input_desc"],
-                "output": n["output_desc"],
-                "check": n["check_desc"],
-                "handoff": n["handoff_desc"],
-                "checklist": json.loads(n["checklist_json"] or "[]")
-            })
-
-        # Runtimes
-        cursor.execute("SELECT * FROM agent_runtimes WHERE project_id = ? ORDER BY id ASC", (project_id,))
-        runtimes = []
-        for rt in cursor.fetchall():
-            # Get messages for this runtime
-            cursor.execute("SELECT * FROM chat_messages WHERE runtime_id = ? ORDER BY id ASC", (rt["id"],))
-            msgs = []
-            for m in cursor.fetchall():
-                msgs.append({
-                    "author": m["author"],
-                    "time": m["created_time"],
-                    "tag": m["tag"],
-                    "body": m["body"],
-                    "react": json.loads(m["react_json"] or "[]")
-                })
-
-            runtimes.append({
-                "id": rt["id"],
-                "role": rt["role_name"],
-                "cli": rt["cli_tool"],
-                "task": rt["task_ref"],
-                "branch": rt["branch"],
-                "status": rt["status"],
-                "path": rt["path"],
-                "messages": msgs,
-                "trace": json.loads(rt["trace_json"] or "[]"),
-                "io": json.loads(rt["io_json"] or "{}")
-            })
-
-        # Master SSOT
-        cursor.execute("SELECT * FROM master_ssot WHERE project_id = ? ORDER BY id ASC", (project_id,))
-        ssot = []
-        for s in cursor.fetchall():
-            ssot.append({
-                "id": s["id"],
-                "title": s["title"],
-                "body": s["body"],
-                "source": s["source_ref"],
-                "verified": s["verified_time"]
-            })
-
-        # Role Memories
-        cursor.execute("SELECT * FROM role_memories WHERE project_id = ? ORDER BY id ASC", (project_id,))
-        role_memory = []
-        for rm in cursor.fetchall():
-            role_name = rm["role_name"]
-            summary = rm["body"][:85] + ("..." if len(rm["body"]) > 85 else "")
-            role_memory.append({
-                "id": f"MEM-0{rm['id']}",
-                "role": role_name,
-                "runtime": f"runtime-{rm['id']}",
-                "summary": summary,
-                "detail": rm["body"],
-                "body": rm["body"],
-                "tags": json.loads(rm["tags_json"] or "[]"),
-                "synced": bool(rm["synced_to_ssot"]),
-                "time": rm["created_time"]
-            })
-
-        # Catalog References
-        cursor.execute("SELECT * FROM catalog_references WHERE project_id = ? ORDER BY id ASC", (project_id,))
-        catalog = []
-        for c in cursor.fetchall():
-            catalog.append({
-                "id": c["id"],
-                "type": c["category"],
-                "title": c["title"],
-                "desc": c["description"],
-                "ref": c["ref_path"]
-            })
-
-        # Refs array for quick table rendering [id, type, title, desc]
-        refs = [[c["id"], c["type"], c["title"], c["desc"]] for c in catalog]
-
-        # Events list (verified events from SQLite ssot_events)
-        cursor.execute("SELECT * FROM ssot_events WHERE project_id = ? ORDER BY id ASC", (project_id,))
-        event_rows = cursor.fetchall()
-        events = []
-        for ev in event_rows:
-            events.append({
-                "id": ev["id"],
-                "runtime": ev["runtime_id"] or (ev["role_name"] + " / " + (ev["runtime_id"] or "")),
-                "role": ev["role_name"],
-                "request": ev["request"],
-                "evidence": ev["evidence"],
-                "status": ev["status"],
-                "time": ev["verified_time"]
-            })
-
-        # Kanban (Derived from todos)
-        cursor.execute("SELECT * FROM todos WHERE project_id = ?", (project_id,))
-        all_todos = cursor.fetchall()
-        kanban = {
-            "backlog": [],
-            "ready": [],
-            "progress": [],
-            "done": []
-        }
-        for t in all_todos:
-            item = [t["id"], t["title"], (t["assigned_role"] or "").split()[0] if (t["assigned_role"] or "").strip() else "", t["viec_ref"] or ""]
-            st = t["status"]
-            if st == "done":
-                kanban["done"].append(item)
-            elif st in ("live", "in_progress", "running"):
-                kanban["progress"].append(item)
-            elif st in ("ready", "wait"):
-                kanban["ready"].append(item)
-            else:
-                kanban["backlog"].append(item)
+        roles = [{
+            "id": rl["id"],
+            "key": rl["role_key"],
+            "name": rl["name"],
+            "cli": rl["cli_tool"],
+            "scope": rl["scope"],
+        } for rl in cursor.fetchall()]
 
         return {
             "project": project,
-            "sourceText": p_row["source_text"],
             "projects": [
                 {
                     "name": p_row["name"],
@@ -998,17 +837,7 @@ def get_full_state(project_id="PRJ-GEN-WORKPLACE"):
                     "repo": p_row["repo_path"]
                 }
             ],
-            "roadmap": roadmaps,
-            "todos": todos,
             "roles": roles,
-            "nodes": nodes,
-            "runtimes": runtimes,
-            "kanban": kanban,
-            "ssot": ssot,
-            "roleMemory": role_memory,
-            "catalog": catalog,
-            "refs": refs,
-            "events": events,
             # Task thật (Kanban phiên, MCP create_kanban_task / claim) cho màn Việc & tiến độ (#24)
             "gen_session_todos": get_all_session_todos(project_id)
         }
@@ -2109,11 +1938,11 @@ def generate_role_spec_file(sid, role_name, scope="", mission="", conv_id="", al
 - **Conversation Thread**: `{use_conv}`
 - **Master SSOT**: `docs/SSOT_ORIGINAL_SPEC.md`
 - **Genesis Brain Link**: `BOOTSTRAP.md` (Genesis Brain SSOT Protocol)
-- **Execution Policy**: Autonomous Execution & Full Bypass Policy (auto-accept, không dừng bước trung gian)
+- **Execution Policy**: Giao qua Phòng giao ban chạy `agy --mode plan -p` (chỉ đọc, KHÔNG skip-permissions) trong worktree riêng của vai; chỉ vai khai trong `GW_AGY_WRITE_ROLES` mới được sửa file
 
 ---
 
-### 🛡️ Ranh Giới Thư Mục Cứng (Zero-Conflict Directory Boundary)
+### Phạm vi thư mục gợi ý (chỉ để tham khảo — app KHÔNG ép buộc)
 - **Được phép chỉnh sửa (Allowed Paths)**:
 {allowed_md}
 - **CẤM TUYỆT ĐỐI CHẠM VÀO (Blocked Paths)**:
@@ -2274,6 +2103,11 @@ def ensure_real_tmux_sessions(project_id="PRJ-GEN-WORKPLACE"):
             continue
         started.append(start_tmux_session(s["id"]))
     return started
+
+def count_active_tmux_sessions():
+    """Số phiên worker đang mở theo DB (active/paused), không gọi tmux."""
+    with get_connection() as conn:
+        return conn.execute("SELECT count(*) FROM tmux_sessions WHERE status IN ('active', 'paused')").fetchone()[0]
 
 def tmux_idle_min():
     """GW_TMUX_IDLE_MIN: số phút rảnh trước khi tự hibernate phiên (mặc định 15; <= 0 → tắt tự hibernate). Nhận số lẻ."""
@@ -5422,78 +5256,6 @@ def post_warroom_message(project_id="PRJ-GEN-WORKPLACE", channel_id="war_room", 
         "task_id": ref_task,
         "note": note,
     }
-
-def generate_structure_from_ssot(content, project_id="PRJ-GEN-WORKPLACE"):
-    """
-    Lưu đặc tả từ Input chat tổng / File Plan làm nguồn cho các vai (chỉ lưu, không phân rã):
-    - Ghi trích đoạn đặc tả vào instruction của mọi role trong agent_roles của dự án.
-    - Cập nhật master_ssot (SSOT-ACTIVE-PLAN).
-    KHÔNG sinh roadmap/todo, KHÔNG ghi tin War Room; response nói rõ generated = 0.
-    """
-    project_id = normalize_project_id(project_id)
-    content = (content or "").strip()
-    if not content:
-        return {"error": "Thiếu nội dung đặc tả", "generated": {"roadmaps": 0, "todos": 0}}
-    spec_summary = " ".join(content[:250].split())
-    now_stamp = time.strftime("%Y-%m-%d %H:%M:%S")
-    role_instruction = f"Nguồn đặc tả SSOT (cập nhật {now_stamp}): {spec_summary}"
-
-    with get_connection() as conn:
-        cursor = conn.cursor()
-
-        # 1. Ghi trích đoạn đặc tả vào instruction của các role thật trong dự án (không câu chữ mẫu)
-        cursor.execute("UPDATE agent_roles SET instruction = ? WHERE project_id = ?", (role_instruction, project_id))
-        roles_updated = cursor.rowcount
-
-        # 2. Cập nhật Master SSOT
-        now_time = time.strftime("%H:%M")
-        cursor.execute("""
-        INSERT OR REPLACE INTO master_ssot (id, project_id, title, body, source_ref, verified_time)
-        VALUES (?, ?, ?, ?, ?, ?)
-        """, (
-            "SSOT-ACTIVE-PLAN", 
-            project_id, 
-            "Bản Kế Hoạch Đang Chấp Hành (Active SSOT)", 
-            spec_summary, 
-            "Input Chat Tổng & File Plan",
-            now_time
-        ))
-        conn.commit()
-
-    return {
-        "status": "saved",
-        "generated": {"roadmaps": 0, "todos": 0},
-        "note": "Chỉ lưu đặc tả làm nguồn cho các vai; roadmap/todo chưa được sinh tự động",
-        "roles_updated": roles_updated,
-        "timestamp": now_stamp,
-        "ssot_summary": spec_summary
-    }
-
-def get_default_model_for_role(role_name):
-    rn = (role_name or "").lower()
-    if "lead" in rn or "architect" in rn:
-        return "Gemini 3.1 Pro (High)"
-    if "backend" in rn or "db" in rn:
-        return "Gemini 3.1 Pro (High)"
-    if "frontend" in rn:
-        return "Gemini 3.8 Flash (High)"
-    if "devops" in rn or "docker" in rn:
-        return "Gemini 3.8 Flash (Medium)"
-    if "qa" in rn or "test" in rn:
-        return "Gemini 3.7 Flash (High)"
-    return "Gemini 3.1 Pro (High)"
-
-def update_role_model(role_id, model_name, project_id="PRJ-GEN-WORKPLACE"):
-    project_id = normalize_project_id(project_id)
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("""
-        UPDATE agent_roles
-        SET model_name = ?
-        WHERE (id = ? OR name = ? OR role_key = ?) AND project_id = ?
-        """, (model_name, role_id, role_id, role_id, project_id))
-        conn.commit()
-        return cursor.rowcount > 0
 
 # =========================================================================
 # REAL DATA ACCESSORS & SYSTEM INTEGRATIONS (100% REAL REPO & SQLITE DATA)
