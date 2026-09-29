@@ -136,13 +136,27 @@ Tin trong War Room có `@backend|@frontend|@devops|@qa|@security|@lead` → thre
 (tác giả = `gw-<vai>-agy`, body = output cắt 4000 ký tự + `exit=<code>`) được ghi vào `chat_messages`, kèm `dispatch_log` và báo cáo `~/gw-reports/warroom-<sid>-<ts>-<dispatch_id>.md`. Tin không có `@vai` chỉ được lưu.
 
 - Tin trả lời có `reply_to` = id tin yêu cầu và `created_at` (ISO, đủ ngày giờ). `dispatch_log` có `request_msg_id` / `reply_msg_id`.
-- **Quyền agy trong `-p`** (không tương tác → tool cần quyền bị auto-denied): trước khi chạy, app thêm vào
-  `<hồ sơ>/antigravity-cli/settings.json` → `permissions.allow` các quy tắc chỉ đọc: `read_file(<worktree của vai>)` và
-  `command(ls|cat|head|tail|wc|grep|rg|pwd|tree|git status|git log|git diff|git show|git branch|git ls-files|git grep|git rev-parse)`.
-  Giữ nguyên các khóa khác; file hỏng thì không đụng; chạy lại không nhân đôi. Không cấp lệnh ghi/xóa. Nếu agy thật vẫn
-  auto-denied → bật `GW_WARROOM_SKIP_PERMISSIONS=1` (chỉ áp dụng trong worktree của vai).
-- agy thoát 0 nhưng output ngắn có `no output produced` / `auto-denied` (hoặc rỗng) → **failed** (tin trả lời ghi
-  `exit=0 (failed: agy bị từ chối quyền, không có kết quả)`).
+- **Quyền agy trong `-p`** (không tương tác → tool cần quyền bị auto-denied): trước khi chạy, app ghi vào
+  `<hồ sơ>/antigravity-cli/settings.json` (hàm `ensure_agy_plan_permissions`, Issue #26 sau lỗi dispatch:9):
+  - `permissions.allow`: `read_file(<worktree của vai>)`, `command(ls|cat|head|tail|wc|grep|rg|pwd|tree|cd|find|stat|file|git status|git log|git diff|git show|git blame|git ls-files|git grep|git rev-parse)`
+    và 2 rule regex: `sed -n 'N,Mp'` (chỉ in theo dòng) và `git branch --show-current|-a|-r|-v|--list|...` (chỉ liệt kê).
+    Rule cũ `command(git branch)` (cho cả `git branch -D`) bị gỡ.
+  - `permissions.deny` (Deny > Allow): cờ ghi / chạy lệnh con của các lệnh trên ở mọi vị trí token (0..10 token sau tên lệnh):
+    `find -delete/-exec/-execdir/-ok/-fprint…`, `sed -n … -i/-e/-f/--in-place`, `rg --pre`, `tree -o`, `file -C`,
+    `git diff|log|show --output`, `git grep -O/--open-files-in-pager`, `git branch -d/-D/-m/-c/-f/-u/--set-upstream-to…`.
+  - Cố ý KHÔNG mở: `python3 -c`, `node -e`, `bash -c`, `xargs`, `awk`, `sed` tự do, lệnh mạng, lệnh ghi/xóa.
+    Giới hạn đã biết của agy: chuyển hướng ghi file đơn giản (`cat a > b`) vẫn khớp tiền tố — prompt cấm dùng.
+  Giữ nguyên các khóa khác; file hỏng / `allow`/`deny` sai kiểu thì không đụng; chạy lại không nhân đôi. Tắt: `GW_AGY_PLAN_ALLOW=0`.
+  Lối thoát cuối (không khuyến nghị): `GW_WARROOM_SKIP_PERMISSIONS=1` (chỉ áp dụng trong worktree của vai).
+- **Prompt chế độ chỉ đọc** (`build_agy_readonly_prompt`, dùng chung cho war-room và `POST /api/task/assign`): chỉ đọc, không lệnh ghi/mạng;
+  ưu tiên công cụ đọc file có sẵn của agy; lệnh shell chỉ trong danh sách trên; bị chặn thì ghi dòng `CẦN QUYỀN: <lệnh> — <lý do>`
+  trong báo cáo thay vì dừng im lặng (dòng này được đưa lên đầu `summary` của dispatch).
+- **Ghi rõ lệnh bị chặn**: agy chạy thêm `--output-format stream-json`; app đọc tool step `run_command` (`CommandLine`, `error`) để biết
+  lệnh nào bị từ chối → `summary` / tin war-room / tin kết quả trong phiên / báo cáo có dòng ``Lệnh bị chặn: `<lệnh>` ``
+  (không trích được thì nêu lệnh shell cuối agy gọi). Báo cáo có mục `## Lệnh shell agy đã gọi`. agy cũ không nhận cờ → tự chạy lại
+  không cờ; tắt hẳn stream-json: `GW_AGY_NO_STREAM=1`.
+- agy thoát 0 nhưng output ngắn có `no output produced` / `auto-denied` (hoặc rỗng / stream-json không có câu trả lời) → **failed**
+  (tin trả lời ghi `exit=0 (failed: agy bị từ chối quyền, không có kết quả)`).
 
 ### 3.6b. Phiên tmux của vai (Issue #7)
 - `ensure_real_tmux_sessions` / `wake_tmux_session` mở phiên `gw-<vai>-agy` trong worktree riêng `<GW_WORKTREE_ROOT>/<session_id>`
@@ -166,6 +180,7 @@ python3 scripts/test_purge_seed.py         # #12: bỏ seed + migration purge_se
 python3 scripts/test_viec_ref.py           # #12: viec_ref bắt buộc + webhook + /api/dispatch/log
 python3 scripts/test_wait_worker_result.py # #9: wait_worker_result, auto-denied → failed, reply_to, N tin mới nhất, tmux thật + webhook
 python3 scripts/test_agy_permissions.py    # #7: alias không skip-permissions, worktree cho tmux, quy tắc chỉ đọc
+python3 scripts/test_agy_readonly_dispatch.py  # #26: allow/deny-rule chỉ đọc, prompt chỉ đọc, ghi lệnh bị chặn (stream-json)
 python3 scripts/test_mcp_instructions.py   # #19: initialize.instructions (HTTP + stdio), log_session_message chỉ lưu, create_conversation reuse
 python3 scripts/test_task_hub.py           # #24: task ↔ war-room ↔ worker, kết quả ghi về phiên, kiểm tham số switch_google_account
 ```

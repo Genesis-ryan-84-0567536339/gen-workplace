@@ -4396,9 +4396,55 @@ def ensure_role_worktree(session_id):
 # Quyền của agy (Issue #7 + lỗi auto-denied của war-room)
 # ---------------------------------------------------------------------------
 AGY_SKIP_PERMISSIONS_FLAG = "--dangerously-skip-permissions"
-# Lệnh chỉ đọc mà agy --mode plan được chạy không cần hỏi (permissions.allow của agy, khớp theo tiền tố lệnh)
-AGY_PLAN_READONLY_COMMANDS = ["ls", "cat", "head", "tail", "wc", "grep", "rg", "pwd", "tree",
-                              "git status", "git log", "git diff", "git show", "git branch", "git ls-files", "git grep", "git rev-parse"]
+# Lệnh chỉ đọc mà agy --mode plan được chạy không cần hỏi (permissions.allow của agy, khớp theo TIỀN TỐ TOKEN: command(grep)
+# cho cả "grep -n x f", "grep -rn x dir | head"; &&, |, ; vẫn khớp từng lệnh). Chỉ lệnh không ghi/xóa, không mạng, không chạy mã tùy ý.
+# KHÔNG có: python3 -c / node -e / bash -c / xargs / awk (chạy mã tùy ý, không giới hạn được về chỉ đọc), sed/find/git branch dạng tự do.
+AGY_PLAN_READONLY_COMMANDS = ["ls", "cat", "head", "tail", "wc", "grep", "rg", "pwd", "tree", "cd",
+                              "find", "stat", "file",
+                              "git status", "git log", "git diff", "git show", "git blame", "git ls-files", "git grep", "git rev-parse"]
+# Dạng regex (mỗi token là 1 regex neo ^(?:...)$): chỉ mở đúng dạng chỉ đọc của lệnh có thể ghi
+AGY_PLAN_READONLY_REGEX = [
+    # sed -n 'N,Mp' / '$p' / 'N,+Kp' (in theo dòng) — không mở sed tự do (sed -i, lệnh w/e trong script)
+    r"""sed -n ['"]?([0-9]+|\$)(,\+?([0-9]+|\$))?p['"]?""",
+    # git branch chỉ ở dạng liệt kê (git branch -D / -m / tên-nhánh-mới là lệnh ghi)
+    r"git branch (--show-current|-a|--all|-r|--remotes|-v|-vv|--list|-l|--contains|--merged|--no-merged)",
+]
+# Cờ ghi / chạy lệnh con của các lệnh ở trên → permissions.deny (Deny > Allow), đặt ở mọi vị trí token sau tên lệnh.
+AGY_PLAN_DENY_FLAGS = [
+    ("find", r"-(delete|exec|execdir|ok|okdir|fprint|fprint0|fprintf|fls)"),
+    ("sed -n", r"-[a-zA-Z]*[ief].*|--(in-place|expression|file).*"),
+    ("rg", r"--pre(=.*)?"),
+    ("tree", r"-[a-zA-Z]*o[a-zA-Z]*|--output.*"),
+    ("file", r"-[a-zA-Z]*C[a-zA-Z]*|--compile"),
+    ("git (diff|log|show)", r"--output(=.*)?"),
+    ("git grep", r"-[a-zA-Z]*O.*|--open-files-in-pager.*"),
+    ("git branch", r"-[a-zA-Z]*[dDmMcCfu].*|--(delete|move|copy|force|set-upstream-to|unset-upstream|edit-description|track|no-track|create-reflog|recurse-submodules).*"),
+]
+AGY_PLAN_DENY_MAX_POS = 10
+# Quy tắc cũ app từng ghi nhưng quá rộng → gỡ khỏi permissions.allow (command(git branch) cho cả git branch -D)
+AGY_PLAN_RETIRED_RULES = ["command(git branch)"]
+
+
+def agy_plan_allow_rules():
+    """Các rule command(...) chỉ đọc app ghi vào permissions.allow (không gồm read_file)."""
+    return [f"command({c})" for c in AGY_PLAN_READONLY_COMMANDS] + [f"command(regex:{r})" for r in AGY_PLAN_READONLY_REGEX]
+
+
+def agy_plan_deny_rules():
+    """Rule deny cho cờ ghi/chạy lệnh con: command(regex:<lệnh> [.* ...] <cờ>) với 0..AGY_PLAN_DENY_MAX_POS token ở giữa."""
+    rules = []
+    for cmd, flag in AGY_PLAN_DENY_FLAGS:
+        for k in range(AGY_PLAN_DENY_MAX_POS + 1):
+            rules.append(f"command(regex:{' '.join([cmd] + ['.*'] * k + ['(' + flag + ')'])})")
+    return rules
+
+
+def agy_plan_allowed_summary():
+    """Danh sách lệnh được phép dạng dễ đọc (cho prompt agy)."""
+    return ", ".join(AGY_PLAN_READONLY_COMMANDS[:13] + ["sed -n 'N,Mp'", "git branch --show-current|-a|-r|-v"]
+                     + AGY_PLAN_READONLY_COMMANDS[13:])
+
+
 _AGY_SETTINGS_LOCK = threading.Lock()
 
 def _env_on(name, default=""):
@@ -4429,8 +4475,10 @@ def ensure_agy_plan_permissions(p_dir, cwd, extra_dirs=()):
     """
     Thêm quy tắc chỉ đọc vào permissions.allow của hồ sơ agy (<p_dir>/antigravity-cli/settings.json) để agy -p
     đọc được file và chạy lệnh chỉ đọc trong thư mục làm việc (worktree của vai / thư mục chat Gen) thay vì bị auto-denied:
-      read_file(<cwd>) [+ read_file(<extra_dirs>...)] + command(ls|cat|grep|git status|git log|git diff|...).
-    Giữ nguyên mọi khóa khác; file hỏng / permissions sai kiểu → không đụng. Tắt bằng GW_AGY_PLAN_ALLOW=0. Trả danh sách quy tắc vừa thêm.
+      allow: read_file(<cwd>) [+ read_file(<extra_dirs>...)] + agy_plan_allow_rules() (ls|cat|grep|find|sed -n 'N,Mp'|git log|...)
+      deny:  agy_plan_deny_rules() — cờ ghi / chạy lệnh con của các lệnh trên (find -delete/-exec, sed -i, rg --pre, git --output...)
+    Gỡ quy tắc cũ quá rộng (AGY_PLAN_RETIRED_RULES). Giữ nguyên mọi khóa khác; file hỏng / permissions sai kiểu → không đụng.
+    Tắt bằng GW_AGY_PLAN_ALLOW=0. Trả danh sách quy tắc vừa thêm (allow + deny); không đổi gì → [].
     """
     if (os.environ.get("GW_AGY_PLAN_ALLOW", "1") or "").strip().lower() in ("0", "false", "no", "off"):
         return []
@@ -4443,7 +4491,8 @@ def ensure_agy_plan_permissions(p_dir, cwd, extra_dirs=()):
         real = os.path.realpath(str(d))
         if real not in dirs:
             dirs.append(real)
-    rules = [f"read_file({d})" for d in dirs] + [f"command({c})" for c in AGY_PLAN_READONLY_COMMANDS]
+    rules = [f"read_file({d})" for d in dirs] + agy_plan_allow_rules()
+    deny_rules = agy_plan_deny_rules()
     path = os.path.join(cli_dir, "settings.json")
     with _AGY_SETTINGS_LOCK:
         try:
@@ -4457,17 +4506,21 @@ def ensure_agy_plan_permissions(p_dir, cwd, extra_dirs=()):
             if not isinstance(perms, dict):
                 return []
             allow = perms.setdefault("allow", [])
-            if not isinstance(allow, list):
+            deny = perms.setdefault("deny", [])
+            if not isinstance(allow, list) or not isinstance(deny, list):
                 return []
             added = [r for r in rules if r not in allow]
-            if not added:
+            added_deny = [r for r in deny_rules if r not in deny]
+            retired = [r for r in AGY_PLAN_RETIRED_RULES if r in allow]
+            if not added and not added_deny and not retired:
                 return []
-            allow.extend(added)
+            allow[:] = [r for r in allow if r not in retired] + added
+            deny.extend(added_deny)
             tmp = f"{path}.gw-tmp"
             with open(tmp, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
             os.replace(tmp, path)
-            return added
+            return added + added_deny
         except Exception as e:
             print(f"[agy-perm] Không cập nhật được {path}: {e}")
             return []
@@ -4505,7 +4558,7 @@ def copy_agy_allow_rules(src_dir, dst_dir):
             allow = perms.setdefault("allow", [])
             if not isinstance(allow, list):
                 return []
-            added = [r for r in src_allow if isinstance(r, str) and r not in allow]
+            added = [r for r in src_allow if isinstance(r, str) and r not in allow and r not in AGY_PLAN_RETIRED_RULES]
             if not added:
                 return []
             allow.extend(added)
@@ -4517,6 +4570,179 @@ def copy_agy_allow_rules(src_dir, dst_dir):
         except Exception as e:
             print(f"[agy-perm] Không chép được allow-rule sang {path}: {e}")
             return []
+
+# ---------------------------------------------------------------------------
+# Prompt chỉ đọc + đọc output stream-json của agy để biết lệnh nào bị chặn (lỗi dispatch:9)
+# ---------------------------------------------------------------------------
+AGY_STREAM_ARGS = ["--output-format", "stream-json"]
+AGY_NEED_PERM_RE = re.compile(r"^\s*[-*>]*\s*\**\s*CẦN QUYỀN\s*\**\s*:\s*(.+)$", re.IGNORECASE | re.MULTILINE)
+_AGY_TOOL_DENY_RE = re.compile(r"permission|denied|not allowed|requires? approval|cannot prompt|auto-den", re.IGNORECASE)
+_AGY_RULE_IN_TEXT_RE = re.compile(r"\b(command|read_file|write_file|read_url|execute_url|mcp)\(([^()\n]{1,300})\)")
+_AGY_FLAG_UNSUPPORTED_RE = re.compile(r"(unknown|unrecognized|invalid|undefined)\s+(flag|option|argument)[^\n]*output-format|"
+                                      r"output-format[^\n]*(unknown|not defined|not supported|unrecognized)", re.IGNORECASE)
+_AGY_CMD_PARAM_KEYS = ("CommandLine", "commandLine", "command_line", "Command", "command", "cmd")
+
+
+def build_agy_readonly_prompt(message, task_block, session_id):
+    """
+    Prompt agy --mode plan cho war-room và POST /api/task/assign (lỗi dispatch:9): nói rõ CHỈ ĐỌC, ưu tiên công cụ đọc file
+    của agy, chỉ dùng lệnh shell trong danh sách allow-rule, không lệnh ghi; bị chặn thì ghi "CẦN QUYỀN: ..." thay vì dừng im lặng.
+    """
+    rules = (
+        "[CHẾ ĐỘ CHỈ ĐỌC — agy --mode plan, không ai duyệt quyền giữa chừng]\n"
+        "- Việc này CHỈ ĐỌC: không tạo/sửa/xóa file, không chạy lệnh ghi (không >, >>, tee, sed -i, rm, mv, cp, mkdir, "
+        "git commit/push/checkout/reset...), không lệnh mạng (curl, wget, pip, npm...).\n"
+        "- Ưu tiên công cụ đọc có sẵn của agy (đọc file, liệt kê thư mục, tìm file theo tên, tìm chuỗi trong code): "
+        "chạy được ngay, không cần xin quyền.\n"
+        f"- Nếu cần lệnh shell thì CHỈ dùng lệnh trong danh sách cho phép: {agy_plan_allowed_summary()}. "
+        "Viết lệnh đơn giản; không dùng $(...), dấu `...`, {a,b}; không python/node/bash -c/xargs/awk; "
+        "không find -exec/-delete, không git --output.\n"
+        "- Lệnh ngoài danh sách sẽ bị hệ thống TỪ CHỐI (không ai bấm duyệt được). Nếu cần thao tác bị chặn: KHÔNG dừng im lặng — "
+        "làm tiếp phần còn lại bằng công cụ đọc file, rồi ghi rõ một dòng \"CẦN QUYỀN: <lệnh hoặc thao tác> — <lý do>\" "
+        "trong báo cáo."
+    )
+    tail = (f"(Bạn là {session_id}, đang ở worktree của repo gen-workplace. "
+            "Hãy tự đọc file cần thiết rồi trả lời ĐẦY ĐỦ ngay trong một lượt bằng tiếng Việt; "
+            "không hỏi lại, không chỉ nêu kế hoạch.)")
+    return f"{message}\n\n" + (f"{task_block}\n\n" if task_block else "") + f"{rules}\n\n{tail}"
+
+
+def _agy_tool_command(params):
+    """Chuỗi lệnh shell trong tham số của 1 tool step (run_command: CommandLine); không phải lệnh shell → ''."""
+    if not isinstance(params, dict):
+        return ""
+    for k in _AGY_CMD_PARAM_KEYS:
+        v = params.get(k)
+        if isinstance(v, str) and v.strip():
+            return v.strip()
+    return ""
+
+
+def parse_agy_stream(stdout):
+    """
+    Đọc stdout của agy --output-format stream-json (NDJSON: init / step_update / result).
+    Trả {"is_stream", "response", "error", "status", "tools": [{"name", "command", "output", "error", "denied"}]}.
+    stdout không phải stream-json (agy cũ / script giả) → is_stream=False, response = cả stdout.
+    """
+    info = {"is_stream": False, "response": "", "error": "", "status": "", "tools": []}
+    raw = stdout or ""
+    events = []
+    other = []
+    for line in raw.splitlines():
+        t = line.strip()
+        if not t:
+            continue
+        ev = None
+        if t.startswith("{"):
+            try:
+                ev = json.loads(t)
+            except Exception:
+                ev = None
+        if isinstance(ev, dict) and ev.get("event"):
+            events.append(ev)
+        else:
+            other.append(line)
+    if not events:
+        info["response"] = raw.strip()
+        return info
+    info["is_stream"] = True
+    deltas = []
+    steps = {}
+    order = []
+    for ev in events:
+        kind = ev.get("event")
+        if kind == "step_update":
+            su = ev.get("step_update") or {}
+            if not isinstance(su, dict):
+                continue
+            if su.get("text_delta") and (su.get("step_type") in (None, "", "agent_response")):
+                deltas.append(str(su["text_delta"]))
+            ti = su.get("tool_info") if isinstance(su.get("tool_info"), dict) else None
+            if su.get("step_type") == "tool" or ti:
+                key = su.get("step_index", len(order))
+                if key not in steps:
+                    steps[key] = {"name": "", "command": "", "output": "", "error": "", "denied": False}
+                    order.append(key)
+                st = steps[key]
+                st["name"] = (ti or {}).get("name") or su.get("tool_name") or st["name"]
+                st["command"] = _agy_tool_command((ti or {}).get("parameters")) or st["command"]
+                if ti and ti.get("output"):
+                    st["output"] = str(ti["output"])
+                err = (ti or {}).get("error")
+                if err:
+                    st["error"] = (" ".join(str(err.get(k) or "") for k in ("type", "message")).strip()
+                                   if isinstance(err, dict) else str(err))
+                st["denied"] = bool(_AGY_TOOL_DENY_RE.search(st["error"])) or st["denied"]
+        elif kind == "result":
+            r = ev.get("result") or {}
+            if isinstance(r, dict):
+                info["response"] = (r.get("response") or "").strip()
+                info["error"] = str(r.get("error") or "").strip()
+                info["status"] = str(r.get("status") or "")
+    if not info["response"]:
+        info["response"] = "".join(deltas).strip()
+    if other:   # dòng không phải JSON trên stdout (hiếm) — giữ lại để không mất thông tin
+        info["response"] = (info["response"] + "\n" + "\n".join(other)).strip()
+    info["tools"] = [steps[k] for k in order]
+    return info
+
+
+def normalize_agy_stream_result(res):
+    """CompletedProcess của agy stream-json → (CompletedProcess với stdout = câu trả lời, stderr = stderr + lỗi result, info)."""
+    info = parse_agy_stream(res.stdout)
+    if not info["is_stream"]:
+        return res, info
+    stderr = (res.stderr or "")
+    if info["error"] and info["error"] not in stderr:
+        stderr = (stderr + "\n" + info["error"]).strip()
+    return subprocess.CompletedProcess(res.args, res.returncode, info["response"], stderr), info
+
+
+def agy_flag_unsupported(res):
+    """agy cũ không nhận --output-format → True (chạy lại không cờ)."""
+    return res is not None and res.returncode != 0 and bool(_AGY_FLAG_UNSUPPORTED_RE.search((res.stderr or "") + "\n" + (res.stdout or "")))
+
+
+def agy_blocked_commands(info, output=""):
+    """
+    Lệnh / thao tác agy bị chặn quyền, trích từ output: (1) tool step có lỗi quyền (stream-json), (2) rule action(target) cụ thể
+    trong thông báo của agy (bỏ mẫu "<target>"). Trả list chuỗi (không trùng), rỗng nếu không trích được.
+    """
+    found = []
+    for t in (info or {}).get("tools") or []:
+        if t.get("denied"):
+            found.append(t.get("command") or f"{t.get('name') or 'tool'}")
+    for action, target in _AGY_RULE_IN_TEXT_RE.findall(output or ""):
+        if "<" in target or ">" in target:
+            continue
+        found.append(target.strip() if action == "command" else f"{action}({target.strip()})")
+    return list(dict.fromkeys(x for x in found if x))
+
+
+def agy_shell_commands(info):
+    """Mọi lệnh shell agy đã gọi trong lần chạy (stream-json), theo thứ tự."""
+    return [t for t in (info or {}).get("tools") or [] if t.get("command")]
+
+
+def describe_agy_blocked(info, output=""):
+    """Dòng mô tả lệnh bị chặn cho dispatch_log / war-room / phiên. Không trích được lệnh cụ thể → nêu lệnh shell cuối agy gọi."""
+    blocked = agy_blocked_commands(info, output)
+    if blocked:
+        return "Lệnh bị chặn: " + " ; ".join(f"`{b[:300]}`" for b in blocked[:5]) + " → cần thêm allow-rule tương ứng (nếu là lệnh chỉ đọc)"
+    shell = agy_shell_commands(info)
+    if shell:
+        last = shell[-1]
+        return (f"Lệnh bị chặn (suy ra: lệnh shell cuối agy gọi, output không nêu tên): `{last['command'][:300]}`"
+                + (f" — lỗi: {last['error'][:200]}" if last.get("error") else ""))
+    if (info or {}).get("is_stream"):
+        return "Lệnh bị chặn: không trích được — agy không gọi lệnh shell nào trong stream, chỉ báo thiếu quyền"
+    return "Lệnh bị chặn: không trích được — output của agy không nêu lệnh"
+
+
+def agy_need_permission_lines(text):
+    """Các dòng "CẦN QUYỀN: ..." agy tự ghi trong báo cáo."""
+    return [m.strip() for m in AGY_NEED_PERM_RE.findall(text or "")][:10]
+
 
 def build_agy_aliases(session_id, p_dir, conv_id, cwd):
     """
@@ -4580,20 +4806,22 @@ def dispatch_warroom_to_agent(project_id, channel_id, session_id, message, timeo
     cwd = ensure_role_worktree(session_id)
     # --mode plan: agy chỉ đọc, không sửa file. Không dùng --sandbox vì sandbox chặn cả việc đọc repo
     # (agy chỉ trả "Để tôi khám phá..." rồi dừng). Dặn trả lời trọn trong một lượt vì -p không tương tác.
-    prompt = (f"{message}\n\n" + (f"{task_block}\n\n" if task_block else "") +
-              f"(Bạn là {session_id}, đang ở worktree của repo gen-workplace. "
-              "Hãy tự đọc file cần thiết rồi trả lời ĐẦY ĐỦ ngay trong một lượt bằng tiếng Việt; "
-              "không hỏi lại, không chỉ nêu kế hoạch.)")
+    # Prompt nói rõ CHỈ ĐỌC + công cụ/lệnh được dùng + ghi "CẦN QUYỀN" khi bị chặn (lỗi dispatch:9: agy tự chạy lệnh shell bị chặn)
+    prompt = build_agy_readonly_prompt(message, task_block, session_id)
     # agy -p không tương tác: tool cần quyền bị auto-denied. Cấp quy tắc chỉ đọc (read_file(worktree), command(ls|grep|git log|...))
     # trong settings của hồ sơ, KHÔNG bật skip-permissions cho mọi vai. Lối thoát cuối (opt-in GW_WARROOM_SKIP_PERMISSIONS=1):
     # thêm --dangerously-skip-permissions nhưng chỉ khi cwd đúng là worktree riêng của vai (vẫn --mode plan).
     in_worktree = is_role_worktree(session_id, cwd)
 
+    # --output-format stream-json: tool step có lệnh shell (run_command.CommandLine) → biết đúng lệnh nào bị chặn quyền.
+    # agy cũ không nhận cờ → chạy lại không cờ (stream_state["ok"] = False cho các lần sau). Tắt hẳn: GW_AGY_NO_STREAM=1.
+    stream_state = {"ok": not _env_on("GW_AGY_NO_STREAM")}
+
     def _build_cmd(pdir):
         c = [_agy_bin(), f"--gemini_dir={pdir}"]
         if in_worktree and _env_on("GW_WARROOM_SKIP_PERMISSIONS"):
             c.append(AGY_SKIP_PERMISSIONS_FLAG)
-        return c + ["--mode", "plan", "-p", prompt]
+        return c + ["--mode", "plan", "-p", prompt] + (AGY_STREAM_ARGS if stream_state["ok"] else [])
 
     cmd = _build_cmd(p_dir)
     started_at = time.strftime("%Y-%m-%d %H:%M:%S")
@@ -4618,8 +4846,14 @@ def dispatch_warroom_to_agent(project_id, channel_id, session_id, message, timeo
             pass
         try:
             res = subprocess.run(c, capture_output=True, text=True, timeout=timeout, cwd=cwd, env=_agy_env(pdir))
+            if stream_state["ok"] and agy_flag_unsupported(res):
+                print(f"[dispatch] agy không nhận {' '.join(AGY_STREAM_ARGS)} → chạy lại không cờ")
+                stream_state["ok"] = False
+                c = _build_cmd(pdir)
+                res = subprocess.run(c, capture_output=True, text=True, timeout=timeout, cwd=cwd, env=_agy_env(pdir))
+            res, sinfo = normalize_agy_stream_result(res)
             st, reset = record_quota_probe_from_result(pid, "default", res)
-            return st, reset, {"cmd": c, "res": res}
+            return st, reset, {"cmd": c, "res": res, "stream": sinfo}
         except subprocess.TimeoutExpired:
             msg = f"Lỗi: agy không phản hồi sau {timeout // 60} phút, đã hủy."
             record_quota_probe(pid, "default", "timeout", "", msg)
@@ -4634,20 +4868,31 @@ def dispatch_warroom_to_agent(project_id, channel_id, session_id, message, timeo
     output = ""
     fail_reason = ""
     res = payload.get("res")
+    sinfo = payload.get("stream") or {}
+    blocked_line = ""
     if res is not None:
         exit_code = res.returncode
         output = ((res.stdout or "") + ("\n" + res.stderr if res.stderr else "")).strip()
         denied = agy_output_denied(output) if exit_code == 0 else ""
+        if exit_code == 0 and not denied and sinfo.get("is_stream") and not (res.stdout or "").strip():
+            # stream-json xong mà không có câu trả lời (stderr dài lấn thông báo) → vẫn là không ra kết quả
+            m = AGY_DENIED_RE.search(output)
+            denied = m.group(0) if m else "no output produced"
+        if denied or agy_blocked_commands(sinfo):
+            # Ghi rõ lệnh bị chặn (trích từ stream-json / thông báo agy) để biết cần mở thêm allow-rule nào
+            blocked_line = describe_agy_blocked(sinfo, output)
         if fb["status"] == "rate_limited":
             reset_raw = classify_agy_result(exit_code, output)[1]
             body = f"Lỗi 429 / hết quota khi gọi agy (hồi {reset_raw or 'chưa rõ'}):\n{output[-1500:]}"
         elif denied:
-            fail_reason = f"agy bị từ chối quyền / không ra kết quả ({denied})"
+            fail_reason = f"agy bị từ chối quyền / không ra kết quả ({denied}). {blocked_line}"
             body = f"{fail_reason}:\n{output[-3000:]}"
         elif exit_code != 0:
             body = f"agy thoát lỗi:\n{output[-3000:] or '(không có output)'}"
         else:
             body = output[:4000] if output else "(agy không trả output)"
+            if blocked_line:   # agy vẫn trả lời nhưng có lệnh bị chặn giữa chừng
+                body = f"{body}\n⚠ {blocked_line}"
     elif payload.get("error_output"):
         output = body = payload["error_output"]
     else:
@@ -4672,7 +4917,14 @@ def dispatch_warroom_to_agent(project_id, channel_id, session_id, message, timeo
             f.write(f"# {session_id} · {started_at} → {finished_at}\n\n")
             f.write(f"- Kênh: {channel_id}\n- cwd: {cwd}\n- Lệnh: {' '.join(cmd)}\n- exit: {exit_code}\n"
                     f"- Hồ sơ gán: {account_type} · hồ sơ chạy: {fb['profile_used'] or '(không)'}"
-                    + (f"\n- Tài khoản: {fb['note']}" if fb["note"] else "") + f"\n\n## Tin nhắn\n\n{message}\n\n## Output\n\n{output}\n")
+                    + (f"\n- Tài khoản: {fb['note']}" if fb["note"] else "") + (f"\n- {blocked_line}" if blocked_line else "")
+                    + f"\n\n## Tin nhắn\n\n{message}\n\n")
+            shell = agy_shell_commands(sinfo)
+            if shell:
+                f.write("## Lệnh shell agy đã gọi\n\n" + "\n".join(
+                    f"- `{t['command'][:500]}`" + (" — BỊ CHẶN" if t.get("denied") else "")
+                    + (f" — lỗi: {t['error'][:300]}" if t.get("error") else "") for t in shell) + "\n\n")
+            f.write(f"## Output\n\n{output}\n")
     except Exception as e:
         print(f"[dispatch] Không ghi được báo cáo: {e}")
         report_path = ""
@@ -4684,7 +4936,10 @@ def dispatch_warroom_to_agent(project_id, channel_id, session_id, message, timeo
     viec_ref = get_task_viec_ref(task_id, project_id)
     webhook_sent = send_event_webhook("dispatch_finished", project_id=project_id, viec_ref=viec_ref, task_id=task_id,
                                       session_id=session_id, exit_code=exit_code, report_path=report_path, status=status)
-    summary = _shorten_output(f"[{fail_reason}]\n{output}" if fail_reason else output)
+    summary = _shorten_output(f"[{fail_reason}]\n{output}" if fail_reason else (f"[{blocked_line}]\n{output}" if blocked_line else output))
+    need = agy_need_permission_lines(output)
+    if need and not fail_reason:
+        summary = _shorten_output("[agy báo cần quyền] " + " | ".join(need) + "\n" + summary)
     if fb["fallback"] and not fb["all_exhausted"]:
         summary = f"[Tài khoản] {fb['note']}.\n{summary}"
 
