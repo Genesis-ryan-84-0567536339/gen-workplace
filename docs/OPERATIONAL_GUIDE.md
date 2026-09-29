@@ -167,6 +167,7 @@ python3 scripts/test_viec_ref.py           # #12: viec_ref bắt buộc + webhoo
 python3 scripts/test_wait_worker_result.py # #9: wait_worker_result, auto-denied → failed, reply_to, N tin mới nhất, tmux thật + webhook
 python3 scripts/test_agy_permissions.py    # #7: alias không skip-permissions, worktree cho tmux, quy tắc chỉ đọc
 python3 scripts/test_mcp_instructions.py   # #19: initialize.instructions (HTTP + stdio), log_session_message chỉ lưu, create_conversation reuse
+python3 scripts/test_task_hub.py           # #24: task ↔ war-room ↔ worker, kết quả ghi về phiên, kiểm tham số switch_google_account
 ```
 
 ### 3.8. Issue #12 — gỡ toàn bộ dữ liệu / phản hồi giả (hợp đồng API cho frontend)
@@ -228,4 +229,29 @@ PORT=18899 DATA_DIR=$(mktemp -d) GW_AUTO_UPDATE=0 python3 backend/main.py &   # 
 curl -s localhost:18899/mcp -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}'
 curl -s localhost:18899/mcp -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"create_conversation","arguments":{"title":"VIEC-1: Thử","reuse_existing":true}}}'
 curl -s localhost:18899/mcp -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"log_session_message","arguments":{"conv_id":"<id>","content":"Bắt đầu — Issue #1","author":"Claude Code"}}}'
+```
+
+### 3.10. Issue #24: Việc là trung tâm (Kanban ↔ Phòng giao ban ↔ Worker) + màn MCP
+
+Task thật nằm ở bảng `gen_session_todos` (MCP `create_kanban_task`, `claim_task`, Kanban phiên). Màn "Việc & tiến độ", Kanban của từng worker và thẻ task đều đọc bảng này (bảng `todos` cũ chỉ còn cho roadmap).
+
+| API / tool | Hợp đồng |
+|---|---|
+| `GET /api/tasks?project=` | `{tasks: [...], count}`: mọi task của dự án, checklist đã parse, `total_items`/`done_items`, `holder` (= `claimed_by`), `conversation_title`, `dispatch_count`, `last_dispatch: {id, session_id, status, request_msg_id, reply_msg_id, report_path, profile_initial, profile_used, fallback, fallback_reason, channel_id, task_msg_id, ...}` (lần giao gần nhất). `/api/state` có cùng danh sách ở khóa `gen_session_todos`; `GET /api/gen/session/todos` cũng kèm `last_dispatch`. |
+| `POST /api/task/assign {todo_id, session_id, author?, channel_id?}` | `session_id` nhận `qa`, `@qa` hoặc `gw-qa-agy`. Claim task cho worker (như `claim_task`), gửi war-room `@qa Thực hiện TSK-n (VIEC-m): <tiêu đề>` + checklist; prompt agy kèm khối `[THÔNG TIN VIỆC TSK-n]` (tiêu đề, `viec_ref`, mô tả, checklist có id mục). Trả `{status: "assigned", task_id, session_id, role, viec_ref, dispatch_id, request_msg_id, channel_id, claim, message}`. 400 thiếu/sai vai · 404 không có task · 409 task đã done (`already_done`) hoặc người khác đang giữ (`locked`, kèm `held_by`). |
+| `GET /api/dispatch/log?limit=&task_id=&session_id=` | Lọc đúng giá trị (bỏ trống = không lọc, 2 tham số cùng lúc = AND). `status` luôn đã chuẩn hóa (`running\|done\|failed`), thêm `fallback` (bool). `limit` sai → 50. |
+| `post_warroom_message` / `POST /api/warroom/send {..., task_id?}` | Task của lần giao việc: `task_id` truyền vào > mã `TSK-n` đầu tiên **có thật** trong nội dung tin > `current_task_id` của worker. `dispatches[]` thêm `task_id`; response thêm `task_id`. `@Gen`, `@Toàn Đội`, `@all` không giao việc (chỉ lưu, `note` nói rõ). |
+| Kết quả giao việc ghi về task | Dispatch gắn task kết thúc (war-room hoặc tmux) → 1 tin `log_gen_message` trong phiên (`conversation_id`) của task, tác giả `<worker> (agy)`: trạng thái XONG/LỖI + exit, "đã chuyển hồ sơ" nếu fallback, tóm tắt, `Báo cáo: <report_path>`, `Tin war-room: #<id>`, `Link: dispatch:<id>`, và `Bằng chứng nghiệm thu gợi ý: dispatch:<id>` khi done. Ghi đúng 1 lần (`dispatch_log.task_msg_id`), trước khi `wait_worker_result` trả về. Worker ghi `[KANBAN_UPDATE: TSK-n \| CHECK: <id mục>]` trong output → mục checklist đó được tick (chỉ task của lần giao đó). |
+| `complete_task` | Thêm ngoại lệ: bằng chứng là `dispatch:<id>` **đã done của chính người đang giữ task, cho đúng task đó** → người khác (vd Boss trên UI, `owner-ui`) đóng được mà không cần force; trả `closed_for_holder`, ghi `task_evidence_audit` action `holder_dispatch`. |
+| MCP `switch_google_account` / `POST /api/tmux/account` | Kiểm tham số: thiếu `session_id`/`account_id`, worker không có, hồ sơ không có → lỗi (`isError` / HTTP 400), không ghi gì. `account_type` NULL cũ trong DB được `init_db` sửa thành `owner_default`; `fetch_live_google_quota(None)` coi là `owner_default`. |
+| `GET /api/quota/live` / MCP `get_live_quota` | Cả nhánh Cloud Code (`source: cloudcode_api_live`) cũng có `gemini.exhausted`, `reset_at`, `reset_at_label` lấy từ `profile_quota_state`. |
+| MCP `create_kanban_task` | Nhận `assigned_to` (bí danh của `assigned_agent`). |
+| MCP `tools/list` | Mỗi tool có `annotations.readOnlyHint`; `GET /api/mcp/tools` thêm `read_only_tools`. Link MCP (`auth.endpoint`, `curl_snippet` token mới) lấy từ Host header (`X-Forwarded-Host/Proto` nếu có), rồi `GW_PUBLIC_ORIGIN`, cuối cùng `http://localhost:$PORT`. |
+
+**Biến môi trường mới:** `GW_TMUX_INIT_DIR` (thư mục script khởi tạo tmux của vai, mặc định `$DATA_DIR/tmux-init`; trước đây ghi chung `/tmp/tmux_init_*.sh` nên các tiến trình ghi đè nhau), `GW_PUBLIC_ORIGIN` (gốc URL in trong link MCP khi request không có Host).
+
+**UI:** thẻ task (màn Việc & tiến độ, Kanban phiên, Kanban của worker) có người giữ, lần giao gần nhất (đang chạy / xong / lỗi / đã chuyển hồ sơ), chip VIEC, checklist x/y và các nút "Giao cho @vai", "Tin #n", "Terminal", "Phiên", "Nghiệm thu" (hộp bằng chứng gợi ý `dispatch:<id>` của lần giao đã xong). War-room: `TSK-n`/`VIEC-n` là chip mở thẻ task, tin trả lời nối với tin hỏi (`reply_to`), trạng thái dispatch dưới tin, `dispatches[]` hiện ngay sau khi gửi. Worker & Terminal: task đang làm (chip TSK/VIEC, checklist x/y), quota thật hoặc lý do chưa có số, cờ hết quota, hồ sơ đang dùng, 5 lần giao gần nhất, nút Claim chọn task từ danh sách. Màn MCP: modal dùng class `show`; Test chỉ gọi ngay tool chỉ đọc, tool có tác dụng phụ phải nhập tham số + xác nhận; token bị che (`••••`) với nút Hiện/Copy.
+
+```bash
+python3 scripts/test_task_hub.py   # #24: /api/task/assign, lọc dispatch log, TSK trong tin, ghi kết quả về phiên, switch_google_account, quota None
 ```
