@@ -178,7 +178,8 @@ Boss chốt 29/09 (VIEC-12): agy được code thật, nhưng chỉ trong worktr
   — đếm theo lần build nên 2 lần build song song trên cùng hồ sơ không gỡ của nhau; rule người dùng có sẵn giữ nguyên;
   không chép sang hồ sơ khác khi fallback quota; chế độ Rà soát tự gỡ rule Làm còn sót nếu app khởi động lại giữa chừng):
   - allow: `read_file(<worktree>)`, `write_file(<worktree>)`, mọi lệnh chỉ đọc của 3.6, `python3 -m py_compile`,
-    `python3 scripts/test_<tên>.py` (regex), `git add`, `git commit`, `echo` (git status/diff/log đã có). Prompt dặn chạy từng lệnh riêng:
+    `python3 scripts/test_<tên>.py` và `python3 <worktree tuyệt đối>/scripts/test_<tên>.py` (regex, chỉ đúng worktree của task — dispatch:15, #49),
+    `git add`, `git commit`, `echo` (git status/diff/log đã có). Prompt dặn chạy từng lệnh riêng:
     một lệnh bị từ chối là agy `-p` dừng luôn (dispatch:13 dừng trước khi commit vì `&& echo`, #47).
   - deny: cờ ghi của 3.6 + `git push|remote|fetch|pull|clone|ls-remote|submodule|worktree|update-ref|symbolic-ref|config|switch|clean|reflog|gc`,
     `git -C|-c|--git-dir|--work-tree` (mọi vị trí), `git checkout main|master|origin/*|-b|-B|--detach|-f`, `git reset --hard|--merge|--keep`,
@@ -187,7 +188,7 @@ Boss chốt 29/09 (VIEC-12): agy được code thật, nhưng chỉ trong worktr
     `write_file(...)` cho repo app, hồ sơ agy, `~/.ssh`, `~/.config`, `~/.gitconfig`, `~/.git-credentials`, `~/gw-reports`, `DATA_DIR`, `/etc`, `/usr`...
   - Lớp chặn thứ hai (chỉ cho tiến trình agy, qua `GIT_CONFIG_*`): `core.hooksPath` → hook `pre-commit` chỉ cho commit trên `wt/TSK-n`
     trong đúng worktree, `pre-push` / `pre-rebase` chặn; `remote.origin.pushurl` hỏng. Hook nằm ở `DATA_DIR/agy-build-hooks/TSK-n`.
-- **Prompt**: SOP `roles/build.md` (hiểu yêu cầu → sửa code → chạy test liên quan → commit message rõ ràng → báo cáo ngắn: đã đổi gì,
+- **Prompt**: giao lại khi worktree còn thay đổi chưa commit → prompt liệt kê file và nói rõ đó là việc dang dở của chính agy (#49). SOP `roles/build.md` (hiểu yêu cầu → sửa code → chạy test liên quan → commit message rõ ràng → báo cáo ngắn: đã đổi gì,
   test nào pass, rủi ro) + khối `[THÔNG TIN VIỆC TSK-n]` (tiêu đề, `viec_ref`, mô tả, checklist) + luật quyền (worktree, lệnh được / cấm, bắt buộc commit, không push).
 - **Sau khi agy xong, app làm tiếp**: (1) kiểm commit mới trên `wt/TSK-n`; main local / HEAD repo app đổi sang commit không có trên
   `origin/main` hoặc worktree rời nhánh → **VI PHẠM**, failed, không push; (2) `py_compile` mọi file `.py` + chạy từng `scripts/test_*.py`

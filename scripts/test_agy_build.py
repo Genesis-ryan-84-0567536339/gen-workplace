@@ -265,7 +265,10 @@ OK_CMDS = ["python3 -m py_compile backend/app.py backend/feature.py", "python3 s
            "git branch --show-current", "find scripts -name 'test_*.py'",
            # dispatch:13 (#47): agy nối echo sau lệnh kiểm; cd tới đường dẫn tuyệt đối của worktree
            'python3 -m py_compile backend/db.py && echo "py_compile OK"', "echo xong",
-           f"cd {os.path.realpath(WT_X)} && git status", "cd .. && ls"]
+           f"cd {os.path.realpath(WT_X)} && git status", "cd .. && ls",
+           # dispatch:15 (#49): agy gọi test bằng đường dẫn tuyệt đối của worktree
+           f"python3 {os.path.realpath(WT_X)}/scripts/test_no_fake_reply.py",
+           f"python3 -m py_compile {os.path.realpath(WT_X)}/backend/db.py"]
 for c in OK_CMDS:
     check(f"cho phép: {c}", agy_allows(c, ALLOW, DENY))
 BAD_CMDS = ["git push", "git push origin wt/TSK-1", "git push --force origin HEAD:main", "git remote add x http://x",
@@ -279,6 +282,8 @@ BAD_CMDS = ["git push", "git push origin wt/TSK-1", "git push --force origin HEA
             "curl http://x", "wget http://x", "ssh host", "scp a b:", "rsync -a . host:", "nc -l 80", "gh pr create",
             "sudo ls", "su root", "pip install x", "pip3 install x", "python3 -m pip install x", "npm i x", "npx x",
             "apt-get install x", "apt install x", "python3 -c 'print(1)'", "bash -c ls", "echo x && git push",
+            f"python3 {REPO}/scripts/test_ok.py", f"python3 {os.path.realpath(WT_X)}/scripts/../evil.py",
+            f"python3 {os.path.realpath(WT_X)}/evil.py",
             "python3 scripts/../evil.py", "python3 evil.py", "git status && git push",
             "ls | xargs rm", "find . -delete"]
 for c in BAD_CMDS:
@@ -310,6 +315,7 @@ check("hết lần build → gỡ sạch rule chế độ Làm", removed and f"w
       and "command(git commit)" not in data["permissions"]["allow"] and "command(git push)" not in data["permissions"]["deny"], str(data)[:300])
 check("giữ rule người dùng (theme, read_url, deny sudo)", data.get("theme") == "terminal" and "read_url(github.com)" in data["permissions"]["allow"]
       and "command(sudo)" in data["permissions"]["deny"])
+check("is_agy_build_rule nhận rule test đường dẫn tuyệt đối", all(db.is_agy_build_rule(r) for r in db.agy_build_test_path_rules(WT_X)))
 src, dst = os.path.join(TMP, "src-prof"), os.path.join(TMP, "dst-prof")
 for d in (src, dst):
     os.makedirs(os.path.join(d, "antigravity-cli"))
@@ -528,6 +534,12 @@ r3 = db.assign_task_to_role(T8, "backend", wait=True)
 row = drow(r3["dispatch_id"])
 check("giao lại → dùng lại worktree, commit mới nối tiếp", row["status"] == "done" and "dùng lại worktree" in row["summary"]
       and git_out("rev-parse", f"{row['build_commit']}~1") == first, row["summary"][:300])
+with open(os.path.join(os.environ["GW_WORKTREE_ROOT"], T8, "backend", "dang_do.py"), "w") as f:
+    f.write("Z = 3\n")
+reset_logs()
+row = drow(db.assign_task_to_role(T8, "backend", wait=True)["dispatch_id"])
+check("giao lại khi worktree còn thay đổi chưa commit → prompt nói đó là việc dang dở của agy",
+      "CHƯA COMMIT do chính bạn" in open(PROMPT_LOG).read() and "backend/dang_do.py" in open(PROMPT_LOG).read())
 WT8 = os.path.join(os.environ["GW_WORKTREE_ROOT"], T8)
 res = db.delete_gen_session_todo(CONV, T8)
 check("xóa task → gỡ worktree, giữ nhánh remote", not os.path.exists(WT8) and res.get("worktree_removed") == WT8
