@@ -568,6 +568,19 @@ def init_db():
         );
         """)
         cursor.execute("INSERT OR IGNORE INTO mcp_auth_settings (key, value) VALUES ('require_auth', '0')")
+        # Nhật ký bật / tắt bắt buộc token MCP (#41): ghi cả lần bị từ chối (thiếu token, token không đủ quyền)
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS mcp_auth_audit (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            action TEXT NOT NULL,
+            allowed INTEGER NOT NULL,
+            token_id TEXT DEFAULT '',
+            token_name TEXT DEFAULT '',
+            client_ip TEXT DEFAULT '',
+            reason TEXT DEFAULT ''
+        );
+        """)
 
         # Seed master sovereign token for Ryan if no tokens exist
         cursor.execute("SELECT count(*) FROM mcp_agent_tokens")
@@ -6821,6 +6834,17 @@ def public_origin(origin=None):
         return o
     return f"http://localhost:{os.environ.get('PORT', '8888')}"
 
+_TOKEN_PREFIX_RE = re.compile(r"^[A-Za-z0-9]{1,8}_(?:[A-Za-z0-9]{1,8}_)?")
+
+def mask_mcp_token(tok):
+    """Bản che token để liệt kê (#41): tiền tố (vd gw_live_) + •••• + 4 ký tự cuối. Token ngắn / lạ chỉ còn ••••."""
+    tok = str(tok or "")
+    if len(tok) < 16:
+        return "••••"
+    m = _TOKEN_PREFIX_RE.match(tok)
+    prefix = m.group(0) if m and len(tok) - len(m.group(0)) >= 12 else ""
+    return f"{prefix}••••{tok[-4:]}"
+
 def get_mcp_auth_status(origin=None):
     """Lấy trạng thái cấu hình xác thực MCP."""
     base = public_origin(origin)
@@ -6866,8 +6890,7 @@ def get_mcp_agent_tokens(owner_id="owner-ryan", origin=None):
         rows = cursor.fetchall()
         tokens = []
         for r in rows:
-            raw_tok = r["token"]
-            masked = f"{raw_tok[:10]}...{raw_tok[-6:]}" if len(raw_tok) > 16 else raw_tok
+            masked = mask_mcp_token(r["token"])
             try:
                 perms = json.loads(r["permissions_json"])
             except Exception:
@@ -6878,8 +6901,7 @@ def get_mcp_agent_tokens(owner_id="owner-ryan", origin=None):
             tokens.append({
                 "id": r["id"],
                 "name": r["name"],
-                "token_masked": masked,
-                "token_raw": raw_tok,
+                "token_masked": masked,  # không trả token thô (#41): token đầy đủ chỉ có trong response lúc tạo
                 "client": r["client"],
                 "role": r["role"],
                 "permissions": perms,
@@ -6933,7 +6955,8 @@ def create_mcp_agent_token(name, permissions=None, expires_days=90, client="Manu
         "id": token_id,
         "name": name.strip(),
         "token": token_val,
-        "token_masked": f"{token_val[:10]}...{token_val[-6:]}",
+        "token_masked": mask_mcp_token(token_val),
+        "shown_once": True,  # token đầy đủ chỉ trả 1 lần ở đây; danh sách chỉ có bản che
         "endpoint": endpoint,
         "auth_url": auth_url,
         "curl_snippet": curl_snippet,
@@ -6949,6 +6972,60 @@ def revoke_mcp_agent_token(token_id):
         cursor.execute("UPDATE mcp_agent_tokens SET status = 'revoked' WHERE id = ?", (token_id,))
         conn.commit()
     return {"ok": True, "status": "revoked", "id": token_id}
+
+def verify_mcp_admin_token(headers=None):
+    """Kiểm Bearer token cho thao tác quản trị (tắt bắt buộc token, #41). Chỉ nhận header Authorization: Bearer,
+    không nhận ?token= (tránh lộ token qua URL / log). Token phải đang hoạt động, chưa hết hạn, và có role admin
+    hoặc quyền đầy đủ ("all" / "*").
+    Trả (ok, agent_info | None, http_status, lỗi): 401 = thiếu / sai / hết hạn / đã thu hồi; 403 = token hợp lệ nhưng không đủ quyền."""
+    headers = headers or {}
+    auth_header = headers.get("Authorization", "") or headers.get("authorization", "")
+    token_str = auth_header[7:].strip() if auth_header.lower().startswith("bearer ") else ""
+    if not token_str:
+        return (False, None, 401, "Thiếu token: gửi header Authorization: Bearer <token> có quyền admin hoặc toàn quyền")
+    token_hash = hashlib.sha256(token_str.encode("utf-8")).hexdigest()
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+        SELECT id, name, role, permissions_json, status, expires_at FROM mcp_agent_tokens
+        WHERE token = ? OR token_hash = ?
+        """, (token_str, token_hash))
+        row = cursor.fetchone()
+        if not row or row["status"] != "active":
+            return (False, None, 401, "Token không hợp lệ hoặc đã bị thu hồi")
+        if row["expires_at"] and str(row["expires_at"]) < datetime.now().strftime("%Y-%m-%d %H:%M:%S"):
+            return (False, None, 401, "Token đã hết hạn")
+        try:
+            perms = json.loads(row["permissions_json"])
+        except Exception:
+            perms = []
+        info = {"id": row["id"], "name": row["name"], "role": row["role"], "permissions": perms}
+        if row["role"] != "admin" and "all" not in perms and "*" not in perms:
+            return (False, info, 403, f"Token '{row['name']}' không có quyền admin hoặc toàn quyền")
+        cursor.execute("UPDATE mcp_agent_tokens SET last_used_at = ?, calls_count = calls_count + 1 WHERE id = ?",
+                       (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), row["id"]))
+        conn.commit()
+    return (True, info, 200, None)
+
+def log_mcp_auth_audit(action, allowed, token_id="", token_name="", client_ip="", reason=""):
+    """Ghi 1 dòng nhật ký đổi chế độ bắt buộc token MCP (cả lần bị từ chối)."""
+    try:
+        with get_connection() as conn:
+            conn.execute("""
+            INSERT INTO mcp_auth_audit (action, allowed, token_id, token_name, client_ip, reason)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """, (str(action or ""), 1 if allowed else 0, str(token_id or ""), str(token_name or ""), str(client_ip or ""), str(reason or "")[:500]))
+            conn.commit()
+    except Exception as e:
+        print(f"[mcp_auth_audit] Không ghi được nhật ký: {e}")
+
+def get_mcp_auth_audit(limit=50):
+    """Đọc nhật ký bật / tắt bắt buộc token MCP, mới nhất trước."""
+    limit = max(1, min(int(limit or 50), 500))
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM mcp_auth_audit ORDER BY id DESC LIMIT ?", (limit,))
+        return [dict(r) for r in cursor.fetchall()]
 
 def verify_mcp_request_auth(headers=None, query=None, tool_name=None):
     """
