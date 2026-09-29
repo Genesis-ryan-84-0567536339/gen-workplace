@@ -103,7 +103,6 @@ google-chrome --headless=new --virtual-time-budget=3000 --dump-dom http://localh
 | `GW_WORKTREE_ROOT` | `<repo>/../gw-worktrees` | Nơi tạo worktree riêng `wt/<session_id>` cho từng vai khi chatroom gọi agy. |
 | `GW_DISPATCH_REPO` | thư mục repo | Repo nguồn để `git worktree add` (test dùng repo git tạm). |
 | `GW_EVENT_WEBHOOK_URL` | (rỗng = tắt) | URL nhận POST JSON sự kiện `task_completed` / `dispatch_finished` (Issue #12, xem 3.8). |
-| `GW_ORCH_MODEL` | (rỗng → model mặc định của agy) | Model dùng cho Orchestrator chat (`/api/orch/chat`). |
 | `GW_AGY_CHAT_TIMEOUT_SEC` | `180` | Timeout một lượt agy cho chat Gen / Orchestrator. |
 | `GW_AGY_WRITE_ROLES` | (rỗng = không vai nào) | Vai được bật `--dangerously-skip-permissions` cho **alias `agy-run`** trong tmux, vd `backend,gw-devops-agy`. Chỉ có hiệu lực khi phiên tmux mở trong worktree riêng của vai; alias `agy` thường không bao giờ có cờ (Issue #7). |
 | `GW_AGY_PLAN_ALLOW` | `1` | War-room tự thêm quy tắc chỉ đọc vào `permissions.allow` của hồ sơ agy (xem 3.6). `0` = không đụng settings. |

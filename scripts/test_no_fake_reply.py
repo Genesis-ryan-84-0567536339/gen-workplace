@@ -118,7 +118,7 @@ print("[6] hàm generate_gen_smart_reply và process_orch_instruction đã bị 
 check("không còn db.generate_gen_smart_reply", not hasattr(db, "generate_gen_smart_reply"))
 check("không còn db.process_orch_instruction", not hasattr(db, "process_orch_instruction"))
 
-print("[9] dispatch_swarm_workflow: worker không có task → lỗi rõ, không echo giả")
+print("[7] dispatch_swarm_workflow: worker không có task → lỗi rõ, không echo giả")
 os.environ["GW_AGY_BIN"] = AGY_OK
 if os.path.exists(SENT_LOG):
     os.remove(SENT_LOG)
@@ -127,7 +127,7 @@ check("4 worker đều có kết quả (security, frontend đã bỏ)", set(res.
 check("tất cả status=error 'không có task'", all(v["status"] == "error" and "không có task" in v["reason"] for v in res.values()), str(res)[:300])
 check("không gửi gì vào tmux", not os.path.exists(SENT_LOG))
 
-print("[10] dispatch với task thật → lệnh agy --mode plan -p qua allowlist")
+print("[8] dispatch với task thật → lệnh agy --mode plan -p qua allowlist")
 with db.get_connection() as conn:
     conn.execute("INSERT OR IGNORE INTO roadmaps (id, project_id, title, description, todos_count, status, order_idx) VALUES ('RM-T', 'PRJ-GEN-WORKPLACE', 'RM test', '', 1, 'queued', 1)")
     conn.execute("INSERT OR IGNORE INTO todos (id, roadmap_id, project_id, title, assigned_role, status) VALUES ('TODO-T1', 'RM-T', 'PRJ-GEN-WORKPLACE', \"Kiểm tra API /api/state; có 'nháy' và $(x)\", 'QA Tester', 'queued')")
@@ -153,13 +153,13 @@ with db.get_connection() as conn:
     a = conn.execute("SELECT allowed, channel FROM directive_audit ORDER BY id DESC LIMIT 1").fetchone()
 check("directive_audit ghi allowed=1", a and a["allowed"] == 1, dict(a) if a else "none")
 
-print("[11] dispatch 1 worker (session_id) và worker lạ")
+print("[9] dispatch 1 worker (session_id) và worker lạ")
 res1 = db.dispatch_swarm_workflow(session_id="gw-qa-agy")
 check("chỉ 1 kết quả, dispatched", list(res1.keys()) == ["gw-qa-agy"] and res1["gw-qa-agy"]["status"] == "dispatched", str(res1)[:200])
 res2 = db.dispatch_swarm_workflow(session_id="gw-khong-co")
 check("worker lạ → error", res2["gw-khong-co"]["status"] == "error", str(res2))
 
-print("[12] attach_cmd = tmux attach -t <sid>")
+print("[10] attach_cmd = tmux attach -t <sid>")
 sess = db.get_tmux_sessions()
 check("attach_cmd đúng, không docker", all(s["attach_cmd"] == f"tmux attach -t {s['id']}" for s in sess) and sess, str([s["attach_cmd"] for s in sess][:2]))
 
