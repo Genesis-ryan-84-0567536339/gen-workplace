@@ -3,7 +3,6 @@
 Test Issue #12 (không bịa câu trả lời). Chạy không cần server/agy/tmux:
 GW_AGY_BIN trỏ script giả (OK JSON / 429 / thoát lỗi / không tồn tại) để kiểm:
 - send_gen_chat: agy lỗi → tin 'Gen (lỗi)' với lý do thật, engine='error', error=True; không còn phản hồi tự sinh.
-- process_orch_instruction: gọi agy thật (conv-orchestrator), lưu 'Orchestrator (agy)' / 'Orchestrator (lỗi)'.
 - dispatch_swarm_workflow: lệnh agy thật qua directive_guard; worker không có task → lỗi rõ.
 - get_tmux_sessions: attach_cmd = tmux attach -t <sid>.
 """
@@ -115,28 +114,9 @@ os.environ["GW_AGY_BIN"] = AGY_EMPTY
 res = db.send_gen_chat("conv-t2", "Ryan (Owner)", "hỏi nữa", "Gemini 3.8 Flash (High)")
 check("error_code EMPTY_RESPONSE", res["error_code"] == "EMPTY_RESPONSE", res["error_code"])
 
-print("[6] hàm generate_gen_smart_reply đã bị xóa")
+print("[6] hàm generate_gen_smart_reply và process_orch_instruction đã bị xóa")
 check("không còn db.generate_gen_smart_reply", not hasattr(db, "generate_gen_smart_reply"))
-
-print("[7] process_orch_instruction → agy thật, lưu 'Orchestrator (agy)'")
-os.environ["GW_AGY_BIN"] = AGY_OK
-res = db.process_orch_instruction("truyền lệnh chạy swarm ngay")
-check("đủ key reply/action_taken/user_time/agent_time/error", all(k in res for k in ("reply", "action_taken", "user_time", "agent_time", "error")), str(sorted(res.keys())))
-check("reply thật từ agy giả, error False", "Trả lời thật từ agy giả" in res["reply"] and res["error"] is False, res["reply"][:100])
-check("không còn câu mẫu 'Đã chấp hành'", "Đã chấp hành" not in res["reply"] and "Chỉ huy tối cao" not in res["reply"])
-msgs = db.get_orch_chat_messages()
-check("tin cuối tác giả 'Orchestrator (agy)'", msgs and msgs[-1]["author"] == "Orchestrator (agy)", str(msgs[-1:]))
-check("tin người dùng lưu trước đó", len(msgs) >= 2 and msgs[-2]["author"] == "Owner (Ryan)", str(msgs[-2:-1]))
-with db.get_connection() as conn:
-    r = conn.execute("SELECT id FROM gen_conversations WHERE id='conv-orchestrator'").fetchone()
-check("gen_conversations có conv-orchestrator (giữ ngữ cảnh agy)", r is not None)
-
-print("[8] process_orch_instruction khi agy 429 → 'Orchestrator (lỗi)' + lý do")
-os.environ["GW_AGY_BIN"] = AGY_429
-res = db.process_orch_instruction("báo cáo tiến độ")
-check("error True", res["error"] is True and res["error_code"] == "RESOURCE_EXHAUSTED", str(res)[:200])
-msgs = db.get_orch_chat_messages()
-check("tin cuối tác giả 'Orchestrator (lỗi)' chứa 429", msgs[-1]["author"] == "Orchestrator (lỗi)" and "429" in msgs[-1]["body"], str(msgs[-1]))
+check("không còn db.process_orch_instruction", not hasattr(db, "process_orch_instruction"))
 
 print("[9] dispatch_swarm_workflow: worker không có task → lỗi rõ, không echo giả")
 os.environ["GW_AGY_BIN"] = AGY_OK

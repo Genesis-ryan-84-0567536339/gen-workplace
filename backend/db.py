@@ -3302,52 +3302,6 @@ def dispatch_swarm_workflow(project_id="PRJ-GEN-WORKPLACE", session_id=None):
     return results
 
 ORCH_CONV_ID = "conv-orchestrator"
-ORCH_DEFAULT_MODEL = os.environ.get("GW_ORCH_MODEL", "")
-
-def _html_escape_lines(text):
-    """Escape HTML và đổi xuống dòng thành <br> (kênh orch được frontend hiển thị bằng innerHTML)."""
-    t = (text or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-    return t.replace("\r\n", "\n").replace("\n", "<br>")
-
-def process_orch_instruction(user_message, project_id="PRJ-GEN-WORKPLACE", model=None, account="owner_default"):
-    """
-    Chỉ thị Owner → Orchestrator: lưu tin người dùng, gọi agy THẬT (conv-orchestrator, giữ ngữ cảnh agy_conv_id),
-    lưu trả lời thật với tác giả 'Orchestrator (agy)'; agy lỗi → 'Orchestrator (lỗi)' + lý do thật.
-    Không còn câu mẫu, không phân tích ý định giả.
-    """
-    project_id = normalize_project_id(project_id)
-    user_time = save_orch_chat_message("Owner (Ryan)", user_message, tag="Instruction", project_id=project_id)
-    model = model or ORCH_DEFAULT_MODEL or None
-    try:
-        with get_connection() as conn:
-            conn.execute("""
-            INSERT OR IGNORE INTO gen_conversations (id, project_id, title, model, account_profile, is_pinned, active_tab, active_file, open_tabs_json, active_evidence_id, owner_id)
-            VALUES (?, 'PRJ-GEN-WORKPLACE', 'Orchestrator (agy)', ?, ?, 0, 'files_repo', '', '[]', '', 'owner-ryan')
-            """, (ORCH_CONV_ID, model or "", account))
-            conn.commit()
-    except Exception as e:
-        print(f"[orch] Không tạo được {ORCH_CONV_ID}: {e}")
-
-    reply, _, usage = call_agy_cli_turn(ORCH_CONV_ID, user_message, model=model, account=account)
-    usage = usage if isinstance(usage, dict) else {}
-    if reply:
-        author, tag, engine, is_error = "Orchestrator (agy)", "Reply", "agy-cli", False
-        body = reply
-    else:
-        author, tag, engine, is_error = "Orchestrator (lỗi)", "Error", "error", True
-        body = f"agy không trả lời: {describe_agy_error(usage)}. Không có phản hồi tự sinh."
-    agent_time = save_orch_chat_message(author, _html_escape_lines(body), tag=tag, project_id=project_id)
-    return {
-        "reply": body,
-        "author": author,
-        "action_taken": None,
-        "engine": engine,
-        "error": is_error,
-        "error_code": usage.get("error", "") if is_error else "",
-        "usage": usage,
-        "user_time": user_time,
-        "agent_time": agent_time
-    }
 
 # ═══════════════════════════════════════════════════════════════════════════
 # SWARM ANTI-CHAOS GOVERNANCE (CƠ CHẾ BẢO ĐẢM KHÔNG RỐI LOẠN)
