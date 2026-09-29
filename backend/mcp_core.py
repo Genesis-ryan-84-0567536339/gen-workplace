@@ -1166,7 +1166,7 @@ def execute_tool(name: str, args: dict) -> dict:
                 "mcp_server": "gen-workplace v1.0.0",
                 "mcp_tools_count": len(TOOLS),
                 "active_agents": len(state.get("roles", [])),
-                "runtimes_count": len(state.get("runtimes", [])),
+                "runtimes_count": db.count_active_tmux_sessions(),
                 "active_project": state.get("project", {}).get("name", "gen-workplace")
             }
             return {"content": [{"type": "text", "text": json.dumps(status, ensure_ascii=False, indent=2)}], "isError": False}

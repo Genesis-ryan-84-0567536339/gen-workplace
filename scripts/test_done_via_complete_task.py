@@ -247,17 +247,14 @@ def js_func(name):
 
 
 check("có hộp #evidenceModal với ô nhập, force, lý do", all(x in html for x in ('id="evidenceModal"', 'id="evidenceModalInput"', 'id="evidenceModalForce"', 'id="evidenceModalReason"')))
-drop = js_func("dropKanban")
-check("dropKanban: sang done gọi updateRoadmapTodoStatus(…'done'…) trước khi di chuyển thẻ",
-      "updateRoadmapTodoStatus(item[0], 'done'" in drop and drop.index("'done'") < drop.index("splice"), drop[:400])
-upd_fn = js_func("updateRoadmapTodoStatus")
-check("updateRoadmapTodoStatus: done → requestTaskDone + tải lại từ server", "requestTaskDone(" in upd_fn and "reloadServerTodoState()" in upd_fn)
+# Kanban roadmap cũ (bảng todos, dropKanban/updateRoadmapTodoStatus) đã gỡ (VIEC-12): không còn đường client nào tự set done
+check("Kanban roadmap cũ đã gỡ (không còn dropKanban / updateRoadmapTodoStatus)", not js_func("dropKanban") and not js_func("updateRoadmapTodoStatus"))
 mv = js_func("moveSessionTodoStatus")
 check("moveSessionTodoStatus: done → requestTaskDone rồi tải lại Kanban phiên", "requestTaskDone(" in mv and "loadGenSessionTodos()" in mv)
 check("Kanban phiên có kéo thả (dragGenKanban / dropGenKanban)", "ondrop=\"dropGenKanban(event, '${col.id}')\"" in html and "dragGenKanban(event" in html)
 req = js_func("requestTaskDone")
 check("requestTaskDone: hủy → báo giữ nguyên cột cũ; bị từ chối → báo lỗi", "giữ nguyên cột cũ" in req and "Từ chối chuyển" in req)
-check("toggleTodoStatus không còn tự set status='done' trên client", "item.status = newStatus" not in js_func("toggleTodoStatus"))
+check("không còn toggleTodoStatus tự set status='done' trên client", "item.status = newStatus" not in html)
 
 server.shutdown()
 shutil.rmtree(TMP, ignore_errors=True)

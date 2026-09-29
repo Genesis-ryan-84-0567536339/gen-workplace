@@ -7,7 +7,7 @@ mở ThreadedHTTPServer trên cổng loopback ngẫu nhiên, tmux giả trên PA
 - POST /api/gen/session/todos/save: conv_id không tồn tại → 400 JSON (không còn IntegrityError ngắt kết nối).
 - Exception chưa bắt trong do_POST/do_GET → 500 JSON {"error": "<tên lỗi>"}.
 - GET /api/roles/sop: mỗi vai có inputFrom/outputTo đọc từ ROLE.md, không có mục → "".
-- POST /api/ssot/generate: không sinh roadmap/todo, không INSERT tin War Room mẫu, response nói thật.
+- VIEC-12: endpoint làm dáng (ssot/orch/role model/catalog/vault) → 404, bảng DB giữ nguyên; /api/state gọn; UI không còn màn làm dáng.
 """
 import json
 import os
@@ -134,15 +134,15 @@ def _boom(*a, **kw):
     raise RuntimeError("nổ thử")
 
 
-_orig_create_project, _orig_vault = db.create_new_project, db.get_vault_list
-db.create_new_project, db.get_vault_list = _boom, _boom
+_orig_create_project, _orig_gitlog = db.create_new_project, db.get_git_log
+db.create_new_project, db.get_git_log = _boom, _boom
 st, js, raw = call("POST", "/api/project/create", {"name": "x"})
 check("POST → 500 {'error': 'RuntimeError'}", st == 500 and js and js.get("error") == "RuntimeError", f"{st} {raw!r}")
-st, js, raw = call("GET", "/api/vault/list")
+st, js, raw = call("GET", "/api/git/log")
 check("GET → 500 {'error': 'RuntimeError'}", st == 500 and js and js.get("error") == "RuntimeError", f"{st} {raw!r}")
-db.create_new_project, db.get_vault_list = _orig_create_project, _orig_vault
-st, js, _ = call("GET", "/api/vault/list")
-check("sau lỗi server vẫn phục vụ bình thường", st == 200 and js and "vault" in js, f"{st} {js}")
+db.create_new_project, db.get_git_log = _orig_create_project, _orig_gitlog
+st, js, _ = call("GET", "/api/git/log")
+check("sau lỗi server vẫn phục vụ bình thường", st == 200 and js and "commits" in js, f"{st} {js}")
 
 print("[5] GET /api/roles/sop: inputFrom/outputTo đọc từ ROLE.md, không có mục → ''")
 ROLES_DIR = os.path.join(TMP, "roles")
@@ -166,33 +166,44 @@ check("không có mục → chuỗi rỗng, không bịa", c.get("inputFrom") ==
 check("các key cũ vẫn còn", all(k in a for k in ("id", "title", "mission", "scope", "allowed", "blocked", "checklist")), str(list(a)))
 os.environ.pop("GW_ROLES_DIR", None)
 
-print("[6] POST /api/ssot/generate: chỉ lưu đặc tả, không sinh roadmap/todo, không tin War Room mẫu")
+print("[6] VIEC-12: endpoint làm dáng đã gỡ → 404; bảng DB giữ nguyên; /api/swarm/dispatch bắt buộc session_id")
 
 
 def _counts():
     with db.get_connection() as conn:
-        return (conn.execute("SELECT count(*) FROM roadmaps").fetchone()[0],
-                conn.execute("SELECT count(*) FROM todos").fetchone()[0],
-                conn.execute("SELECT count(*) FROM chat_messages WHERE runtime_id = 'war_room'").fetchone()[0])
+        return tuple(conn.execute(f"SELECT count(*) FROM {t}").fetchone()[0]
+                     for t in ("roadmaps", "todos", "master_ssot", "catalog_references", "agent_roles", "chat_messages"))
 
 
 before = _counts()
-st, js, _ = call("POST", "/api/ssot/generate", {"content": "Đặc tả thật:\nxây API kanban\n" + "chi tiết " * 60, "project_id": "PRJ-GEN-WORKPLACE"})
-after = _counts()
-check("200 status=saved", st == 200 and js and js.get("status") == "saved", f"{st} {js and js.get('status')}")
-check("generated = {roadmaps: 0, todos: 0}", js and js.get("generated") == {"roadmaps": 0, "todos": 0}, str(js and js.get("generated")))
-check("note nói thật", js and js.get("note") == "Chỉ lưu đặc tả làm nguồn cho các vai; roadmap/todo chưa được sinh tự động", str(js and js.get("note")))
-check("có key state cho frontend", js and isinstance(js.get("state"), dict), str(type(js and js.get("state"))))
-check("roadmaps/todos/war_room không đổi", before == after, f"{before} → {after}")
+for method, path, body in [("POST", "/api/ssot/generate", {"content": "Đặc tả thật " * 50}), ("POST", "/api/ssot/save", {"content": "x"}),
+                           ("GET", "/api/ssot/spec", None), ("POST", "/api/role/model", {"role_id": "ROLE-01", "model": "x"}),
+                           ("GET", "/api/orch/messages", None), ("POST", "/api/orch/chat", {"message": "hi"}),
+                           ("POST", "/api/orch/spawn", {"role_name": "X"}), ("GET", "/api/catalog?q=a", None),
+                           ("GET", "/api/vault/list", None), ("POST", "/api/events/verify", {"event_id": "EVT-1"})]:
+    st, js, _ = call(method, path, body)
+    check(f"{method} {path.split('?')[0]} → 404", st == 404, f"{st} {js}")
+check("không bảng nào bị ghi / xóa", _counts() == before, f"{before} → {_counts()}")
 with db.get_connection() as conn:
-    insts = [r[0] for r in conn.execute("SELECT instruction FROM agent_roles WHERE project_id = 'PRJ-GEN-WORKPLACE'").fetchall()]
-    ssot = conn.execute("SELECT body FROM master_ssot WHERE id = 'SSOT-ACTIVE-PLAN'").fetchone()
-check("roles_updated = số role thật", js and js.get("roles_updated") == len(insts), f"{js and js.get('roles_updated')} vs {len(insts)}")
-check("instruction chỉ chứa trích đặc tả thật", insts and all("Đặc tả thật: xây API kanban" in i and "Chỉ huy kiến trúc toàn cục" not in i for i in insts), str(insts[:1]))
-check("master_ssot lưu trích đoạn thật", ssot and ssot["body"].startswith("Đặc tả thật: xây API kanban"), str(ssot and ssot["body"][:60]))
-check("summary không còn câu 'Đặc tả SSOT gốc từ Ryan'", js and js.get("ssot_summary", "").startswith("Đặc tả thật"), str(js and js.get("ssot_summary")))
-st, js, _ = call("POST", "/api/ssot/generate", {"content": "  "})
-check("content rỗng → 400, không ghi mặc định bịa", st == 400 and js and "error" in js and _counts() == after, f"{st} {js}")
+    tbls = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+check("bảng cũ vẫn còn (chỉ ngừng đọc)", {"roadmaps", "todos", "workflow_nodes", "master_ssot", "role_memories", "catalog_references", "ssot_events", "agent_runtimes"} <= tbls, str(sorted(tbls)))
+st, js, _ = call("POST", "/api/swarm/dispatch", {"project_id": "PRJ-GEN-WORKPLACE"})
+check("POST /api/swarm/dispatch không session_id → 400 (bỏ bản chạy toàn bộ Swarm)", st == 400 and "session_id" in (js or {}).get("error", ""), f"{st} {js}")
+st, js, _ = call("GET", "/api/state")
+check("/api/state chỉ còn project/projects/roles/gen_session_todos", st == 200 and sorted(js.keys()) == ["gen_session_todos", "project", "projects", "roles"], str(sorted((js or {}).keys())))
+check("/api/state.roles không còn model (cấu hình model cho vai đã gỡ)", all("model" not in r for r in js.get("roles", [])), str(js.get("roles", [])[:1]))
+st, js, _ = call("GET", "/api/status")
+check("/api/status không còn ssot_synced, runtimes_count là số", st == 200 and "ssot_synced" not in js and isinstance(js.get("runtimes_count"), int), str(js))
+html = open(os.path.join(ROOT, "frontend", "index.html"), encoding="utf-8").read()
+for needle, label in [('id="orchestrator"', "màn Tổng chỉ huy"), ("Tổng chỉ huy", "chữ Tổng chỉ huy"), ("Chạy Toàn Bộ Swarm", "nút Chạy toàn bộ Swarm"),
+                      ("Lưu đặc tả cho các vai", "nút Lưu đặc tả"), ('id="roadmapList"', "Roadmap"), ("Todo DAG", "Todo DAG"),
+                      ("Phase hiện tại", "Phase hiện tại"), ('id="data-catalog"', "Catalog"), ('id="data-vault"', "Vault"),
+                      ("/api/role/model", "gọi /api/role/model"), ("main · 6 vai", "chữ 6 vai trên thanh trên"), ('id="sideSsot"', "SSOT ở chân sidebar"),
+                      ('id="sideRoles"', "Vai 6 ở chân sidebar"), ("Security Boundary", "ô Security Boundary")]:
+    check(f"UI không còn {label}", needle not in html)
+for keep in ('id="gen_workplace"', 'id="warroom"', 'id="runtimes"', 'id="implementation"', 'id="dashRoleKanbanBoard"', 'id="mcp"', 'id="data"',
+             'id="data-repo"', 'id="data-db"', 'id="data-files"'):
+    check(f"UI vẫn giữ {keep}", keep in html)
 
 shutil.rmtree(TMP, ignore_errors=True)
 server.shutdown()

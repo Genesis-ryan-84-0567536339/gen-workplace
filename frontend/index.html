@@ -4298,7 +4298,7 @@ body.resizing-active, body.resizing-active * {
     <div class="projectSelect" title="Dự án đang điều phối">
       <span class="projectDot"></span>
       <strong id="topProjectName">gen-workplace</strong>
-      <span class="topmeta" id="topProjectMeta">main · 6 vai</span>
+      <span class="topmeta" id="topProjectMeta">main</span>
     </div>
 
     <div class="topRight">
@@ -4324,9 +4324,6 @@ body.resizing-active, body.resizing-active * {
         <button class="navItem navSub" onclick="go('gen_workplace'); switchGenVsTab('kanban_todo');" title="Mở bảng Kanban và checklist của phiên">
           <span class="navIcon">▦</span><span>Kanban phiên</span>
           <span class="badge subtle" id="genSidebarTodoBadge">0</span>
-        </button>
-        <button class="navItem" data-nav="orchestrator" onclick="go('orchestrator', this)">
-          <span class="navIcon">◉</span><span>Tổng chỉ huy</span>
         </button>
       </div>
 
@@ -4363,9 +4360,7 @@ body.resizing-active, body.resizing-active * {
     <!-- Sidebar Footer Telemetry -->
     <div class="sidebarFoot">
       <div class="env"><span>Repo</span><strong id="sideRepo">—</strong></div>
-      <div class="env"><span>Vai</span><strong id="sideRoles">6</strong></div>
       <div class="env"><span>Worker</span><strong id="sideRuntime">—</strong></div>
-      <div class="env"><span>SSOT</span><strong id="sideSsot">—</strong></div>
     </div>
     <!-- DRAGGABLE RESIZER CHO SIDEBAR CHÍNH -->
     <div class="sidebarResizer" id="appSidebarResizer" title="Kéo để chỉnh độ rộng Sidebar chính"></div>
@@ -4983,174 +4978,6 @@ body.resizing-active, body.resizing-active * {
         </div>
       </section>
 
-      <!-- ========================================================================= -->
-      <!-- 0. GENESIS CORE ORCHESTRATOR: TỔNG CHỈ HUY TOÀN CỤC (GLOBAL CONTROL PLANE) -->
-      <!-- ========================================================================= -->
-      <section class="screen" id="orchestrator">
-        <div class="pageHead">
-          <div>
-            <h1>Tổng chỉ huy</h1>
-            <p>Trò chuyện với Gen, xem trí nhớ SSOT, định nghĩa vai, skill và MCP tool dùng chung cho mọi dự án.</p>
-          </div>
-          <div class="actions">
-            <button class="btn" onclick="loadOrchChatMessages()">Tải lại chat</button>
-            <button class="btn primary" onclick="orchSpawnWorker()">+ Spawn Worker Mới</button>
-          </div>
-        </div>
-
-        <div class="orchDualLayout">
-          <!-- Cột Trái: Danh Mục Hệ Thống, Dự Án, OAuth & Swarm -->
-          <div class="orchListCol card">
-            <div class="cardHead">
-              <strong>Hạ Tầng Chỉ Huy</strong>
-              <span class="chip live">GLOBAL SSOT</span>
-            </div>
-            <div class="orchListScroll">
-              <div class="orchListGroupTitle">Hệ Thống SSOT (Brain)</div>
-              <div class="orchListItem active" onclick="switchOrchTab('definition')">
-                <span class="orchItemIcon"></span>
-                <div class="orchItemInfo">
-                  <strong>Genesis Brain SSOT</strong>
-                  <small>Genesis-ryan-84-0567536339/Brain</small>
-                </div>
-              </div>
-              <div class="orchListItem" onclick="switchOrchTab('memory')">
-                <span class="orchItemIcon"></span>
-                <div class="orchItemInfo">
-                  <strong>BOOTSTRAP.md & Quy Chuẩn</strong>
-                  <small>Nguồn chuẩn bất biến (Branch main)</small>
-                </div>
-              </div>
-
-              <div class="orchListGroupTitle">Dự Án Điều Phối</div>
-              <div class="orchListItem" onclick="go('implementation')">
-                <span class="orchItemIcon"></span>
-                <div class="orchItemInfo">
-                  <strong>gen-workplace (Active)</strong>
-                  <small>~/LinuxDataA/gen-workplace</small>
-                </div>
-                <span class="chip done" style="font-size:9px">ĐANG CHẠY</span>
-              </div>
-
-              <div class="orchListGroupTitle">OAuth & Quota Pool</div>
-              <div class="orchListItem" onclick="openAccountModal()">
-                <span class="orchItemIcon"></span>
-                <div class="orchItemInfo">
-                  <strong class="orchOwnerEmail">chưa đăng nhập</strong>
-                  <small id="orchOwnerQuotaSmall">—</small>
-                </div>
-              </div>
-              <div class="orchListItem" onclick="openAccountModal()">
-                <span class="orchItemIcon"></span>
-                <div class="orchItemInfo">
-                  <strong>Secondary OAuth Profiles</strong>
-                  <small>Chống cạn ngạch, điều hướng động</small>
-                </div>
-              </div>
-
-              <div class="orchListGroupTitle">Swarm Trực Thuộc</div>
-              <div class="orchListItem" onclick="switchOrchTab('swarm')">
-                <span class="orchItemIcon"></span>
-                <div class="orchItemInfo">
-                  <strong>Swarm gen-workplace</strong>
-                  <small>6 Chuyên gia AI (Tmux runtimes)</small>
-                </div>
-                <span class="chip live" style="font-size:9px">6 LIVE</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Cột Phải: Detail View & 6 Tabs -->
-          <div class="orchDetailCol">
-            <div class="commandDeck" style="height: 100%; min-height: 520px;">
-              <div class="commandDeckHead">
-                <div class="deckSelectedAgentInfo">
-                  <div class="deckAvatar" style="background: linear-gradient(135deg, var(--panel3), var(--panel2)); border-color: var(--accent);"></div>
-                  <div class="deckTitleBlock">
-                    <h3>
-                      <span>Genesis Core Orchestrator</span>
-                      <span class="expertSidBadge" style="background:#172538;color:var(--accent);border-color:#2a4365">GLOBAL CONTROLLER</span>
-                      <span class="expertStatusChip live">● Sẵn sàng</span>
-                    </h3>
-                    <p>
-                      <span>Phân vùng: <code style="color:var(--accent);font-size:10.5px">SSOT Global Control Plane</code></span>
-                      <span>·</span>
-                      <span>Tài khoản: <span style="color:var(--text)" class="orchOwnerEmail">chưa đăng nhập</span></span>
-                      <span>·</span>
-                      <span>Phạm vi: <span style="color:var(--muted)">Độc lập toàn cục (All Projects)</span></span>
-                    </p>
-                  </div>
-                </div>
-                <div class="deckHeadActions">
-                  <span class="deckQuotaPill" id="orchDeckQuotaPill">5h: 85% | Tuần: 37% · Tuần: 0%</span>
-                  <button class="btn small" onclick="orchSpawnWorker()" title="Sinh worker mới">Spawn Worker</button>
-                  <button class="btn small" onclick="loadOrchChatMessages()" title="Đồng bộ lịch sử chat">Đồng Bộ</button>
-                </div>
-              </div>
-
-              <div class="commandDeckNav">
-                <button class="deckNavTab orchTab active" data-orchtab="chat" onclick="switchOrchTab('chat', this)">Chat IDE</button>
-                <button class="deckNavTab orchTab" data-orchtab="memory" onclick="switchOrchTab('memory', this)">Trí Nhớ & SSOT</button>
-                <button class="deckNavTab orchTab" data-orchtab="definition" onclick="switchOrchTab('definition', this)">Định Nghĩa & Role</button>
-                <button class="deckNavTab orchTab" data-orchtab="skills" onclick="switchOrchTab('skills', this)">Skills Hệ Thống</button>
-                <button class="deckNavTab orchTab" data-orchtab="mcps" onclick="switchOrchTab('mcps', this)">MCPs</button>
-                <button class="deckNavTab orchTab" data-orchtab="swarm" onclick="switchOrchTab('swarm', this)">Swarm Directory</button>
-              </div>
-
-              <div class="orchPanelBody">
-                <!-- Panel: Chat IDE -->
-                <div class="orchPanel active" id="orchPanel-chat">
-                  <div class="orchChatArea" id="orchChatMessages"></div>
-                  <div class="orchInputRow">
-                    <textarea id="orchChatInput" rows="1" placeholder="Nhập chỉ thị toàn cục cho Core Orchestrator… (Shift+Enter xuống dòng, Enter gửi)"
-                      onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendOrchMessage()}"
-                      oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,140)+'px'"></textarea>
-                    <button class="orchSendBtn" onclick="sendOrchMessage()" title="Gửi (Enter)">↑</button>
-                  </div>
-                </div>
-
-                <!-- Panel: Memory -->
-                <div class="orchPanel" id="orchPanel-memory">
-                  <div class="orchViewerPanel" id="orchMemoryContent"></div>
-                </div>
-
-                <!-- Panel: Definition -->
-                <div class="orchPanel" id="orchPanel-definition">
-                  <div class="orchViewerPanel" id="orchDefinitionContent"></div>
-                </div>
-
-                <!-- Panel: Skills -->
-                <div class="orchPanel" id="orchPanel-skills">
-                  <div class="orchViewerPanel" id="orchSkillsContent"></div>
-                </div>
-
-                <!-- Panel: MCPs -->
-                <div class="orchPanel" id="orchPanel-mcps">
-                  <div class="orchViewerPanel" id="orchMcpsContent"></div>
-                </div>
-
-                <!-- Panel: Swarm -->
-                <div class="orchPanel" id="orchPanel-swarm">
-                  <div class="orchViewerPanel" style="padding:16px">
-                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-                      <div>
-                        <strong style="font-size:13px;color:var(--text)">Danh Bạ Worker Swarm — Dự Án: gen-workplace</strong>
-                        <div style="font-size:11px;color:var(--muted)">Được điều phối và giám sát bởi Core Orchestrator</div>
-                      </div>
-                      <div style="display:flex;gap:6px">
-                        <button class="btn small" onclick="triggerSwarmLifecycle('sleep_all')">Ngủ đông cả đội</button>
-                        <button class="btn small primary" onclick="triggerSwarmLifecycle('wake_all')">Đánh thức cả đội</button>
-                        <button class="btn small" onclick="go('runtimes')">Mở Màn Hình Swarm</button>
-                      </div>
-                    </div>
-                    <div id="orchSwarmMiniCards" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(260px, 1fr));gap:10px"></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section><!-- /orchestrator -->
 
       <!-- ========================================================================= -->
       <!-- PHÒNG GIAO BAN SWARM (WAR ROOM) - MỆNH LỆNH VÀ ĐIỀU PHỐI BẰNG TIẾNG VIỆT -->
@@ -5344,7 +5171,7 @@ body.resizing-active, body.resizing-active * {
           <!-- Cột Trái: 6 Pods Chuyên Gia -->
           <div class="cockpitListPane">
             <div class="cockpitPaneHeader">
-              <span class="cockpitPaneTitle">Sáu vai</span>
+              <span class="cockpitPaneTitle">Vai</span>
               <span class="badge" id="podsOnlineBadge" style="font-size:9.5px;background:var(--panel3);color:var(--muted)" title="Số phiên tmux đang chạy thật">…</span>
             </div>
             <div class="cockpitPaneScroll expertSquadGrid" id="expertSquadGrid"></div>
@@ -5386,14 +5213,6 @@ body.resizing-active, body.resizing-active * {
                   <div style="display:flex;align-items:center;gap:5px">
                     <span style="color:var(--muted);font-weight:600">Nhiệm vụ:</span>
                     <span id="deckAgentActiveTask" style="font-family:var(--mono);font-weight:700;color:var(--accent);background:rgba(56,189,248,0.12);padding:2px 8px;border-radius:4px;border:1px solid rgba(56,189,248,0.3)">…</span>
-                  </div>
-                  <div style="display:flex;align-items:center;gap:5px">
-                    <span style="color:var(--muted);font-weight:600">Quyền sửa:</span>
-                    <span id="deckAgentAllowed" style="font-family:var(--mono);color:var(--green);background:rgba(74,222,128,0.1);padding:2px 8px;border-radius:4px;border:1px solid rgba(74,222,128,0.25)" title="">*</span>
-                  </div>
-                  <div style="display:flex;align-items:center;gap:5px">
-                    <span style="color:var(--muted);font-weight:600">Cấm:</span>
-                    <span id="deckAgentBlocked" style="font-family:var(--mono);color:var(--red);background:rgba(248,113,113,0.1);padding:2px 8px;border-radius:4px;border:1px solid rgba(248,113,113,0.25)" title="">None</span>
                   </div>
                 </div>
                 <div style="display:flex;align-items:center;gap:6px">
@@ -5457,17 +5276,11 @@ body.resizing-active, body.resizing-active * {
                     </div>
                   </div>
 
-                  <!-- Card 3: Ranh giới thư mục & Link SOP -->
+                  <!-- Card 3: Link hồ sơ SOP (bỏ ô ranh giới thư mục: chỉ hiển thị, không ép — VIEC-12) -->
                   <div class="wbRibbonCard" style="background:#111620;border:1px solid #1f2a3a;border-radius:8px;padding:8px 12px;display:flex;flex-direction:column;gap:3px">
                     <div style="display:flex;align-items:center;justify-content:space-between">
-                      <span style="font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:0.5px">Ranh Giới & Nghiệm Thu</span>
+                      <span style="font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:0.5px">Hồ sơ vai</span>
                       <button class="btn small" style="font-size:9.5px;padding:1px 6px;height:18px" onclick="switchDeckTab('sop')" title="Xem chi tiết hồ sơ SOP">Xem SOP đầy đủ </button>
-                    </div>
-                    <div style="font-size:10.5px;font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
-                      <span style="color:var(--green)" id="wbAllowedBox">—</span>
-                    </div>
-                    <div style="font-size:10.5px;font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
-                      <span style="color:var(--red)" id="wbBlockedBox">—</span>
                     </div>
                   </div>
                 </div>
@@ -5500,9 +5313,6 @@ body.resizing-active, body.resizing-active * {
                       <button class="btn small" style="font-size:10px;padding:2px 8px;font-family:var(--mono)" onclick="sendWbTmuxPredefinedCmd('gw-role')" title="Đọc toàn bộ Role Spec">gw-role</button>
                       <button class="btn small" style="font-size:10px;padding:2px 8px;font-family:var(--mono);color:var(--accent);border-color:rgba(56,189,248,0.3)" onclick="sendWbTmuxRoleTask()" title="Chạy nhiệm vụ chuyên môn của role này">▶ Chạy Task này</button>
                     </div>
-                    <div>
-                      <button class="btn small primary" style="font-size:10px;padding:2px 10px;font-family:var(--mono);background:linear-gradient(135deg,var(--accent),var(--accent));border:none" onclick="triggerDispatchSwarmAll()" title="Truyền lệnh & chạy đồng loạt toàn bộ 6 Agent Swarm">Chạy Toàn Bộ Swarm</button>
-                    </div>
                   </div>
 
                   <div class="streamlinedConsoleBody" id="wbTerminalOutput" style="flex:1;min-height:360px;padding:12px 16px;font-family:ui-monospace,SFMono-Regular,'JetBrains Mono',Menlo,Consolas,monospace;font-size:12px;line-height:1.65;color:var(--text);overflow-y:auto;background:#05070a;white-space:pre-wrap;word-break:normal;overflow-wrap:break-word">
@@ -5527,7 +5337,7 @@ body.resizing-active, body.resizing-active * {
                       <span class="chip done" id="sopStatusChip" style="font-size:9.5px">● Đang hoạt động</span>
                     </div>
                     <p style="font-size:11.5px;color:var(--muted);line-height:1.5;margin:0" id="sopRoleMission">
-                      Bảo tồn đặc tả SSOT gốc, phân rã Roadmap & Todo DAG, kiểm duyệt bằng chứng và ký nghiệm thu.
+                      Điều phối, rà soát kế hoạch và kiểm bằng chứng trước khi nghiệm thu.
                     </p>
                   </div>
 
@@ -5540,13 +5350,6 @@ body.resizing-active, body.resizing-active * {
                       </div>
                     </div>
 
-                    <div class="card" style="padding:12px 14px;background:#111620;border:1px solid #1f2a3a;border-radius:10px;display:flex;flex-direction:column;gap:8px">
-                      <h4 style="margin:0;font-size:11.5px;color:var(--accent);text-transform:uppercase;letter-spacing:0.5px">Ranh Giới Thư Mục (Security Boundary)</h4>
-                      <div style="display:flex;flex-direction:column;gap:6px;font-size:11px">
-                        <div><strong style="color:var(--green)">Được phép sửa đổi:</strong> <div id="sopAllowedPaths" style="font-family:var(--mono);color:var(--green);background:rgba(74,222,128,0.08);padding:6px 10px;border-radius:6px;margin-top:3px;border:1px solid rgba(74,222,128,0.2)">* (Toàn quyền)</div></div>
-                        <div><strong style="color:var(--red)">Tuyệt đối cấm can thiệp:</strong> <div id="sopBlockedPaths" style="font-family:var(--mono);color:var(--red);background:rgba(248,113,113,0.08);padding:6px 10px;border-radius:6px;margin-top:3px;border:1px solid rgba(248,113,113,0.2)">None</div></div>
-                      </div>
-                    </div>
                   </div>
 
                   <div class="card" style="padding:12px 14px;background:#111620;border:1px solid #1f2a3a;border-radius:10px;display:flex;flex-direction:column;gap:8px">
@@ -5671,26 +5474,13 @@ body.resizing-active, body.resizing-active * {
         <div class="pageHead">
           <div>
             <h1>Việc &amp; tiến độ</h1>
-            <p>Kanban theo vai (mỗi việc gắn mã VIEC-n trong Kho Ryan), roadmap sinh từ đặc tả, và model AI cho từng vai.</p>
-          </div>
-          <div class="actions">
-            <span class="chip done" id="sourceState">Nguồn đồng bộ SSOT</span>
-            <button class="btn" onclick="saveSource()">Lưu nguồn</button>
-            <button class="btn primary" onclick="generateFromSource()">Lưu đặc tả cho các vai</button>
+            <p>Kanban task thật theo vai (mỗi task gắn mã VIEC-n trong Kho Ryan): ai đang giữ, lần giao gần nhất, checklist, giao việc và nghiệm thu ngay trên thẻ.</p>
           </div>
         </div>
 
-        <div class="genBar">
-          <div class="genPill done">01 · Input & Chỉ Thị Tổng</div>
-          <div class="genPill done">02 · File Plan: docs/SSOT_ORIGINAL_SPEC.md</div>
-          <div class="genPill done">03 · Roadmap</div>
-          <div class="genPill live">04 · Todo DAG Tasks</div>
-          <div class="genPill live">05 · Cấu Hình Model AI Cho Role</div>
-        </div>
 
-        <!-- CẤU TRÚC CHUẨN SSOT CỦA RYAN: HÀNG 01 (3 CỘT INPUT - ROADMAP - TODO) + HÀNG 02 (BẢNG ROLES & ĐỔI MODEL) -->
+        <!-- Chỉ còn Kanban task thật; roadmap, phase, lưu đặc tả, model cho vai đã gỡ (VIEC-12, #36) -->
         <div class="implMasterTierStack">
-          <!-- HÀNG 01: 1 HÀNG 3 CỘT CÂN XỨNG (INPUT/PLAN ROADMAP TODO DAG) -->
           <div class="card" id="dashKanbanCard" style="margin-bottom:0;display:flex;flex-direction:column;width:100%">
             <div class="cardHead" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding:10px 16px">
               <div style="display:flex;align-items:center;gap:10px">
@@ -5715,83 +5505,6 @@ body.resizing-active, body.resizing-active * {
             </div>
           </div>
 
-          <div class="implRow1_ThreeCols">
-            <!-- Cột 1: 01 · Input & File Plan Gốc -->
-            <div class="card implCardCol" id="impRow1">
-              <div class="cardHead">
-                <div style="display:flex;align-items:center;gap:6px">
-                  <span style="font-size:14px"></span>
-                  <strong style="font-size:12px;color:var(--text)">01 · Input & File Plan Gốc</strong>
-                </div>
-                <span class="chip done" style="font-size:9px">SSOT Nguồn</span>
-              </div>
-              <div class="cardBody" style="display:flex;flex-direction:column;gap:8px;flex:1">
-                <textarea class="sourceText" id="sourceInput" oninput="sourceChanged()" placeholder="Nhập chỉ thị tổng thể / PRD tại đây..."></textarea>
-                <div class="sourceMeta">
-                  <span class="fileTag">SSOT_ORIGINAL_SPEC.md</span>
-                  <button class="btn small" onclick="attachPlan()">Nạp SSOT spec</button>
-                  <span class="sourceLock">Khóa theo Input</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Cột 2: 02 · Lộ Trình Roadmap -->
-            <div class="card implCardCol">
-              <div class="cardHead">
-                <div style="display:flex;align-items:center;gap:6px">
-                  <span style="font-size:14px"></span>
-                  <strong style="font-size:12px;color:var(--text)">02 · Lộ Trình Roadmap</strong>
-                </div>
-                <span class="hint" id="roadmapSourceState" style="font-size:10px">—</span>
-              </div>
-              <div class="cardBody" style="overflow-y:auto;flex:1;max-height:360px">
-                <div class="roadmapList" id="roadmapList"></div>
-              </div>
-            </div>
-
-            <!-- Cột 3: 03 · Danh Sách Todo DAG Tasks -->
-            <div class="card implCardCol">
-              <div class="cardHead">
-                <div style="display:flex;align-items:center;gap:6px">
-                  <span style="font-size:14px"></span>
-                  <strong style="font-size:12px;color:var(--text)">03 · Todo DAG Tasks</strong>
-                </div>
-                <span class="hint" id="selectedRoadmapTitle" style="font-size:10px">Phase hiện tại</span>
-              </div>
-              <div class="cardBody" style="overflow-y:auto;flex:1;max-height:360px">
-                <div class="todoList" id="todoList"></div>
-              </div>
-            </div>
-          </div>
-
-          <!-- HÀNG 02: BẢNG AGENT ROLES & ĐỔI MODEL CHO ROLE (TOÀN CHIỀU RỘNG) -->
-          <div class="card implRow2_Roles">
-            <div class="cardHead">
-              <div style="display:flex;align-items:center;gap:8px">
-                <span style="font-size:16px"></span>
-                <div>
-                  <strong style="font-size:12.5px;color:var(--text)">Danh Sách Agent Roles & Cấu Hình Model AI Cho Role</strong>
-                  <div class="hint" style="font-size:10.5px">Owner trực tiếp chỉ định Model AI tối ưu cho từng vai trò chuyên môn. Instruction khóa bất biến theo SSOT.</div>
-                </div>
-              </div>
-              <button class="btn small" onclick="openRoleSource()">Sửa từ Input tổng</button>
-            </div>
-            <div class="cardBody" style="overflow-x:auto;padding:0">
-              <table class="roleTable">
-                <thead>
-                  <tr>
-                    <th>Role Chuyên Trách</th>
-                    <th>Model AI Được Chỉ Định</th>
-                    <th>Phạm Vi Nhiệm Vụ</th>
-                    <th>Instruction Khóa SSOT</th>
-                    <th>Trạng Thái</th>
-                    <th>Thao Tác</th>
-                  </tr>
-                </thead>
-                <tbody id="roleRows"></tbody>
-              </table>
-            </div>
-          </div>
         </div>
       </section>
 
@@ -5949,7 +5662,7 @@ body.resizing-active, body.resizing-active * {
         <div class="pageHead">
           <div>
             <h1>Trung tâm dữ liệu</h1>
-            <p>Kho dữ liệu chuẩn hóa: Repo Git, database, vault và file manager của chính dự án; runtime lấy nhanh qua mã tham chiếu.</p>
+            <p>Dữ liệu thật của dự án: lịch sử Git, database SQLite và cây file.</p>
           </div>
           <div class="actions">
             <button class="btn" onclick="refreshData()">Làm mới index</button>
@@ -5974,17 +5687,9 @@ body.resizing-active, body.resizing-active * {
                   <div style="font-weight:600;font-size:12px;color:var(--text)">Database Explorer</div>
                   <div style="font-size:10px;color:var(--muted)">SQLite 3 WAL Schemas & FTS5 Tables</div>
                 </button>
-                <button class="dataTab" onclick="switchData('vault', this)" style="text-align:left;padding:10px 12px;border-radius:6px;width:100%;border:1px solid transparent;background:#141921">
-                  <div style="font-weight:600;font-size:12px;color:var(--text)">Vault & Secrets</div>
-                  <div style="font-size:10px;color:var(--muted)">Biến môi trường, credentials an toàn</div>
-                </button>
                 <button class="dataTab" onclick="switchData('files', this)" style="text-align:left;padding:10px 12px;border-radius:6px;width:100%;border:1px solid transparent;background:#141921">
                   <div style="font-weight:600;font-size:12px;color:var(--text)">File Manager & Artifacts</div>
                   <div style="font-size:10px;color:var(--muted)">Mã nguồn thật, specs và cây file</div>
-                </button>
-                <button class="dataTab" onclick="switchData('catalog', this)" style="text-align:left;padding:10px 12px;border-radius:6px;width:100%;border:1px solid transparent;background:#141921">
-                  <div style="font-weight:600;font-size:12px;color:var(--text)">Catalog &amp; sự kiện</div>
-                  <div style="font-size:10px;color:var(--muted)">Mã tham chiếu và sự kiện nghiệm thu</div>
                 </button>
               </div>
             </div>
@@ -6049,38 +5754,6 @@ body.resizing-active, body.resizing-active * {
           </div>
         </div>
 
-        <!-- Tab 3: Vault -->
-        <div class="dataPane" id="data-vault">
-          <div class="card">
-            <div class="cardHead">
-              <strong>Vault & Secret References (Thật)</strong>
-              <span class="hint">mã hóa an toàn · secret value không lộ trong log</span>
-            </div>
-            <div class="cardBody">
-              <div class="vaultNotice">
-                Quy tắc an toàn: Runtime chỉ nhận <b>ID + Quyền + Mục đích</b>. Giá trị secret thực sự chỉ được nạp ở execution boundary.
-              </div>
-              <table class="dataTable" id="vaultTable">
-                <thead>
-                  <tr>
-                    <th>Mã ID</th>
-                    <th>Tên Secret / Credential</th>
-                    <th>Chủ sở hữu</th>
-                    <th>Phạm vi phân quyền</th>
-                    <th>Trạng thái</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr><td class="ref">SEC-01</td><td>PORT</td><td>Docker Env</td><td>Container Web Port = 8888</td><td><span class="chip done">sẵn sàng</span></td></tr>
-                  <tr><td class="ref">SEC-02</td><td>DATA_DIR</td><td>Docker Env</td><td>Path lưu volume = /app/data</td><td><span class="chip done">sẵn sàng</span></td></tr>
-                  <tr><td class="ref">SEC-03</td><td>DOCKER_CONTAINER</td><td>Runtime Guard</td><td>Cờ phát hiện môi trường = 1</td><td><span class="chip done">sẵn sàng</span></td></tr>
-                  <tr><td class="ref">CRD-01</td><td>GitHub Token</td><td>Owner (Ryan)</td><td>Phục vụ publish repo lên GitHub</td><td><span class="chip wait">sẵn sàng gắn</span></td></tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
         <!-- Tab 4: File Manager -->
         <div class="dataPane" id="data-files">
           <div class="split2">
@@ -6136,44 +5809,6 @@ body.resizing-active, body.resizing-active * {
             </div>
           </div>
         </div>
-        <div class="dataPane" id="data-catalog">
-          <div class="cardHead" style="padding:10px 14px"><strong>Catalog tra cứu &amp; sự kiện</strong><span class="hint">Mã tham chiếu (#EVT, #DB, #FILE…) và sự kiện đã nghiệm thu. Trống nếu chưa ghi.</span></div>
-          <div class="cardBody" style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
-            <div class="card memoryIndex" id="memCatalogCard" style="border:none;background:transparent;padding:0">
-                <div style="font-size:10.5px;font-weight:700;color:var(--text);margin-bottom:6px">Tra cứu nhanh ID (Catalog)</div>
-                <div class="indexToolbar" style="margin-bottom:8px">
-                  <input class="searchBox" placeholder="Tìm mã ID, sự kiện, vault, mcp tool, file..." oninput="filterRefs(this.value)">
-                </div>
-                <div style="max-height:220px;overflow-y:auto;border:1px solid var(--line);border-radius:6px">
-                  <table class="eventTable" style="margin:0">
-                    <thead>
-                      <tr>
-                        <th>Mã ID</th>
-                        <th>Loại</th>
-                        <th>Target</th>
-                      </tr>
-                    </thead>
-                    <tbody id="refRows"></tbody>
-                  </table>
-                </div>
-              </div>
-            <div class="card" id="memEventCard" style="border:none;background:transparent;padding:0;margin-top:10px">
-                <div style="font-size:10.5px;font-weight:700;color:var(--text);margin-bottom:6px">Sự kiện chờ thẩm định (Events)</div>
-                <div style="max-height:220px;overflow-y:auto;border:1px solid var(--line);border-radius:6px">
-                  <table class="eventTable" style="margin:0">
-                    <thead>
-                      <tr>
-                        <th>ID</th>
-                        <th>Role</th>
-                        <th>Status</th>
-                      </tr>
-                    </thead>
-                    <tbody id="eventRows"></tbody>
-                  </table>
-                </div>
-              </div>
-          </div>
-        </div>
             </div><!-- /cockpitDetailBody -->
           </div><!-- /cockpitDetailPane -->
         </div><!-- /cockpitShell -->
@@ -6183,28 +5818,6 @@ body.resizing-active, body.resizing-active * {
   </main>
 </div>
 
-<!-- MODAL XEM TOÀN VĂN SSOT ĐẶC TẢ GỐC CỦA RYAN -->
-<div class="modal" id="ssotFullModal">
-  <div class="modalBox" style="max-width:960px;width:95vw;max-height:90vh;display:flex;flex-direction:column;background:var(--panel2);border:1px solid var(--line)">
-    <div class="modalHead" style="display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);padding:12px 18px">
-      <div>
-        <strong style="font-size:14px;color:var(--text)">ĐẶC TẢ GỐC BẤT BIẾN (docs/SSOT_ORIGINAL_SPEC.md)</strong>
-        <div style="font-size:11px;color:var(--muted)">Single Source of Truth · Chủ sở hữu: Ryan · Khóa bất biến 100%</div>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px">
-        <button class="btn small" onclick="copySSOTFullText()">Copy Markdown</button>
-        <button class="iconBtn" onclick="closeSSOTModal()">×</button>
-      </div>
-    </div>
-    <div class="modalBody" style="flex:1;overflow-y:auto;padding:18px;background:#090d12">
-      <div id="ssotFullViewerContent" style="font-family:var(--font);font-size:12.5px;line-height:1.75;color:var(--text);white-space:pre-wrap">Đang tải đặc tả SSOT...</div>
-    </div>
-    <div class="modalFoot" style="display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--line);padding:10px 18px">
-      <div style="font-size:11px;color:var(--muted2)">Trạng thái: LOCKED (Bất biến) · Nguồn tham chiếu bắt buộc của 6 Agent</div>
-      <button class="btn primary" onclick="closeSSOTModal()">Đóng Trình Đọc</button>
-    </div>
-  </div>
-</div>
 
 <!-- MODAL POPUP (TẠO DỰ ÁN, EVENT, RUNTIME) -->
 <div class="modal" id="modal">
@@ -6699,7 +6312,7 @@ const state = {
   projects: [
     {
       name: 'gen-workplace',
-      meta: '6 vai',
+      meta: 'SQLite WAL',
       repo: '/workspace'
     }
   ],
@@ -6769,10 +6382,6 @@ function go(id, el) {
 
   if (id === 'gen_workplace') {
     initGenWorkplace();
-  } else if (id === 'orchestrator') {
-    loadOrchChatMessages();
-    if (!state.currentOrchTab) state.currentOrchTab = 'chat';
-    switchOrchTab(state.currentOrchTab);
   } else if (id === 'runtimes') {
     refreshTmuxSessions();
     refreshOauthProfiles();
@@ -6782,7 +6391,6 @@ function go(id, el) {
   } else if (id === 'warroom') {
     loadWarRoomMessages(true);
   } else if (id === 'implementation') {
-    renderImplementation();
     renderDashboardKanban();
     refreshHubTasks();
   } else if (id === 'data') {
@@ -6988,9 +6596,8 @@ function selectProject(i, saveCurrent = true) {
   state.project = { ...state.project, name: p.name, repo: p.repo, branch: 'main', plan: 'docs/SSOT_ORIGINAL_SPEC.md' };
   restoreWorkspace(p.workspace);
   $('topProjectName').textContent = p.name;
-  $('topProjectMeta').textContent = 'main · ' + (state.roles ? state.roles.length : 6) + ' role';
+  $('topProjectMeta').textContent = 'main';
   $('sideRepo').textContent = p.repo;
-  $('sourceInput').value = state.sourceText || '';
   renderProjectList();
   refreshAll();
   persist();
@@ -7006,299 +6613,18 @@ function renderProjectList() {
   `).join('');
 }
 
-// Implementation Handlers & Scroll Navigation
-function switchImplTab(tabKey) {
-  if (tabKey === 'roles') {
-    scrollToTarget('.implRow2_Roles');
-  } else {
-    scrollToTarget('#impRow1');
-  }
-}
 
-function sourceChanged() {
-  state.sourceText = $('sourceInput').value;
-  state.sourceSaved = false;
-  $('sourceState').textContent = 'Nguồn đã thay đổi';
-  $('sourceState').className = 'chip wait';
-  $('roadmapSourceState').textContent = 'chưa regenerate';
-}
-async function attachPlan() {
-  try {
-    const res = await fetch('/api/ssot/spec');
-    if (res.ok) {
-      const data = await res.json();
-      if (data.content) {
-        $('sourceInput').value = data.content;
-        state.sourceText = data.content;
-        state.sourceSaved = true;
-        $('sourceState').textContent = 'Đã nạp file SSOT';
-        $('sourceState').className = 'chip done';
-        showToast('Đã nạp toàn văn đặc tả SSOT nguyên bản của Ryan (' + (data.size_bytes / 1024).toFixed(1) + ' KB)');
-        persist();
-      }
-    } else {
-      showToast('Không thể tải file SSOT');
-    }
-  } catch (e) {
-    showToast('Lỗi nạp file SSOT: ' + e.message);
-  }
-}
 
-async function saveSource() {
-  const content = $('sourceInput').value;
-  state.sourceText = content;
-  state.sourceSaved = true;
-  $('sourceState').textContent = 'Đang lưu SSOT...';
-  try {
-    const res = await fetch('/api/ssot/save', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: content, project_id: 'PRJ-GEN-WORKPLACE' })
-    });
-    if (res.ok) {
-      $('sourceState').textContent = 'Đã lưu SSOT';
-      $('sourceState').className = 'chip done';
-      $('syncState').textContent = 'Đồng bộ ' + new Date().toLocaleTimeString('vi-VN', { hour12: false });
-      persist();
-      showToast('Đã lưu Input tổng vào docs/SSOT_ORIGINAL_SPEC.md & SQLite');
-    } else {
-      showToast('Lỗi lưu nguồn SSOT');
-    }
-  } catch (e) {
-    showToast('Lỗi kết nối lưu SSOT: ' + e.message);
-  }
-}
 
-async function generateFromSource() {
-  const content = $('sourceInput').value;
-  state.sourceText = content;
-  state.sourceSaved = true;
-  $('sourceState').textContent = 'AI đang phân rã...';
-  $('sourceState').className = 'chip live';
-  try {
-    const res = await fetch('/api/ssot/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: content, project_id: 'PRJ-GEN-WORKPLACE' })
-    });
-    if (res.ok) {
-      const data = await res.json();
-      if (data.state) {
-        Object.assign(state, data.state);
-      }
-      $('sourceState').textContent = 'Đã lưu đặc tả cho các vai';
-      $('sourceState').className = 'chip live';
-      // Backend chỉ lưu đặc tả (generated = 0), không sinh roadmap → nói đúng số giai đoạn đang có
-      const nRm = (state.roadmap || []).length;
-      $('roadmapSourceState').textContent = nRm ? `${nRm} giai đoạn` : `chưa có roadmap (sinh ${data.generated || 0})`;
-      refreshAll();
-      showToast(data.note || 'Đã lưu đặc tả làm nguồn cho các vai');
-    } else {
-      { const err = await res.json().catch(() => ({})); showToast('Không lưu được đặc tả: ' + (err.error || res.status)); }
-    }
-  } catch (e) {
-    showToast('Lỗi kết nối: ' + e.message);
-  }
-}
 
-function renderImplementation() {
-  if (state.sourceText && state.sourceText.length > 500) {
-    $('sourceInput').value = state.sourceText;
-    $('sourceState').textContent = 'Đã nạp file SSOT (' + (state.sourceText.length / 1024).toFixed(1) + ' KB)';
-    $('sourceState').className = 'chip done';
-  } else {
-    // Tự động kéo toàn văn đặc tả SSOT nguyên bản của Ryan từ docs/SSOT_ORIGINAL_SPEC.md
-    fetch('/api/ssot/spec').then(r => r.json()).then(d => {
-      if (d && d.content) {
-        state.sourceText = d.content;
-        $('sourceInput').value = d.content;
-        $('sourceState').textContent = 'Đã nạp file SSOT (' + (d.size_bytes / 1024).toFixed(1) + ' KB)';
-        $('sourceState').className = 'chip done';
-      }
-    }).catch(() => {
-      $('sourceInput').value = state.sourceText || '';
-    });
-  }
-  
-  // 1. Roadmap List
-  if (!state.roadmap || state.roadmap.length === 0) {
-    $('roadmapList').innerHTML = '<div class="emptyState">Chưa có roadmap. Nạp đặc tả rồi bấm "AI sinh cấu trúc", hoặc tạo việc trực tiếp trên Kanban.</div>';
-  } else
-  $('roadmapList').innerHTML = state.roadmap.map((r, i) => `
-    <div class="roadmapRow ${i === state.selectedRoadmap ? 'selected' : ''}" onclick="selectRoadmap(${i})">
-      <div class="rmNo">${i + 1}</div>
-      <div>
-        <b>${escapeHtml(r.title)}</b>
-        <small>${escapeHtml(r.desc)}</small>
-      </div>
-      <span class="count">${r.todos} todo</span>
-      <span class="chip ${r.status === 'done' ? 'done' : r.status === 'live' ? 'live' : r.status === 'wait' ? 'wait' : ''}">
-        ${r.status === 'done' ? 'done' : r.status === 'live' ? 'live' : r.status === 'wait' ? 'chờ' : 'queued'}
-      </span>
-    </div>
-  `).join('');
 
-  // 2. Todo List
-  const todos = state.todos[state.selectedRoadmap] || [];
-  $('selectedRoadmapTitle').textContent = `${state.roadmap[state.selectedRoadmap]?.id || ''} · ${state.roadmap[state.selectedRoadmap]?.title || ''}`;
-  if (todos.length === 0) $('todoList').innerHTML = '<div class="emptyState">Chưa có việc trong giai đoạn này.</div>'; else
-  $('todoList').innerHTML = todos.map(t => `
-    <div class="todoItem ${t.status === 'done' ? 'done' : ''}" onclick="toggleTodoStatus('${t.id}', '${t.status}')" style="cursor:pointer" title="Nhấp để nghiệm thu hoặc mở lại task">
-      <span class="check" style="cursor:pointer">${t.status === 'done' ? '✓' : ''}</span>
-      <div>
-        <b>${escapeHtml(t.title)}</b>
-        <small>${escapeHtml(t.role)} · ${t.id}</small>
-      </div>
-      <span class="chip ${t.status === 'done' ? 'done' : t.status === 'live' ? 'live' : t.status === 'wait' ? 'wait' : ''}">
-        ${t.status === 'done' ? 'done' : t.status === 'live' ? 'running' : t.status === 'wait' ? 'blocked' : 'queued'}
-      </span>
-    </div>
-  `).join('');
 
-  // 3. Roles Table (Owner chọn Model AI, Instruction khóa theo SSOT)
-  const AVAILABLE_MODELS = [
-    'Gemini 3.1 Pro (High)',
-    'Gemini 3.8 Flash (High)',
-    'Gemini 3.8 Flash (Medium)',
-    'Gemini 3.7 Flash (High)',
-    'Gemini 3.6 Flash (High)',
-    'Claude Sonnet 4.6 (Thinking)',
-    'Claude Opus 4.6 (Thinking)',
-    'GPT-OSS 120B (Medium)'
-  ];
 
-  $('roleRows').innerHTML = state.roles.map((r, i) => {
-    const curModel = r.model || getRoleDefaultModel(r.name);
-    return `
-    <tr>
-      <td>
-        <div class="roleName">
-          <div class="roleBadge">${r.key}</div>
-          <div>
-            <b>${escapeHtml(r.name)}</b>
-            <div class="hint">${r.id}</div>
-          </div>
-        </div>
-      </td>
-      <td>
-        <select class="select" onchange="changeRoleModel(${i}, this.value)" style="min-width:230px;background:#0d1219;color:var(--accent);font-weight:600;border:1px solid var(--line);padding:5px 8px;border-radius:5px;font-family:var(--mono);font-size:11.5px">
-          ${AVAILABLE_MODELS.map(m => `<option value="${m}" ${curModel === m ? 'selected' : ''}>${m}</option>`).join('')}
-        </select>
-      </td>
-      <td>${escapeHtml(r.scope)}</td>
-      <td class="roleInst">${escapeHtml(r.instruction)} <span class="lock">khóa theo SSOT</span></td>
-      <td>
-        <span class="chip ${r.name.includes('Backend') ? 'live' : r.name.includes('Lead') ? 'done' : r.name.includes('QA') ? 'wait' : 'done'}">
-          ${(() => { const st = (state.tmuxSessions || []).find(t => t.role_name === r.name)?.status; return st === 'active' ? 'đang chạy' : st === 'hibernated' ? 'ngủ đông' : st === 'paused' ? 'tạm dừng' : st === 'idle' ? 'rảnh' : '—'; })()}
-        </span>
-      </td>
-      <td>
-        <button class="btn small" onclick="openRoleSource('${escapeHtml(r.name)}')">Chỉnh từ Source</button>
-      </td>
-    </tr>
-  `;
-  }).join('');
 
-  if ($('workflowCanvas')) {
-    renderWorkflow();
-  }
-}
 
-function selectRoadmap(i) {
-  state.selectedRoadmap = i;
-  persist();
-  renderImplementation();
-}
 
-function openRoleSource(role = 'Role') {
-  go('implementation');
-  $('sourceInput').focus();
-  $('sourceInput').selectionStart = 0;
-  $('sourceInput').selectionEnd = $('sourceInput').value.length;
-  showToast('Sửa chỉ thị của ' + role + ' ngay trong Input tổng rồi bấm "Lưu nguồn"');
-}
 
-async function reloadServerTodoState() {
-  try {
-    const res = await fetch('/api/state');
-    if (res.ok) {
-      const data = await res.json();
-      if (data.roadmap) state.roadmap = data.roadmap;
-      if (data.todos) state.todos = data.todos;
-      if (data.kanban) state.kanban = data.kanban;
-      persist();
-      for (const fn of [renderImplementation, renderDashboardKanban, renderOverview, renderKanban]) {
-        try { fn(); } catch (e) { console.warn('[reloadServerTodoState]', fn.name, e); }
-      }
-    }
-  } catch (e) {
-    console.warn('Lỗi tải lại trạng thái todo:', e);
-  }
-}
 
-function findTodoTitle(todoId) {
-  for (const list of (state.todos || [])) {
-    const item = (list || []).find(t => t.id === todoId);
-    if (item) return item.title || '';
-  }
-  return '';
-}
-
-// Đổi trạng thái task roadmap qua /api/todo/update. Sang 'done' → hộp nhập bằng chứng (complete_task phía server).
-async function updateRoadmapTodoStatus(todoId, newStatus, title) {
-  const send = (extra) => fetch('/api/todo/update', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(Object.assign({ id: todoId, status: newStatus, project_id: 'PRJ-GEN-WORKPLACE' }, extra || {}))
-  });
-  if (newStatus === 'done') {
-    const r = await requestTaskDone(todoId, title || findTodoTitle(todoId), send);
-    await reloadServerTodoState();
-    return r.ok;
-  }
-  try {
-    const res = await send();
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok || data.error) {
-      showToast(`Không đổi được trạng thái ${todoId}: ${data.error || res.status}`, 6000);
-      await reloadServerTodoState();
-      return false;
-    }
-    showToast(`Đã đổi trạng thái ${todoId} → ${newStatus}`);
-    await reloadServerTodoState();
-    return true;
-  } catch (e) {
-    showToast(`Lỗi kết nối khi đổi trạng thái ${todoId}: ${e.message}`, 6000);
-    await reloadServerTodoState();
-    return false;
-  }
-}
-
-async function toggleTodoStatus(todoId, currentStatus) {
-  const newStatus = (currentStatus === 'done') ? 'queued' : 'done';
-  await updateRoadmapTodoStatus(todoId, newStatus);
-}
-
-async function changeRoleModel(i, v) {
-  state.roles[i].model = v;
-  persist();
-  showToast(`Đã đổi model ${state.roles[i].name} → ${v}`);
-  try {
-    await fetch('/api/role/model', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ role_id: state.roles[i].id, model: v, project_id: 'PRJ-GEN-WORKPLACE' })
-    });
-  } catch (e) {
-    console.warn('Lỗi lưu model lên server:', e);
-  }
-  renderOverview();
-  renderDashboardKanban();
-}
-
-function changeCli(i, v) {
-  changeRoleModel(i, v);
-}
 
 // Workflow Canvas & Detail (safe fallback)
 function renderWorkflow() {
@@ -7378,112 +6704,7 @@ function resetWorkflow() {
   showToast('Workflow đã reset về checkpoint TUI Installer');
 }
 
-// Dashboard Renderers
-function renderDashboardProjects() {
-  return; // màn Tổng quan đã gộp vào Việc & tiến độ
-  const list = $('dashboardProjectList');
-  list.innerHTML = state.projects.map((p, i) => {
-    const selected = p.name === state.project.name;
-    const roles = state.roles.length;
-    const runtimes = state.runtimes.length;
-    const done = state.nodes.filter(n => n.status === 'done').length;
-    const total = state.nodes.length;
-    const pr = Math.round(done / total * 100);
-    return `
-      <div class="projectCard ${selected ? 'selected' : ''}" onclick="selectProject(${i})">
-        <div class="projectCardHead">
-          <div>
-            <b>${escapeHtml(p.name)}</b>
-            <small>${escapeHtml(p.repo)}</small>
-          </div>
-          <span class="chip ${selected ? 'live' : ''}">${selected ? 'đang chọn' : 'dự án'}</span>
-        </div>
-        <div class="projectMetaRow">
-          <span class="chip">${roles} role</span>
-          <span class="chip">${runtimes} runtime</span>
-          <span class="chip">${selected ? 'theo dõi trực tiếp' : 'theo dõi'}</span>
-        </div>
-        <div class="progress"><i style="width:${pr}%"></i></div>
-        <div style="display:flex;justify-content:space-between;margin-top:4px">
-          <span class="hint">tiến độ dự án</span>
-          <span class="hint">${pr}%</span>
-        </div>
-      </div>
-    `;
-  }).join('');
 
-  $('ovProjects').textContent = state.projects.length;
-  const p = state.project;
-  $('dashboardSelectedMeta').textContent = p.repo;
-  $('dashboardSelected').innerHTML = `
-    <div class="resource">
-      <div><b>${escapeHtml(p.name)}</b><small>Branch: ${escapeHtml(p.branch || 'main')} · Clean</small></div>
-      <span class="chip live">LIVE REPO</span>
-    </div>
-    <div class="resource">
-      <div><b>Implementation</b><small>Input + Plan → Roadmap → Todo → Role → Workflow</small></div>
-      <button class="btn" onclick="go('implementation')">Mở</button>
-    </div>
-    <div class="resource">
-      <div><b>Runtimes Điều Hành</b><small>${state.runtimes.filter(r => r.status === 'running').length} đang chạy · ${state.runtimes.length} tổng</small></div>
-      <button class="btn" onclick="go('runtimes')">Xem</button>
-    </div>
-    <div class="resource">
-      <div><b>Nơi làm việc / SSOT</b><small>${state.ssot.length} dữ kiện đã xác thực</small></div>
-      <button class="btn" onclick="go('data'); switchData('catalog')">Mở</button>
-    </div>
-  `;
-}
-
-function renderOverview() {
-  return; // màn Tổng quan đã gộp vào Việc & tiến độ
-  const active = state.runtimes.filter(r => r.status === 'running').length;
-  if ($('ovRoadmap')) $('ovRoadmap').textContent = state.roadmap.length;
-  if ($('ovTodo')) $('ovTodo').textContent = state.todos.flat().length;
-  if ($('ovActive')) $('ovActive').textContent = active;
-  if ($('sideRuntime')) $('sideRuntime').textContent = state.runtimes.length + ' đang chạy';
-  if ($('sideRoles')) $('sideRoles').textContent = state.roles.length;
-  if ($('sideSsot')) $('sideSsot').textContent = state.ssot.length + ' mục';
-
-  if ($('overviewSteps')) {
-    $('overviewSteps').innerHTML = state.nodes.map((n, i) => `
-      <div class="runStep">
-        <div class="stepNo">${i + 1}</div>
-        <div>
-          <b>${escapeHtml(n.title)}</b>
-          <small>${escapeHtml(n.role)} · ${escapeHtml(n.input)} → ${escapeHtml(n.output)}</small>
-        </div>
-        <span class="chip ${n.status === 'done' ? 'done' : n.status === 'live' ? 'live' : n.status === 'blocked' ? 'bad' : 'wait'}">
-          ${n.status === 'done' ? 'done' : n.status === 'live' ? 'running' : n.status === 'blocked' ? 'blocked' : 'waiting'}
-        </span>
-      </div>
-    `).join('');
-  }
-
-  if ($('overviewAgents')) {
-    $('overviewAgents').innerHTML = state.runtimes.map(r => {
-      const matchedRole = (state.roles || []).find(x => x.name.toLowerCase().includes(r.role.split(' ')[0].toLowerCase())) || {};
-      const modelTag = matchedRole.model || r.cli || 'Gemini 2.5 Pro';
-      return `
-      <div class="resource">
-        <div class="resLeft">
-          <div class="resIcon">${r.role[0]}</div>
-          <div>
-            <b>${escapeHtml(r.role)}</b>
-            <small>${escapeHtml(r.task)} · <span style="color:var(--accent)">${escapeHtml(modelTag)}</span></small>
-          </div>
-        </div>
-        <span class="chip ${r.status === 'running' ? 'live' : r.status === 'done' ? 'done' : 'wait'}">${r.status}</span>
-      </div>
-    `;
-    }).join('');
-  }
-
-  renderDashboardKanban();
-
-  // Load real git commits and repo workspace status
-  loadGitData();
-}
 
 let dashKanbanCurrentView = 'roles'; // 'roles' | 'stages'
 
@@ -7507,15 +6728,6 @@ function switchDashKanbanView(view) {
   renderDashboardKanban();
 }
 
-function getRoleDefaultModel(roleName) {
-  const rn = (roleName || '').toLowerCase();
-  if (rn.includes('lead') || rn.includes('architect')) return 'Gemini 3.1 Pro (High)';
-  if (rn.includes('backend') || rn.includes('db')) return 'Gemini 3.1 Pro (High)';
-  if (rn.includes('frontend')) return 'Gemini 3.8 Flash (High)';
-  if (rn.includes('devops') || rn.includes('docker')) return 'Gemini 3.8 Flash (Medium)';
-  if (rn.includes('qa') || rn.includes('test')) return 'Gemini 3.7 Flash (High)';
-  return 'Gemini 3.1 Pro (High)';
-}
 
 function renderDashboardKanban() {
   const container = $('dashRoleKanbanBoard');
@@ -7530,8 +6742,6 @@ function renderDashboardKanban() {
     container.style.width = '100%';
     const roleCol = ({ rt, items }) => {
       const doneCount = items.filter(t => t.status === 'done').length;
-      const rObj = (state.roles || []).find(x => rt.match.some(m => (x.name || '').toLowerCase().includes(m))) || {};
-      const modelName = rObj.model || getRoleDefaultModel(rt.name);
       return `
         <div class="hubCol">
           <div class="hubColHead">
@@ -7541,7 +6751,6 @@ function renderDashboardKanban() {
             </div>
             <span class="badge" style="font-size:9.5px;background:var(--panel3);color:${doneCount === items.length && items.length ? 'var(--green)' : 'var(--accent)'}">${doneCount}/${items.length}</span>
           </div>
-          <div class="hubColModel" title="${escapeHtml(modelName)}">Model: <b>${escapeHtml(modelName)}</b></div>
           <div class="hubColBody">
             ${items.length ? items.map(t => renderHubTaskCard(t, 'dash')).join('') : `<div class="hubEmpty">Chưa có task của vai này</div>`}
           </div>
@@ -7698,13 +6907,12 @@ function renderTmuxSessions() {
 
   renderExpertSquadGrid();
   updateCommandDeck();
-  renderOrchSwarmCards();
 }
 
 const ROLE_DETAILS = {
   'gw-lead-agy': {
     title: 'Lead Architect (Chỉ Huy Kỹ Thuật)',
-    mission: 'Bảo tồn đặc tả SSOT gốc, phân rã Roadmap & Todo DAG, kiểm duyệt bằng chứng và ký nghiệm thu.',
+    mission: 'Điều phối, rà soát kế hoạch và kiểm bằng chứng trước khi nghiệm thu.',
     inputFrom: 'Nhận yêu cầu đề bài trực tiếp từ Ryan (Owner)',
     outputTo: 'Chuyển giao Schema CSDL cho Backend & Khung giao diện cho Frontend',
     checklist: [
@@ -8276,28 +7484,6 @@ async function sendWbTmuxRoleTask() {
   }
 }
 
-async function triggerDispatchSwarmAll() {
-  try {
-    showToast('Đang truyền lệnh đồng loạt tới toàn bộ 6 vị trí Swarm...');
-    const prj = state.project?.name || 'gen-workplace';
-    const res = await fetch('/api/swarm/dispatch', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ project_id: prj })
-    });
-    const data = await res.json().catch(() => ({}));
-    if (res.ok) {
-      const errs = Object.entries(data.results || {}).filter(([, r]) => r.status !== 'dispatched').map(([k, r]) => `${k}: ${r.reason || 'lỗi'}`);
-      showToast(`Đã giao việc cho ${data.dispatched_count || 0}/6 worker` + (errs.length ? ` · không chạy: ${errs.join('; ')}` : ''));
-      setTimeout(async () => {
-        await refreshTmuxSessions();
-        if ($('wbTerminalOutput')) $('wbTerminalOutput').scrollTop = $('wbTerminalOutput').scrollHeight;
-      }, 500);
-    }
-  } catch (e) {
-    showToast('Lỗi điều phối Swarm: ' + e.message);
-  }
-}
 
 function toggleWbRibbon() {
   const ribbon = $('wbRibbon');
@@ -8520,442 +7706,16 @@ function copyThinkingTrace() {
    GENESIS ORCHESTRATOR IDE & SWARM CONTROLLER FUNCTIONS
    ========================================================================= */
 
-function switchOrchTab(tabName, el) {
-  state.currentOrchTab = tabName;
-  document.querySelectorAll('.orchTab').forEach(t => t.classList.remove('active'));
-  if (el && el.classList && el.classList.contains('orchTab')) {
-    el.classList.add('active');
-  } else {
-    document.querySelector(`.orchTab[data-orchtab="${tabName}"]`)?.classList.add('active');
-  }
 
-  ['chat', 'memory', 'definition', 'skills', 'mcps', 'swarm'].forEach(tab => {
-    const p = $('orchPanel-' + tab);
-    if (p) {
-      if (tab === tabName) {
-        p.classList.add('active');
-        p.style.display = 'flex';
-      } else {
-        p.classList.remove('active');
-        p.style.display = 'none';
-      }
-    }
-  });
 
-  if (tabName === 'chat') {
-    const chat = $('orchChatMessages');
-    if (chat) chat.scrollTop = chat.scrollHeight;
-  } else if (tabName === 'memory') {
-    renderOrchMemory();
-  } else if (tabName === 'definition') {
-    renderOrchDefinition();
-  } else if (tabName === 'skills') {
-    renderOrchSkills();
-  } else if (tabName === 'mcps') {
-    renderOrchMcps();
-  } else if (tabName === 'swarm') {
-    renderOrchSwarmCards();
-  }
-}
 
-function toggleSwarmBody(btn) {
-  const body = $('swarmBody');
-  if (!body) return;
-  const isCollapsed = body.classList.toggle('collapsed');
-  const collapseBtn = btn || $('swarmCollapseBtn');
-  if (collapseBtn) collapseBtn.textContent = isCollapsed ? 'Mở rộng ▼' : 'Thu gọn ▲';
-}
 
-async function sendOrchMessage() {
-  const input = $('orchChatInput');
-  if (!input) return;
-  const text = input.value.trim();
-  if (!text) return;
 
-  const chat = $('orchChatMessages');
-  const now = new Date().toLocaleTimeString('vi-VN', { hour12: false });
 
-  // 1. Render User Message
-  if (chat) {
-    const userDiv = document.createElement('div');
-    userDiv.className = 'orchMsgUser';
-    userDiv.innerHTML = `
-      <div>
-        <div class="orchBubble">${escapeHtml(text)}</div>
-        <div class="orchMsgMeta" style="text-align:right">Owner (Ryan) · ${now}</div>
-      </div>
-    `;
-    chat.appendChild(userDiv);
-    chat.scrollTop = chat.scrollHeight;
-  }
 
-  input.value = '';
-  input.style.height = 'auto';
 
-  // 2. Typing indicator
-  const typingId = 'orchTypingIndicator_' + Date.now();
-  if (chat) {
-    const typingDiv = document.createElement('div');
-    typingDiv.id = typingId;
-    typingDiv.className = 'orchTypingIndicator';
-    typingDiv.innerHTML = `
-      <div class="orchTypingDots"><span></span><span></span><span></span></div>
-      <span>Genesis Orchestrator đang phân tích ngữ cảnh và điều phối…</span>
-    `;
-    chat.appendChild(typingDiv);
-    chat.scrollTop = chat.scrollHeight;
-  }
 
-  try {
-    const res = await fetch('/api/orch/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: text, project_id: 'PRJ-GEN-WORKPLACE' })
-    });
-    const typingEl = $(typingId);
-    if (typingEl) typingEl.remove();
 
-    if (res.ok) {
-      const data = await res.json();
-      const reply = data.reply || ('Không có phản hồi từ agy' + (data.error ? ': ' + escapeHtml(String(data.error)) : '') + '.');
-      const agentTime = data.agent_time || now;
-
-      if (chat) {
-        const agentDiv = document.createElement('div');
-        agentDiv.className = 'orchMsgAgent';
-        agentDiv.innerHTML = `
-          <div class="orchBubbleAvatar"></div>
-          <div>
-            <div class="orchBubble">${reply}</div>
-            <div class="orchMsgMeta">${escapeHtml(data.author || 'Orchestrator')} · ${agentTime}</div>
-          </div>
-        `;
-        chat.appendChild(agentDiv);
-        chat.scrollTop = chat.scrollHeight;
-      }
-
-      if (data.action_taken === 'spawn_worker') {
-        await refreshTmuxSessions();
-        renderOrchSwarmCards();
-      }
-    } else {
-      throw new Error('API status: ' + res.status);
-    }
-  } catch (err) {
-    console.warn('[Orchestrator Chat] Local fallback:', err);
-    const typingEl = $(typingId);
-    if (typingEl) typingEl.remove();
-    if (chat) {
-      const agentDiv = document.createElement('div');
-      agentDiv.className = 'orchMsgAgent';
-      agentDiv.className = 'orchMsgAgent error';
-      agentDiv.innerHTML = `
-        <div class="orchBubbleAvatar">!</div>
-        <div>
-          <div class="orchBubble">Không gửi được tới agy (lỗi mạng hoặc server). Tin chưa được xử lý.</div>
-          <div class="orchMsgMeta">Lỗi · ${now}</div>
-        </div>
-      `;
-      chat.appendChild(agentDiv);
-      chat.scrollTop = chat.scrollHeight;
-    }
-  }
-}
-
-async function loadOrchChatMessages() {
-  const chat = $('orchChatMessages');
-  if (!chat) return;
-
-  try {
-    const res = await fetch('/api/orch/messages');
-    if (res.ok) {
-      const data = await res.json();
-      if (data && data.messages && data.messages.length > 0) {
-        chat.innerHTML = data.messages.map(m => {
-          const isUser = m.author.includes('Ryan') || m.author.includes('Owner');
-          if (isUser) {
-            return `
-              <div class="orchMsgUser">
-                <div>
-                  <div class="orchBubble">${escapeHtml(m.body)}</div>
-                  <div class="orchMsgMeta" style="text-align:right">${escapeHtml(m.author)} · ${escapeHtml(m.time)}</div>
-                </div>
-              </div>
-            `;
-          } else {
-            return `
-              <div class="orchMsgAgent">
-                <div class="orchBubbleAvatar"></div>
-                <div>
-                  <div class="orchBubble">${m.body}</div>
-                  <div class="orchMsgMeta">${escapeHtml(m.author)} · ${escapeHtml(m.time)}</div>
-                </div>
-              </div>
-            `;
-          }
-        }).join('');
-        chat.scrollTop = chat.scrollHeight;
-        return;
-      }
-    }
-  } catch (e) {
-    console.warn('[Orchestrator] Error loading chat history:', e);
-  }
-
-  if (chat.children.length === 0) {
-    chat.innerHTML = '<div class="emptyState">Chưa có hội thoại. Gõ chỉ thị bên dưới; agy sẽ trả lời thật (hoặc báo lỗi thật).</div>';
-  }
-}
-
-function renderOrchMemory() {
-  const container = $('orchMemoryContent');
-  if (!container) return;
-  const items = state.ssot || [];
-  if (!items.length) {
-    container.innerHTML = '<div class="emptyState">Chưa có mục SSOT nào. Nạp đặc tả ở "Việc & tiến độ" → "Lưu nguồn" để tạo mục đầu tiên.</div>';
-    return;
-  }
-  container.innerHTML = items.map(x => `
-    <div class="orchMemoryEntry">
-      <span class="orchMemTag">${escapeHtml(x.id || '')}</span>
-      <div><b>${escapeHtml(x.title || '')}</b><div class="orchMemText">${escapeHtml(x.body || x.content || '')}</div></div>
-    </div>`).join('');
-}
-
-function renderOrchDefinition() {
-  const container = $('orchDefinitionContent');
-  if (!container) return;
-
-  container.innerHTML = `
-    <div class="orchSection">
-      <div class="orchSectionHead">
-        <h4>Hồ Sơ & Quyền Hạn Core Orchestrator (Gen)</h4>
-        <span class="orchToggle">Global Control Plane</span>
-      </div>
-      <div class="orchSectionBody">
-        <p><strong>Vai trò:</strong> Genesis Brain Swarm Orchestrator & Chief of Staff (Gen)</p>
-        <p><strong>Nhiệm vụ tối cao:</strong> Tiếp nhận bài toán vĩ mô từ Owner (Ryan), phân rã yêu cầu thành các roadmap, sinh ra (spawn) sub-agent nhân viên theo nhu cầu thực tế, áp đặt ranh giới thư mục và thu hồi khi hoàn thành. Đảm bảo toàn bộ Swarm vận hành thống nhất theo tiêu chuẩn SSOT.</p>
-        <p><strong>Mô hình AI:</strong> Google Gemini 3.8 Flash (High) / Claude Sonnet 4.6 (Extended Thinking)</p>
-        <p><strong>Cơ chế Bootstrap:</strong> Đọc trực tiếp <code>BOOTSTRAP.md</code> trên branch <code>main</code> của <code>Genesis-ryan-84-0567536339/Brain</code> trước mọi tác vụ.</p>
-        <pre><code># Autonomous Execution & Full Bypass Policy
-- Tự động chạy tất cả lệnh terminal cần thiết, đọc/ghi/sửa file, gọi MCP tool mà không hỏi xin quyền ở bước trung gian.
-- Nhập vai con người (triệt tiêu 100% mùi AI), phản hồi súc tích, thực tế và đi thẳng vào giải pháp.
-- Bàn giao kết quả rõ ràng, kiểm chứng thực nghiệm trước khi báo cáo Owner.</code></pre>
-      </div>
-    </div>
-
-    <div class="orchSection">
-      <div class="orchSectionHead">
-        <h4>Quy Trình 5 Bước Kiến Thiết Dự Án Chuẩn Chỉnh (Project Construction SOP)</h4>
-        <span class="orchToggle">Chuẩn Bắt Buộc</span>
-      </div>
-      <div class="orchSectionBody">
-        <ol style="margin:0;padding-left:18px;line-height:1.75">
-          <li><strong>Tiếp nhận đặc tả & Khóa SSOT (Spec Ingestion):</strong> Lưu nguyên văn yêu cầu gốc của Owner vào <code>docs/SSOT_ORIGINAL_SPEC.md</code> và bảng <code>master_ssot</code>. Tuyệt đối không suy diễn thêm bớt ngoài ý định gốc.</li>
-          <li><strong>Phân rã Lộ trình Tuần tự (Roadmap Breakdown):</strong> Chia nhỏ dự án thành 3 - 6 mốc Roadmap tuần tự (Hàng 1), mỗi mốc gắn với một mục tiêu kiến trúc độc lập.</li>
-          <li><strong>Phát sinh Todo List & Khóa Phụ Thuộc (Todo DAG):</strong> Chẻ nhỏ việc cho từng Role, gắn chặt mã phụ thuộc <code>depends_on</code> để ngăn chặn việc chạy tắt đón đầu.</li>
-          <li><strong>Thiết lập Live Workflow DAG & Hợp đồng I/O:</strong> Vẽ sơ đồ luồng dữ liệu giữa các Node, khóa Hợp đồng Đầu vào / Đầu ra (Input/Output Contract).</li>
-          <li><strong>Đóng gói Phân phối All-In-One:</strong> Cấu hình Docker Compose (cờ <code>:z</code>), kịch bản cài đặt dòng lệnh TUI (<code>install.sh</code>) và tự động tạo shortcut Desktop.</li>
-        </ol>
-      </div>
-    </div>
-
-    <div class="orchSection">
-      <div class="orchSectionHead">
-        <h4>Quy Cách 6 Điều Lệ Quản Trị & Sinh Nhân Sự AI (Personnel Governance)</h4>
-        <span class="orchToggle">Kỷ Luật Thép</span>
-      </div>
-      <div class="orchSectionBody">
-        <ul style="margin:0;padding-left:18px;line-height:1.75">
-          <li><strong>Điều 1: Đúng việc mới sinh (Demand-Driven Spawning):</strong> Không bao giờ spawn nhân sự bừa bãi. Chỉ spawn khi có đầu việc Todo cụ thể chưa ai đảm nhận.</li>
-          <li><strong>Điều 2: 1 Profile = 1 Identity (Cô lập OAuth Pool):</strong> Mỗi nhân sự chạy trên 1 runtime tmux tách biệt, profile Google/Claude độc lập để chống cạn hạn ngạch chung (chống lỗi 429).</li>
-          <li><strong>Điều 3: Khóa ranh giới thư mục 0-Conflict:</strong> Whitelist thư mục được sửa (Allowed Paths) và Blacklist thư mục cấm (Blocked Paths) được sinh vào <code>ROLE.md</code>. Cấm tuyệt đối xâm lấn file của đồng đội.</li>
-          <li><strong>Điều 4: Khóa độc quyền nhiệm vụ (Atomic Task Mutex):</strong> Worker phải claim task qua <code>/api/task/claim</code> trước khi làm. Tuyệt đối không cho 2 worker cùng nhận 1 task (task đang có người giữ → 409 kèm <code>held_by</code>; claim lại được khi khóa quá hạn).</li>
-          <li><strong>Điều 5: Nghiệm thu bằng chứng (Evidence-Backed Completion):</strong> Cấm tự nhận "Done" bằng lời nói. Bắt buộc nộp bằng chứng kiểm được (commit SHA, file báo cáo trong <code>~/gw-reports/</code>/repo, <code>dispatch:&lt;id&gt;</code>, <code>warroom:&lt;id&gt;</code> hoặc URL PR GitHub có thật) qua <code>/api/task/complete</code> mới được duyệt. Task đã done không bị ghi đè bằng chứng (trừ khi <code>force</code>, có ghi nhật ký).</li>
-          <li><strong>Điều 6: Vòng đời tiết kiệm & Chống Zombie:</strong> Tự động ngủ đông (0% CPU, 0MB RAM) khi rảnh rỗi. Thu hồi task nếu worker bị crash quá 5 phút không heartbeat.</li>
-        </ul>
-      </div>
-    </div>
-
-    <div class="orchSection">
-      <div class="orchSectionHead">
-        <h4>Cơ Cấu Đội Ngũ Chuẩn 5 Tầng & Ma Trận RACI (Standard Squad Charter)</h4>
-        <span class="orchToggle">SSOT Doc</span>
-      </div>
-      <div class="orchSectionBody">
-        <p style="margin-bottom:6px">Chi tiết hồ sơ và ma trận trách nhiệm lưu tại: <code>docs/STANDARD_SQUAD_AND_WORKFLOW.md</code></p>
-        <div style="font-size:11.5px;line-height:1.75;color:var(--text);background:rgba(0,0,0,0.25);padding:10px;border-radius:6px;border:1px solid rgba(255,255,255,0.06)">
-          <div><strong>• Tầng 0 (Chiến Lược Toàn Cục):</strong> <strong>Gen</strong> (Core Orchestrator - Chief of Staff) · Quản trị tài nguyên & Vòng đời</div>
-          <div><strong>• Tầng 1 (Chỉ Huy Kỹ Thuật):</strong> <code>gw-lead-agy</code> (Lead Architect) · Khóa SSOT, Phân rã DAG & Ký duyệt nghiệm thu</div>
-          <div><strong>• Tầng 2 (Xây Dựng Cốt Lõi):</strong> <code>gw-backend-agy</code> (Backend & DB) · <code>gw-frontend-agy</code> (Frontend UI)</div>
-          <div><strong>• Tầng 3 (Hạ Tầng & Đóng Gói):</strong> <code>gw-devops-agy</code> (DevOps & Packaging) · Docker, TUI Installer & Desktop Shortcut</div>
-          <div><strong>• Tầng 4 (Kiểm Thẩm & Bảo Vệ):</strong> <code>gw-qa-agy</code> (QA Tester)</div>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-function renderOrchSkills() {
-  const container = $('orchSkillsContent');
-  if (!container) return;
-
-  fetch('/api/skills').then(r => r.json()).then(d => {
-    const list = d.skills || [];
-    container.innerHTML = `
-      <div style="font-size:12px;color:var(--purple);font-weight:600;margin-bottom:8px">
-        Danh mục Kỹ Năng (Skills) Tích Hợp Sẵn (${list.length} kỹ năng thực tế)
-      </div>
-      <div class="orchSkillGrid">
-        ${list.map(s => `
-          <div class="orchSkillCard">
-            <div style="display:flex;align-items:center;justify-content:space-between">
-              <span class="orchSkillName">${escapeHtml(s.name)}</span>
-              <span class="orchMemTag" style="font-size:9px">${escapeHtml(s.tag || 'Active')}</span>
-            </div>
-            <div class="orchSkillDesc">${escapeHtml(s.desc)}</div>
-          </div>
-        `).join('')}
-      </div>
-    `;
-  }).catch(() => {});
-}
-
-function renderOrchMcps() {
-  const container = $('orchMcpsContent');
-  if (!container) return;
-
-  fetch('/api/mcps').then(r => r.json()).then(d => {
-    const mcps = d.mcps || [];
-    container.innerHTML = `
-      <div style="font-size:12px;color:var(--purple);font-weight:600;margin-bottom:8px">
-        Giao Thức MCP Servers & Công Cụ Ngoại Vi (${mcps.length} Servers tích hợp)
-      </div>
-      ${mcps.map(m => `
-        <div class="orchSection" style="margin-bottom:8px">
-          <div class="orchSectionHead">
-            <h4>${escapeHtml(m.name)}</h4>
-            <span class="chip done" style="font-size:9px">${escapeHtml(m.status || 'Active')} · ${escapeHtml(m.tools || '')}</span>
-          </div>
-          <div class="orchSectionBody">
-            <div style="font-size:11.5px;color:var(--muted)">${escapeHtml(m.desc)}</div>
-          </div>
-        </div>
-      `).join('')}
-    `;
-  }).catch(() => {});
-}
-
-function renderOrchSwarmCards() {
-  const container = $('orchSwarmMiniCards');
-  if (!container) return;
-
-  const sessions = state.tmuxSessions || [];
-  if (sessions.length === 0) {
-    container.innerHTML = '<div style="color:var(--muted);font-size:11px">Đang tải danh sách worker swarm...</div>';
-    return;
-  }
-
-  container.innerHTML = sessions.map(s => {
-    const avatar = ROLE_AVATARS[s.id] || '';
-    const isHib = s.status === 'hibernated';
-    const isPaused = s.status === 'paused';
-    const isLive = !isHib && !isPaused;
-
-    const tmuxLive = Number(s.pid) > 0;
-    const statusLabel = isHib ? 'Ngủ đông' : (isPaused ? 'Tạm dừng' : (tmuxLive ? '● Đang chạy' : 'Chưa có tmux'));
-    const statusClass = isHib ? 'sleep' : (isPaused || !tmuxLive ? 'paused' : 'live');
-    const qG = 'Gemini ' + quotaText(s.quota_gemini);
-    const qA = 'Claude ' + quotaText(s.quota_anthropic);
-
-    const hasTask = Boolean(s.current_task_id && s.current_task_id.trim());
-    const allowed = (s.allowed_paths && s.allowed_paths.length) ? s.allowed_paths.join(', ') : 'Toàn quyền';
-    const blocked = (s.blocked_paths && s.blocked_paths.length) ? s.blocked_paths.join(', ') : 'Không có';
-
-    return `
-      <div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:8px">
-        <div style="display:flex;align-items:center;justify-content:space-between">
-          <div style="display:flex;align-items:center;gap:8px">
-            <span style="font-size:20px">${avatar}</span>
-            <div>
-              <strong style="font-size:13px;color:var(--text);display:block;line-height:1.2">${escapeHtml(s.role_name || s.id)}</strong>
-              <span style="font-size:10px;color:var(--muted);font-family:var(--mono)">${escapeHtml(s.id)}</span>
-            </div>
-          </div>
-          <span class="expertStatusChip ${statusClass}">${statusLabel}</span>
-        </div>
-
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:10px;font-family:var(--mono);background:rgba(0,0,0,0.25);padding:3px 8px;border-radius:5px">
-          <span>PID: <strong style="color:var(--text)">${escapeHtml(s.pid > 0 ? s.pid : '0 (Off)')}</strong></span>
-          <span style="color:var(--accent)">${qG} · ${qA}</span>
-        </div>
-
-        <div style="font-size:11px;display:flex;flex-direction:column;gap:3px;background:rgba(255,255,255,0.02);padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.05)">
-          <div style="display:flex;align-items:center;gap:5px">
-            <span style="color:var(--muted);font-size:10.5px">Nhiệm vụ:</span>
-            <span style="font-family:var(--mono);font-size:10.5px;font-weight:600;color:${hasTask ? 'var(--accent)' : 'var(--muted)'}">${hasTask ? taskChip(s.current_task_id) + viecChip(s.task_viec_ref) : 'Rảnh'}</span>
-          </div>
-          <div style="display:flex;align-items:center;gap:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
-            <span style="color:var(--muted);font-size:10px">Được sửa:</span>
-            <span style="font-family:var(--mono);font-size:10px;color:var(--green)" title="${escapeHtml(allowed)}">${escapeHtml(allowed)}</span>
-          </div>
-          <div style="display:flex;align-items:center;gap:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
-            <span style="color:var(--muted);font-size:10px">Cấm sửa:</span>
-            <span style="font-family:var(--mono);font-size:10px;color:var(--red)" title="${escapeHtml(blocked)}">${escapeHtml(blocked)}</span>
-          </div>
-        </div>
-
-        <div style="display:flex;align-items:center;gap:5px;margin-top:2px">
-          <button class="btn small primary" style="flex:1;font-size:11px;padding:4px 8px" onclick="focusWorkerFromOrch('${escapeHtml(s.id)}')">
-            Vào Bàn Làm Việc
-          </button>
-          ${isHib
-            ? `<button class="btn small" style="padding:4px 8px" onclick="triggerGridLifecycle('${escapeHtml(s.id)}', 'wake')" title="Đánh thức dậy">Thức</button>`
-            : `<button class="btn small" style="padding:4px 8px" onclick="triggerGridLifecycle('${escapeHtml(s.id)}', 'hibernate')" title="Ngủ đông giải phóng RAM">Ngủ</button>`
-          }
-        </div>
-      </div>
-    `;
-  }).join('');
-}
-
-function focusWorkerFromOrch(sid) {
-  go('runtimes');
-  selectTmuxSession(sid);
-  $('commandDeck')?.scrollIntoView({ behavior: 'smooth' });
-}
-
-async function orchSpawnWorker() {
-  const role = prompt('Nhập tên vai trò Worker cần spawn (ví dụ: Data Pipeline Engineer, Security Pentester, v.v.):');
-  if (!role || !role.trim()) return;
-
-  const roleName = role.trim();
-  const mission = prompt('Nhập mục tiêu / chỉ thị cho worker này (để trống nếu dùng mặc định):') || '';
-
-  showToast('Orchestrator đang cấp phát tài nguyên và khởi tạo worker: ' + roleName);
-
-  try {
-    const res = await fetch('/api/orch/spawn', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        role_name: roleName,
-        project_id: 'PRJ-GEN-WORKPLACE',
-        mission: mission
-      })
-    });
-    if (res.ok) {
-      const data = await res.json();
-      await refreshTmuxSessions();
-      renderOrchSwarmCards();
-      showToast('Đã spawn thành công worker: ' + roleName + ' (' + data.session_id + ')');
-      loadOrchChatMessages();
-      return;
-    }
-  } catch (e) {
-    showToast('Không tạo được worker: ' + e.message);
-  }
-}
 
 async function promptClaimTask(defaultTaskId) {
   const current = state.tmuxSessions?.find(s => s.id === state.selectedTmuxSessionId) || state.tmuxSessions?.[0];
@@ -9058,9 +7818,9 @@ async function triggerSwarmLifecycle(action) {
     });
     if (res.ok) {
       if (action === 'sleep_all') {
-        showToast('Đã đưa toàn bộ 6 phiên Swarm vào trạng thái ngủ đông (0% CPU, 0MB RAM)!');
+        showToast('Đã đưa mọi phiên worker vào ngủ đông');
       } else if (action === 'wake_all') {
-        showToast('Đã đánh thức và phục hồi toàn bộ 6 phiên Swarm!');
+        showToast('Đã mở lại mọi phiên worker');
       }
       await refreshTmuxSessions();
     }
@@ -9918,34 +8678,6 @@ function renderKanban() {
   }).join('');
 }
 
-let dragRef = null;
-function dragKanban(e, key, i) {
-  dragRef = { key, i };
-  e.dataTransfer.effectAllowed = 'move';
-}
-async function dropKanban(e, target) {
-  if (e && e.preventDefault) e.preventDefault();
-  if (!dragRef) return;
-  const { key: from, i: idx } = dragRef;
-  dragRef = null;
-  if (from === target) return;
-  const item = (state.kanban[from] || [])[idx];
-  if (!item) return;
-  const statusMap = { done: 'done', progress: 'live', ready: 'ready', backlog: 'queued' };
-  const newSt = statusMap[target] || target;
-  if (newSt === 'done') {
-    // Không di chuyển thẻ trước: chỉ chuyển khi server nghiệm thu (complete_task) thành công
-    await updateRoadmapTodoStatus(item[0], 'done', item[1]);
-    renderKanban();
-    return;
-  }
-  // Cột khác: chuyển ngay trên giao diện, server từ chối thì tải lại (thẻ về cột cũ)
-  state.kanban[from].splice(idx, 1);
-  state.kanban[target].push(item);
-  renderKanban();
-  await updateRoadmapTodoStatus(item[0], newSt, item[1]);
-  renderKanban();
-}
 
 // =========================================================================
 // SIDEBAR COLLAPSE & DRAGGABLE COLUMN RESIZERS (WITH PERSISTENT STATE)
@@ -10527,7 +9259,7 @@ function syncGenQuotaTelemetry() {
   if (cText) { cText.textContent = qC.status_label || `Tuần: ${qTxt(cWk)} · 5h: ${qTxt(c5h)}`; }
 
   // 3. Đồng bộ các thanh hiển thị quota toàn bộ giao diện
-  // deckQuotaPill (worker đang chọn) do updateCommandDeck ghi; ở đây chỉ quota hồ sơ owner cho màn Tổng chỉ huy
+  // deckQuotaPill (worker đang chọn) do updateCommandDeck ghi; ở đây chỉ quota hồ sơ owner
   const pillStr = `Gemini ${quotaText(qG)} | Claude ${quotaText(qC)}`;
   if ($('orchDeckQuotaPill')) $('orchDeckQuotaPill').textContent = pillStr;
   if ($('deckQuotaGeminiVal')) $('deckQuotaGeminiVal').textContent = `${qTxt(g5h)} (Tuần ${qTxt(gWk)})`;
@@ -13031,30 +11763,6 @@ async function loadDbData() {
   }
 }
 
-async function loadVaultData() {
-  const tbody = document.querySelector('#vaultTable tbody');
-  if (!tbody) return;
-  try {
-    const res = await fetch('/api/vault/list');
-    if (res.ok) {
-      const data = await res.json();
-      const vault = data.vault || [];
-      if (vault.length > 0) {
-        tbody.innerHTML = vault.map(v => `
-          <tr>
-            <td class="ref" style="font-weight:700;color:var(--accent)">${v.id}</td>
-            <td style="font-family:var(--mono);color:var(--text);font-weight:600">${escapeHtml(v.name)}</td>
-            <td style="color:var(--text)">${escapeHtml(v.owner)}</td>
-            <td style="font-size:11px;color:var(--muted)">${escapeHtml(v.scope)}</td>
-            <td><span class="chip ${v.status.includes('sẵn') || v.status.includes('mã hóa') ? 'done' : 'wait'}" style="font-size:9.5px">${escapeHtml(v.status)}</span></td>
-          </tr>
-        `).join('');
-      }
-    }
-  } catch (e) {
-    console.warn('[Vault Data] Error:', e);
-  }
-}
 
 async function loadFilesData() {
   const tbody = document.querySelector('#fileTable tbody');
@@ -13098,15 +11806,12 @@ function switchData(id, el) {
 
   if (id === 'repo') loadGitData();
   else if (id === 'db') loadDbData();
-  else if (id === 'vault') loadVaultData();
   else if (id === 'files') loadFilesData();
-  else if (id === 'catalog') renderMemory();
 }
 
 function refreshData() {
   loadGitData();
   loadDbData();
-  loadVaultData();
   loadFilesData();
   showToast('Đã làm mới dữ liệu Data Center từ Git và SQLite!');
 }
@@ -13119,201 +11824,18 @@ function filterTable(id, q) {
 
 // Memory, SSOT & Catalog Tra Cứu Nhanh
 
-function renderMemory() {
-  const catalogList = (state.refs && state.refs.length > 0) ? state.refs : ((state.catalog || []).map(c => [c.id, c.type, c.title, c.desc]));
-  const refRows = $('refRows');
-  if (refRows) {
-    refRows.innerHTML = catalogList.length ? catalogList.map(r => `
-    <tr>
-      <td class="ref" style="font-weight:700;color:var(--accent)">${escapeHtml(r[0])}</td>
-      <td><span class="chip">${escapeHtml(r[1])}</span></td>
-      <td style="color:var(--text)" title="${escapeHtml(r[3] || '')}"><b>${escapeHtml(r[2])}</b></td>
-    </tr>`).join('') : '<tr><td colspan="3" class="emptyState">Chưa có mã tham chiếu nào.</td></tr>';
-  }
-  const eventList = state.events || [];
-  const eventRows = $('eventRows');
-  if (eventRows) {
-    eventRows.innerHTML = eventList.length ? eventList.map(e => `
-    <tr>
-      <td class="ref" style="font-weight:700;color:var(--accent)">${escapeHtml(e.id)}</td>
-      <td style="color:var(--text)">${escapeHtml(e.runtime || e.role || '')}</td>
-      <td><span class="chip ${e.status === 'ssot' ? 'done' : 'wait'}">${e.status === 'ssot' ? 'đã nghiệm thu' : escapeHtml(e.status || '')}</span></td>
-    </tr>`).join('') : '<tr><td colspan="3" class="emptyState">Chưa có sự kiện nào.</td></tr>';
-  }
-  const cnt = $('ssotCount'); if (cnt) cnt.textContent = (state.ssot?.length || 0) + ' mục';
-}
 
 
 
-async function openFullSSOTModal() {
-  const modal = $('ssotFullModal');
-  if (!modal) return;
-  modal.classList.add('show');
-  const viewer = $('ssotFullViewerContent');
-  if (viewer) {
-    viewer.textContent = 'Đang tải toàn văn đặc tả SSOT nguyên bản từ docs/SSOT_ORIGINAL_SPEC.md...';
-    try {
-      const res = await fetch('/api/ssot/spec');
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.content) {
-          viewer.textContent = data.content;
-          return;
-        }
-      }
-      viewer.textContent = state.sourceText || 'Chưa tải được nội dung SSOT.';
-    } catch (e) {
-      viewer.textContent = state.sourceText || ('Lỗi tải file SSOT: ' + e.message);
-    }
-  }
-}
-
-function closeSSOTModal() {
-  $('ssotFullModal')?.classList.remove('show');
-}
-
-function copySSOTFullText() {
-  const text = $('ssotFullViewerContent')?.textContent || state.sourceText || '';
-  if (navigator.clipboard) {
-    navigator.clipboard.writeText(text);
-    showToast('Đã sao chép toàn văn SSOT vào Clipboard!');
-  }
-}
-async function filterRefs(q) {
-  const cleanQ = (q || '').trim().toLowerCase();
-  if (cleanQ.length >= 2) {
-    try {
-      const res = await fetch('/api/catalog?q=' + encodeURIComponent(cleanQ));
-      if (res.ok) {
-        const json = await res.json();
-        if (json.results && json.results.length > 0) {
-          const matchedIds = new Set(json.results.map(r => r.id));
-          document.querySelectorAll('#refRows tr').forEach(r => {
-            const firstCol = r.children[0]?.textContent.trim();
-            r.style.display = matchedIds.has(firstCol) || r.textContent.toLowerCase().includes(cleanQ) ? '' : 'none';
-          });
-          return;
-        }
-      }
-    } catch (e) {}
-  }
-  document.querySelectorAll('#refRows tr').forEach(r => {
-    r.style.display = r.textContent.toLowerCase().includes(cleanQ) ? '' : 'none';
-  });
-}
 
 
-function verifyEvent(i) {
-  const e = state.events[i];
-  if (!e) return;
-  e.status = 'ssot';
-  const id = e.id;
-  state.ssot.push({
-    id: 'SSOT-RULE-' + String(state.ssot.length + 1).padStart(2, '0'),
-    title: e.request.slice(0, 36),
-    body: 'Sự kiện đã được Trưởng nhóm xác thực và đưa vào SSOT tham chiếu bắt buộc cho mọi runtime.',
-    source: e.id + ' · ' + (e.evidence || ''),
-    verified: new Date().toLocaleTimeString('vi-VN', { hour12: false })
-  });
-  state.refs.unshift([e.id, 'Event', 'SSOT-RULE-' + String(state.ssot.length).padStart(2, '0'), e.request]);
-  fetch('/api/events/verify', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ id: id, status: 'ssot' })
-  }).catch(err => console.warn('[SSOT Verify] Error:', err));
-  persist();
-  renderMemory();
-  showToast(id + ' đã được nâng thành dữ kiện SSOT!');
-}
 
 
-function openEventModal() {
-  $('modalTitle').textContent = 'Ghi nhận Sự Kiện Mới';
-  $('modalBody').innerHTML = `
-    <div class="field"><label>Nội dung sự kiện / Request</label><input id="eventReq" placeholder="Runtime vừa hoàn thành điều gì?"></div>
-    <div class="field"><label>Evidence / Tham chiếu</label><input id="eventEvidence" placeholder="FILE-xx · commit / thread / test log"></div>
-    <div class="field"><label>Runtime ghi nhận</label>
-      <select id="eventRuntime">
-        ${state.runtimes.map(r => `<option>${escapeHtml(r.role)} / ${r.id}</option>`).join('')}
-      </select>
-    </div>
-  `;
-  $('modalPrimary').textContent = 'Ghi nhận';
-  $('modalPrimary').onclick = submitEvent;
-  $('modal').classList.add('show');
-}
 
-function submitEvent() {
-  const req = ($('eventReq')?.value || 'Sự kiện mới').trim();
-  const ev = ($('eventEvidence')?.value || 'evidence pending').trim();
-  const rt = $('eventRuntime')?.value || 'Lead';
-  const id = 'EVT-' + (10 + state.events.length);
-  state.events.unshift({
-    id,
-    runtime: rt,
-    request: req,
-    evidence: ev,
-    status: 'pending',
-    time: new Date().toLocaleTimeString('vi-VN', { hour12: false })
-  });
-  closeModal();
-  persist();
-  renderMemory();
-  showToast('Đã ghi nhận ' + id + ' · chờ Trưởng nhóm xác thực');
-}
 
-function requestRuntime() {
-  openModal();
-  $('modalTitle').textContent = 'Khởi tạo Agent Runtime mới';
-  $('modalBody').innerHTML = `
-    <div class="field"><label>Role</label>
-      <select id="rtRole">
-        ${state.roles.map(r => `<option>${escapeHtml(r.name)}</option>`).join('')}
-      </select>
-    </div>
-    <div class="field"><label>CLI Engine</label>
-      <select id="rtCli">
-        <option>Gemini CLI (agy --effort high)</option>
-        <option>Claude Code CLI</option>
-        <option>Cursor CLI</option>
-        <option>Codex Security CLI</option>
-      </select>
-    </div>
-    <div class="field"><label>Task scope</label><input id="rtTask" placeholder="TODO-xx"></div>
-  `;
-  $('modalPrimary').textContent = 'Tạo Runtime';
-  $('modalPrimary').onclick = submitRuntime;
-}
 
-function submitRuntime() {
-  const role = $('rtRole').value;
-  const cli = $('rtCli').value;
-  const task = $('rtTask').value || 'TODO-new';
-  const id = 'runtime-0' + (state.runtimes.length + 1);
-  state.runtimes.push({
-    id,
-    role,
-    cli,
-    task,
-    branch: 'main',
-    status: 'running',
-    path: state.project.repo,
-    messages: [{
-      author: role,
-      time: new Date().toLocaleTimeString('vi-VN', { hour12: false }),
-      tag: 'init',
-      body: 'Runtime đã sẵn sàng nhận task từ Workflow.',
-      react: ['ready']
-    }],
-    trace: ['runtime initialized'],
-    io: { input: 'workflow contract', output: 'task artifact', request: task, conclusion: 'running' }
-  });
-  closeModal();
-  state.selectedRuntime = state.runtimes.length - 1;
-  persist();
-  renderOverview();
-  showToast(id + ' đã được kích hoạt');
-}
+
+
 
 // Persistence - DÙNG KEY MỚI ĐỂ XÓA SẠCH CACHE GIẢ
 const STORAGE_KEY = 'gen-workplace-real-state-v1';
@@ -13337,13 +11859,8 @@ function loadPersisted() {
 
 function refreshAll() {
   try { renderProjectList(); } catch (e) { console.warn('[refreshAll] renderProjectList:', e); }
-  try { renderDashboardProjects(); } catch (e) { console.warn('[refreshAll] renderDashboardProjects:', e); }
-  try { renderImplementation(); } catch (e) { console.warn('[refreshAll] renderImplementation:', e); }
-  try { renderOverview(); } catch (e) { console.warn('[refreshAll] renderOverview:', e); }
-  try { renderMemory(); } catch (e) { console.warn('[refreshAll] renderMemory:', e); }
   try { refreshTmuxSessions(); } catch (e) { console.warn('[refreshAll] refreshTmuxSessions:', e); }
   try { refreshOauthProfiles(); } catch (e) { console.warn('[refreshAll] refreshOauthProfiles:', e); }
-  try { renderOrchSwarmCards(); } catch (e) { console.warn('[refreshAll] renderOrchSwarmCards:', e); }
   try { renderKanban(); } catch (e) { console.warn('[refreshAll] renderKanban:', e); }
   try { updateCommandDeck(); } catch (e) { console.warn('[refreshAll] updateCommandDeck:', e); }
   try { renderDashboardKanban(); } catch (e) { console.warn('[refreshAll] renderDashboardKanban:', e); }
@@ -13354,8 +11871,7 @@ function refreshAll() {
 document.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
     e.preventDefault();
-    go('data'); switchData('catalog');
-    document.querySelector('#data-catalog input')?.focus();
+    go('data'); switchData('files');
   }
   if (e.key === 'Escape') closeModal();
 });
@@ -14023,14 +12539,13 @@ async function submitClaimPick(current) {
   }
 }
 
-// Thanh chân trái: Repo / Worker / SSOT lấy từ dữ liệu thật
+// Thanh chân trái: Repo / Worker lấy từ dữ liệu thật
 function updateSidebarFoot() {
   const repo = state.project?.repo || '';
   if ($('sideRepo')) { $('sideRepo').textContent = repo ? repo.split('/').filter(Boolean).slice(-1)[0] || repo : '—'; $('sideRepo').title = repo; }
   const ss = state.tmuxSessions || [];
-  const live = ss.filter(s => Number(s.pid) > 0 && s.status !== 'hibernated').length;
-  if ($('sideRuntime')) { $('sideRuntime').textContent = ss.length ? `${live}/${ss.length} chạy` : '—'; $('sideRuntime').title = 'Số phiên tmux có tiến trình thật / tổng số vai'; }
-  if ($('sideSsot')) $('sideSsot').textContent = (state.ssot || []).length ? `${state.ssot.length} mục` : 'chưa có';
+  const live = ss.filter(s => s.tmux_live && s.status !== 'hibernated').length;
+  if ($('sideRuntime')) { $('sideRuntime').textContent = ss.length ? `${live}/${ss.length} chạy` : '—'; $('sideRuntime').title = 'Số phiên tmux đang mở / tổng số vai (phiên mở khi cần, tự ngủ khi rảnh)'; }
   const badge = $('podsOnlineBadge');
   if (badge) {
     badge.textContent = !ss.length ? 'chưa tải' : (live ? `${live}/${ss.length} phiên tmux chạy` : 'không có tmux chạy');
@@ -14083,21 +12598,9 @@ setInterval(async () => {
     if (res.ok) {
       const data = await res.json();
       if (data && data.project && data.project.name === 'gen-workplace') {
-        if (data.kanban) state.kanban = data.kanban;
-        if (data.todos) state.todos = data.todos;
+        // /api/state chỉ còn project, projects, roles, gen_session_todos (VIEC-12: bỏ roadmap/ssot/roleMemory/... rỗng)
         if (Array.isArray(data.gen_session_todos)) state.gen_session_todos = data.gen_session_todos;
-        if (data.roadmap) state.roadmap = data.roadmap;
-        if (data.ssot) state.ssot = data.ssot;
         if (data.roles) state.roles = data.roles;
-        if (data.roleMemory) state.roleMemory = data.roleMemory;
-        if (data.refs) state.refs = data.refs;
-        if (data.events) state.events = data.events;
-        if (data.sourceText && (!state.sourceText || state.sourceText.length < 500)) {
-          state.sourceText = data.sourceText;
-          if ($('sourceInput') && (!$('sourceInput').value || $('sourceInput').value.length < 500)) {
-            $('sourceInput').value = data.sourceText;
-          }
-        }
       }
     }
     // 3. Tự động đồng bộ phiên Chuyên gia (task_status, terminal_output, quota)
@@ -14106,6 +12609,7 @@ setInterval(async () => {
       const sData = await sRes.json();
       if (sData && Array.isArray(sData.sessions) && sData.sessions.length > 0) {
         state.tmuxSessions = sData.sessions;
+        if (sData.idle_min !== undefined) state.tmuxIdleMin = sData.idle_min;
         syncGenQuotaTelemetry();
       }
     }
