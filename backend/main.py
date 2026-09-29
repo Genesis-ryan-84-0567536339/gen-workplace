@@ -860,11 +860,7 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             res = db.assign_task_to_role(todo_id, session_id, data.get("project_id", "PRJ-GEN-WORKPLACE"),
                                          author=str(data.get("author") or "Ryan (Owner)"), channel_id=str(data.get("channel_id") or "war_room"),
                                          mode=str(data.get("mode") or "build"))
-            code = {"bad_request": 400, "not_found": 404, "already_done": 409, "locked": 409, "retry": 409, "busy": 409}.get(res.get("code"), 400) \
-                if "error" in res else 200
-            if res.get("error") == "Task not found":
-                code = 404
-            self._send_json(code, res)
+            self._send_json(db.assign_task_http_status(res), res)
             return
 
         # 14c. Worker Jules (#43). Key: POST /api/jules/key {key} lưu (DATA_DIR/secrets/jules.key, 600) | {action:"delete"} xóa;

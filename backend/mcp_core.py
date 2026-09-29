@@ -40,7 +40,7 @@ DEFAULT_MCP_INSTRUCTIONS = (
     "1. Mỗi việc = 1 phiên: list_conversations, đã có phiên \"VIEC-<n>: <tên việc>\" thì dùng lại; chưa có thì create_conversation(title=\"VIEC-<n>: <tên việc>\", reuse_existing=true).\n"
     "2. Chia bước thành task Kanban: create_kanban_task(conv_id, viec_ref=\"VIEC-<n>\" bắt buộc); claim_task trước khi làm, update_task_checklist khi tiến triển.\n"
     "3. Ghi tiến độ vào chatroom của phiên: log_session_message(conv_id, content, author) ở mỗi mốc (bắt đầu, giao việc, kết quả, bị chặn, xong), tin ngắn kèm link Issue/PR/commit. Chỉ lưu tin, không gọi AI (đừng dùng gen_chat để ghi log).\n"
-    "4. Giao việc cho agy: post_warroom_message với @<vai> (chỉ đọc), rồi wait_worker_result(dispatch_id). Sửa code: POST /api/task/assign mode=\"build\" (mặc định): agy làm trong worktree ../gw-worktrees/TSK-n, app test + push nhánh wt/TSK-n; điều phối tạo PR, review rồi merge.\n"
+    "4. Giao việc cho agy: post_warroom_message với @<vai> (chỉ đọc), rồi wait_worker_result(dispatch_id). Sửa code: assign_task(task_id, session_id, mode=\"build\" mặc định): agy làm trong worktree ../gw-worktrees/TSK-n, app test + push nhánh wt/TSK-n; điều phối tạo PR, review rồi merge. @vai chỉ để rà soát.\n"
     "5. Đóng việc: complete_task với evidence thật (commit SHA, URL PR có thật, dispatch:<id>, file trong ~/gw-reports/).\n"
     "6. Quy trình đầy đủ: repo Genesis-ryan-84-0567536339/Brain → skills/work-style/subskills/gen-workplace-dispatch/SKILL.md.\n"
     "7. Xác thực: gọi HTTP /mcp phải kèm Authorization: Bearer <token> (thiếu token → 401). Agent điều phối dùng connector Gen-hub mcp-06594, hoặc REST /api/* không cần token (POST /api/gen/conversations/log, /api/task/assign, /api/dispatch/wait)."
@@ -274,13 +274,13 @@ TOOLS = [
 
     {
         "name": "wait_worker_result",
-        "description": "Chờ phía server tới khi worker làm xong một lần giao việc (tin War Room @vai hoặc /api/swarm/dispatch) rồi trả kết quả ngay: status done/failed, exit_code, summary (kết quả rút gọn), report_path, task_id/viec_ref, evidence. Hết timeout_sec mà chưa xong → status 'running', gọi lại với cùng dispatch_id. Không cần poll get_worker_terminal_output.",
+        "description": "Chờ phía server tới khi worker làm xong một lần giao việc (tin War Room @vai, assign_task hoặc /api/swarm/dispatch) rồi trả kết quả ngay: status done/failed, exit_code, summary (kết quả rút gọn), report_path, task_id/viec_ref, evidence. Hết timeout_sec mà chưa xong → status 'running', gọi lại với cùng dispatch_id. Không cần poll get_worker_terminal_output.",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "dispatch_id": {
                     "type": "integer",
-                    "description": "ID lần giao việc: 'dispatches[].dispatch_id' do post_warroom_message trả về, hoặc 'results.<sid>.dispatch_id' của POST /api/swarm/dispatch (= dispatch_log.id)."
+                    "description": "ID lần giao việc: 'dispatches[].dispatch_id' do post_warroom_message trả về, 'dispatch_id' của assign_task, hoặc 'results.<sid>.dispatch_id' của POST /api/swarm/dispatch (= dispatch_log.id)."
                 },
                 "task_id": {
                     "type": "string",
@@ -462,6 +462,35 @@ TOOLS = [
                 }
             },
             "required": ["task_id", "item_id", "done"]
+        }
+    },
+    {
+        "name": "assign_task",
+        "description": "Giao 1 task Kanban cho 1 vai agy (cùng hàm với REST POST /api/task/assign): claim task cho worker của vai rồi chạy agy nền, trả ngay dispatch_id để chờ bằng wait_worker_result. mode=\"build\" (mặc định, \"Làm\"): agy SỬA CODE với toàn quyền trên máy Fedora trong worktree riêng ../gw-worktrees/TSK-n (nhánh wt/TSK-n từ origin/main); app tự chạy py_compile + test, push nhánh wt/TSK-n, ghi nhánh / commit / kết quả test / link compare vào dispatch và phiên của task; app KHÔNG merge, điều phối tạo PR, review rồi merge. mode=\"review\" (\"Rà soát\"): như tin @vai trong war-room, agy --mode plan chỉ đọc. Lỗi (isError, kèm code + http_status): 400 thiếu / sai tham số hoặc vai đã bỏ, 404 không có task, 409 task đã done / worker khác đang giữ / đang có lần Làm chạy (code busy).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "task_id": {
+                    "type": "string",
+                    "description": "Mã task Kanban (vd 'TSK-26')."
+                },
+                "session_id": {
+                    "type": "string",
+                    "description": "Vai nhận việc: 'backend' | 'devops' | 'qa' | 'lead' hoặc session worker 'gw-<vai>-agy'."
+                },
+                "mode": {
+                    "type": "string",
+                    "enum": ["build", "review"],
+                    "description": "'build' (mặc định) = Làm: agy sửa code toàn quyền trong worktree của task; 'review' = Rà soát, chỉ đọc.",
+                    "default": "build"
+                },
+                "author": {
+                    "type": "string",
+                    "description": "Người giao (ghi vào tin giao việc trong war-room).",
+                    "default": "AI Agent"
+                }
+            },
+            "required": ["task_id", "session_id"]
         }
     },
 
@@ -766,6 +795,7 @@ TOOL_META = {
     "claim_task": _m("kanban", "kanban", False, "Nhận (khóa) một task cho worker trước khi làm."),
     "complete_task": _m("kanban", "kanban", False, "Nghiệm thu task xong, bắt buộc có bằng chứng kiểm được."),
     "update_task_checklist": _m("kanban", "kanban", False, "Tick hoặc bỏ tick một mục checklist của task."),
+    "assign_task": _m("kanban", "kanban", False, "Giao task cho agy; mode=build cho agy sửa code với toàn quyền trên máy Fedora."),
     # Giao ban & Worker
     "list_swarm_workers": _m("warroom", "swarm", True, "Xem danh sách worker agy, vai trò và trạng thái."),
     "get_worker_terminal_output": _m("warroom", "swarm", True, "Đọc màn hình terminal gần nhất của một worker."),
@@ -1084,6 +1114,21 @@ def execute_tool(name: str, args: dict) -> dict:
             item_id = args.get("item_id")
             done = bool(args.get("done"))
             res = db.toggle_gen_session_todo_checklist_item(conv_id, task_id, item_id, done)
+            return {"content": [{"type": "text", "text": json.dumps(res, ensure_ascii=False, indent=2)}], "isError": "error" in res}
+
+        # 15b. assign_task (#61): cùng hàm với REST POST /api/task/assign (db.assign_task_to_role), không chờ agy chạy xong
+        if name == "assign_task":
+            if str(args.get("engine") or "").strip():
+                res = {"error": "assign_task không nhận engine: chỉ giao cho agy (mode build | review)", "code": "bad_request"}
+            else:
+                res = db.assign_task_to_role(str(args.get("task_id") or args.get("todo_id") or ""),
+                                             str(args.get("session_id") or args.get("role") or "").strip(),
+                                             args.get("project_id") or "PRJ-GEN-WORKPLACE",
+                                             author=str(args.get("author") or "AI Agent"), channel_id="war_room",
+                                             mode=str(args.get("mode") or "build"))
+            res = dict(res, http_status=db.assign_task_http_status(res))
+            if "error" not in res and res.get("dispatch_id"):
+                res["next"] = f"wait_worker_result(dispatch_id={res['dispatch_id']}) để chờ kết quả"
             return {"content": [{"type": "text", "text": json.dumps(res, ensure_ascii=False, indent=2)}], "isError": "error" in res}
 
         # 16. gen_chat
