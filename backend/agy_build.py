@@ -5,11 +5,15 @@ Chế độ "Làm" (build) cho worker agy (Issue #45): agy được sửa code t
 Luồng 1 lần giao (POST /api/task/assign mode="build", mặc định của nút "Giao cho @vai" trên thẻ task):
   1. Worktree riêng <GW_WORKTREE_ROOT>/TSK-n trên nhánh wt/TSK-n, tạo từ origin/main mới nhất (git fetch trước).
      Giao lại cùng task → dùng lại worktree / nhánh đang có (làm tiếp trên kết quả cũ).
-  2. Chọn hồ sơ còn quota (db.select_agy_profile_for_run, hết quota thì chuyển hồ sơ khác), ghi allow + deny chế độ Làm vào
-     settings của hồ sơ (db.ensure_agy_build_permissions), chạy `agy --gemini_dir=<hồ sơ> -p <prompt> --output-format stream-json`
-     trong worktree: chế độ MẶC ĐỊNH của agy (KHÔNG --mode plan), KHÔNG --model (agy dùng model mặc định), KHÔNG cờ bỏ
-     hỏi quyền (skip-permissions). Xong thì gỡ các rule vừa thêm (db.release_agy_build_permissions).
-  3. Lớp chặn thứ hai (không phụ thuộc allow-rule của agy), chỉ áp cho tiến trình agy qua biến môi trường git:
+  2. Chọn hồ sơ còn quota (db.select_agy_profile_for_run, hết quota thì chuyển hồ sơ khác), chạy
+     `agy --gemini_dir=<hồ sơ> -p <prompt> --output-format stream-json` trong worktree: chế độ MẶC ĐỊNH của agy (KHÔNG --mode
+     plan), KHÔNG --model (agy dùng model mặc định). Quyền theo công tắc "agy toàn quyền" (db.agy_full_access, #56, đọc lại
+     mỗi lần build, mặc định BẬT theo quyết định của Boss 29/09):
+     - BẬT: thêm --dangerously-skip-permissions, KHÔNG ghi allow/deny-rule, KHÔNG hook git chặn commit/push (bước 3 bỏ qua);
+       agy chạy như chủ máy tự gõ lệnh.
+     - TẮT: ghi allow + deny chế độ Làm vào settings của hồ sơ (db.ensure_agy_build_permissions), không cờ bỏ hỏi quyền;
+       xong thì gỡ các rule vừa thêm (db.release_agy_build_permissions).
+  3. (Chỉ khi TẮT toàn quyền) Lớp chặn thứ hai, chỉ áp cho tiến trình agy qua biến môi trường git:
      core.hooksPath → hook pre-commit (chỉ commit được trên wt/TSK-n trong đúng worktree) + pre-push (chặn mọi push),
      remote.origin.pushurl → URL hỏng. Tiến trình git của app không mang các biến này.
   4. Sau khi agy xong, APP (không phải agy) làm tiếp: kiểm có commit mới trên wt/TSK-n và main / repo app không bị đổi;
@@ -224,14 +228,17 @@ exit 0
 
 
 def agy_git_env(hooks, session_id):
-    """Biến môi trường git CHỈ cho tiến trình agy: hook chặn, pushurl hỏng, tác giả commit = vai (agy)."""
+    """Biến môi trường git CHỈ cho tiến trình agy: tác giả commit = vai (agy); hooks khác rỗng → thêm hook chặn + pushurl hỏng
+    (chế độ Làm khi TẮT toàn quyền). hooks rỗng (toàn quyền, #56) → không chặn gì."""
     who = f"{session_id} (agy)"
     mail = f"{session_id}@gen-workplace.local"
-    return {"GIT_CONFIG_COUNT": "2",
-            "GIT_CONFIG_KEY_0": "core.hooksPath", "GIT_CONFIG_VALUE_0": hooks,
-            "GIT_CONFIG_KEY_1": f"remote.{REMOTE}.pushurl", "GIT_CONFIG_VALUE_1": "gw-push-blocked::agy-khong-duoc-push",
-            "GIT_TERMINAL_PROMPT": "0",
-            "GIT_AUTHOR_NAME": who, "GIT_AUTHOR_EMAIL": mail, "GIT_COMMITTER_NAME": who, "GIT_COMMITTER_EMAIL": mail}
+    env = {"GIT_TERMINAL_PROMPT": "0",
+           "GIT_AUTHOR_NAME": who, "GIT_AUTHOR_EMAIL": mail, "GIT_COMMITTER_NAME": who, "GIT_COMMITTER_EMAIL": mail}
+    if hooks:
+        env.update({"GIT_CONFIG_COUNT": "2",
+                    "GIT_CONFIG_KEY_0": "core.hooksPath", "GIT_CONFIG_VALUE_0": hooks,
+                    "GIT_CONFIG_KEY_1": f"remote.{REMOTE}.pushurl", "GIT_CONFIG_VALUE_1": "gw-push-blocked::agy-khong-duoc-push"})
+    return env
 
 
 def _repo_snapshot(repo):
@@ -260,22 +267,41 @@ def detect_violations(repo, before, worktree, branch):
 # ---------------------------------------------------------------------------
 # Prompt
 # ---------------------------------------------------------------------------
-def load_sop():
+_SOP_BLOCK_RE = re.compile(r"<!--\s*gw:(restricted|full)\s*-->(.*?)<!--\s*/gw:\1\s*-->", re.S)
+
+
+def load_sop(full_access=False):
+    """
+    roles/build.md. Khối <!-- gw:restricted -->…<!-- /gw:restricted --> chỉ giữ khi TẮT toàn quyền (câu về lệnh bị chặn),
+    khối <!-- gw:full -->…<!-- /gw:full --> chỉ giữ khi BẬT (#56); thẻ đánh dấu luôn bị bỏ khỏi prompt.
+    """
     p = os.path.join(str(db.BASE_DIR), "roles", "build.md")
     try:
         with open(p, "r", encoding="utf-8") as f:
             txt = f.read().strip()
-            if txt:
-                return txt
     except OSError:
-        pass
-    return DEFAULT_SOP
+        txt = ""
+    if not txt:
+        return DEFAULT_SOP
+    keep = "full" if full_access else "restricted"
+    txt = _SOP_BLOCK_RE.sub(lambda m: m.group(2) if m.group(1) == keep else "", txt)
+    return re.sub(r"[ \t]+\n", "\n", txt).strip()
 
 
-def build_prompt(task_id, session_id, worktree, branch, project_id="PRJ-GEN-WORKPLACE", pending=None):
-    """Prompt chế độ Làm: SOP roles/build.md + khối THÔNG TIN VIỆC (tiêu đề, viec_ref, mô tả, checklist) + luật quyền."""
+def build_prompt(task_id, session_id, worktree, branch, project_id="PRJ-GEN-WORKPLACE", pending=None, full_access=False):
+    """Prompt chế độ Làm: SOP roles/build.md + khối THÔNG TIN VIỆC (tiêu đề, viec_ref, mô tả, checklist) + luật làm việc
+    (full_access=True: không có danh sách lệnh cấm, #56)."""
     task_block = db.build_task_prompt_block(task_id, project_id)
-    rules = (
+    if full_access:
+        rules = (
+            "[CHẾ ĐỘ LÀM — agy toàn quyền, không bị chặn lệnh]\n"
+            f"- Bạn đang ở worktree riêng của việc: {worktree} (nhánh {branch}, tạo từ {REMOTE}/{base_branch()}). "
+            "Làm việc trong thư mục này; dùng lệnh shell, đường dẫn tuyệt đối, công cụ sửa file tùy ý như chủ máy tự gõ.\n"
+            f"- BẮT BUỘC có ít nhất 1 commit trên {branch} trước khi kết thúc; không commit thì việc bị tính là chưa làm. "
+            "Không cần push: app tự chạy py_compile + toàn bộ test rồi push nhánh sau khi bạn xong. Không merge vào main."
+        )
+    else:
+        rules = (
         "[CHẾ ĐỘ LÀM — agy sửa code thật, không ai duyệt quyền giữa chừng]\n"
         f"- Bạn đang ở worktree riêng của việc: {worktree} (nhánh {branch}, tạo từ {REMOTE}/{base_branch()}). "
         "CHỈ tạo/sửa file trong thư mục này; không cd ra ngoài; sửa file bằng công cụ sửa file của agy "
@@ -290,7 +316,7 @@ def build_prompt(task_id, session_id, worktree, branch, project_id="PRJ-GEN-WORK
         f"- BẮT BUỘC có ít nhất 1 commit trên {branch} trước khi kết thúc; không commit thì việc bị tính là chưa làm. "
         "KHÔNG push: app tự chạy py_compile + toàn bộ test rồi push nhánh sau khi bạn xong.\n"
         "- Bị chặn quyền: KHÔNG dừng im lặng — làm tiếp phần còn lại, ghi dòng \"CẦN QUYỀN: <lệnh> — <lý do>\" trong báo cáo."
-    )
+        )
     if pending:
         # Giao lại cùng task: worktree còn thay đổi chưa commit của lần trước (dispatch:15 agy tưởng việc đã có người làm, #49)
         rules += ("\n- LƯU Ý: worktree đang có thay đổi CHƯA COMMIT do chính bạn làm ở lần trước (bị dừng giữa chừng): "
@@ -298,7 +324,7 @@ def build_prompt(task_id, session_id, worktree, branch, project_id="PRJ-GEN-WORK
                   "làm nốt phần còn thiếu, chạy test rồi commit.")
     tail = (f"(Bạn là {session_id}. Làm trọn việc trong một lượt, không hỏi lại, không chỉ nêu kế hoạch. "
             "Kết thúc bằng báo cáo ngắn tiếng Việt theo mục 5 của SOP.)")
-    return f"{load_sop()}\n\n" + (f"{task_block}\n\n" if task_block else f"[THÔNG TIN VIỆC {task_id}]\n\n") + f"{rules}\n\n{tail}"
+    return f"{load_sop(full_access)}\n\n" + (f"{task_block}\n\n" if task_block else f"[THÔNG TIN VIỆC {task_id}]\n\n") + f"{rules}\n\n{tail}"
 
 
 # ---------------------------------------------------------------------------
@@ -457,9 +483,11 @@ def _set_row(did, **cols):
         conn.commit()
 
 
-def build_command(p_dir, prompt, stream=True):
-    """Lệnh agy chế độ Làm: chế độ mặc định (không --mode plan), không --model, không --dangerously-skip-permissions."""
-    return [db._agy_bin(), f"--gemini_dir={p_dir}", "-p", prompt] + (db.AGY_STREAM_ARGS if stream else [])
+def build_command(p_dir, prompt, stream=True, full_access=False):
+    """Lệnh agy chế độ Làm: chế độ mặc định (không --mode plan), không --model; full_access (#56) → thêm
+    --dangerously-skip-permissions, không thì không có cờ bỏ hỏi quyền."""
+    return ([db._agy_bin(), f"--gemini_dir={p_dir}", "-p", prompt] + ([db.AGY_SKIP_PERMISSIONS_FLAG] if full_access else [])
+            + (db.AGY_STREAM_ARGS if stream else []))
 
 
 def run_build(dispatch_id, project_id="PRJ-GEN-WORKPLACE"):

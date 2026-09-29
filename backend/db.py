@@ -581,6 +581,29 @@ def init_db():
             reason TEXT DEFAULT ''
         );
         """)
+        # Cài đặt chung của app (key/value), vd agy_full_access (#56). Chưa có dòng = dùng mặc định trong code.
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS app_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+        """)
+        # Nhật ký bật / tắt công tắc "agy toàn quyền (chế độ Làm)" (#56)
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS agy_access_audit (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            action TEXT NOT NULL,
+            full_access INTEGER NOT NULL,
+            previous INTEGER NOT NULL,
+            effective INTEGER NOT NULL,
+            env_override TEXT DEFAULT '',
+            actor TEXT DEFAULT '',
+            client_ip TEXT DEFAULT '',
+            reason TEXT DEFAULT ''
+        );
+        """)
 
         # Seed master sovereign token for Ryan if no tokens exist
         cursor.execute("SELECT count(*) FROM mcp_agent_tokens")
@@ -4669,6 +4692,108 @@ def _edit_agy_settings(path, fn):
     except Exception as e:
         print(f"[agy-perm] Không cập nhật được {path}: {e}")
         return False
+
+
+# ---------------------------------------------------------------------------
+# Công tắc "agy toàn quyền (chế độ Làm)" (#56 — Boss chọn A ngày 29/09): mặc định BẬT.
+# Bật: agy chế độ Làm chạy --dangerously-skip-permissions, không ghi allow/deny-rule, không hook git chặn commit/push.
+# Tắt: như cũ (allow/deny chế độ Làm + hook). Chế độ Rà soát / war-room (--mode plan) không phụ thuộc công tắc này.
+# Nguồn: env GW_AGY_FULL_ACCESS=0|1 (ghi đè) > app_settings.agy_full_access (đổi từ UI / POST /api/agy/access) > mặc định.
+# Đọc lại ở mỗi lần build → đổi xong áp dụng cho lần giao tiếp theo, không cần restart.
+# ---------------------------------------------------------------------------
+AGY_FULL_ACCESS_KEY = "agy_full_access"
+AGY_FULL_ACCESS_DEFAULT = True
+_ON_WORDS = ("1", "true", "yes", "on")
+_OFF_WORDS = ("0", "false", "no", "off")
+
+
+def parse_bool(value):
+    """True / False từ bool, 0/1, chuỗi 'true'/'false'/'on'/'off'...; không nhận ra → None."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int) and value in (0, 1):
+        return bool(value)
+    if isinstance(value, str):
+        v = value.strip().lower()
+        if v in _ON_WORDS:
+            return True
+        if v in _OFF_WORDS:
+            return False
+    return None
+
+
+def get_app_setting(key, default=None):
+    try:
+        with get_connection() as conn:
+            r = conn.execute("SELECT value FROM app_settings WHERE key = ?", (key,)).fetchone()
+        return r["value"] if r else default
+    except sqlite3.Error:
+        return default
+
+
+def set_app_setting(key, value):
+    with get_connection() as conn:
+        conn.execute("INSERT OR REPLACE INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)",
+                     (key, str(value), time.strftime("%Y-%m-%d %H:%M:%S")))
+        conn.commit()
+
+
+def agy_access_state():
+    """
+    Trạng thái công tắc: {full_access (hiệu lực), setting (giá trị lưu trong DB), source: env|setting|default,
+    env_override ('0'/'1' hoặc ''), flag, applies_to, description}.
+    """
+    raw = get_app_setting(AGY_FULL_ACCESS_KEY)
+    saved = parse_bool(raw) if raw is not None else None
+    setting = AGY_FULL_ACCESS_DEFAULT if saved is None else saved
+    env_raw = (os.environ.get("GW_AGY_FULL_ACCESS") or "").strip()
+    env_val = parse_bool(env_raw) if env_raw else None
+    if env_val is not None:
+        eff, source = env_val, "env"
+    else:
+        eff, source = setting, ("setting" if saved is not None else "default")
+    return {"full_access": eff, "setting": setting, "source": source,
+            "env_override": ("1" if env_val else "0") if env_val is not None else "",
+            "default": AGY_FULL_ACCESS_DEFAULT, "flag": AGY_SKIP_PERMISSIONS_FLAG, "applies_to": "build",
+            "description": ("Bật: agy không bị chặn quyền, chạy như bạn tự gõ lệnh. "
+                            "Tắt: quay về danh sách lệnh cho phép.")}
+
+
+def agy_full_access():
+    """Chế độ Làm có chạy agy toàn quyền không (đọc mỗi lần build)."""
+    return agy_access_state()["full_access"]
+
+
+def set_agy_full_access(enabled, actor="", client_ip="", reason=""):
+    """Lưu công tắc vào app_settings + ghi agy_access_audit. Trả trạng thái mới (kèm changed, note)."""
+    before = agy_access_state()
+    set_app_setting(AGY_FULL_ACCESS_KEY, "1" if enabled else "0")
+    after = agy_access_state()
+    note = "không đổi (đã ở trạng thái này)" if before["setting"] == bool(enabled) else ("đã bật" if enabled else "đã tắt")
+    if after["source"] == "env":
+        note += f"; GW_AGY_FULL_ACCESS={after['env_override']} đang ghi đè → hiệu lực vẫn là {'bật' if after['full_access'] else 'tắt'}"
+    try:
+        with get_connection() as conn:
+            conn.execute("""INSERT INTO agy_access_audit (action, full_access, previous, effective, env_override, actor, client_ip, reason)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                         ("enable" if enabled else "disable", 1 if enabled else 0, 1 if before["setting"] else 0,
+                          1 if after["full_access"] else 0, after["env_override"], str(actor or "")[:120],
+                          str(client_ip or "")[:64], (str(reason or "").strip()[:300] + (" · " if reason else "") + note)[:500]))
+            conn.commit()
+    except sqlite3.Error as e:
+        print(f"[agy_access_audit] Không ghi được nhật ký: {e}")
+    print(f"[agy-access] công tắc toàn quyền chế độ Làm: {note} (bởi {actor or '?'} {client_ip})")
+    return {**after, "changed": before["setting"] != bool(enabled), "note": note}
+
+
+def get_agy_access_audit(limit=20):
+    try:
+        limit = max(1, min(int(limit), 500))
+    except (TypeError, ValueError):
+        limit = 20
+    with get_connection() as conn:
+        rows = conn.execute("SELECT * FROM agy_access_audit ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+    return [dict(r) for r in rows]
 
 
 def ensure_agy_build_permissions(p_dir, worktree, repo=""):
