@@ -6907,6 +6907,9 @@ def parse_and_apply_agent_kanban_updates(conv_id, agent_text):
 
     return updates_made
 
+# Scope token của từng tool MCP: mcp_core điền từ TOOL_META lúc import (db không import mcp_core để tránh vòng import).
+MCP_TOOL_SCOPES = {}
+
 def public_origin(origin=None):
     """Gốc URL (scheme://host[:port]) để in link MCP: origin tính từ Host header của request > GW_PUBLIC_ORIGIN >
     http://localhost:<PORT>. Không ghi cứng localhost:8888 (app thường chạy sau IP / domain khác)."""
@@ -6927,10 +6930,14 @@ def get_mcp_auth_status(origin=None):
         active_count = cursor.fetchone()[0]
         cursor.execute("SELECT count(*) FROM mcp_agent_tokens")
         total_count = cursor.fetchone()[0]
+        since = (datetime.now() - timedelta(hours=24)).strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute("SELECT count(*) FROM mcp_agent_tokens WHERE status = 'active' AND last_used_at >= ?", (since,))
+        used_24h = cursor.fetchone()[0]
         return {
             "require_auth": req_auth,
             "active_tokens": active_count,
             "total_tokens": total_count,
+            "used_24h": used_24h,
             "origin": base,
             "endpoint": f"{base}/mcp"
         }
@@ -6962,6 +6969,9 @@ def get_mcp_agent_tokens(owner_id="owner-ryan", origin=None):
                 perms = json.loads(r["permissions_json"])
             except Exception:
                 perms = ["all"]
+            status = r["status"]
+            if status == "active" and r["expires_at"] and str(r["expires_at"]) < datetime.now().strftime("%Y-%m-%d %H:%M:%S"):
+                status = "expired"  # quá hạn nhưng chưa ai gọi (verify mới ghi 'expired' vào DB)
             tokens.append({
                 "id": r["id"],
                 "name": r["name"],
@@ -6970,7 +6980,7 @@ def get_mcp_agent_tokens(owner_id="owner-ryan", origin=None):
                 "client": r["client"],
                 "role": r["role"],
                 "permissions": perms,
-                "status": r["status"],
+                "status": status,
                 "expires_at": r["expires_at"] or "Vĩnh viễn",
                 "last_used_at": r["last_used_at"] or "Chưa sử dụng",
                 "calls_count": r["calls_count"] or 0,
@@ -7096,18 +7106,9 @@ def verify_mcp_request_auth(headers=None, query=None, tool_name=None):
             perms = ["all"]
 
         if tool_name and "all" not in perms and "*" not in perms and tool_name not in perms:
-            domain_allowed = False
-            domain_map = {
-                "quota": ["get_live_quota", "list_google_accounts", "switch_google_account", "get_oauth_login_url"],
-                "swarm": ["list_swarm_workers", "send_worker_directive", "manage_worker_lifecycle", "get_worker_terminal_output", "post_warroom_message", "get_warroom_messages", "wait_worker_result"],
-                "kanban": ["list_kanban_tasks", "create_kanban_task", "claim_task", "complete_task", "update_task_checklist"],
-                "chat": ["gen_chat", "list_conversations", "create_conversation", "log_session_message", "get_conversation_messages", "compact_conversation"],
-                "files": ["list_notes", "save_note", "delete_note", "read_workspace_file", "create_workspace_file", "list_workspace_files", "get_system_status"]
-            }
-            for p in perms:
-                if p in domain_map and tool_name in domain_map[p]:
-                    domain_allowed = True
-                    break
+            # scope của tool lấy từ mcp_core.TOOL_META (nguồn duy nhất, #28); tool không có scope → chỉ token toàn quyền
+            scope = MCP_TOOL_SCOPES.get(tool_name)
+            domain_allowed = bool(scope) and scope in perms
             if not domain_allowed:
                 return (False, None, f"Agent không có quyền thực thi công cụ '{tool_name}'")
 

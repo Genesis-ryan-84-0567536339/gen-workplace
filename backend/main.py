@@ -74,6 +74,18 @@ def render_oauth_callback_html(status_code, title, desc, profile_id, email=None)
 </body>
 </html>"""
 
+def mcp_stdio_info():
+    """Cách chạy MCP qua stdio trên máy chủ này (cho agy / Claude Code cùng máy): lệnh bọc ~/.local/bin/gen-workplace-mcp
+    nếu có, luôn kèm lệnh python3 trỏ thẳng backend/mcp_server.py và DATA_DIR để dùng chung DB với app."""
+    wrapper = os.path.join(os.environ.get("HOME") or str(Path.home()), ".local", "bin", "gen-workplace-mcp")
+    return {
+        "wrapper": wrapper,
+        "wrapper_exists": os.path.isfile(wrapper) and os.access(wrapper, os.X_OK),
+        "python": "python3",
+        "script": str(BASE_DIR / "backend" / "mcp_server.py"),
+        "data_dir": str(db.DATA_DIR),
+    }
+
 OAUTH_STATE_RE = re.compile(r"^(owner_default|profile[0-9]{1,2})$")
 
 def handle_oauth_callback(handler, query):
@@ -211,7 +223,11 @@ class SwarmHandler(SimpleHTTPRequestHandler):
                 "tools_count": len(mcp_core.TOOLS),
                 "read_only_tools": sorted(mcp_core.READ_ONLY_TOOLS),
                 "auth": auth_st,
-                "tools": mcp_core.TOOLS,
+                # tool kèm group / scope / read_only / summary từ mcp_core.TOOL_META (#28)
+                "tools": mcp_core.tool_catalog(),
+                "groups": mcp_core.TOOL_GROUPS,
+                "scopes": mcp_core.TOKEN_SCOPES,
+                "stdio": mcp_stdio_info(),
                 "resources": mcp_core.RESOURCES,
                 "prompts": mcp_core.PROMPTS
             })
@@ -564,6 +580,12 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             perms = data.get("permissions", ["all"])
             expires_days = data.get("expires_days", 90)
             client = data.get("client", "Manual Token")
+            if not isinstance(perms, list):
+                perms = [perms]
+            ok_perms, bad_perms = mcp_core.valid_token_permissions(perms)
+            if not ok_perms:
+                self._send_json(400, {"error": f"Scope không hợp lệ: {', '.join(map(str, bad_perms))}"})
+                return
             res = db.create_mcp_agent_token(name, perms, expires_days, client, origin=self._request_origin())
             self._send_json(200 if "error" not in res else 400, res)
             return
