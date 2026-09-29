@@ -341,24 +341,9 @@ class SwarmHandler(SimpleHTTPRequestHandler):
         # 4. API Tmux Sessions (Phiên Nền Runtimes & Account Profiles)
         if path == "/api/tmux/sessions":
             prj_id = query.get("project", ["PRJ-GEN-WORKPLACE"])[0]
-            sessions = db.get_tmux_sessions(prj_id)
-            
-            # Thử capture live nếu có lệnh tmux trên hệ thống
-            for s in sessions:
-                sid = s["id"]
-                try:
-                    res = subprocess.run(["tmux", "capture-pane", "-t", sid, "-p", "-S", "-200"],
-                                         capture_output=True, text=True, timeout=1.5)
-                    if res.returncode == 0 and res.stdout.strip():
-                        # Cắt bỏ toàn bộ các dòng trống ở đuôi (tránh đen màn hình khi auto-scroll)
-                        raw_lines = res.stdout.splitlines()
-                        while raw_lines and not raw_lines[-1].strip():
-                            raw_lines.pop()
-                        if raw_lines:
-                            s["terminal_output"] = "\n".join(raw_lines)
-                except Exception:
-                    pass
-
+            # Chỉ đọc DB + 1 lần `tmux list-sessions`; capture-pane riêng phiên đang xem (?output=<sid>) (#30)
+            output_sid = query.get("output", [""])[0].strip()
+            sessions = db.get_tmux_sessions(prj_id, output_sid=output_sid)
             self._send_json(200, {"sessions": sessions})
             return
 
@@ -1299,6 +1284,8 @@ def main():
     print(f"  Database: SQLite 3 WAL + FTS5 Ready")
     start_oauth_callback_server(8085)
     start_reclaim_worker()
+    # Mở phiên worker chưa chạy đúng 1 lần lúc khởi động (trước đây chạy ở mỗi lượt poll /api/tmux/sessions, #30)
+    threading.Thread(target=db.ensure_real_tmux_sessions, daemon=True, name="TmuxStartup").start()
     auto_update.start_worker(BASE_DIR, DATA_DIR)
     print(f"==================================================")
     server = ThreadedHTTPServer(("0.0.0.0", PORT), SwarmHandler)
