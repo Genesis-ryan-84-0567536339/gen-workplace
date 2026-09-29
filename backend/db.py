@@ -4025,6 +4025,24 @@ def start_dispatch_log(session_id, kind="warroom", channel_id="", task_id="", co
         conn.commit()
         return cur.lastrowid
 
+# Việc chạy trên cloud (Jules): app restart không làm mất → không hoãn tự cập nhật vì chúng
+AUTO_UPDATE_IGNORE_KINDS = ("jules",)
+
+def running_dispatches_for_update():
+    """Dispatch đang running chạy TRÊN MÁY này (agy build, review/war-room, tmux) — tự cập nhật (restart) lúc này làm mất
+    việc, nên auto_update hoãn. Bỏ Jules (chạy trên cloud, poll lại được sau restart). Trả [{id, kind, session_id, task_id, started_at}]."""
+    with get_connection() as conn:
+        rows = conn.execute("SELECT id, kind, engine, session_id, task_id, started_at FROM dispatch_log WHERE status = 'running' "
+                            "ORDER BY id").fetchall()
+    out = []
+    for r in rows:
+        kind = (r["kind"] or "").strip()
+        if kind in AUTO_UPDATE_IGNORE_KINDS or (r["engine"] or "").strip() in AUTO_UPDATE_IGNORE_KINDS:
+            continue
+        out.append({"id": r["id"], "kind": kind or "warroom", "session_id": r["session_id"] or "", "task_id": r["task_id"] or "",
+                    "started_at": r["started_at"] or ""})
+    return out
+
 def _get_dispatch_row(dispatch_id):
     with get_connection() as conn:
         r = conn.execute("SELECT * FROM dispatch_log WHERE id = ?", (dispatch_id,)).fetchone()
