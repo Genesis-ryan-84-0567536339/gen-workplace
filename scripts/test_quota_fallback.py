@@ -39,11 +39,13 @@ with open(AGY, "w") as f:
     f.write(f"""#!/bin/bash
 prof=""
 json=0
+prev=""
 for a in "$@"; do
   case "$a" in
     --gemini_dir=*) prof="$(basename "${{a#--gemini_dir=}}")" ;;
-    --output-format) json=1 ;;
   esac
+  if [ "$prev" = "--output-format" ]; then [ "$a" = "stream-json" ] && json=2 || json=1; fi
+  prev="$a"
 done
 if [ -z "$prof" ] && [ -n "$ANTIGRAVITY_APP_DATA_DIR" ]; then prof="$(basename "$(dirname "$ANTIGRAVITY_APP_DATA_DIR")")"; fi
 [ -z "$prof" ] && prof="owner_default"
@@ -55,7 +57,10 @@ if grep -qx "$prof" '{EXHAUSTED_FILE}' 2>/dev/null; then
   echo "Error: 429 RESOURCE_EXHAUSTED \\"Individual quota reached. Resets in $r\\"" >&2
   exit 1
 fi
-if [ "$json" = 1 ]; then
+if [ "$json" = 2 ]; then
+  echo "{{\"event\":\"init\",\"init\":{{\"cwd\":\"$(pwd)\"}}}}"
+  echo "{{\"event\":\"result\",\"result\":{{\"status\":\"SUCCESS\",\"response\":\"OK từ $prof\\ncwd=$(pwd)\"}}}}"
+elif [ "$json" = 1 ]; then
   echo "{{\\"response\\": \\"OK từ $prof\\", \\"conversation_id\\": \\"agy-conv-$prof\\", \\"usage\\": {{\\"total_tokens\\": 7}}}}"
 else
   echo "OK từ $prof"; echo "cwd=$(pwd)"

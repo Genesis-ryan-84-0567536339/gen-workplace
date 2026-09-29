@@ -33,9 +33,9 @@ with open(os.path.join(FAKEBIN, "tmux"), "w") as f:
 os.chmod(os.path.join(FAKEBIN, "tmux"), 0o755)
 PROMPT_LOG = os.path.join(TMP, "agy-prompts.log")
 AGY = os.path.join(FAKEBIN, "agy")
-# agy giả: ghi prompt (đối số cuối) ra file, trả lời có dòng tick checklist chk-a của TSK nhắc trong prompt
+# agy giả: ghi prompt (đối số sau -p) ra file, trả lời có dòng tick checklist chk-a của TSK nhắc trong prompt
 with open(AGY, "w") as f:
-    f.write('#!/bin/bash\nfor last; do :; done\nprintf "%%s\\n===\\n" "$last" >> "%s"\n'
+    f.write('#!/bin/bash\nprev=""; for a; do [ "$prev" = "-p" ] && last="$a"; prev="$a"; done\nprintf "%%s\\n===\\n" "$last" >> "%s"\n'
             'tid=$(printf "%%s" "$last" | grep -o "THÔNG TIN VIỆC TSK-[0-9]*" | head -1 | sed "s/THÔNG TIN VIỆC //")\n'
             'echo "Đã kiểm tra xong."\n[ -n "$tid" ] && echo "[KANBAN_UPDATE: $tid | CHECK: chk-a]"\nexit 0\n' % PROMPT_LOG)
 os.chmod(AGY, 0o755)
