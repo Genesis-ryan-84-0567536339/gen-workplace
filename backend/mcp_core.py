@@ -1027,7 +1027,11 @@ def execute_tool(name: str, args: dict) -> dict:
             mode = str(args.get("mode") or "build").strip() or "build"
             res = db.post_warroom_message("PRJ-GEN-WORKPLACE", channel, author, msg, tag,
                                           task_id=str(args.get("task_id") or "").strip(), mode=mode)
-            return {"content": [{"type": "text", "text": json.dumps(res, ensure_ascii=False, indent=2)}], "isError": "error" in res}
+            # TSK-24 (A): isError=True khi mọi vai đều lỗi (không dispatch được, chỉ có errors)
+            all_failed = bool(res.get("errors")) and not res.get("dispatched")
+            is_err = "error" in res or all_failed
+            return {"content": [{"type": "text", "text": json.dumps(res, ensure_ascii=False, indent=2)}], "isError": is_err}
+
 
         # 10. get_warroom_messages
         if name == "get_warroom_messages":

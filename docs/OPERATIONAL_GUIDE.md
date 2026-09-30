@@ -168,6 +168,12 @@ Tin trong War Room có `@backend|@devops|@qa|@lead` → thread nền chạy (`@s
   không cờ; tắt hẳn stream-json: `GW_AGY_NO_STREAM=1`.
 - agy thoát 0 nhưng output ngắn có `no output produced` / `auto-denied` (hoặc rỗng / stream-json không có câu trả lời) → **failed**
   (tin trả lời ghi `exit=0 (failed: agy bị từ chối quyền, không có kết quả)`).
+- **[TSK-24] Lỗi giao task qua war-room**: tin `@vai TSK-n` khi `assign_task_to_role` trả lỗi (`locked`, `busy`, `already_done`...):
+  - **Không dispatch Đọc thay thế nữa** (đã bỏ) — trước đây agy chạy `--mode plan` làm agent ngoài tưởng agy đang sửa code.
+  - Thay bằng: đăng 1 tin hệ thống vào war-room (tác giả = `Hệ thống`, tag = `System`): `"⚠️ Không giao được TSK-n cho @vai: <lỗi> (<code>). Cách xử lý: <gợi ý>"`.
+    Gợi ý: `locked` → chờ người giữ / `complete_task`; `busy` → `wait_worker_result(dispatch_id=...)` cho lần Làm đang chạy; `already_done` → task đã xong.
+  - Response `post_warroom_message` thêm `"errors": [{session_id, task_id, mode, error, code, http_status}]` cho mỗi vai lỗi.
+    Nếu tất cả vai đều lỗi: `"dispatched": []` và `"note"` giải thích; MCP `post_warroom_message` trả `isError: true`.
 
 ### 3.6c. Chế độ "Làm" (build) — agy sửa code thật (Issue #45)
 Boss chốt 29/09 (VIEC-12): agy được code thật, nhưng chỉ trong worktree riêng của task; app (không phải agy) test, push, ghi kết quả.
@@ -222,6 +228,13 @@ Boss chốt 29/09 (VIEC-12): agy được code thật, nhưng chỉ trong worktr
 - `directive_guard` từ chối mọi lệnh agy gửi qua directive có `--dangerously-skip-permissions`.
 - Phiên tmux đang chạy từ trước **không tự chuyển**: cần hibernate → wake (hoặc kill phiên để app mở lại) để vào worktree + alias mới.
 - Chat Gen / Orchestrator (`call_agy_cli_turn`, `agy --print`) vẫn dùng `--dangerously-skip-permissions` như cũ (không phải tmux, chạy trong thư mục phiên chat).
+- **[TSK-24] Đồng bộ main + push cho build không-task** (tin `@vai` không có TSK-n/VIEC-n, chạy trong `<GW_WORKTREE_ROOT>/gw-<vai>-agy`):
+  - **Trước khi chạy** (`_sync_role_worktree_from_main`): `git fetch origin main` rồi `git merge --no-edit origin/main` vào `wt/gw-<vai>-agy`
+    nếu worktree sạch (không file sửa). Fast-forward nếu được, không thì merge commit. Xung đột → `merge --abort` + cảnh báo trong tin trả lời,
+    tiếp tục trên bản hiện có. Worktree bẩn → bỏ qua merge, ghi chú trong tin.
+  - **Sau khi chạy** (nếu có commit mới và không vi phạm): `git push origin HEAD:refs/heads/wt/gw-<vai>-agy` (không force), ghi kết quả push +
+    nhánh + commit SHA vào `build_lines` và `dispatch_log`. Push lỗi ghi rõ, không crash.
+  - Kết quả đồng bộ và push xuất hiện trong tin trả lời war-room (dòng `Đồng bộ main: ...` và `Push: ...`).
 
 ### 3.7. Kiểm thử không cần server / agy / tmux
 ```bash
@@ -240,7 +253,9 @@ python3 scripts/test_mcp_instructions.py   # #19: initialize.instructions (HTTP 
 python3 scripts/test_task_hub.py           # #24: task ↔ war-room ↔ worker, kết quả ghi về phiên, kiểm tham số switch_google_account
 python3 scripts/test_agy_build.py          # #45: chế độ Làm — worktree, allow/deny, commit, test, push remote giả, chặn push/main, dọn worktree
 python3 scripts/test_mcp_assign_task.py    # #61: tool MCP assign_task — tools/list + TOOL_META, build/review đúng lệnh agy, 400/404/409 isError, quyền theo scope
+python3 scripts/test_warroom_assign_error.py  # TSK-24: lỗi giao task → tin hệ thống + errors, không dispatch Đọc; đồng bộ worktree main + push
 ```
+
 
 ### 3.8. Issue #12 — gỡ toàn bộ dữ liệu / phản hồi giả (hợp đồng API cho frontend)
 
