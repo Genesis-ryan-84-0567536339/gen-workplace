@@ -122,6 +122,12 @@ set_card("TSK-T3", "in_progress", "gw-devops-agy", "datetime('now', '-2 days')")
 res = db.reclaim_stalled_tasks(300)
 check("vòng sau (khóa lại cũ, không còn dispatch running) → thu hồi", "TSK-T3" in (res.get("reclaimed_ids") or []), str(res))
 
+set_card("TSK-T3", "in_progress", "gw-devops-agy", "datetime('now', '-2 days')")
+db.toggle_gen_session_todo_checklist_item(conv, "TSK-T3", "chk-b", True)
+res = db.reclaim_stalled_tasks(300)
+check("tick checklist khi đang làm = heartbeat → không thu hồi", "TSK-T3" not in (res.get("reclaimed_ids") or [])
+      and row("TSK-T3")["status"] == "in_progress", str(res))
+
 print("[3] đổi trạng thái: về todo bỏ claim, review giữ người giữ")
 set_card("TSK-T5", "in_progress", "gw-qa-agy", "CURRENT_TIMESTAMP")
 res = db.set_task_status("TSK-T5", "review", conv_id=conv)

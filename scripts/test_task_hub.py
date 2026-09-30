@@ -222,7 +222,9 @@ tasks = {t["id"]: t for t in state.get("gen_session_todos", [])}
 check("có T1, T2", T1 in tasks and T2 in tasks, str(list(tasks))[:200])
 ld = (tasks.get(T1) or {}).get("last_dispatch") or {}
 check("T1.last_dispatch = lần giao gần nhất cho T1 (done)", ld.get("status") == "done" and ld.get("session_id") == "gw-qa-agy", str(ld))
-check("T1 có checklist đã parse + done_items", tasks[T1]["total_items"] == 2 and tasks[T1]["done_items"] == 1, str(tasks[T1])[:300])
+# T1 đã done bằng bằng chứng kiểm được → complete_task tự tick nốt mục còn mở (Refs: stale kanban cards)
+check("T1 có checklist đã parse + done_items (tự tick khi done)", tasks[T1]["total_items"] == 2 and tasks[T1]["done_items"] == 2
+      and tasks[T1]["checklist_done"] == 2 and tasks[T1]["checklist_total"] == 2, str(tasks[T1])[:300])
 st, todos = call("GET", f"/api/gen/session/todos?conv_id={CONV}")
 check("GET /api/gen/session/todos cũng có last_dispatch", any(t.get("last_dispatch") for t in todos["todos"]), str(todos)[:200])
 

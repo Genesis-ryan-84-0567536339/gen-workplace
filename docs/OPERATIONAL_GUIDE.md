@@ -271,7 +271,7 @@ python3 scripts/test_mcp_assign_task.py    # #61: tool MCP assign_task — tools
 #### Thẻ Kanban: đang chạy thật hay treo
 - `GET /api/state`, `GET /api/tasks`, `GET /api/gen/session/todos` và MCP `list_kanban_tasks` trả thêm mỗi thẻ: `live` = `{dispatch_id, kind, session_id, started_at, elapsed_sec}` khi có dòng `dispatch_log` `running` cho task (không thì `null`), `stale` = `true` khi `in_progress` mà không có dispatch nào chạy, `checklist_done` / `checklist_total`.
 - UI thẻ hiện huy hiệu xanh "▶ Đang chạy · dispatch #id · X phút" hoặc vàng "⚠ Không ai chạy", kèm checklist x/y.
-- Thẻ có dispatch `running` không bao giờ bị thu hồi. Dispatch warroom/build `running` quá hạn cứng (thread mất do app khởi động lại) được chốt `failed` trước khi xét. Lúc dispatch bắt đầu và kết thúc, `locked_at` của thẻ được làm mới (heartbeat), nên người điều phối còn trọn một ngưỡng khóa để nghiệm thu.
+- Thẻ có dispatch `running` không bao giờ bị thu hồi. Dispatch warroom/build `running` quá hạn cứng (thread mất do app khởi động lại) được chốt `failed` trước khi xét. Lúc dispatch bắt đầu và kết thúc, và khi tick checklist của thẻ đang làm, `locked_at` của thẻ được làm mới (heartbeat), nên người điều phối còn trọn một ngưỡng khóa để nghiệm thu.
 - Agent tự làm lâu mà không qua dispatch: gọi lại `claim_task` để làm mới khóa. Thẻ bị thu hồi vẫn đóng được bằng `complete_task` (thẻ không ai giữ thì ai cũng đóng được).
 - Chuyển thẻ về `todo` (nút, kéo thả, `save`) bỏ luôn `claimed_by`/`locked_at`; `review` giữ người làm.
 - `complete_task` đóng được (bằng chứng kiểm được) thì tự tick các mục checklist còn mở; response có `auto_ticked: [id…]`. Mục chưa tick không bao giờ làm việc đóng thất bại.

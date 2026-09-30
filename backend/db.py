@@ -7405,11 +7405,13 @@ def toggle_gen_session_todo_checklist_item(conv_id, todo_id, item_id, done_statu
         if all_done and len(chk) > 0 and new_status in ("todo", "in_progress"):
             new_status = "review"
 
+        # Tick checklist khi đang làm = dấu hiệu còn sống → làm mới locked_at (heartbeat, không bị thu hồi oan)
         cursor.execute("""
-        UPDATE gen_session_todos 
-        SET checklist_json = ?, status = ?, updated_at = CURRENT_TIMESTAMP 
+        UPDATE gen_session_todos
+        SET checklist_json = ?, status = ?, updated_at = CURRENT_TIMESTAMP,
+            locked_at = CASE WHEN ? = 'in_progress' AND COALESCE(claimed_by, '') != '' THEN CURRENT_TIMESTAMP ELSE locked_at END
         WHERE id = ? AND conversation_id = ?
-        """, (json.dumps(chk, ensure_ascii=False), new_status, todo_id, target_conv_id))
+        """, (json.dumps(chk, ensure_ascii=False), new_status, new_status, todo_id, target_conv_id))
         conn.commit()
     return {"status": "updated", "id": todo_id, "item_id": item_id, "all_done": all_done, "new_status": new_status}
 
