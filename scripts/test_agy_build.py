@@ -27,6 +27,10 @@ import time
 import urllib.error
 import urllib.request
 
+for k in list(os.environ):
+    if k.startswith("GIT_CONFIG_") or k.startswith("GIT_AUTHOR_") or k.startswith("GIT_COMMITTER_"):
+        os.environ.pop(k, None)
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TMP = tempfile.mkdtemp(prefix="gw-test-agy-build-")
 FAKEBIN = os.path.join(TMP, "bin")
@@ -419,9 +423,9 @@ check("mode=review → kind warroom, --mode plan", res.get("mode") == "review" a
       and args[args.index("--mode") + 1] == "plan", str(args)[:200])
 check("review không tạo worktree task", not os.path.exists(os.path.join(os.environ["GW_WORKTREE_ROOT"], T2)))
 reset_logs()
-db.post_warroom_message(message=f"@lead xem {T2}", author="Ryan (Owner)", wait=True)
+db.post_warroom_message(message=f"@lead xem {T2}", author="Ryan (Owner)", wait=True, mode="review")
 args = json.loads(open(ARGS_LOG).read().splitlines()[-1])
-check("war-room @lead vẫn --mode plan", "--mode" in args and "plan" in args)
+check("war-room @lead mode=review → --mode plan", "--mode" in args and "plan" in args)
 check("mode sai → bad_request", db.assign_task_to_role(T2, "qa", mode="xoa-het").get("code") == "bad_request")
 
 server = main.ThreadedHTTPServer(("127.0.0.1", 0), main.SwarmHandler)

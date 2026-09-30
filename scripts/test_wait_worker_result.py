@@ -23,6 +23,10 @@ import urllib.error
 import urllib.request
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
+for k in list(os.environ):
+    if k.startswith("GIT_CONFIG_") or k.startswith("GIT_AUTHOR_") or k.startswith("GIT_COMMITTER_"):
+        os.environ.pop(k, None)
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TMP = tempfile.mkdtemp(prefix="gw-test-wait-")
 FAKEBIN = os.path.join(TMP, "bin")

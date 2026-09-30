@@ -36,11 +36,12 @@ MCP_PROTOCOL_VERSION = "2024-11-05"
 MCP_INSTRUCTIONS_FILE = Path(__file__).resolve().parent / "mcp_instructions.md"
 
 DEFAULT_MCP_INSTRUCTIONS = (
+    "gen-workplace là nơi các agent ngoài phát lệnh chỉ huy vào Phòng giao ban để đội agy CLI làm việc.\n"
     "BẮT BUỘC cho mọi agent dùng gen-workplace: ghi công việc lên app để Boss theo dõi được trong chatroom và Kanban.\n"
     "1. Mỗi việc = 1 phiên: list_conversations, đã có phiên \"VIEC-<n>: <tên việc>\" thì dùng lại; chưa có thì create_conversation(title=\"VIEC-<n>: <tên việc>\", reuse_existing=true).\n"
     "2. Chia bước thành task Kanban: create_kanban_task(conv_id, viec_ref=\"VIEC-<n>\" bắt buộc); claim_task trước khi làm, update_task_checklist khi tiến triển.\n"
     "3. Ghi tiến độ vào chatroom của phiên: log_session_message(conv_id, content, author) ở mỗi mốc (bắt đầu, giao việc, kết quả, bị chặn, xong), tin ngắn kèm link Issue/PR/commit. Chỉ lưu tin, không gọi AI (đừng dùng gen_chat để ghi log).\n"
-    "4. Giao việc cho agy: post_warroom_message với @<vai> (chỉ đọc), rồi wait_worker_result(dispatch_id). Sửa code: assign_task(task_id, session_id, mode=\"build\" mặc định): agy làm trong worktree ../gw-worktrees/TSK-n, app test + push nhánh wt/TSK-n; điều phối tạo PR, review rồi merge. @vai chỉ để rà soát.\n"
+    "4. Giao việc cho agy: post_warroom_message với @<vai> mặc định THỰC THI (Làm), rồi wait_worker_result(dispatch_id) để lấy kết quả; thêm [đọc] ngay sau @vai hoặc mode=\"review\" cho việc chỉ đọc; assign_task khi giao đúng một việc trong Kanban (sửa code trong worktree TSK-n, app test + push nhánh wt/TSK-n).\n"
     "5. Đóng việc: complete_task với evidence thật (commit SHA, URL PR có thật, dispatch:<id>, file trong ~/gw-reports/).\n"
     "6. Quy trình đầy đủ: repo Genesis-ryan-84-0567536339/Brain → skills/work-style/subskills/gen-workplace-dispatch/SKILL.md.\n"
     "7. Xác thực: gọi HTTP /mcp phải kèm Authorization: Bearer <token> (thiếu token → 401). Agent điều phối dùng connector Gen-hub mcp-06594, hoặc REST /api/* không cần token (POST /api/gen/conversations/log, /api/task/assign, /api/dispatch/wait)."
@@ -221,7 +222,7 @@ TOOLS = [
     },
     {
         "name": "post_warroom_message",
-        "description": "Đăng tin nhắn / chỉ thị vào phòng họp chung War Room. Tin có @backend, @devops, @qa hoặc @lead sẽ được chuyển cho agy thật của vai đó chạy nền (--mode plan, trong worktree riêng của vai) và trả lời thật xuất hiện trong kênh; không có @vai thì chỉ lưu. @security và @frontend đã bỏ (29/09): tin nhắc vai đã bỏ bị từ chối với lỗi rõ ràng (code retired_role), không lưu; việc giao diện giao cho @backend. Tin nhắc TSK-<n> (task có thật) được gắn vào task đó: prompt agy kèm tiêu đề + checklist + viec_ref, kết quả tự ghi về phiên của task. @Gen / @Toàn Đội không giao việc. Response có 'dispatches': [{session_id, dispatch_id, task_id}] — truyền dispatch_id cho wait_worker_result để chờ kết quả.",
+        "description": "Đăng tin nhắn / chỉ thị vào Phòng giao ban (War Room). Tin có @backend, @devops, @qa hoặc @lead mặc định chạy agy chế độ MẶC ĐỊNH (Làm, sửa code): nếu tin nêu TSK-n hoặc VIEC-n của task có thật thì giao task đó (assign_task_to_role mode=build); nếu không có task thì agy chạy trong worktree riêng của vai (../gw-worktrees/gw-<vai>-agy). Thêm [đọc] ngay sau @vai (vd '@qa [đọc] xem file X') hoặc truyền mode='review' để giữ chế độ Rà soát cũ (agy --mode plan, chỉ đọc). @security và @frontend đã bỏ (29/09): tin nhắc vai đã bỏ bị từ chối với lỗi rõ ràng (code retired_role), không lưu. @Gen / @Toàn Đội không giao việc. Response có 'dispatches': [{session_id, dispatch_id, task_id, mode}] — truyền dispatch_id cho wait_worker_result để chờ kết quả.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -246,7 +247,13 @@ TOOLS = [
                 },
                 "task_id": {
                     "type": "string",
-                    "description": "Gắn lần giao việc với task này (bỏ trống = mã TSK-<n> đầu tiên trong tin, rồi task đang làm của worker)."
+                    "description": "Gắn lần giao việc với task này (bỏ trống = mã TSK-n/VIEC-n đầu tiên trong tin, rồi task đang làm của worker)."
+                },
+                "mode": {
+                    "type": "string",
+                    "enum": ["build", "review"],
+                    "description": "'build' (mặc định) = Làm: agy sửa code trong worktree (hoặc giao assign_task_to_role nếu có task); 'review' = Đọc: agy --mode plan chỉ đọc. [đọc] sau @vai cũng chọn review.",
+                    "default": "build"
                 }
             },
             "required": ["message"]
@@ -801,7 +808,7 @@ TOOL_META = {
     "get_worker_terminal_output": _m("warroom", "swarm", True, "Đọc màn hình terminal gần nhất của một worker."),
     "get_warroom_messages": _m("warroom", "swarm", True, "Đọc tin mới nhất trong Phòng giao ban."),
     "wait_worker_result": _m("warroom", "swarm", True, "Chờ worker làm xong một lần giao việc rồi trả kết quả."),
-    "post_warroom_message": _m("warroom", "swarm", False, "Đăng tin vào Phòng giao ban; có @vai là giao việc cho agy."),
+    "post_warroom_message": _m("warroom", "swarm", False, "Đăng tin vào Phòng giao ban; có @vai mặc định Làm, [đọc] để chỉ đọc."),
     "send_worker_directive": _m("warroom", "swarm", False, "Gửi lệnh hoặc phím thẳng vào terminal của worker."),
     "manage_worker_lifecycle": _m("warroom", "swarm", False, "Tạm dừng, tiếp tục, ngủ đông hoặc đánh thức worker."),
     "assign_to_jules": _m("warroom", "swarm", False, "Giao task cho Google Jules: chỉ mở PR, người phải duyệt kế hoạch."),
@@ -1035,7 +1042,9 @@ def execute_tool(name: str, args: dict) -> dict:
             author = args.get("author", "AI Agent")
             tag = args.get("tag", "Directive")
             channel = args.get("channel_id", "war_room")
-            res = db.post_warroom_message("PRJ-GEN-WORKPLACE", channel, author, msg, tag, task_id=str(args.get("task_id") or "").strip())
+            mode = str(args.get("mode") or "build").strip() or "build"
+            res = db.post_warroom_message("PRJ-GEN-WORKPLACE", channel, author, msg, tag,
+                                          task_id=str(args.get("task_id") or "").strip(), mode=mode)
             return {"content": [{"type": "text", "text": json.dumps(res, ensure_ascii=False, indent=2)}], "isError": "error" in res}
 
         # 10. get_warroom_messages

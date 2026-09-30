@@ -1,4 +1,5 @@
 # 🏛️ GEN-WORKPLACE · Multi-Agent Swarm Workplace & Autonomous Mission Control OS
+> **gen-workplace là nơi các agent ngoài phát lệnh chỉ huy vào Phòng giao ban để đội agy CLI làm việc.**  
 > **Hệ điều hành và trung tâm chỉ huy đa tác nhân (Multi-Agent Swarm Workbench) chuyên biệt cho quy trình phát triển phần mềm tự động hóa cao cấp.**  
 > **Chủ sở hữu:** Ryan · **Phiên bản:** v1.2-RELEASE · **Kiến trúc:** SQLite WAL + FTS5 + Docker Sandbox + MCP Server (27 Tools)
 

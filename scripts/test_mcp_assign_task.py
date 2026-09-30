@@ -21,6 +21,10 @@ import time
 import urllib.error
 import urllib.request
 
+for k in list(os.environ):
+    if k.startswith("GIT_CONFIG_") or k.startswith("GIT_AUTHOR_") or k.startswith("GIT_COMMITTER_"):
+        os.environ.pop(k, None)
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TMP = tempfile.mkdtemp(prefix="gw-test-mcp-assign-")
 FAKEBIN = os.path.join(TMP, "bin")
@@ -157,8 +161,8 @@ check("TOOL_META: nhóm kanban, scope kanban, read_only false", meta.get("group"
 check("TOOL_META mô tả nêu mode=build toàn quyền trên máy Fedora", "mode=build" in meta.get("summary", "") and "toàn quyền trên máy Fedora" in meta.get("summary", ""))
 check("db.MCP_TOOL_SCOPES có assign_task = kanban", db.MCP_TOOL_SCOPES.get("assign_task") == "kanban")
 check("tool_catalog có assign_task", any(t["name"] == "assign_task" for t in mcp_core.tool_catalog()))
-check("instructions dặn dùng assign_task cho việc sửa code", "assign_task" in mcp_core.MCP_INSTRUCTIONS
-      and "@vai chỉ để rà soát" in mcp_core.MCP_INSTRUCTIONS)
+check("instructions dặn dùng assign_task cho việc sửa code qua task", "assign_task" in mcp_core.MCP_INSTRUCTIONS
+      and "assign_task" in mcp_core.MCP_INSTRUCTIONS)
 
 print("[2] mode mặc định = build: lệnh agy không --mode plan, trả dispatch_id + branch + worktree_dir, chờ bằng wait_worker_result")
 T1 = new_task("[THỬ] MCP Làm")

@@ -19,6 +19,10 @@ import sys
 import tempfile
 import time
 
+for k in list(os.environ):
+    if k.startswith("GIT_CONFIG_") or k.startswith("GIT_AUTHOR_") or k.startswith("GIT_COMMITTER_"):
+        os.environ.pop(k, None)
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TMP = tempfile.mkdtemp(prefix="gw-test-perm-")
 FAKEBIN = os.path.join(TMP, "bin")
@@ -110,15 +114,15 @@ for cmd in (f"agy {FLAG} -p 'x'", f"agy-run {FLAG}", f"clear; agy --mode plan {F
 ok, _ = directive_guard.guard("gw-qa-agy", "agy --mode plan -p 'x'")
 check("lệnh agy thường vẫn được nhận", ok)
 
-print("[4] war-room: --mode plan -p như cũ + quy tắc chỉ đọc trong settings hồ sơ")
+print("[4] war-room [đọc] (mode=review): --mode plan -p như cũ + quy tắc chỉ đọc trong settings hồ sơ")
 with db.get_connection() as conn:  # gw-qa-agy dùng hồ sơ owner_default (~/.gemini) cho test
     conn.execute("UPDATE tmux_sessions SET account_type = 'owner_default', profile_dir = '' WHERE id = 'gw-qa-agy'")
     conn.commit()
-res = db.post_warroom_message(message="@qa liệt kê test", author="Ryan (Owner)", wait=True)
+res = db.post_warroom_message(message="@qa [đọc] liệt kê test", author="Ryan (Owner)", wait=True)
 with db.get_connection() as conn:
     row = conn.execute("SELECT command, status FROM dispatch_log WHERE id = ?", (res["dispatches"][0]["dispatch_id"],)).fetchone()
 cmd = row["command"]
-check("lệnh vẫn là agy --gemini_dir=... --mode plan -p", f"--gemini_dir={PROFILE} --mode plan -p @qa" in cmd, cmd[:200])
+check("lệnh [đọc] là agy --gemini_dir=... --mode plan -p", f"--gemini_dir={PROFILE}" in cmd and "--mode plan -p" in cmd, cmd[:200])
 check("không --sandbox, không skip-permissions", "--sandbox" not in cmd and FLAG not in cmd, cmd[:200])
 check("dispatch done", row["status"] == "done", row["status"])
 data = json.load(open(SETTINGS))
@@ -128,7 +132,7 @@ check("thêm read_file(<worktree qa>)", f"read_file({os.path.realpath(wt_qa)})" 
 check("thêm command(git log), command(grep), command(ls)", all(f"command({c})" in allow for c in ("git log", "grep", "ls")), str(allow))
 check("không cấp lệnh ghi/xóa", not any(r.startswith(("command(rm", "command(git push", "command(git commit", "write_file")) for r in allow), str(allow))
 n = len(allow)
-db.post_warroom_message(message="@qa lần 2", author="Ryan (Owner)", wait=True)
+db.post_warroom_message(message="@qa [đọc] lần 2", author="Ryan (Owner)", wait=True)
 check("idempotent: gọi lần 2 không nhân đôi quy tắc", len(json.load(open(SETTINGS))["permissions"]["allow"]) == n)
 check("ensure_agy_plan_permissions lần 2 trả []", db.ensure_agy_plan_permissions(PROFILE, wt_qa) == [])
 bad = os.path.join(TMP, "bad-profile")
@@ -142,15 +146,15 @@ os.makedirs(other)
 check("GW_AGY_PLAN_ALLOW=0 → không ghi", db.ensure_agy_plan_permissions(other, wt_qa) == [] and not os.path.exists(os.path.join(other, "antigravity-cli")))
 os.environ.pop("GW_AGY_PLAN_ALLOW")
 
-print("[5] GW_WARROOM_SKIP_PERMISSIONS=1 (lối thoát cuối) chỉ thêm cờ khi ở worktree của vai")
+print("[5] GW_WARROOM_SKIP_PERMISSIONS=1 (lối thoát cuối) chỉ thêm cờ khi ở worktree của vai (chế độ review)")
 os.environ["GW_WARROOM_SKIP_PERMISSIONS"] = "1"
-res = db.post_warroom_message(message="@qa lần 3", author="Ryan (Owner)", wait=True)
+res = db.post_warroom_message(message="@qa [đọc] lần 3", author="Ryan (Owner)", wait=True)
 with db.get_connection() as conn:
     cmd = conn.execute("SELECT command FROM dispatch_log WHERE id = ?", (res["dispatches"][0]["dispatch_id"],)).fetchone()["command"]
 check("có cờ + vẫn --mode plan", FLAG in cmd and "--mode plan -p" in cmd, cmd[:200])
 _orig = db.ensure_role_worktree
 db.ensure_role_worktree = lambda sid: REPO  # giả lập git worktree lỗi → rơi về repo app
-res = db.post_warroom_message(message="@lead lần 4", author="Ryan (Owner)", wait=True)
+res = db.post_warroom_message(message="@lead [đọc] lần 4", author="Ryan (Owner)", wait=True)
 db.ensure_role_worktree = _orig
 with db.get_connection() as conn:
     cmd = conn.execute("SELECT command FROM dispatch_log WHERE id = ?", (res["dispatches"][0]["dispatch_id"],)).fetchone()["command"]
