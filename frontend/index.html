@@ -4257,6 +4257,13 @@ body.resizing-active, body.resizing-active * {
 .taskLinkActions { display:flex; flex-wrap:wrap; gap:4px; align-items:center; }
 .taskLinkActions .btn.small { font-size:9.5px; padding:1px 6px; }
 /* Chế độ Làm (#45): nhánh wt/TSK-n, commit, test, push, compare trên thẻ task */
+.buildStrip { display:flex; flex-wrap:wrap; gap:4px; align-items:center; font-size:10px; padding:3px 6px; border-radius:4px; background:rgba(158,206,106,0.08); border:1px solid rgba(158,206,106,0.3); }
+.buildStrip a { color:var(--accent); }
+.buildStrip .buildLabel { font-weight:600; color:var(--text); }
+.buildStrip code { font-size:9.5px; }
+.buildStrip .bad { color:var(--red); }
+.buildStrip .good { color:var(--green); }
+/* Chế độ Làm (#45): nhánh wt/TSK-n, commit, test, push, compare trên thẻ task */
 .taskAssignSel { font-size:9.5px; padding:1px 2px; background:#0b0f17; color:var(--text); border:1px solid var(--line2); border-radius:4px; }
 .refChip { display:inline-flex; align-items:center; font-family:var(--mono); font-size:9.5px; font-weight:700; padding:0 6px; margin:0 2px; border-radius:4px; cursor:pointer; line-height:16px; border:1px solid rgba(122,162,247,.45); background:rgba(122,162,247,.12); color:var(--accent2, #9ab8ff); }
 .refChip.viec { border-color:rgba(224,179,90,.45); background:rgba(224,179,90,.12); color:var(--yellow); }

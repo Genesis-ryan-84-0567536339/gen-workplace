@@ -3881,7 +3881,7 @@ def touch_task_lock(task_id):
 
 def _expire_lost_dispatches(task_ids):
     """Dòng warroom/build 'running' của các task này đã quá hạn cứng (thread mất do app khởi động lại) → failed
-    (cùng luật _mark_stale_warroom mà wait_worker_result dùng). tmux/jules có poller riêng nên bỏ qua."""
+    (cùng luật _mark_stale_warroom mà wait_worker_result dùng). tmux có poller riêng nên bỏ qua."""
     if not task_ids:
         return
     marks = ",".join("?" for _ in task_ids)
