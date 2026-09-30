@@ -642,7 +642,7 @@ def init_db():
                               ("fallback_reason", "TEXT DEFAULT ''"), ("profiles_tried", "TEXT DEFAULT ''"),
                               # tin kết quả đã ghi về phiên (conversation) của task: id gen_messages (tránh ghi 2 lần)
                               ("task_msg_id", "INTEGER"),
-                              # worker ngoài (#43, Jules): engine ('' = agy), id phiên bên ngoài, trạng thái bên ngoài, link phiên,
+                              # worker ngoài: engine ('' = agy), id phiên bên ngoài, trạng thái bên ngoài, link phiên,
                               # URL PR worker mở, id kế hoạch đã ghi về phiên của task (tránh ghi 2 lần)
                               ("engine", "TEXT DEFAULT ''"), ("ext_session_id", "TEXT DEFAULT ''"), ("ext_state", "TEXT DEFAULT ''"),
                               ("ext_url", "TEXT DEFAULT ''"), ("pr_url", "TEXT DEFAULT ''"), ("ext_plan_id", "TEXT DEFAULT ''"),
@@ -3881,7 +3881,7 @@ def touch_task_lock(task_id):
 
 def _expire_lost_dispatches(task_ids):
     """Dòng warroom/build 'running' của các task này đã quá hạn cứng (thread mất do app khởi động lại) → failed
-    (cùng luật _mark_stale_warroom mà wait_worker_result dùng). tmux/jules có poller riêng nên bỏ qua."""
+    (cùng luật _mark_stale_warroom mà wait_worker_result dùng). tmux có poller riêng nên bỏ qua."""
     if not task_ids:
         return
     marks = ",".join("?" for _ in task_ids)
@@ -4105,7 +4105,7 @@ def get_dispatch_log(limit=50, task_id="", session_id=""):
 # Chỗ ghi kết quả dispatch (dispatch_warroom_to_agent, watcher tmux) gọi _notify_dispatch_change();
 # wait_worker_result chờ trên Condition này, kèm poll DB mỗi giây (tiến trình MCP stdio riêng không nhận được notify).
 _DISPATCH_COND = threading.Condition()
-# Worker ngoài đăng ký hàm làm mới 1 dòng dispatch_log đang running theo kind (vd 'jules' → jules_worker.refresh_for_wait).
+# Worker ngoài đăng ký hàm làm mới 1 dòng dispatch_log đang running theo kind.
 # wait_worker_result gọi hàm này thay vì đánh dấu quá hạn kiểu war-room. db không import module worker (tránh vòng import).
 DISPATCH_POLLERS = {}
 WAIT_WORKER_DEFAULT_SEC = 60
@@ -4165,12 +4165,12 @@ def start_dispatch_log(session_id, kind="warroom", channel_id="", task_id="", co
     touch_task_lock(task_id)   # heartbeat khóa thẻ Kanban lúc bắt đầu chạy
     return did
 
-# Việc chạy trên cloud (Jules): app restart không làm mất → không hoãn tự cập nhật vì chúng
-AUTO_UPDATE_IGNORE_KINDS = ("jules",)
+# AUTO_UPDATE_IGNORE_KINDS giữ lại tuple rỗng để không hoãn vì lý do engine
+AUTO_UPDATE_IGNORE_KINDS = ()
 
 def running_dispatches_for_update():
     """Dispatch đang running chạy TRÊN MÁY này (agy build, review/war-room, tmux) — tự cập nhật (restart) lúc này làm mất
-    việc, nên auto_update hoãn. Bỏ Jules (chạy trên cloud, poll lại được sau restart). Trả [{id, kind, session_id, task_id, started_at}]."""
+    việc, nên auto_update hoãn. Trả [{id, kind, session_id, task_id, started_at}]."""
     with get_connection() as conn:
         rows = conn.execute("SELECT id, kind, engine, session_id, task_id, started_at FROM dispatch_log WHERE status = 'running' "
                             "ORDER BY id").fetchall()
@@ -4484,7 +4484,7 @@ def wait_worker_result(dispatch_id=None, task_id="", session_id="", timeout_sec=
         "profile_used": row.get("profile_used") or "",
         "fallback": bool(row.get("profile_used")) and (row.get("profile_used") or "") != (row.get("profile_initial") or ""),
         "fallback_reason": row.get("fallback_reason") or "",
-        # worker ngoài (#43): engine ('jules'), id phiên bên ngoài, trạng thái bên ngoài, URL PR đã mở
+        # worker ngoài: engine, id phiên bên ngoài, trạng thái bên ngoài, URL PR đã mở
         "engine": row.get("engine") or "",
         "ext_session_id": row.get("ext_session_id") or "",
         "ext_state": row.get("ext_state") or "",

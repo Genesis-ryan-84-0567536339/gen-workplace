@@ -186,16 +186,16 @@ def main():
     r = run(busy=lambda: busy_items)
     check("up_to_date dù còn việc chạy", r["action"] == "up_to_date", r)
 
-    # 13. db.running_dispatches_for_update: build / warroom / tmux tính, Jules (cloud) và việc đã xong không tính
+    # 13. db.running_dispatches_for_update: build / warroom / tmux tính, việc đã xong không tính
     os.environ["DATA_DIR"] = str(tmp / "dbdata")
     from backend import db
-    ids = {k: db.start_dispatch_log("gw-backend-agy", kind=k, task_id="TSK-1") for k in ("build", "warroom", "tmux", "jules")}
+    ids = {k: db.start_dispatch_log("gw-backend-agy", kind=k, task_id="TSK-1") for k in ("build", "warroom", "tmux")}
     done = db.start_dispatch_log("gw-qa-agy", kind="build")
     with db.get_connection() as conn:
         conn.execute("UPDATE dispatch_log SET status = 'done' WHERE id = ?", (done,))
         conn.commit()
     got = db.running_dispatches_for_update()
-    check("running_dispatches_for_update: build + warroom + tmux, bỏ jules + done",
+    check("running_dispatches_for_update: build + warroom + tmux, bỏ done",
           sorted(x["kind"] for x in got) == ["build", "tmux", "warroom"] and all(x["id"] != done for x in got), got)
 
     print(f"{total - failed}/{total} test pass")

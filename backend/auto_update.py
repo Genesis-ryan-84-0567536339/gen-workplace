@@ -12,8 +12,7 @@ Mỗi GW_AUTO_UPDATE_SEC giây (mặc định 120) thread nền:
      tiến trình bằng os.execv (giữ nguyên PID -> systemd/nohup đều ổn).
   5. Chạy thử hỏng -> quay về commit cũ, nhớ commit hỏng để không thử lại, ghi log.
 
-Hoãn khi đang có việc chạy (VIEC-12): trước bước 3, còn dispatch 'running' (agy build, review/war-room, tmux; Jules không
-tính vì chạy trên cloud) -> action=deferred, thử lại chu kỳ sau (restart lúc đó làm mất lần build). Hoãn quá
+Hoãn khi đang có việc chạy (VIEC-12): trước bước 3, còn dispatch 'running' (agy build, review/war-room, tmux) -> action=deferred, thử lại chu kỳ sau (restart lúc đó làm mất lần build). Hoãn quá
 GW_AUTO_UPDATE_MAX_DEFER_MIN phút (mặc định 60; 0 = không hoãn) -> vẫn cập nhật, ghi log cảnh báo (dispatch treo không
 chặn cập nhật mãi).
 
