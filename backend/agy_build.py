@@ -386,7 +386,7 @@ def push_branch(worktree, branch):
 
 def create_draft_pr(slug, branch, title, body):
     """Có GITHUB_TOKEN → tạo PR NHÁP head=wt/TSK-n base=main. Không bao giờ merge. Trả (url, lỗi)."""
-    token = (os.environ.get("GITHUB_TOKEN") or "").strip()
+    token = db.github_token()
     if not token or not slug:
         return "", ""
     api = (os.environ.get("GW_GITHUB_API_URL") or "https://api.github.com").rstrip("/")
