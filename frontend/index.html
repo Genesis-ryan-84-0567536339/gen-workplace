@@ -12251,7 +12251,7 @@ function taskLiveBadge(t) {
     return `<span class="chip taskLiveBadge run" data-live-dispatch="${escapeHtml(String(lv.dispatch_id))}" title="${escapeHtml(tip)}">▶ Đang chạy · dispatch #${escapeHtml(String(lv.dispatch_id))}${mins !== null ? ' · ' + mins + ' phút' : ''}</span>`;
   }
   if (t.stale) {
-    return `<span class="chip taskLiveBadge wait" data-stale="1" title="Thẻ đang 'in_progress' nhưng không có dispatch nào chạy. Khóa quá hạn thì hệ thống tự đưa về Cần làm.">⚠ Không ai chạy</span>`;
+    return `<span class="chip taskLiveBadge wait" data-stale="1" title="Thẻ đang 'in_progress' nhưng không có agy nào chạy cho thẻ này. Người giữ không cập nhật quá 30 phút (GW_KANBAN_STALE_MIN) thì hệ thống tự đưa về Cần làm.">⚠ Không có agy chạy${t.claimed_by ? ' · ' + escapeHtml(String(t.claimed_by)) + ' giữ' : ''}${t.locked_at ? ' · từ ' + escapeHtml(String(t.locked_at).slice(5, 16)) : ''}</span>`;
   }
   return '';
 }

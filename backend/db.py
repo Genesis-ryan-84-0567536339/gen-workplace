@@ -3901,6 +3901,14 @@ def _fmt_timeout(sec):
     sec = int(sec or 0)
     return f"{max(1, round(sec / 60))} phút" if sec >= 60 else f"{max(0, sec)} giây"
 
+def kanban_stale_timeout_sec():
+    """Ngưỡng thu hồi thẻ Kanban không có dispatch chạy (giây): GW_KANBAN_STALE_MIN phút, mặc định 30.
+    Dài hơn khóa roadmap (5 phút) vì agent ngoài (Claude điều phối) có thể giữ thẻ trong lúc làm PR mà không có dispatch."""
+    try:
+        return max(60, int(float(os.environ.get("GW_KANBAN_STALE_MIN", "30")) * 60))
+    except ValueError:
+        return 1800
+
 def reclaim_stalled_tasks(timeout_seconds=None, project_id="PRJ-GEN-WORKPLACE", all_projects=False):
     """
     Thu hồi nhiệm vụ bị treo từ Agent bóng ma / crash (Anti-Zombie Reclamation):
@@ -3913,6 +3921,7 @@ def reclaim_stalled_tasks(timeout_seconds=None, project_id="PRJ-GEN-WORKPLACE", 
     Trả {"reclaimed_count": tổng, "todos_reclaimed": n, "reclaimed_ids": [TSK-..]}.
     """
     project_id = normalize_project_id(project_id)
+    kanban_timeout = timeout_seconds if timeout_seconds is not None else kanban_stale_timeout_sec()
     if timeout_seconds is None:
         timeout_seconds = task_lock_timeout_sec()
     with get_connection() as conn:
@@ -3927,7 +3936,7 @@ def reclaim_stalled_tasks(timeout_seconds=None, project_id="PRJ-GEN-WORKPLACE", 
         conn.commit()
         where_prj, prm = ("", []) if all_projects else (" AND project_id = ?", [project_id])
         cands = conn.execute(f"SELECT id FROM gen_session_todos WHERE status = 'in_progress'{where_prj} AND {_LOCK_STALE_SQL}",
-                             prm + [timeout_seconds]).fetchall()
+                             prm + [kanban_timeout]).fetchall()
     cand_ids = [r["id"] for r in cands]
     _expire_lost_dispatches(cand_ids)
 
@@ -3943,7 +3952,7 @@ def reclaim_stalled_tasks(timeout_seconds=None, project_id="PRJ-GEN-WORKPLACE", 
             UPDATE gen_session_todos SET status = 'todo', claimed_by = '', locked_at = '', updated_at = CURRENT_TIMESTAMP
             WHERE id = ? AND status = 'in_progress' AND {_LOCK_STALE_SQL}
               AND NOT EXISTS (SELECT 1 FROM dispatch_log d WHERE d.task_id = gen_session_todos.id AND d.status = 'running')
-            """, (tid, timeout_seconds))
+            """, (tid, kanban_timeout))
             if cur.rowcount == 1:
                 conn.execute("UPDATE tmux_sessions SET current_task_id = '' WHERE current_task_id = ?", (tid,))
                 reclaimed.append(dict(r))
@@ -3951,7 +3960,7 @@ def reclaim_stalled_tasks(timeout_seconds=None, project_id="PRJ-GEN-WORKPLACE", 
 
     for r in reclaimed:
         holder = (r["holder"] or "").strip() or "(không rõ)"
-        lock_txt = (f"khóa của {holder} đã quá {_fmt_timeout(timeout_seconds)}" if (r["locked_at"] or "").strip()
+        lock_txt = (f"khóa của {holder} đã quá {_fmt_timeout(kanban_timeout)}" if (r["locked_at"] or "").strip()
                     else f"khóa của {holder} không có thời điểm khóa")
         note = (f"Tự thu hồi {r['id']}: không có dispatch nào chạy, {lock_txt}. "
                 f"Thẻ về 'todo' (bỏ người giữ) để giao lại hoặc nghiệm thu bằng complete_task.")
