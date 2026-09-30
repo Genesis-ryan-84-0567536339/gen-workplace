@@ -3317,11 +3317,47 @@ EVIDENCE_FORMATS_HINT = ("commit SHA có trong repo, file không rỗng trong ~/
 GITHUB_API_BASE = "https://api.github.com"
 DISPATCH_OK_STATUSES = ("done", "ok")
 
+
+def _github_token_with_source():
+    """Trả về (nguồn, token): ('env' | 'file' | 'none', token).
+    Ưu tiên biến môi trường GITHUB_TOKEN, không có thì đọc <DATA_DIR>/secrets/github.token."""
+    env_tok = (os.environ.get("GITHUB_TOKEN") or "").strip()
+    if env_tok:
+        return "env", env_tok
+    d = os.environ.get("DATA_DIR")
+    data_dir = Path(d) if d else Path(DATA_DIR)
+    token_file = data_dir / "secrets" / "github.token"
+    try:
+        if token_file.is_file():
+            content = token_file.read_text(encoding="utf-8")
+            for line in content.splitlines():
+                tok = line.strip()
+                if tok and not tok.startswith("#"):
+                    return "file", tok
+    except Exception:
+        pass
+    return "none", ""
+
+
+def github_token_source():
+    """Trả về nguồn token GitHub: 'env' | 'file' | 'none' (chỉ nguồn, không lộ giá trị)."""
+    src, _ = _github_token_with_source()
+    return src
+
+
+def github_token():
+    """Ưu tiên env GITHUB_TOKEN, không có thì đọc file <DATA_DIR>/secrets/github.token (strip, bỏ dòng trống);
+    không có thì "". Không bao giờ in token ra log/response."""
+    _, tok = _github_token_with_source()
+    return tok
+
+
 def _github_api_timeout():
     try:
         return max(1.0, float(os.environ.get("GW_GITHUB_API_TIMEOUT_SEC", "5")))
     except ValueError:
         return 5.0
+
 
 def _verify_github_pr(owner, repo, number):
     """Gọi GitHub API công khai kiểm PR có thật. Không gọi được mạng / bị từ chối → (False, lý do); không bao giờ im lặng cho qua."""
@@ -3330,7 +3366,7 @@ def _verify_github_pr(owner, repo, number):
     url = f"{GITHUB_API_BASE}/repos/{owner}/{repo}/pulls/{number}"
     headers = {"Accept": "application/vnd.github+json", "User-Agent": "gen-workplace-evidence-check",
                "X-GitHub-Api-Version": "2022-11-28"}
-    token = (os.environ.get("GITHUB_TOKEN") or "").strip()
+    token = github_token()
     if token:
         headers["Authorization"] = f"Bearer {token}"
     try:
