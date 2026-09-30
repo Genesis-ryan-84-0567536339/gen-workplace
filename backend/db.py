@@ -3672,6 +3672,7 @@ def complete_task(session_id, todo_id, evidence_ref, verified_by="Lead Architect
         return {"error": msg, "code": "invalid_evidence", "task_id": todo_id}
     evidence_ref = evidence_ref.strip()
     holder_col = _TASK_HOLDER_COL[table]
+    auto_ticked = []
 
     with get_connection() as conn:
         conn.isolation_level = None
@@ -3692,11 +3693,27 @@ def complete_task(session_id, todo_id, evidence_ref, verified_by="Lead Architect
                 WHERE id = ? AND project_id = ?{guard}
                 """, [evidence_ref, verified_by, todo_id, project_id] + guard_params)
             else:
+                # Bằng chứng đã kiểm được → tick nốt các mục checklist còn mở (không bao giờ làm việc đóng thất bại)
+                chk_row = conn.execute("SELECT checklist_json FROM gen_session_todos WHERE id = ? AND project_id = ?",
+                                       (todo_id, project_id)).fetchone()
+                chk_json = chk_row["checklist_json"] if chk_row else None
+                try:
+                    chk = json.loads(chk_json or "[]")
+                    if isinstance(chk, list):
+                        for it in chk:
+                            if isinstance(it, dict) and not it.get("done"):
+                                it["done"] = True
+                                auto_ticked.append(str(it.get("id") or it.get("text") or ""))
+                        if auto_ticked:
+                            chk_json = json.dumps(chk, ensure_ascii=False)
+                except Exception:
+                    auto_ticked = []
                 cur = conn.execute(f"""
                 UPDATE gen_session_todos
-                SET status = 'done', evidence_ref = ?, claimed_by = '', locked_at = '', updated_at = CURRENT_TIMESTAMP
+                SET status = 'done', evidence_ref = ?, claimed_by = '', locked_at = '', updated_at = CURRENT_TIMESTAMP,
+                    checklist_json = COALESCE(?, checklist_json)
                 WHERE id = ? AND project_id = ?{guard}
-                """, [evidence_ref, todo_id, project_id] + guard_params)
+                """, [evidence_ref, chk_json if auto_ticked else None, todo_id, project_id] + guard_params)
             if cur.rowcount == 0:
                 conn.execute("ROLLBACK")
                 if old and old["status"] == "done":
@@ -3737,6 +3754,9 @@ def complete_task(session_id, todo_id, evidence_ref, verified_by="Lead Architect
         res["force_closed"] = {"held_by": old_holder, "reason": reason or ""}
     if acting_for:
         res["closed_for_holder"] = acting_for
+    if auto_ticked:
+        res["auto_ticked"] = auto_ticked
+        print(f"[evidence] {todo_id} done ({evidence_ref}) → tự tick checklist còn mở: {', '.join(auto_ticked)}")
     if cleanup.get("removed"):
         res["worktree_removed"] = cleanup["dir"]
     return res
@@ -3794,10 +3814,11 @@ def set_task_status(todo_id, new_status, project_id="PRJ-GEN-WORKPLACE", conv_id
     with get_connection() as conn:
         if conv_id:
             params = [new_status]
-            extra = ""
+            # Về 'todo' = không ai giữ nữa → bỏ claimed_by/locked_at (review vẫn giữ người làm)
+            extra = ", claimed_by = '', locked_at = ''" if new_status == "todo" else ""
             if evidence_ref:
                 # Không đè bằng chứng của task đã done qua đường đổi trạng thái thường
-                extra = ", evidence_ref = CASE WHEN status = 'done' THEN evidence_ref ELSE ? END"
+                extra += ", evidence_ref = CASE WHEN status = 'done' THEN evidence_ref ELSE ? END"
                 params.append(evidence_ref)
             cur = conn.execute(f"UPDATE gen_session_todos SET status = ?, updated_at = CURRENT_TIMESTAMP{extra} WHERE id = ? AND conversation_id = ?",
                                params + [todo_id, conv_id])
@@ -3811,15 +3832,96 @@ def set_task_status(todo_id, new_status, project_id="PRJ-GEN-WORKPLACE", conv_id
         _refresh_roadmap_status(todo_id, project_id)
     return {"status": "updated", "id": todo_id, "new_status": new_status}
 
-def reclaim_stalled_tasks(timeout_seconds=None, project_id="PRJ-GEN-WORKPLACE"):
+def _dispatch_elapsed_sec(started_at):
+    """Số giây từ started_at (giờ máy '%Y-%m-%d %H:%M:%S' hoặc ISO) tới giờ; không đọc được → None."""
+    s = (started_at or "").strip()
+    if not s:
+        return None
+    try:
+        return max(0, int(time.time() - time.mktime(time.strptime(s, "%Y-%m-%d %H:%M:%S"))))
+    except Exception:
+        pass
+    try:
+        dt = datetime.fromisoformat(s)
+        ts = dt.timestamp() if dt.tzinfo else time.mktime(dt.timetuple())
+        return max(0, int(time.time() - ts))
+    except Exception:
+        return None
+
+def _live_info(row):
+    """Thông tin 'đang chạy' của 1 dòng dispatch_log running cho thẻ Kanban (trường live)."""
+    return {"dispatch_id": row["id"], "kind": row["kind"] or "warroom", "session_id": row["session_id"] or "",
+            "started_at": row["started_at"] or "", "elapsed_sec": _dispatch_elapsed_sec(row["started_at"])}
+
+def running_dispatch_by_task(conn=None):
+    """{task_id: live-info} của dispatch đang running (lần mới nhất mỗi task) — 1 câu SELECT cho cả danh sách."""
+    def _q(c):
+        return c.execute("SELECT id, kind, session_id, task_id, started_at FROM dispatch_log "
+                         "WHERE status = 'running' AND COALESCE(task_id, '') != '' ORDER BY id DESC").fetchall()
+    rows = _q(conn) if conn is not None else None
+    if rows is None:
+        with get_connection() as c:
+            rows = _q(c)
+    out = {}
+    for r in rows:
+        out.setdefault(r["task_id"], _live_info(r))
+    return out
+
+def touch_task_lock(task_id):
+    """Heartbeat: task Kanban in_progress đang có dispatch (bắt đầu / vừa xong) → làm mới locked_at để không bị thu hồi oan."""
+    if not task_id:
+        return
+    try:
+        with get_connection() as conn:
+            conn.execute("UPDATE gen_session_todos SET locked_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'in_progress'",
+                         (task_id,))
+            conn.commit()
+    except Exception as e:
+        print(f"[reclaim] không làm mới được khóa {task_id}: {e}")
+
+def _expire_lost_dispatches(task_ids):
+    """Dòng warroom/build 'running' của các task này đã quá hạn cứng (thread mất do app khởi động lại) → failed
+    (cùng luật _mark_stale_warroom mà wait_worker_result dùng). tmux/jules có poller riêng nên bỏ qua."""
+    if not task_ids:
+        return
+    marks = ",".join("?" for _ in task_ids)
+    with get_connection() as conn:
+        rows = [dict(r) for r in conn.execute(
+            f"SELECT * FROM dispatch_log WHERE status = 'running' AND task_id IN ({marks})", list(task_ids)).fetchall()]
+    for row in rows:
+        if (row.get("kind") or "warroom") in ("warroom", "build"):
+            try:
+                if _mark_stale_warroom(row):
+                    print(f"[reclaim] dispatch:{row['id']} ({row.get('kind')}) quá hạn không có kết quả → failed")
+                    report_dispatch_to_task(row["id"])
+            except Exception as e:
+                print(f"[reclaim] lỗi kiểm dispatch:{row.get('id')}: {e}")
+
+def _fmt_timeout(sec):
+    sec = int(sec or 0)
+    return f"{max(1, round(sec / 60))} phút" if sec >= 60 else f"{max(0, sec)} giây"
+
+def kanban_stale_timeout_sec():
+    """Ngưỡng thu hồi thẻ Kanban không có dispatch chạy (giây): GW_KANBAN_STALE_MIN phút, mặc định 30.
+    Dài hơn khóa roadmap (5 phút) vì agent ngoài (Claude điều phối) có thể giữ thẻ trong lúc làm PR mà không có dispatch."""
+    try:
+        return max(60, int(float(os.environ.get("GW_KANBAN_STALE_MIN", "30")) * 60))
+    except ValueError:
+        return 1800
+
+def reclaim_stalled_tasks(timeout_seconds=None, project_id="PRJ-GEN-WORKPLACE", all_projects=False):
     """
     Thu hồi nhiệm vụ bị treo từ Agent bóng ma / crash (Anti-Zombie Reclamation):
-    - Quét các task 'in_progress' bị giữ quá timeout mà session không gửi heartbeat
-      (kể cả task seed/không có locked_at — không ai thật sự đang giữ).
-    - Nhả task về lại trạng thái 'queued' để worker khác nhận việc.
+    - Roadmap 'todos': task 'in_progress' giữ quá timeout (kể cả không có locked_at) → 'queued'.
+    - Kanban phiên 'gen_session_todos': thẻ 'in_progress' KHÔNG có dispatch nào đang running cho task đó VÀ khóa quá
+      timeout (locked_at rỗng/NULL coi như quá hạn) → 'todo', claimed_by='', locked_at=''; ghi 1 tin vào phiên của thẻ.
+      Thẻ đang có dispatch running KHÔNG BAO GIỜ bị thu hồi (dispatch warroom/build quá hạn cứng được chốt failed trước).
     - timeout_seconds=None → task_lock_timeout_sec() (cùng ngưỡng claim_task dùng để cho claim lại).
+    - all_projects=True (thread nền) → quét Kanban mọi dự án.
+    Trả {"reclaimed_count": tổng, "todos_reclaimed": n, "reclaimed_ids": [TSK-..]}.
     """
     project_id = normalize_project_id(project_id)
+    kanban_timeout = timeout_seconds if timeout_seconds is not None else kanban_stale_timeout_sec()
     if timeout_seconds is None:
         timeout_seconds = task_lock_timeout_sec()
     with get_connection() as conn:
@@ -3830,9 +3932,45 @@ def reclaim_stalled_tasks(timeout_seconds=None, project_id="PRJ-GEN-WORKPLACE"):
         WHERE project_id = ? AND status = 'in_progress'
           AND {_LOCK_STALE_SQL}
         """, (project_id, timeout_seconds))
-        reclaimed = cursor.rowcount
+        todos_reclaimed = cursor.rowcount
         conn.commit()
-        return {"reclaimed_count": reclaimed}
+        where_prj, prm = ("", []) if all_projects else (" AND project_id = ?", [project_id])
+        cands = conn.execute(f"SELECT id FROM gen_session_todos WHERE status = 'in_progress'{where_prj} AND {_LOCK_STALE_SQL}",
+                             prm + [kanban_timeout]).fetchall()
+    cand_ids = [r["id"] for r in cands]
+    _expire_lost_dispatches(cand_ids)
+
+    reclaimed = []
+    with get_connection() as conn:
+        for tid in cand_ids:
+            r = conn.execute("SELECT id, conversation_id, COALESCE(NULLIF(claimed_by, ''), assigned_agent, '') AS holder, locked_at "
+                             "FROM gen_session_todos WHERE id = ?", (tid,)).fetchone()
+            if not r:
+                continue
+            # Điều kiện đặt lại trong chính câu UPDATE: vẫn in_progress, khóa vẫn quá hạn, không có dispatch running
+            cur = conn.execute(f"""
+            UPDATE gen_session_todos SET status = 'todo', claimed_by = '', locked_at = '', updated_at = CURRENT_TIMESTAMP
+            WHERE id = ? AND status = 'in_progress' AND {_LOCK_STALE_SQL}
+              AND NOT EXISTS (SELECT 1 FROM dispatch_log d WHERE d.task_id = gen_session_todos.id AND d.status = 'running')
+            """, (tid, kanban_timeout))
+            if cur.rowcount == 1:
+                conn.execute("UPDATE tmux_sessions SET current_task_id = '' WHERE current_task_id = ?", (tid,))
+                reclaimed.append(dict(r))
+        conn.commit()
+
+    for r in reclaimed:
+        holder = (r["holder"] or "").strip() or "(không rõ)"
+        lock_txt = (f"khóa của {holder} đã quá {_fmt_timeout(kanban_timeout)}" if (r["locked_at"] or "").strip()
+                    else f"khóa của {holder} không có thời điểm khóa")
+        note = (f"Tự thu hồi {r['id']}: không có dispatch nào chạy, {lock_txt}. "
+                f"Thẻ về 'todo' (bỏ người giữ) để giao lại hoặc nghiệm thu bằng complete_task.")
+        print(f"[reclaim] {note}")
+        if r["conversation_id"]:
+            res = log_gen_message(r["conversation_id"], note, "assistant", "Hệ thống (thu hồi task)")
+            if "error" in res:
+                print(f"[reclaim] không ghi được tin vào phiên {r['conversation_id']}: {res['error']}")
+    return {"reclaimed_count": todos_reclaimed + len(reclaimed), "todos_reclaimed": todos_reclaimed,
+            "reclaimed_ids": [r["id"] for r in reclaimed]}
 
 def get_warroom_messages(channel_id="war_room", project_id="PRJ-GEN-WORKPLACE", limit=60):
     """Lấy danh sách tin nhắn phòng giao ban theo kênh."""
@@ -4023,7 +4161,9 @@ def start_dispatch_log(session_id, kind="warroom", channel_id="", task_id="", co
         VALUES (?, ?, NULL, ?, ?, '', ?, ?, ?, 0, 'running', ?, '', ?)
         """, (session_id, command, report_path, time.strftime("%Y-%m-%d %H:%M:%S"), task_id or "", viec_ref or "", channel_id, kind, request_msg_id))
         conn.commit()
-        return cur.lastrowid
+        did = cur.lastrowid
+    touch_task_lock(task_id)   # heartbeat khóa thẻ Kanban lúc bắt đầu chạy
+    return did
 
 # Việc chạy trên cloud (Jules): app restart không làm mất → không hoãn tự cập nhật vì chúng
 AUTO_UPDATE_IGNORE_KINDS = ("jules",)
@@ -5372,7 +5512,8 @@ def build_task_prompt_block(task_id, project_id="PRJ-GEN-WORKPLACE"):
         for c in chk:
             if isinstance(c, dict):
                 lines.append(f"- [{'x' if c.get('done') else ' '}] ({c.get('id', '')}) {c.get('text', '')}")
-        lines.append(f"Xong mục nào thì ghi đúng một dòng [KANBAN_UPDATE: {d['id']} | CHECK: <id mục>] trong câu trả lời để hệ thống tick checklist.")
+        lines.append(f"Xong mục nào thì ghi ngay đúng một dòng [KANBAN_UPDATE: {d['id']} | CHECK: <id mục>] trong câu trả lời "
+                     "(mỗi mục một dòng, <id mục> là mã trong ngoặc ở trên) để hệ thống tick checklist; Boss xem tiến độ qua checklist này.")
     return "\n".join(lines)
 
 
@@ -5405,6 +5546,8 @@ def report_dispatch_to_task(dispatch_id, project_id="PRJ-GEN-WORKPLACE"):
         status = _row_status(row)
         if status == "running":
             return None
+        # Heartbeat lúc dispatch kết thúc: cho người điều phối trọn 1 ngưỡng khóa để nghiệm thu trước khi bị thu hồi
+        touch_task_lock(row["task_id"])
         task = _task_detail(row["task_id"], project_id)
         if not task or not task.get("conversation_id"):
             return None
@@ -5625,16 +5768,30 @@ def attach_task_links(todos):
     with get_connection() as conn:
         rows = conn.execute(f"SELECT * FROM dispatch_log WHERE task_id IN ({marks}) ORDER BY id DESC", ids).fetchall()
         convs = {r["id"]: r["title"] for r in conn.execute("SELECT id, title FROM gen_conversations").fetchall()}
-    last, counts = {}, {}
+    last, counts, live = {}, {}, {}
     for r in rows:
         counts[r["task_id"]] = counts.get(r["task_id"], 0) + 1
         if r["task_id"] not in last:
             last[r["task_id"]] = _dispatch_brief(r)
+        if r["status"] == "running" and r["task_id"] not in live:   # rows đã ORDER BY id DESC → lần running mới nhất
+            live[r["task_id"]] = _live_info(r)
     for t in todos:
         t["last_dispatch"] = last.get(t["id"])
         t["dispatch_count"] = counts.get(t["id"], 0)
         t["holder"] = t.get("claimed_by") or ""
         t["conversation_title"] = convs.get(t.get("conversation_id"), "")
+        # Sự thật về thẻ: có dispatch đang chạy thật không (live), hay 'in_progress' mà không ai chạy (stale)
+        t["live"] = live.get(t["id"])
+        t["stale"] = t.get("status") == "in_progress" and t["live"] is None
+        chk = t.get("checklist")
+        if not isinstance(chk, list):
+            try:
+                chk = json.loads(t.get("checklist_json") or "[]")
+            except Exception:
+                chk = []
+            chk = chk if isinstance(chk, list) else []
+        t["checklist_total"] = len(chk)
+        t["checklist_done"] = sum(1 for it in chk if isinstance(it, dict) and it.get("done"))
     return todos
 
 
@@ -7194,6 +7351,8 @@ def save_gen_session_todo(conv_id, todo_id=None, title="Nhiệm vụ mới", des
             order_idx = excluded.order_idx,
             owner_id = excluded.owner_id,
             viec_ref = CASE WHEN excluded.viec_ref != '' THEN excluded.viec_ref ELSE gen_session_todos.viec_ref END,
+            claimed_by = CASE WHEN excluded.status = 'todo' THEN '' ELSE gen_session_todos.claimed_by END,
+            locked_at = CASE WHEN excluded.status = 'todo' THEN '' ELSE gen_session_todos.locked_at END,
             updated_at = CURRENT_TIMESTAMP
         """, (todo_id, conv_id, title, description, status, priority, assigned_agent, json.dumps(normalized_chk, ensure_ascii=False), evidence_ref, order_idx, owner_id, viec_ref))
         conn.commit()
@@ -7255,11 +7414,13 @@ def toggle_gen_session_todo_checklist_item(conv_id, todo_id, item_id, done_statu
         if all_done and len(chk) > 0 and new_status in ("todo", "in_progress"):
             new_status = "review"
 
+        # Tick checklist khi đang làm = dấu hiệu còn sống → làm mới locked_at (heartbeat, không bị thu hồi oan)
         cursor.execute("""
-        UPDATE gen_session_todos 
-        SET checklist_json = ?, status = ?, updated_at = CURRENT_TIMESTAMP 
+        UPDATE gen_session_todos
+        SET checklist_json = ?, status = ?, updated_at = CURRENT_TIMESTAMP,
+            locked_at = CASE WHEN ? = 'in_progress' AND COALESCE(claimed_by, '') != '' THEN CURRENT_TIMESTAMP ELSE locked_at END
         WHERE id = ? AND conversation_id = ?
-        """, (json.dumps(chk, ensure_ascii=False), new_status, todo_id, target_conv_id))
+        """, (json.dumps(chk, ensure_ascii=False), new_status, new_status, todo_id, target_conv_id))
         conn.commit()
     return {"status": "updated", "id": todo_id, "item_id": item_id, "all_done": all_done, "new_status": new_status}
 

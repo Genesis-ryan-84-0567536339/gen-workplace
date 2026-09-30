@@ -507,6 +507,8 @@ body.resizing-active, body.resizing-active * {
 .chip.done { color: var(--green); border-color: #355844; background: #17251c; }
 .chip.wait { color: var(--yellow); border-color: #5e4e27; background: #262117; }
 .chip.bad { color: var(--red); border-color: #6a3737; background: #281b1b; }
+.chip.run { color: var(--green); border-color: #2f6b45; background: #13261a; }
+.chip.taskLiveBadge { font-weight: 700; }
 .ref { font: 10px var(--mono); color: var(--accent2); }
 .mono { font-family: var(--mono); }
 
@@ -12234,8 +12236,24 @@ function taskWorkerSid(t) {
 }
 function checklistXY(t) {
   const chk = Array.isArray(t.checklist) ? t.checklist : [];
-  const done = chk.filter(c => c && c.done).length;
-  return { done, total: chk.length, text: chk.length ? `${done}/${chk.length}` : '0' };
+  const done = typeof t.checklist_done === 'number' ? t.checklist_done : chk.filter(c => c && c.done).length;
+  const total = typeof t.checklist_total === 'number' ? t.checklist_total : chk.length;
+  return { done, total, text: total ? `${done}/${total}` : '0' };
+}
+// Sự thật về thẻ: có dispatch đang chạy thật (live) hay in_progress mà không ai chạy (stale)
+function taskLiveBadge(t) {
+  if (!t) return '';
+  const lv = t.live;
+  if (lv && lv.dispatch_id != null) {
+    const sec = Number(lv.elapsed_sec);
+    const mins = Number.isFinite(sec) ? Math.max(0, Math.floor(sec / 60)) : null;
+    const tip = `dispatch:${lv.dispatch_id} · ${lv.kind || ''} · ${lv.session_id || ''} · bắt đầu ${lv.started_at || '?'}`;
+    return `<span class="chip taskLiveBadge run" data-live-dispatch="${escapeHtml(String(lv.dispatch_id))}" title="${escapeHtml(tip)}">▶ Đang chạy · dispatch #${escapeHtml(String(lv.dispatch_id))}${mins !== null ? ' · ' + mins + ' phút' : ''}</span>`;
+  }
+  if (t.stale) {
+    return `<span class="chip taskLiveBadge wait" data-stale="1" title="Thẻ đang 'in_progress' nhưng không có agy nào chạy cho thẻ này. Người giữ không cập nhật quá 30 phút (GW_KANBAN_STALE_MIN) thì hệ thống tự đưa về Cần làm.">⚠ Không có agy chạy${t.claimed_by ? ' · ' + escapeHtml(String(t.claimed_by)) + ' giữ' : ''}${t.locked_at ? ' · từ ' + escapeHtml(String(t.locked_at).slice(5, 16)) : ''}</span>`;
+  }
+  return '';
 }
 function dispatchStatusInfo(d) {
   if (!d) return null;
@@ -12266,6 +12284,7 @@ function renderTaskLinkMeta(t) {
   const di = dispatchStatusInfo(d);
   return `
     <div class="taskLinkMeta">
+      ${taskLiveBadge(t)}
       ${viecChip(t.viec_ref)}
       <span class="chip ${holder ? 'live' : 'wait'}" title="Người đang giữ task (claim)">${holder ? 'giữ: ' + escapeHtml(holder) : 'chưa ai giữ'}</span>
       <span class="chip" title="Checklist đã xong / tổng">checklist ${xy.text}</span>
