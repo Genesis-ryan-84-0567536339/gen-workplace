@@ -5266,7 +5266,7 @@ def dispatch_warroom_to_agent(project_id, channel_id, session_id, message, timeo
     before_repo = {}
     hooks = None
     sync_note = ""
-    is_role_build = bool(build_mode and not task_id and in_worktree)
+    is_role_build = bool(build_mode and in_worktree)   # war-room không-task luôn chạy trong worktree của vai
     if build_mode:
         # Chế độ Làm: agy chạy không --mode plan trong worktree của vai; tái dùng build_prompt của agy_build.py
         try:
@@ -6001,8 +6001,7 @@ def post_warroom_message(project_id="PRJ-GEN-WORKPLACE", channel_id="war_room", 
                 http_st = assign_task_http_status(bres)
                 _hints = {
                     "locked": "chờ người đang giữ hoặc dùng complete_task để đóng lần làm cũ",
-                    "busy": ("wait_worker_result(dispatch_id=" + repr(str(bres.get("dispatch_id", "?")))
-                             + ") cho lần Làm đang chạy"),
+                    "busy": f"wait_worker_result(dispatch_id={bres.get('dispatch_id', '?')}) cho lần Làm đang chạy",
                     "already_done": "task đã xong; dùng complete_task để xác nhận hoặc tạo task mới",
                 }
                 hint = _hints.get(err_code, "kiểm tra trạng thái task và thử lại sau")
