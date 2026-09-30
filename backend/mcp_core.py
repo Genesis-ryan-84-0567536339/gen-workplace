@@ -324,7 +324,7 @@ TOOLS = [
     # ---------------- Kanban & Task Governance ----------------
     {
         "name": "list_kanban_tasks",
-        "description": "Liệt kê danh sách nhiệm vụ Kanban trong phiên làm việc, kèm trạng thái (todo, in_progress, review, done), độ ưu tiên, danh sách checklist con, agent được giao, viec_ref (mã việc Kho Ryan) và bằng chứng nghiệm thu.",
+        "description": "Liệt kê danh sách nhiệm vụ Kanban trong phiên làm việc, kèm trạng thái (todo, in_progress, review, done), độ ưu tiên, danh sách checklist con, agent được giao, viec_ref (mã việc Kho Ryan) và bằng chứng nghiệm thu. Mỗi thẻ có thêm: live = {dispatch_id, kind, session_id, started_at, elapsed_sec} khi có dispatch đang chạy thật cho task (null nếu không), stale = true khi in_progress mà không có dispatch nào chạy (thẻ treo — thread nền tự thu hồi về todo khi khóa quá hạn), checklist_done / checklist_total.",
         "inputSchema": {
             "type": "object",
             "properties": {

@@ -1201,27 +1201,39 @@ def start_oauth_callback_server(port=8085):
         print(f"  [Warning] Không thể mở cổng OAuth Callback {port}: {e}")
         return None
 
-def start_reclaim_worker():
-    """Thread daemon gọi db.reclaim_stalled_tasks() mỗi GW_RECLAIM_INTERVAL_SEC giây (mặc định 300) để thu hồi task treo (#4)."""
+def reclaim_interval_sec():
+    """Chu kỳ thread thu hồi task treo: GW_TASK_RECLAIM_SEC (mặc định 60; 0 = tắt), thiếu thì GW_RECLAIM_INTERVAL_SEC (cũ)."""
+    raw = os.environ.get("GW_TASK_RECLAIM_SEC")
+    if raw is None or not raw.strip():
+        raw = os.environ.get("GW_RECLAIM_INTERVAL_SEC", "60")
     try:
-        interval = max(5, int(os.environ.get("GW_RECLAIM_INTERVAL_SEC", "300")))
+        v = int(raw)
     except ValueError:
-        interval = 300
-    # Cùng ngưỡng claim_task dùng để cho claim lại task có khóa quá hạn (#16)
-    timeout = db.task_lock_timeout_sec()
+        return 60
+    return 0 if v <= 0 else max(5, v)
+
+def start_reclaim_worker():
+    """Thread daemon gọi db.reclaim_stalled_tasks() mỗi reclaim_interval_sec() giây để thu hồi task treo (#4) — cả roadmap
+    'todos' và thẻ Kanban phiên in_progress không có dispatch nào đang chạy (mọi dự án). Ngưỡng khóa = task_lock_timeout_sec()."""
+    interval = reclaim_interval_sec()
+    if interval <= 0:
+        print("  Reclaim task treo: TẮT (GW_TASK_RECLAIM_SEC=0)")
+        return None
 
     def _loop():
         while True:
             time.sleep(interval)
             try:
-                res = db.reclaim_stalled_tasks(timeout)
-                print(f"[reclaim] thu hồi {res.get('reclaimed_count', 0)} task")
+                # Cùng ngưỡng claim_task dùng để cho claim lại task có khóa quá hạn (#16); đọc lại mỗi vòng
+                res = db.reclaim_stalled_tasks(db.task_lock_timeout_sec(), all_projects=True)
+                if res.get("reclaimed_count"):
+                    print(f"[reclaim] thu hồi {res.get('reclaimed_count', 0)} task {res.get('reclaimed_ids') or ''}")
             except Exception as e:
                 print(f"[reclaim] lỗi: {e}")
 
     t = threading.Thread(target=_loop, daemon=True, name="TaskReclaimWorker")
     t.start()
-    print(f"  Reclaim task treo: mỗi {interval}s (timeout {timeout}s)")
+    print(f"  Reclaim task treo: mỗi {interval}s (timeout {db.task_lock_timeout_sec()}s)")
     return t
 
 def start_tmux_idle_reaper():
