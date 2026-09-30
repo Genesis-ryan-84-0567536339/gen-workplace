@@ -28,13 +28,12 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 # Tự động nạp SQLite DB Module & MCP Core
 sys.path.insert(0, str(BASE_DIR))
 try:
-    from backend import db, mcp_core, directive_guard, auto_update, jules_worker
+    from backend import db, mcp_core, directive_guard, auto_update
 except ImportError:
     import db
     import mcp_core
     import directive_guard
     import auto_update
-    import jules_worker
 
 auto_update.set_busy_checker(db.running_dispatches_for_update)   # hoãn tự cập nhật khi còn việc chạy (VIEC-12)
 RUNNING_COMMIT = auto_update.current_commit(BASE_DIR)  # commit của code đang chạy (đổi sau khi tự cập nhật execv)
@@ -288,11 +287,6 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             self._handle_dispatch_wait({k: v[0] for k, v in query.items() if v})
             return
 
-        # 0.86. Worker Jules (#43): GET /api/jules/status?check=1 → configured, key_last4 (KHÔNG bao giờ trả key), allowlist,
-        #       giới hạn, số phiên đang chạy; check=1 gọi Jules GET /sources để kiểm key (state connected | error) + danh sách repo
-        if path == "/api/jules/status":
-            self._send_json(200, jules_worker.status(check=query.get("check", ["0"])[0] in ("1", "true")))
-            return
 
         # 0.9. Nhật ký allowlist lệnh gửi vào tmux (audit)
         if path == "/api/directive/audit":
@@ -847,12 +841,9 @@ class SwarmHandler(SimpleHTTPRequestHandler):
         #      400 thiếu/sai tham số · 404 không có task · 409 task đã done / người khác đang giữ
         if path == "/api/task/assign":
             todo_id = str(data.get("todo_id") or data.get("task_id") or "").strip()
-            # engine:"jules" (#43): giao cho Google Jules (chỉ mở PR, bắt buộc duyệt kế hoạch); mặc định tắt khi chưa có key
-            if str(data.get("engine") or "").strip().lower() == "jules":
-                res = jules_worker.assign_task(todo_id, str(data.get("repo") or ""), str(data.get("branch") or ""),
-                                               author=str(data.get("author") or "Ryan (Owner)"),
-                                               project_id=data.get("project_id", "PRJ-GEN-WORKPLACE"))
-                self._send_json(res.pop("http", 200) if "error" in res else 200, res)
+            # Từ chối mọi engine không rỗng: không còn hỗ trợ engine ngoài
+            if str(data.get("engine") or "").strip():
+                self._send_json(400, {"error": "Tham số 'engine' không còn được hỗ trợ. Giao task bằng session_id.", "code": "engine_not_supported"})
                 return
             session_id = str(data.get("session_id") or data.get("role") or "").strip()
             # mode (#45): "build" (mặc định, "Làm": agy sửa code trong worktree ../gw-worktrees/TSK-n, app test + push nhánh wt/TSK-n)
@@ -861,24 +852,6 @@ class SwarmHandler(SimpleHTTPRequestHandler):
                                          author=str(data.get("author") or "Ryan (Owner)"), channel_id=str(data.get("channel_id") or "war_room"),
                                          mode=str(data.get("mode") or "build"))
             self._send_json(db.assign_task_http_status(res), res)
-            return
-
-        # 14c. Worker Jules (#43). Key: POST /api/jules/key {key} lưu (DATA_DIR/secrets/jules.key, 600) | {action:"delete"} xóa;
-        #      trả configured + 4 ký tự cuối, không bao giờ trả key. Duyệt kế hoạch / hủy phiên: {dispatch_id | task_id, author}.
-        #      Không có endpoint nào merge PR của Jules: Boss / Claude điều phối merge qua quy trình PR bình thường.
-        if path == "/api/jules/key":
-            if str(data.get("action") or "").lower() == "delete" or data.get("delete") in (True, 1, "1", "true"):
-                res = jules_worker.delete_key()
-            else:
-                res = jules_worker.save_key(data.get("key"))
-            self._send_json(400 if "error" in res else 200, res)
-            return
-
-        if path in ("/api/jules/approve", "/api/jules/cancel"):
-            fn = jules_worker.approve_plan if path.endswith("approve") else jules_worker.cancel
-            res = fn(data.get("dispatch_id"), str(data.get("task_id") or data.get("todo_id") or ""),
-                     author=str(data.get("author") or "Ryan (Owner)"), project_id=data.get("project_id", "PRJ-GEN-WORKPLACE"))
-            self._send_json(res.pop("http", 200) if "error" in res else 200, res)
             return
 
         # 15. Nghiệm thu hoàn tất nhiệm vụ (Evidence-Backed Task Completion)
@@ -1261,7 +1234,6 @@ def main():
     start_reclaim_worker()
     # Không mở tmux lúc khởi động: phiên mở khi cần và tự hibernate khi rảnh (#32)
     start_tmux_idle_reaper()
-    jules_worker.start_poller()   # chỉ làm mới phiên Jules đang mở; không bao giờ tự giao việc (#43)
     auto_update.start_worker(BASE_DIR, DATA_DIR)
     print(f"==================================================")
     server = ThreadedHTTPServer(("0.0.0.0", PORT), SwarmHandler)
