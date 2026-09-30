@@ -101,7 +101,7 @@ google-chrome --headless=new --virtual-time-budget=3000 --dump-dom http://localh
 | `GW_TASK_RECLAIM_SEC` | `60` | Chu kỳ thread nền `[reclaim]` (`0` = tắt). Không đặt thì dùng `GW_RECLAIM_INTERVAL_SEC` (biến cũ). Mỗi vòng thu hồi task `todos` treo và thẻ Kanban phiên treo (xem mục "Thẻ Kanban: đang chạy thật hay treo"). |
 | `GW_KANBAN_STALE_MIN` | `30` | Thẻ Kanban `in_progress` không có dispatch chạy và người giữ không làm mới khóa (claim_task / tick checklist) quá số phút này → tự về `todo`. Dài hơn khóa roadmap để agent ngoài đang làm PR không bị thu hồi oan. |
 | `GW_RECLAIM_INTERVAL_SEC` | `300` | Biến cũ: chu kỳ `[reclaim]` khi không có `GW_TASK_RECLAIM_SEC`, và là mặc định của `GW_RECLAIM_TIMEOUT_SEC` (ngưỡng treo). Cùng ngưỡng này quyết định khi nào khóa `claim_task` quá hạn và worker khác được claim lại (#16). |
-| `GITHUB_TOKEN` | (rỗng) | Có thì gửi `Authorization: Bearer` khi kiểm URL PR làm bằng chứng (repo private, tránh rate limit 60 lượt/giờ). |
+| `GITHUB_TOKEN` | (rỗng) | Token GitHub (PAT). Ưu tiên biến môi trường `GITHUB_TOKEN`, nếu không có thì đọc file `<DATA_DIR>/secrets/github.token` (strip, bỏ dòng trống). Có thì gửi `Authorization: Bearer` khi kiểm URL PR làm bằng chứng (repo private, tránh rate limit 60 lượt/giờ). Nguồn cấu hình hiển thị qua `/api/status` (`github_token`: `"env"` \| `"file"` \| `"none"`, không lộ giá trị). |
 | `GW_GITHUB_API_TIMEOUT_SEC` | `5` | Timeout gọi `https://api.github.com/repos/<owner>/<repo>/pulls/<n>` khi kiểm bằng chứng PR. |
 | `GW_WORKTREE_ROOT` | `<repo>/../gw-worktrees` | Nơi tạo worktree riêng `wt/<session_id>` cho từng vai khi chatroom gọi agy. |
 | `GW_DISPATCH_REPO` | thư mục repo | Repo nguồn để `git worktree add` (test dùng repo git tạm). |
@@ -116,7 +116,7 @@ google-chrome --headless=new --virtual-time-budget=3000 --dump-dom http://localh
 | `GW_BUILD_TEST_EXCLUDE` | `test_mcp_suite.py` | Chế độ Làm: file `scripts/test_*.py` app KHÔNG chạy sau khi agy xong (phân cách bằng dấu phẩy). |
 | `GW_BUILD_TEST_TIMEOUT_SEC` / `GW_BUILD_PUSH_TIMEOUT_SEC` | `300` / `120` | Chế độ Làm: giới hạn 1 file test / lệnh `git push` của app. |
 | `GW_BUILD_GITHUB_REPO` | (suy từ `git remote get-url origin`) | Chế độ Làm: `owner/repo` cho link compare / PR nháp khi remote không phải GitHub. |
-| `GITHUB_TOKEN` | (rỗng) | Chế độ Làm: có token thì app tạo **PR nháp** `wt/TSK-n → main` sau khi push (không bao giờ merge); không có thì chỉ ghi link compare. |
+| `GITHUB_TOKEN` | (rỗng) | Chế độ Làm: có token (từ env hoặc file `<DATA_DIR>/secrets/github.token`) thì app tạo **PR nháp** `wt/TSK-n → main` sau khi push (không bao giờ merge); không có thì chỉ ghi link compare. |
 
 ### 3.2. OAuth callback
 - Server callback cổng 8085 chỉ bind `127.0.0.1`; route dự phòng `/oauth2callback` trên cổng chính dùng chung `handle_oauth_callback()`.

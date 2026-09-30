@@ -317,7 +317,8 @@ class SwarmHandler(SimpleHTTPRequestHandler):
                 "db_engine": "SQLite 3 WAL + FTS5",
                 "active_project": state.get("project", {}).get("name", "gen-workplace"),
                 "commit": RUNNING_COMMIT,
-                "auto_update": auto_update.enabled()
+                "auto_update": auto_update.enabled(),
+                "github_token": db.github_token_source()
             }
             self._send_json(200, status)
             return
