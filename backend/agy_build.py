@@ -569,7 +569,8 @@ def _add_git_exclude(worktree, pattern="node_modules"):
 
 
 def _get_base_file_content(repo, base, filename):
-    for ref in [f"{REMOTE}/{base}", base, f"refs/remotes/{REMOTE}/{base}", f"refs/heads/{base}"]:
+    # Chỉ đọc từ nhánh remote (origin/<base>): nhánh local trong clone/worktree có thể bị agy sửa
+    for ref in [f"refs/remotes/{REMOTE}/{base}"]:
         r = _git(["show", f"{ref}:{filename}"], cwd=repo)
         if r.returncode == 0:
             return r.stdout
