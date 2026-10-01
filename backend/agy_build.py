@@ -945,12 +945,15 @@ def assign_build(todo_id, sid, role, task, body, claim, project_id="PRJ-GEN-WORK
                 "code": "busy", "task_id": todo_id, "dispatch_id": busy}
     repo_key = (repo or task.get("repo") or "").strip()
     branch, wt = task_branch(todo_id), task_worktree_dir(todo_id, repo_key)
+    repo_conf = get_repo(repo_key, auto_clone=False)
+    r_kind = ((repo_conf.get("kind") if repo_conf else "") or "python").strip().lower()
+    sop_name = f"build.{r_kind}" if (r_kind and r_kind != "python") else "build"
     msg = f"[Làm] {body}\n(chế độ Làm: agy sửa code trong worktree {wt}, nhánh {branch}; app tự chạy test + push nhánh)"
     msg_id = db.save_warroom_record(project_id, channel_id, author, msg, "Assignment")
     did = db.start_dispatch_log(sid, kind=KIND, channel_id=channel_id, task_id=todo_id,
-                                viec_ref=task.get("viec_ref") or "", request_msg_id=msg_id)
+                                viec_ref=task.get("viec_ref") or "", request_msg_id=msg_id, sop=sop_name)
     with db.get_connection() as conn:
-        conn.execute("UPDATE dispatch_log SET worktree_dir = ?, build_branch = ? WHERE id = ?", (wt, branch, did))
+        conn.execute("UPDATE dispatch_log SET worktree_dir = ?, build_branch = ?, sop = ? WHERE id = ?", (wt, branch, sop_name, did))
         conn.commit()
     if wait:
         run_build(did, project_id)
@@ -1022,7 +1025,9 @@ def _run_build(did, project_id):
     account, primary_dir = _session_profile(sid)
     wt_info = ensure_task_worktree(task_id, repo_key)
     wt, branch = wt_info.get("dir") or task_worktree_dir(task_id, repo_key), wt_info.get("branch") or task_branch(task_id)
-    _set_row(did, worktree_dir=wt, build_branch=branch, profile_initial=account)
+    r_kind = ((repo_conf.get("kind") if repo_conf else "") or "python").strip().lower()
+    sop_name = f"build.{r_kind}" if (r_kind and r_kind != "python") else "build"
+    _set_row(did, worktree_dir=wt, build_branch=branch, profile_initial=account, sop=sop_name)
 
     ctx = {"exit_code": -1, "output": "", "sinfo": {}, "cmd": [], "fail": "", "blocked": "", "fb_note": "", "profile_used": "",
            "attempts": [], "perm_note": "", "commits": [], "head": "", "dirty": [], "violations": [], "tests": None,

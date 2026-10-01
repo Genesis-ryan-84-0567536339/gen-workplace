@@ -83,7 +83,7 @@ check("agent_roles không có ROLE-06", not q("SELECT 1 FROM agent_roles WHERE i
 check("tmux_sessions không có frontend", not q("SELECT 1 FROM tmux_sessions WHERE id = ?", (FE,)))
 check("agent_roles không có ROLE-03", not q("SELECT 1 FROM agent_roles WHERE id = 'ROLE-03'"))
 check("SWARM_SESSION_IDS còn 4 vai lead/backend/devops/qa", db.SWARM_SESSION_IDS == ["gw-lead-agy", "gw-backend-agy", "gw-devops-agy", "gw-qa-agy"], str(db.SWARM_SESSION_IDS))
-check("WARROOM_ROLE_SESSIONS không có security/frontend", set(db.WARROOM_ROLE_SESSIONS) == {"lead", "backend", "devops", "qa"}, str(db.WARROOM_ROLE_SESSIONS))
+check("WARROOM_ROLE_SESSIONS không có security/frontend", "security" not in db.WARROOM_ROLE_SESSIONS and "frontend" not in db.WARROOM_ROLE_SESSIONS, str(db.WARROOM_ROLE_SESSIONS))
 check("retire_roles trên DB mới không gọi tmux", db.retire_roles() == [] and calls() == [], str(calls()))
 
 print("[2] DB cũ có security + frontend đang chạy + lịch sử → retire_roles (chỉ UPDATE)")

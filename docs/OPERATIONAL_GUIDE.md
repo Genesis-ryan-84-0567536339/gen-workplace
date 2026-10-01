@@ -142,11 +142,11 @@ dùng luật cũ (URL PR chỉ kiểm định dạng, file chỉ cần tồn t�
 - Cập nhật thủ công: `POST /api/quota/probe {"profile_id": "owner_default"}` hoặc MCP `probe_quota` (chạy `agy --gemini_dir=<dir> --mode plan -p 'ping'`, timeout 60s).
 
 ### 3.6. Chatroom gọi agy thật (#3)
-Tin trong War Room có `@backend|@devops|@qa|@lead` (`@security` và `@frontend` đã bỏ từ 29/09: trả lỗi `retired_role`, không lưu tin; việc giao diện giao cho `@backend`) mặc định chạy ở **chế độ Làm** (`agy -p`, sửa code):
+Tin trong War Room có `@backend|@devops|@qa|@lead|@build|@review` (`@security` và `@frontend` đã bỏ từ 29/09: trả lỗi `retired_role`, không lưu tin; việc giao diện giao cho `@backend`). `@build` tương đương `@backend` (chế độ Làm), `@review` tương đương `@qa [đọc]` (luôn chế độ Rà soát chỉ đọc). Mặc định chạy ở **chế độ Làm** (`agy -p`, sửa code):
 - Nếu tin nêu mã `TSK-n` hoặc `VIEC-n` có thật: giao task đó qua `assign_task_to_role(mode='build')` trong worktree riêng của task (`../gw-worktrees/TSK-n`, nhánh `wt/TSK-n`).
-- Nếu không có task: agy chạy chế độ Làm (không `--mode plan`) trong worktree riêng của vai (`<GW_WORKTREE_ROOT>/gw-<vai>-agy`, nhánh `wt/gw-<vai>-agy`).
-- Chỉ khi có `[đọc]` ngay sau `@vai` (vd `@backend [đọc] ...`) hoặc truyền `mode="review"`: mới chạy ở **chế độ Rà soát** (`agy --gemini_dir=<profile của worker> --mode plan -p "<tin>"`, timeout 15 phút, chỉ đọc).
-Trả lời thật (tác giả = `gw-<vai>-agy`, body = output cắt 4000 ký tự + `exit=<code>`) được ghi vào `chat_messages`, kèm `dispatch_log` và báo cáo `~/gw-reports/warroom-<sid>-<ts>-<dispatch_id>.md`. Tin không có `@vai` chỉ được lưu.
+- Nếu không có task: agy chạy chế độ Làm (không `--mode plan`) trong worktree riêng của vai (`<GW_WORKTREE_ROOT>/gw-<vai>-agy`, nhánh `wt/gw-<vai>-agy`). Cột `dispatch_log.sop` ghi `"build"` (hoặc `"build.node"` tùy loại repo).
+- Khi nhắc `@review`, hoặc có `[đọc]` ngay sau `@vai` (vd `@backend [đọc] ...`), hoặc truyền `mode="review"`: chạy ở **chế độ Rà soát** (`agy --gemini_dir=<profile của worker> --mode plan -p "<tin>"`, timeout 15 phút, chỉ đọc). Cột `dispatch_log.sop` ghi `"review"`.
+Trả lời thật (tác giả = `gw-<vai>-agy`, body = output cắt 4000 ký tự + `exit=<code>`) được ghi vào `chat_messages`, kèm `dispatch_log` và báo cáo `~/gw-reports/warroom-<sid>-<ts>-<dispatch_id>.md`. Cột `dispatch_log.sop` được trả thêm qua `GET /api/dispatch/log` và `wait_worker_result`. Tin không có `@vai` chỉ được lưu.
 
 - Tin trả lời có `reply_to` = id tin yêu cầu và `created_at` (ISO, đủ ngày giờ). `dispatch_log` có `request_msg_id` / `reply_msg_id`.
 - **Quyền agy trong `-p`** (không tương tác → tool cần quyền bị auto-denied): trước khi chạy, app ghi vào
@@ -161,7 +161,7 @@ Trả lời thật (tác giả = `gw-<vai>-agy`, body = output cắt 4000 ký t�
     Giới hạn đã biết của agy: chuyển hướng ghi file đơn giản (`cat a > b`) vẫn khớp tiền tố — prompt cấm dùng.
   Giữ nguyên các khóa khác; file hỏng / `allow`/`deny` sai kiểu thì không đụng; chạy lại không nhân đôi. Tắt: `GW_AGY_PLAN_ALLOW=0`.
   Lối thoát cuối (không khuyến nghị): `GW_WARROOM_SKIP_PERMISSIONS=1` (chỉ áp dụng trong worktree của vai).
-- **Prompt chế độ chỉ đọc** (`build_agy_readonly_prompt`, dùng chung cho war-room và `POST /api/task/assign`): chỉ đọc, không lệnh ghi/mạng;
+- **Prompt chế độ chỉ đọc** (`build_agy_readonly_prompt`, dùng chung cho war-room và `POST /api/task/assign`): nạp nội dung SOP `roles/review.md` vào đầu prompt (đọc mỗi lần, thiếu thì bỏ qua); chỉ đọc, không lệnh ghi/mạng;
   ưu tiên công cụ đọc file có sẵn của agy; lệnh shell chỉ trong danh sách trên; bị chặn thì ghi dòng `CẦN QUYỀN: <lệnh> — <lý do>`
   trong báo cáo thay vì dừng im lặng (dòng này được đưa lên đầu `summary` của dispatch).
 - **Ghi rõ lệnh bị chặn**: agy chạy thêm `--output-format stream-json`; app đọc tool step `run_command` (`CommandLine`, `error`) để biết
