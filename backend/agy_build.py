@@ -20,9 +20,12 @@ Luồng 1 lần giao (POST /api/task/assign mode="build", mặc định của n�
 """
 
 import fnmatch
+import glob
+import hashlib
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -147,8 +150,8 @@ def build_repos(auto_clone=False):
             if not isinstance(item, dict):
                 continue
             key = str(item.get("key") or "").strip()
-            if not REPO_KEY_RE.match(key):
-                print(f"[build] Bỏ qua repo cấu hình sai key: '{key}' (phải khớp ^[a-z0-9-]{{2,32}}$)")
+            if not REPO_KEY_RE.match(key) or key.startswith("gw-") or key.startswith("tsk-"):
+                print(f"[build] Bỏ qua repo cấu hình sai key: '{key}' (phải khớp ^[a-z0-9-]{{2,32}}$ và không bắt đầu bằng gw-/tsk-)")
                 continue
             slug = str(item.get("slug") or "").strip()
             base = str(item.get("base") or "").strip()
@@ -224,7 +227,7 @@ def _wt_confined(wt, repo_key=""):
     k = (repo_key or "").strip()
     root = os.path.realpath(db._worktree_root())
     if k and k != "gen-workplace":
-        if not REPO_KEY_RE.match(k):
+        if not REPO_KEY_RE.match(k) or k.startswith("gw-") or k.startswith("tsk-"):
             return False
         root = os.path.join(root, k)
         if os.path.realpath(root) != root:
@@ -373,7 +376,7 @@ def cleanup_task_worktree(task_id, repo_key=""):
             k = db.get_task_repo(task_id)
         except Exception:
             pass
-    if k and not REPO_KEY_RE.match(k):
+    if k and (not REPO_KEY_RE.match(k) or k.startswith("gw-") or k.startswith("tsk-")):
         return {"removed": False, "dir": "", "error": f"repo không hợp lệ: '{k}'"}
     repo_conf = get_repo(k, auto_clone=False)
     repo = repo_conf["clone_dir"] if repo_conf else repo_dir()
@@ -475,7 +478,17 @@ def detect_violations(repo, before, worktree, branch, base=None, extra=None):
 # ---------------------------------------------------------------------------
 # Prompt
 # ---------------------------------------------------------------------------
-def load_sop():
+def load_sop(kind="python"):
+    k = (kind or "python").strip().lower()
+    if k and k != "python":
+        cand = os.path.join(str(db.BASE_DIR), "roles", f"build.{k}.md")
+        try:
+            with open(cand, "r", encoding="utf-8") as f:
+                txt = f.read().strip()
+                if txt:
+                    return txt
+        except OSError:
+            pass
     p = os.path.join(str(db.BASE_DIR), "roles", "build.md")
     try:
         with open(p, "r", encoding="utf-8") as f:
@@ -487,20 +500,32 @@ def load_sop():
     return DEFAULT_SOP
 
 
-def build_prompt(task_id, session_id, worktree, branch, project_id="PRJ-GEN-WORKPLACE", pending=None, base=None):
-    """Prompt chế độ Làm: SOP roles/build.md + khối THÔNG TIN VIỆC (tiêu đề, viec_ref, mô tả, checklist) + luật quyền."""
+def build_prompt(task_id, session_id, worktree, branch, project_id="PRJ-GEN-WORKPLACE", pending=None, base=None,
+                 repo_conf=None):
+    """Prompt chế độ Làm: SOP roles/build.md (hoặc build.<kind>.md) + khối THÔNG TIN VIỆC (tiêu đề, viec_ref, mô tả, checklist) + luật quyền."""
     b = (base or base_branch()).strip()
+    r_key = (repo_conf.get("key") if repo_conf else "") or "gen-workplace"
+    r_kind = ((repo_conf.get("kind") if repo_conf else "") or "python").strip().lower()
+    r_test_cmd = (repo_conf.get("test_cmd") if repo_conf else "").strip()
+    if r_kind == "node":
+        test_cmd_desc = r_test_cmd if r_test_cmd else "node --test tests/*.test.mjs"
+        allowed_test = test_cmd_desc
+    else:
+        test_cmd_desc = r_test_cmd if r_test_cmd else "python3 -m py_compile <file>; python3 scripts/test_<tên>.py"
+        allowed_test = "python3 -m py_compile <file>; python3 scripts/test_<tên>.py"
+
     task_block = db.build_task_prompt_block(task_id, project_id)
     rules = (
         "[CHẾ ĐỘ LÀM — agy sửa code thật, không ai duyệt quyền giữa chừng]\n"
-        f"- Bạn đang ở worktree riêng của việc: {worktree} (nhánh {branch}, tạo từ {REMOTE}/{b}). "
-        "CHỈ tạo/sửa file trong thư mục này; không cd ra ngoài; sửa file bằng công cụ sửa file của agy "
+        f"- Bạn đang ở worktree riêng của việc: {worktree} (nhánh {branch}, tạo từ {REMOTE}/{b}, repo '{r_key}', kind '{r_kind}').\n"
+        f"- Lệnh test: {test_cmd_desc}.\n"
+        "  CHỈ tạo/sửa file trong thư mục này; không cd ra ngoài; sửa file bằng công cụ sửa file của agy "
         "(không dùng sed -i, echo >, tee, cat >).\n"
-        f"- Lệnh shell được phép: lệnh chỉ đọc ({db.agy_plan_allowed_summary()}); python3 -m py_compile <file>; "
-        "python3 scripts/test_<tên>.py; git status, git diff, git add <file>, git commit -m \"<message>\".\n"
+        f"- Lệnh shell được phép: lệnh chỉ đọc ({db.agy_plan_allowed_summary()}); {allowed_test}; "
+        "git status, git diff, git add <file>, git commit -m \"<message>\".\n"
         "- Cấm (hệ thống TỪ CHỐI): git push / remote / fetch / pull / checkout main / switch / reset --hard / -C / -c / "
         "commit --no-verify / --amend, rm -rf, xóa hay sửa file ngoài worktree, curl / wget / ssh / lệnh mạng, sudo, "
-        "pip / npm / apt. Không dùng $(...), dấu `...`, python3 -c, bash -c, xargs, awk.\n"
+        "pip / npm / apt. Không dùng $(...), dấu `...`, python3 -c, node -e, bash -c, xargs, awk.\n"
         "- Chạy TỪNG lệnh riêng, đơn giản (vd `python3 -m py_compile backend/db.py`, rồi `python3 scripts/test_x.py`); "
         "không nối thêm `&& echo …`, `;`, `||`. Một lệnh bị từ chối là lần chạy dừng luôn, việc chưa commit sẽ mất lượt.\n"
         f"- BẮT BUỘC có ít nhất 1 commit trên {branch} trước khi kết thúc; không commit thì việc bị tính là chưa làm. "
@@ -514,7 +539,146 @@ def build_prompt(task_id, session_id, worktree, branch, project_id="PRJ-GEN-WORK
                   "làm nốt phần còn thiếu, chạy test rồi commit.")
     tail = (f"(Bạn là {session_id}. Làm trọn việc trong một lượt, không hỏi lại, không chỉ nêu kế hoạch. "
             "Kết thúc bằng báo cáo ngắn tiếng Việt theo mục 5 của SOP.)")
-    return f"{load_sop()}\n\n" + (f"{task_block}\n\n" if task_block else f"[THÔNG TIN VIỆC {task_id}]\n\n") + f"{rules}\n\n{tail}"
+    return f"{load_sop(kind=r_kind)}\n\n" + (f"{task_block}\n\n" if task_block else f"[THÔNG TIN VIỆC {task_id}]\n\n") + f"{rules}\n\n{tail}"
+
+
+# ---------------------------------------------------------------------------
+# Node / Dependency Helpers & Exclude
+# ---------------------------------------------------------------------------
+def _add_git_exclude(worktree, pattern="node_modules"):
+    r = _git(["rev-parse", "--git-path", "info/exclude"], cwd=worktree)
+    p = _out(r)
+    if not p:
+        p = os.path.join(worktree, ".git", "info", "exclude")
+    elif not os.path.isabs(p):
+        p = os.path.abspath(os.path.join(worktree, p))
+    try:
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        cur = ""
+        if os.path.exists(p):
+            with open(p, "r", encoding="utf-8") as f:
+                cur = f.read()
+        lines = [ln.strip() for ln in cur.splitlines()]
+        if pattern not in lines and f"{pattern}/" not in lines:
+            with open(p, "a", encoding="utf-8") as f:
+                if cur and not cur.endswith("\n"):
+                    f.write("\n")
+                f.write(f"{pattern}\n")
+    except Exception as e:
+        print(f"[build] Không ghi được git exclude ({pattern}): {e}")
+
+
+def _get_base_file_content(repo, base, filename):
+    # Chỉ đọc từ nhánh remote (origin/<base>): nhánh local trong clone/worktree có thể bị agy sửa
+    for ref in [f"refs/remotes/{REMOTE}/{base}"]:
+        r = _git(["show", f"{ref}:{filename}"], cwd=repo)
+        if r.returncode == 0:
+            return r.stdout
+    return None
+
+
+def ensure_node_modules(worktree, repo_conf=None, timeout=120):
+    """
+    Cài node_modules an toàn từ lockfile của base (Issue #57 mục 5):
+    - Đọc package-lock.json + package.json TỪ origin/<base> (git show), tính sha256 của lockfile.
+    - Cache tại <DATA_DIR>/cache/node_modules/<key>/<sha>/.
+    - Nếu chưa có thì dựng thư mục tạm chứa package.json + package-lock.json của base,
+      chạy npm ci --ignore-scripts --no-audit --no-fund (timeout, env sạch KHÔNG có token).
+    - Liên kết vào worktree bằng symlink node_modules → cache (chỉ khi worktree chưa có node_modules).
+    - Thêm node_modules vào .git/info/exclude để không bao giờ bị commit.
+    """
+    conf = repo_conf or {}
+    key = (conf.get("key") or "gen-workplace").strip()
+    base = (conf.get("base") or base_branch()).strip()
+    clone_dir = conf.get("clone_dir") or repo_dir()
+
+    lock_content = _get_base_file_content(clone_dir, base, "package-lock.json")
+    if lock_content is None and worktree:
+        lock_content = _get_base_file_content(worktree, base, "package-lock.json")
+
+    if lock_content is None:
+        return {"ok": True, "cached": False, "note": "không có package-lock.json ở base"}
+
+    pkg_content = _get_base_file_content(clone_dir, base, "package.json")
+    if pkg_content is None and worktree:
+        pkg_content = _get_base_file_content(worktree, base, "package.json")
+    if not pkg_content:
+        pkg_content = "{}"
+
+    sha = hashlib.sha256(lock_content.encode("utf-8") if isinstance(lock_content, str) else lock_content).hexdigest()
+    cache_dir = os.path.join(str(db.DATA_DIR), "cache", "node_modules", key, sha)
+
+    if not os.path.isdir(cache_dir):
+        tmp_build = tempfile.mkdtemp(prefix=f"gw-npm-ci-{key}-")
+        try:
+            with open(os.path.join(tmp_build, "package.json"), "w", encoding="utf-8") as f:
+                f.write(pkg_content)
+            with open(os.path.join(tmp_build, "package-lock.json"), "w", encoding="utf-8") as f:
+                f.write(lock_content)
+
+            # Env sạch không chứa token
+            clean_env = {
+                "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
+                "HOME": os.path.join(tmp_build, "home"),
+                "LANG": "C.UTF-8",
+                "LC_ALL": "C.UTF-8",
+                "TMPDIR": tmp_build,
+            }
+            os.makedirs(clean_env["HOME"], exist_ok=True)
+            cmd = ["npm", "ci", "--ignore-scripts", "--no-audit", "--no-fund"]
+            to = timeout if timeout is not None else _env_int("GW_BUILD_NPM_TIMEOUT_SEC", 120)
+            try:
+                p = subprocess.run(cmd, cwd=tmp_build, capture_output=True, text=True, timeout=to, env=clean_env)
+                if p.returncode != 0:
+                    err = _redact(((p.stderr or "") + "\n" + (p.stdout or "")).strip())[-600:]
+                    return {"ok": False, "error": f"npm ci thất bại (rc={p.returncode}): {err}"}
+            except subprocess.TimeoutExpired:
+                return {"ok": False, "error": f"npm ci quá {to}s"}
+            except FileNotFoundError:
+                return {"ok": False, "error": "không tìm thấy lệnh npm"}
+
+            nm_built = os.path.join(tmp_build, "node_modules")
+            if not os.path.isdir(nm_built):
+                return {"ok": False, "error": "npm ci không tạo được node_modules"}
+
+            os.makedirs(os.path.dirname(cache_dir), exist_ok=True)
+            if not os.path.isdir(cache_dir):
+                shutil.move(nm_built, cache_dir)
+        finally:
+            shutil.rmtree(tmp_build, ignore_errors=True)
+
+    wt_nm = os.path.join(worktree, "node_modules")
+    if not os.path.exists(wt_nm) and not os.path.islink(wt_nm):
+        try:
+            os.symlink(cache_dir, wt_nm)
+        except OSError as e:
+            return {"ok": False, "error": f"Không thể tạo symlink node_modules: {e}"}
+
+    _add_git_exclude(worktree, "node_modules")
+    return {"ok": True, "cached": True, "cache_dir": cache_dir, "symlink": wt_nm}
+
+
+def check_deps_changed(worktree, base="main"):
+    """Kiểm tra nhánh trong worktree có thay đổi package.json hoặc package-lock.json so với base."""
+    b = (base or "main").strip() or "main"
+    ref = f"{REMOTE}/{b}"
+    if _git(["rev-parse", "--verify", "--quiet", ref], cwd=worktree).returncode != 0:
+        if _git(["rev-parse", "--verify", "--quiet", f"refs/heads/{b}"], cwd=worktree).returncode == 0:
+            ref = f"refs/heads/{b}"
+        else:
+            return False
+    diff_range = f"{ref}...HEAD"
+    r = _git(["diff", "--name-only", "--no-renames", "-z", diff_range], cwd=worktree)
+    if r.returncode != 0:
+        r = _git(["diff", "--name-only", "--no-renames", "-z", f"{ref}..HEAD"], cwd=worktree)
+        if r.returncode != 0:
+            return False
+    for p in (r.stdout or "").split("\0"):
+        norm = p.strip().replace("\\", "/")
+        bname = os.path.basename(norm)
+        if bname in ("package.json", "package-lock.json"):
+            return True
+    return False
 
 
 # ---------------------------------------------------------------------------
@@ -522,10 +686,12 @@ def build_prompt(task_id, session_id, worktree, branch, project_id="PRJ-GEN-WORK
 # ---------------------------------------------------------------------------
 def run_tests(worktree, budget_sec=None, repo_conf=None):
     """
-    py_compile mọi file .py đang theo dõi + chạy từng scripts/test_*.py (trừ GW_BUILD_TEST_EXCLUDE) trong worktree, HOME tạm,
-    không ghi __pycache__ vào worktree. Trả {ok, py_compile: {ok, files, output}, tests: [{name, ok, rc, sec, tail}], passed,
-    total, skipped, note, sec}.
-    (repo_conf: Issue #57 mục B1; B2/B3 sẽ mở rộng sang node/npm theo kind / test_cmd).
+    Chạy test theo repo_conf.kind:
+    - "python" (mặc định): py_compile mọi file .py đang theo dõi + chạy từng scripts/test_*.py (trừ GW_BUILD_TEST_EXCLUDE).
+    - "node": chuẩn bị node_modules an toàn từ lockfile base, chạy lệnh cố định từ repo_conf.test_cmd nếu có
+      (tách bằng shlex, KHÔNG shell=True), mặc định ["node", "--test"] + glob tests/*.test.mjs (sắp xếp).
+      KHÔNG đọc scripts trong package.json của nhánh.
+    Trả {ok, py_compile: {ok, files, output}, tests: [{name, ok, rc, sec, tail}], passed, total, skipped, note, sec}.
     """
     t0 = time.time()
     budget = budget_sec if budget_sec is not None else db.AGY_BUILD_POST_SEC - 120
@@ -538,39 +704,85 @@ def run_tests(worktree, budget_sec=None, repo_conf=None):
     res = {"ok": False, "py_compile": {"ok": False, "files": 0, "output": ""}, "tests": [], "passed": 0, "total": 0,
            "skipped": [], "note": "", "sec": 0.0}
     try:
-        files = [f for f in _out(_git(["ls-files", "*.py"], cwd=worktree)).splitlines() if f.strip()]
-        res["py_compile"]["files"] = len(files)
-        if files:
-            try:
-                p = subprocess.run([sys.executable, "-m", "py_compile"] + files, cwd=worktree, capture_output=True, text=True,
-                                   timeout=120, env=env)
-                res["py_compile"].update(ok=p.returncode == 0, output=((p.stderr or "") + (p.stdout or "")).strip()[-800:])
-            except subprocess.TimeoutExpired:
-                res["py_compile"]["output"] = "py_compile quá 120s"
-        else:
-            res["py_compile"].update(ok=True, output="không có file .py")
-        sdir = os.path.join(worktree, "scripts")
-        names = sorted(n for n in (os.listdir(sdir) if os.path.isdir(sdir) else [])
-                       if re.match(r"^test_[A-Za-z0-9_]+\.py$", n))
-        excl = test_exclude()
-        res["skipped"] = [n for n in names if n in excl]
-        todo = [n for n in names if n not in excl]
-        res["total"] = len(todo)
-        for n in todo:
+        conf = repo_conf or {}
+        kind = (conf.get("kind") or "python").strip().lower()
+        if kind == "node":
+            res["py_compile"] = {"ok": True, "files": 0, "output": "không áp dụng (node)"}
             left = budget - (time.time() - t0)
-            if left < 10:
-                res["note"] = f"hết ngân sách thời gian test ({int(budget)}s): chưa chạy {len(todo) - len(res['tests'])} file"
-                break
+            if left < 5:
+                res["note"] = f"hết ngân sách thời gian test ({int(budget)}s)"
+                return res
+
+            nm_res = ensure_node_modules(worktree, conf, timeout=min(120, max(10, int(left))))
+            if not nm_res.get("ok"):
+                res["note"] = nm_res.get("error") or "Không thể chuẩn bị node_modules"
+                return res
+
+            test_cmd = (conf.get("test_cmd") or "").strip()
+            if test_cmd:
+                cmd = shlex.split(test_cmd)
+            else:
+                tdir = os.path.join(worktree, "tests")
+                files = []
+                if os.path.isdir(tdir):
+                    files = sorted([os.path.join("tests", f) for f in os.listdir(tdir)
+                                    if fnmatch.fnmatch(f, "*.test.mjs") and os.path.isfile(os.path.join(tdir, f))])
+                cmd = ["node", "--test"] + files
+
+            left = budget - (time.time() - t0)
+            if left < 5:
+                res["note"] = f"hết ngân sách thời gian test ({int(budget)}s)"
+                return res
+
             s = time.time()
             try:
-                p = subprocess.run([sys.executable, os.path.join("scripts", n)], cwd=worktree, capture_output=True, text=True,
+                p = subprocess.run(cmd, cwd=worktree, capture_output=True, text=True,
                                    timeout=min(per_test, left), env=env)
                 rc, tail = p.returncode, ((p.stdout or "") + "\n" + (p.stderr or "")).strip()[-800:]
             except subprocess.TimeoutExpired:
                 rc, tail = -1, f"quá {int(min(per_test, left))}s"
-            res["tests"].append({"name": n, "ok": rc == 0, "rc": rc, "sec": round(time.time() - s, 1), "tail": tail if rc else tail[-200:]})
-        res["passed"] = sum(1 for t in res["tests"] if t["ok"])
-        res["ok"] = res["py_compile"]["ok"] and res["passed"] == res["total"] and not res["note"]
+            except FileNotFoundError:
+                rc, tail = 127, f"không tìm thấy lệnh: {cmd[0] if cmd else ''}"
+
+            res["tests"].append({"name": " ".join(cmd), "ok": rc == 0, "rc": rc, "sec": round(time.time() - s, 1),
+                                 "tail": tail if rc else tail[-200:]})
+            res["total"] = 1
+            res["passed"] = 1 if rc == 0 else 0
+            res["ok"] = (rc == 0) and not res["note"]
+        else:
+            files = [f for f in _out(_git(["ls-files", "*.py"], cwd=worktree)).splitlines() if f.strip()]
+            res["py_compile"]["files"] = len(files)
+            if files:
+                try:
+                    p = subprocess.run([sys.executable, "-m", "py_compile"] + files, cwd=worktree, capture_output=True, text=True,
+                                       timeout=120, env=env)
+                    res["py_compile"].update(ok=p.returncode == 0, output=((p.stderr or "") + (p.stdout or "")).strip()[-800:])
+                except subprocess.TimeoutExpired:
+                    res["py_compile"]["output"] = "py_compile quá 120s"
+            else:
+                res["py_compile"].update(ok=True, output="không có file .py")
+            sdir = os.path.join(worktree, "scripts")
+            names = sorted(n for n in (os.listdir(sdir) if os.path.isdir(sdir) else [])
+                           if re.match(r"^test_[A-Za-z0-9_]+\.py$", n))
+            excl = test_exclude()
+            res["skipped"] = [n for n in names if n in excl]
+            todo = [n for n in names if n not in excl]
+            res["total"] = len(todo)
+            for n in todo:
+                left = budget - (time.time() - t0)
+                if left < 10:
+                    res["note"] = f"hết ngân sách thời gian test ({int(budget)}s): chưa chạy {len(todo) - len(res['tests'])} file"
+                    break
+                s = time.time()
+                try:
+                    p = subprocess.run([sys.executable, os.path.join("scripts", n)], cwd=worktree, capture_output=True, text=True,
+                                       timeout=min(per_test, left), env=env)
+                    rc, tail = p.returncode, ((p.stdout or "") + "\n" + (p.stderr or "")).strip()[-800:]
+                except subprocess.TimeoutExpired:
+                    rc, tail = -1, f"quá {int(min(per_test, left))}s"
+                res["tests"].append({"name": n, "ok": rc == 0, "rc": rc, "sec": round(time.time() - s, 1), "tail": tail if rc else tail[-200:]})
+            res["passed"] = sum(1 for t in res["tests"] if t["ok"])
+            res["ok"] = res["py_compile"]["ok"] and res["passed"] == res["total"] and not res["note"]
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
         res["sec"] = round(time.time() - t0, 1)
@@ -826,7 +1038,9 @@ def _run_build(did, project_id):
     before_head = _out(_git(["rev-parse", "HEAD"], cwd=wt))
     st0 = _git(["status", "--porcelain"], cwd=wt)
     pending = [ln[3:] for ln in (st0.stdout or "").splitlines() if ln.strip()] if st0.returncode == 0 else []
-    prompt = build_prompt(task_id, sid, wt, branch, project_id, pending=pending, base=repo_base)
+    prompt = build_prompt(task_id, sid, wt, branch, project_id, pending=pending, base=repo_base, repo_conf=repo_conf)
+    if (repo_conf.get("kind") or "").strip().lower() == "node":
+        ensure_node_modules(wt, repo_conf)
     hooks = write_guard_hooks(task_id, wt, branch)
     stream = {"ok": not db._env_on("GW_AGY_NO_STREAM")}
     timeout = db.AGY_BUILD_TIMEOUT_SEC
@@ -907,6 +1121,7 @@ def _run_build(did, project_id):
         ctx["fail"] = f"agy không tạo commit mới trên {branch}" + (f" (còn {len(ctx['dirty'])} file sửa chưa commit)" if ctx["dirty"] else "")
     if ctx["commits"] and not ctx["violations"]:
         ctx["tests"] = run_tests(wt, repo_conf=repo_conf)
+        ctx["deps_changed"] = check_deps_changed(wt, base=repo_base)
         diff_blocked = check_push_diff(wt, base=repo_base, protected_paths=repo_conf.get("protected_paths"))
         if diff_blocked:
             ctx["fail"] = "Chặn push: " + "; ".join(diff_blocked)
@@ -916,10 +1131,12 @@ def _run_build(did, project_id):
             ctx["compare"] = compare_url(slug, branch, base=repo_base)
             if ctx["push"]["ok"]:
                 task_detail = db._task_detail(task_id, project_id) or {}
+                pr_body = (f"PR nháp do app gen-workplace tạo cho lần Làm dispatch:{did} ({sid}, agy). "
+                           f"Claude điều phối review rồi mới merge.\n\nRefs {task_detail.get('viec_ref') or ''} {task_id}")
+                if ctx.get("deps_changed"):
+                    pr_body += "\n\n⚠️ **Lưu ý**: Nhánh có thay đổi `package.json` / `package-lock.json` (deps_changed=True). Cần review kỹ dependencies trước khi merge."
                 url, err = create_draft_pr(slug, branch, f"[agy] {task_id}: {task_detail.get('title') or ''}".strip(),
-                                           f"PR nháp do app gen-workplace tạo cho lần Làm dispatch:{did} ({sid}, agy). "
-                                           f"Claude điều phối review rồi mới merge.\n\nRefs {task_detail.get('viec_ref') or ''} {task_id}",
-                                           base=repo_base)
+                                           pr_body, base=repo_base)
                 if url:
                     ctx["pr_url"] = url
                     ctx["push"]["pr_url"] = url
@@ -953,6 +1170,8 @@ def _finish(did, row, ctx, wt, branch, wt_info, started_at, t0, project_id, acco
         head.append(f"[Tài khoản] {ctx['fb_note']}")
     if ctx["perm_note"]:
         head.append(f"[Quyền] {ctx['perm_note']}")
+    if ctx.get("deps_changed"):
+        head.append("[Dependencies] Nhánh có thay đổi package.json / package-lock.json (deps_changed=True)")
     if wt_info.get("note"):
         head.append(f"[Worktree] {wt_info['note']}")
     header = "\n".join(head)
@@ -1018,4 +1237,5 @@ def _finish(did, row, ctx, wt, branch, wt_info, started_at, t0, project_id, acco
         db._notify_dispatch_change()
     return {"dispatch_id": did, "status": status, "task_id": task_id, "session_id": sid, "branch": branch, "worktree_dir": wt,
             "commit": bf["build_commit"], "tests": tests, "push": push, "compare_url": ctx["compare"], "pr_url": ctx["pr_url"],
+            "deps_changed": ctx.get("deps_changed", False),
             "error": ctx["fail"], "report_path": report_path, "elapsed_sec": round(time.time() - t0, 1)}
