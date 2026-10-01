@@ -19,6 +19,7 @@ Luồng 1 lần giao (POST /api/task/assign mode="build", mặc định của n�
   5. Task done (complete_task) hoặc bị xóa → `git worktree remove` worktree của task; nhánh (local + remote) giữ nguyên.
 """
 
+import fnmatch
 import json
 import os
 import re
@@ -49,6 +50,9 @@ _GITHUB_URL_RE = re.compile(r"github\.com[:/]+([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+
 _CRED_RE = re.compile(r"(https?://)[^/@\s]+@")
 
 
+REPO_KEY_RE = re.compile(r"^[a-z0-9-]{2,32}$")
+
+
 def base_branch():
     return (os.environ.get("GW_BUILD_BASE") or "main").strip() or "main"
 
@@ -57,8 +61,182 @@ def repo_dir():
     return os.environ.get("GW_DISPATCH_REPO") or str(db.BASE_DIR)
 
 
-def task_worktree_dir(task_id):
-    return os.path.join(db._worktree_root(), task_id)
+def gw_repos_dir():
+    return os.environ.get("GW_REPOS_ROOT") or os.path.abspath(os.path.join(str(db.BASE_DIR), "..", "gw-repos"))
+
+
+SLUG_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9-]*/(?!\.\.?$)[A-Za-z0-9._-]+$")
+BASE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]{0,99}$")
+
+
+def _valid_base(b):
+    return bool(BASE_RE.match(b or "")) and ".." not in b and not b.endswith("/") and not b.endswith(".lock")
+
+
+def clone_url_for(slug):
+    """URL clone dựng CHỈ từ slug trong cấu hình (GW_BUILD_CLONE_BASE ghi đè gốc, mặc định https://github.com — test / mirror)."""
+    if not SLUG_RE.match(slug or ""):
+        return ""
+    root = (os.environ.get("GW_BUILD_CLONE_BASE") or "https://github.com").rstrip("/")
+    return f"{root}/{slug}.git"
+
+
+def _ensure_clone(entry):
+    """Chưa có clone_dir/.git thì app tự `git clone -- <url từ slug> <clone_dir>`; lỗi ghi vào entry['clone_error']."""
+    clone_dir = entry["clone_dir"]
+    if os.path.exists(os.path.join(clone_dir, ".git")):
+        return entry
+    url = clone_url_for(entry.get("slug") or "")
+    if not url:
+        entry["clone_error"] = f"slug không hợp lệ: '{entry.get('slug')}'"
+        return entry
+    try:
+        os.makedirs(os.path.dirname(clone_dir), exist_ok=True)
+    except OSError as e:
+        entry["clone_error"] = f"Không tạo được thư mục gw-repos: {e}"
+        return entry
+    r = _git(["clone", "--", url, clone_dir], cwd=os.path.dirname(clone_dir),
+             timeout=_env_int("GW_BUILD_CLONE_TIMEOUT_SEC", 120))
+    if r.returncode != 0:
+        entry["clone_error"] = _err(r) or f"git clone thoát {r.returncode}"
+        print(f"[build] Lỗi khi git clone repo {entry['key']} ({url}): {entry['clone_error']}")
+    return entry
+
+
+def build_repos(auto_clone=False):
+    """
+    Danh sách repo cho chế độ Làm (Issue #57):
+    Đọc env GW_BUILD_REPOS (JSON list) hoặc <DATA_DIR>/config/build_repos.json.
+    Luôn có mục mặc định key 'gen-workplace' = repo hiện tại (repo_dir cũ, slug từ origin, base main, kind python).
+    Key phải khớp ^[a-z0-9-]{2,32}$, slug khớp SLUG_RE, base là tên nhánh hợp lệ, clone_dir phải nằm hẳn dưới gw-repos/
+    (trừ gen-workplace). auto_clone=True: chưa có clone thì app tự git clone https://github.com/<slug>.git <clone_dir>
+    (get_repo chỉ clone đúng repo được hỏi).
+    """
+    default_entry = {
+        "key": "gen-workplace",
+        "slug": github_repo_slug(repo_dir()),
+        "clone_dir": repo_dir(),
+        "base": base_branch(),
+        "kind": "python",
+        "test_cmd": "",
+        "protected_paths": []
+    }
+    repos_map = {"gen-workplace": default_entry}
+    order = ["gen-workplace"]
+
+    raw_data = None
+    if os.environ.get("GW_BUILD_REPOS"):
+        try:
+            raw_data = json.loads(os.environ["GW_BUILD_REPOS"])
+        except Exception as e:
+            print(f"[build] Không đọc được env GW_BUILD_REPOS: {e}")
+    else:
+        cfg_path = os.path.join(str(db.DATA_DIR), "config", "build_repos.json")
+        if os.path.exists(cfg_path):
+            try:
+                with open(cfg_path, "r", encoding="utf-8") as f:
+                    raw_data = json.load(f)
+            except Exception as e:
+                print(f"[build] Không đọc được cấu hình {cfg_path}: {e}")
+
+    if isinstance(raw_data, list):
+        repos_root = gw_repos_dir()
+        real_repos_root = os.path.realpath(repos_root)
+
+        for item in raw_data:
+            if not isinstance(item, dict):
+                continue
+            key = str(item.get("key") or "").strip()
+            if not REPO_KEY_RE.match(key):
+                print(f"[build] Bỏ qua repo cấu hình sai key: '{key}' (phải khớp ^[a-z0-9-]{{2,32}}$)")
+                continue
+            slug = str(item.get("slug") or "").strip()
+            base = str(item.get("base") or "").strip()
+            if (slug and not SLUG_RE.match(slug)) or (base and not _valid_base(base)):
+                print(f"[build] Bỏ qua repo '{key}': slug '{slug}' hoặc base '{base}' không hợp lệ")
+                continue
+            protected = item.get("protected_paths") or []
+            if not isinstance(protected, list):
+                protected = []
+            protected = [str(x) for x in protected if isinstance(x, str) and x.strip()]
+
+            if key == "gen-workplace":
+                if slug:
+                    default_entry["slug"] = slug
+                if base:
+                    default_entry["base"] = base
+                if item.get("kind"):
+                    default_entry["kind"] = str(item["kind"]).strip()
+                if "test_cmd" in item:
+                    default_entry["test_cmd"] = str(item.get("test_cmd") or "").strip()
+                if "protected_paths" in item:
+                    default_entry["protected_paths"] = protected
+                continue
+
+            if not slug:
+                print(f"[build] Bỏ qua repo '{key}': thiếu slug")
+                continue
+            base = base or "main"
+            kind = str(item.get("kind") or "python").strip() or "python"
+            test_cmd = str(item.get("test_cmd") or "").strip()
+
+            specified_clone = str(item.get("clone_dir") or "").strip()
+            clone_dir = os.path.abspath(os.path.join(repos_root, specified_clone or key))
+            real_clone = os.path.realpath(clone_dir)
+            if not real_clone.startswith(real_repos_root + os.sep):
+                print(f"[build] Bỏ qua repo '{key}': clone_dir '{clone_dir}' không nằm dưới gw-repos/ ({repos_root})")
+                continue
+
+            entry = {
+                "key": key,
+                "slug": slug,
+                "clone_dir": clone_dir,
+                "base": base,
+                "kind": kind,
+                "test_cmd": test_cmd,
+                "protected_paths": protected
+            }
+            if auto_clone:
+                _ensure_clone(entry)
+
+            repos_map[key] = entry
+            if key not in order:
+                order.append(key)
+
+    return [repos_map[k] for k in order]
+
+
+def get_repo(key="", auto_clone=True):
+    """Lấy thông tin cấu hình repo theo key. Rỗng hoặc 'gen-workplace' -> repo mặc định. Chỉ clone đúng repo này."""
+    k = (key or "").strip()
+    if not k:
+        k = "gen-workplace"
+    for r in build_repos(auto_clone=False):
+        if r["key"] == k:
+            if auto_clone and k != "gen-workplace":
+                _ensure_clone(r)
+            return r
+    return None
+
+
+def _wt_confined(wt, repo_key=""):
+    """realpath của worktree phải nằm hẳn dưới gw-worktrees/ (repo khác: dưới gw-worktrees/<key>/), chặn symlink thoát ra ngoài."""
+    k = (repo_key or "").strip()
+    root = os.path.realpath(db._worktree_root())
+    if k and k != "gen-workplace":
+        if not REPO_KEY_RE.match(k):
+            return False
+        root = os.path.join(root, k)
+        if os.path.realpath(root) != root:
+            return False
+    return os.path.realpath(wt).startswith(root + os.sep)
+
+
+def task_worktree_dir(task_id, repo_key=""):
+    k = (repo_key or "").strip()
+    if not k or k == "gen-workplace":
+        return os.path.join(db._worktree_root(), task_id)
+    return os.path.join(db._worktree_root(), k, task_id)
 
 
 def task_branch(task_id):
@@ -106,16 +284,31 @@ def _err(res):
 # ---------------------------------------------------------------------------
 # Worktree của task
 # ---------------------------------------------------------------------------
-def ensure_task_worktree(task_id):
+def ensure_task_worktree(task_id, repo_key=""):
     """
-    Worktree <root>/TSK-n trên nhánh wt/TSK-n. Chưa có → git fetch origin <base> rồi `git worktree add --no-track -b wt/TSK-n
-    <dir> origin/<base>` (không có origin/<base> thì <base> local, rồi HEAD, kèm ghi chú). Đã có → dùng lại (phải đúng nhánh).
+    Worktree <root>/TSK-n (gen-workplace) hoặc <root>/<key>/TSK-n (repo khác) trên nhánh wt/TSK-n.
+    Chưa có → git fetch origin <base> rồi `git worktree add --no-track -b wt/TSK-n <dir> origin/<base>`
+    (không có origin/<base> thì <base> local, rồi HEAD, kèm ghi chú). Đã có → dùng lại (phải đúng nhánh).
     Trả {ok, dir, branch, base_ref, base_sha, reused, note, error}.
     """
     if not TASK_ID_RE.match(task_id or ""):
         return {"ok": False, "error": f"Mã task không hợp lệ cho worktree: '{task_id}'"}
-    repo, wt, branch = repo_dir(), task_worktree_dir(task_id), task_branch(task_id)
-    base = base_branch()
+    k = (repo_key or "").strip()
+    repo_conf = get_repo(k, auto_clone=True)
+    if not repo_conf:
+        return {"ok": False, "error": f"Repo '{k}' không tồn tại trong cấu hình"}
+    if repo_conf.get("clone_error"):
+        return {"ok": False, "error": f"Không clone được repo '{k}': {repo_conf['clone_error']}"}
+
+    repo = repo_conf["clone_dir"]
+    if not os.path.exists(os.path.join(repo, ".git")):
+        return {"ok": False, "error": f"Thư mục repo chưa được clone: {repo}"}
+
+    base = repo_conf.get("base") or base_branch()
+    wt = task_worktree_dir(task_id, k)
+    branch = task_branch(task_id)
+    if not _wt_confined(wt, k):
+        return {"ok": False, "error": f"Đường dẫn worktree thoát khỏi gw-worktrees/: {wt}"}
     out = {"ok": False, "dir": wt, "branch": branch, "base_ref": "", "base_sha": "", "reused": False, "note": "", "error": ""}
     if os.path.exists(os.path.join(wt, ".git")):
         cur = _out(_git(["symbolic-ref", "--short", "-q", "HEAD"], cwd=wt))
@@ -140,7 +333,7 @@ def ensure_task_worktree(task_id):
     elif base_ref != f"{REMOTE}/{base}":
         notes.append(f"không có {REMOTE}/{base} — tạo từ nhánh local {base}")
     try:
-        os.makedirs(db._worktree_root(), exist_ok=True)
+        os.makedirs(os.path.dirname(wt), exist_ok=True)
     except OSError as e:
         out["error"] = f"Không tạo được thư mục worktree: {e}"
         return out
@@ -167,17 +360,36 @@ def running_build(task_id):
     return r["id"] if r else None
 
 
-def cleanup_task_worktree(task_id):
+def cleanup_task_worktree(task_id, repo_key=""):
     """
     Gỡ worktree của task (`git worktree remove --force`, rồi prune) và hook chặn của task. Nhánh wt/TSK-n (local + remote) giữ
     nguyên để còn review / làm bằng chứng. Task đang có lần build chạy → không gỡ. Trả {removed, dir, branch, error?}.
     """
     if not TASK_ID_RE.match(task_id or ""):
         return {"removed": False, "dir": "", "error": "mã task không hợp lệ"}
-    wt, repo = task_worktree_dir(task_id), repo_dir()
+    k = (repo_key or "").strip()
+    if not k:
+        try:
+            k = db.get_task_repo(task_id)
+        except Exception:
+            pass
+    if k and not REPO_KEY_RE.match(k):
+        return {"removed": False, "dir": "", "error": f"repo không hợp lệ: '{k}'"}
+    repo_conf = get_repo(k, auto_clone=False)
+    repo = repo_conf["clone_dir"] if repo_conf else repo_dir()
+    wt = task_worktree_dir(task_id, k)
     res = {"removed": False, "dir": wt, "branch": task_branch(task_id)}
     if not os.path.exists(wt):
-        return res
+        if k:
+            old_wt = task_worktree_dir(task_id, "")
+            if os.path.exists(old_wt):
+                wt = old_wt
+                repo = repo_dir()
+                res["dir"] = wt
+            else:
+                return res
+        else:
+            return res
     busy = running_build(task_id)
     if busy:
         res["error"] = f"đang có lần build dispatch:{busy} chạy — không gỡ"
@@ -234,23 +446,26 @@ def agy_git_env(hooks, session_id):
             "GIT_AUTHOR_NAME": who, "GIT_AUTHOR_EMAIL": mail, "GIT_COMMITTER_NAME": who, "GIT_COMMITTER_EMAIL": mail}
 
 
-def _repo_snapshot(repo):
-    return {"main": _out(_git(["rev-parse", "--verify", "--quiet", f"refs/heads/{base_branch()}"], cwd=repo)),
+def _repo_snapshot(repo, base=None):
+    b = (base or base_branch()).strip()
+    return {"main": _out(_git(["rev-parse", "--verify", "--quiet", f"refs/heads/{b}"], cwd=repo)),
             "head": _out(_git(["rev-parse", "HEAD"], cwd=repo))}
 
 
-def detect_violations(repo, before, worktree, branch):
+def detect_violations(repo, before, worktree, branch, base=None, extra=None):
     """
-    Sau khi agy chạy: nhánh main local / HEAD của repo app đổi sang commit KHÔNG có trên origin/main (auto-update kéo main
+    Sau khi agy chạy: nhánh main local / HEAD của repo app đổi sang commit KHÔNG có trên origin/<base> (auto-update kéo main
     về thì hợp lệ) → vi phạm; worktree không còn ở wt/TSK-n → vi phạm. Trả list mô tả.
     """
     v = []
-    after = _repo_snapshot(repo)
-    base = f"{REMOTE}/{base_branch()}"
-    for key, label in (("main", f"nhánh {base_branch()} local"), ("head", "HEAD của repo app")):
-        old, new = before.get(key) or "", after.get(key) or ""
-        if new and new != old and _git(["merge-base", "--is-ancestor", new, base], cwd=repo).returncode != 0:
-            v.append(f"{label} đổi {old[:10] or '(trống)'} → {new[:10]} (commit không có trên {base})")
+    for rp, bf, bs in [(repo, before, base)] + list(extra or []):
+        b = (bs or base_branch()).strip()
+        after = _repo_snapshot(rp, base=b)
+        base_ref = f"{REMOTE}/{b}"
+        for key, label in (("main", f"nhánh {b} local"), ("head", f"HEAD của repo {os.path.basename(rp)}")):
+            old, new = bf.get(key) or "", after.get(key) or ""
+            if new and new != old and _git(["merge-base", "--is-ancestor", new, base_ref], cwd=rp).returncode != 0:
+                v.append(f"{label} đổi {old[:10] or '(trống)'} → {new[:10]} (commit không có trên {base_ref})")
     cur = _out(_git(["symbolic-ref", "--short", "-q", "HEAD"], cwd=worktree))
     if cur != branch:
         v.append(f"worktree không còn ở {branch} (đang ở '{cur or 'detached'}')")
@@ -272,12 +487,13 @@ def load_sop():
     return DEFAULT_SOP
 
 
-def build_prompt(task_id, session_id, worktree, branch, project_id="PRJ-GEN-WORKPLACE", pending=None):
+def build_prompt(task_id, session_id, worktree, branch, project_id="PRJ-GEN-WORKPLACE", pending=None, base=None):
     """Prompt chế độ Làm: SOP roles/build.md + khối THÔNG TIN VIỆC (tiêu đề, viec_ref, mô tả, checklist) + luật quyền."""
+    b = (base or base_branch()).strip()
     task_block = db.build_task_prompt_block(task_id, project_id)
     rules = (
         "[CHẾ ĐỘ LÀM — agy sửa code thật, không ai duyệt quyền giữa chừng]\n"
-        f"- Bạn đang ở worktree riêng của việc: {worktree} (nhánh {branch}, tạo từ {REMOTE}/{base_branch()}). "
+        f"- Bạn đang ở worktree riêng của việc: {worktree} (nhánh {branch}, tạo từ {REMOTE}/{b}). "
         "CHỈ tạo/sửa file trong thư mục này; không cd ra ngoài; sửa file bằng công cụ sửa file của agy "
         "(không dùng sed -i, echo >, tee, cat >).\n"
         f"- Lệnh shell được phép: lệnh chỉ đọc ({db.agy_plan_allowed_summary()}); python3 -m py_compile <file>; "
@@ -304,11 +520,12 @@ def build_prompt(task_id, session_id, worktree, branch, project_id="PRJ-GEN-WORK
 # ---------------------------------------------------------------------------
 # Kiểm của app sau khi agy xong: py_compile + test, push, compare / PR nháp
 # ---------------------------------------------------------------------------
-def run_tests(worktree, budget_sec=None):
+def run_tests(worktree, budget_sec=None, repo_conf=None):
     """
     py_compile mọi file .py đang theo dõi + chạy từng scripts/test_*.py (trừ GW_BUILD_TEST_EXCLUDE) trong worktree, HOME tạm,
     không ghi __pycache__ vào worktree. Trả {ok, py_compile: {ok, files, output}, tests: [{name, ok, rc, sec, tail}], passed,
     total, skipped, note, sec}.
+    (repo_conf: Issue #57 mục B1; B2/B3 sẽ mở rộng sang node/npm theo kind / test_cmd).
     """
     t0 = time.time()
     budget = budget_sec if budget_sec is not None else db.AGY_BUILD_POST_SEC - 120
@@ -370,8 +587,9 @@ def github_repo_slug(repo=None):
     return f"{m.group(1)}/{m.group(2)}" if m else ""
 
 
-def compare_url(slug, branch):
-    return f"https://github.com/{slug}/compare/{base_branch()}...{branch}" if slug else ""
+def compare_url(slug, branch, base=None):
+    b = (base or base_branch()).strip()
+    return f"https://github.com/{slug}/compare/{b}...{branch}" if slug else ""
 
 
 def push_branch(worktree, branch):
@@ -384,13 +602,14 @@ def push_branch(worktree, branch):
     return out
 
 
-def create_draft_pr(slug, branch, title, body):
-    """Có GITHUB_TOKEN → tạo PR NHÁP head=wt/TSK-n base=main. Không bao giờ merge. Trả (url, lỗi)."""
+def create_draft_pr(slug, branch, title, body, base=None):
+    """Có GITHUB_TOKEN → tạo PR NHÁP head=wt/TSK-n base=<base>. Không bao giờ merge. Trả (url, lỗi)."""
     token = db.github_token()
     if not token or not slug:
         return "", ""
+    b = (base or base_branch()).strip()
     api = (os.environ.get("GW_GITHUB_API_URL") or "https://api.github.com").rstrip("/")
-    data = json.dumps({"title": title, "head": branch, "base": base_branch(), "body": body, "draft": True}).encode("utf-8")
+    data = json.dumps({"title": title, "head": branch, "base": b, "body": body, "draft": True}).encode("utf-8")
     req = urllib.request.Request(f"{api}/repos/{slug}/pulls", data=data, method="POST",
                                  headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json",
                                           "Content-Type": "application/json", "User-Agent": "gen-workplace-build"})
@@ -407,18 +626,113 @@ def create_draft_pr(slug, branch, title, body):
         return "", f"{type(e).__name__}: {e}".replace(token, "***")
 
 
+BLOCKED_DIRS = (".github", ".gitea", "deploy")
+BLOCKED_FILES = ("dockerfile", "docker-compose.yml", "install.sh")
+
+
+def _push_diff_reasons(path, prot):
+    """Lý do chặn cho 1 đường dẫn trong diff (so khớp không phân biệt hoa thường cho đường cấm cố định)."""
+    norm = path.replace("\\", "/").lstrip("/")
+    parts = [x for x in norm.split("/") if x and x != "."]
+    norm = "/".join(parts)
+    low = norm.lower()
+    lparts = low.split("/") if low else []
+    bname = parts[-1] if parts else ""
+    lb = bname.lower()
+    if lparts and lparts[0] in BLOCKED_DIRS:
+        return f"thư mục '{parts[0]}/' ({norm})"
+    if lb in BLOCKED_FILES:
+        return f"file '{bname}' ({norm})"
+    if lb.startswith(".env"):
+        return f"file nhạy cảm '{bname}' ({norm})"
+    for pat in prot:
+        pc = pat.replace("\\", "/").strip().lstrip("/")
+        if pc.startswith("./"):
+            pc = pc[2:]
+        if not pc:
+            continue
+        pr = pc.rstrip("/")
+        if norm == pr or norm.startswith(pr + "/") or fnmatch.fnmatchcase(norm, pc) or fnmatch.fnmatchcase(bname, pc):
+            return f"protected_paths '{pat}' ({norm})"
+    return ""
+
+
+def check_push_diff(worktree, base="main", protected_paths=None, fetch=True):
+    """
+    Kiểm diff trước khi push (Issue #57 mục 4) — lớp chặn chính, áp cho mọi repo kể cả gen-workplace:
+    so HEAD với merge-base của origin/<base> (git diff --no-renames -z origin/<base>...HEAD, cả --name-status và --raw).
+    Chặn nếu có file (thêm / sửa / xoá, kể cả 2 đầu của rename):
+    - dưới .github/, .gitea/, deploy/ ở gốc repo
+    - tên Dockerfile, docker-compose.yml, install.sh, .env*
+    - khớp protected_paths
+    - mode mới 120000 (symlink) / 160000 (submodule)
+    Không kiểm được (thiếu ref, git lỗi) → chặn (fail closed). Trả list lý do chặn; rỗng = cho push.
+    """
+    violations = []
+
+    def add(msg):
+        if msg and msg not in violations:
+            violations.append(msg)
+
+    b = (base or "main").strip() or "main"
+    if not _valid_base(b):
+        return [f"base không hợp lệ: '{b}'"]
+    if fetch:
+        _git(["fetch", "--quiet", REMOTE, f"+refs/heads/{b}:refs/remotes/{REMOTE}/{b}"], cwd=worktree,
+             timeout=_env_int("GW_BUILD_FETCH_TIMEOUT_SEC", 60))
+    ref = f"refs/remotes/{REMOTE}/{b}"
+    if _git(["rev-parse", "--verify", "--quiet", ref], cwd=worktree).returncode != 0:
+        if _git(["rev-parse", "--verify", "--quiet", f"refs/heads/{b}"], cwd=worktree).returncode == 0:
+            ref = f"refs/heads/{b}"
+        else:
+            return [f"không kiểm được diff: không có {REMOTE}/{b}"]
+    diff_range = f"{ref}...HEAD"
+    prot = [str(x) for x in (protected_paths or []) if isinstance(x, str)]
+
+    # 1. Tên file (-z: không bị quote đường dẫn có ký tự lạ)
+    r_name = _git(["diff", "--name-only", "--no-renames", "-z", diff_range], cwd=worktree)
+    if r_name.returncode != 0:
+        return [f"không kiểm được diff ({_err(r_name)[:200]})"]
+    for p in (r_name.stdout or "").split("\0"):
+        if p:
+            add(_push_diff_reasons(p, prot))
+
+    # 2. Mode (symlink / submodule)
+    r_raw = _git(["diff", "--raw", "--no-renames", "-z", "--no-abbrev", diff_range], cwd=worktree)
+    if r_raw.returncode != 0:
+        return violations + [f"không kiểm được diff --raw ({_err(r_raw)[:200]})"]
+    toks = (r_raw.stdout or "").split("\0")
+    i = 0
+    while i < len(toks):
+        meta = toks[i]
+        if not meta.startswith(":"):
+            i += 1
+            continue
+        path = toks[i + 1] if i + 1 < len(toks) else ""
+        i += 2
+        parts = meta[1:].split()
+        dst_mode = parts[1] if len(parts) >= 2 else ""
+        if dst_mode == "120000":
+            add(f"symlink mode 120000 ({path})")
+        elif dst_mode == "160000":
+            add(f"submodule mode 160000 ({path})")
+
+    return violations
+
+
 # ---------------------------------------------------------------------------
 # Giao việc + chạy
 # ---------------------------------------------------------------------------
 def assign_build(todo_id, sid, role, task, body, claim, project_id="PRJ-GEN-WORKPLACE", author="Ryan (Owner)",
-                 channel_id="war_room", wait=False):
+                 channel_id="war_room", wait=False, repo=""):
     """Phần chế độ Làm của db.assign_task_to_role (task đã claim cho sid): ghi tin giao việc vào war-room (không giao qua
     war-room), tạo dòng dispatch_log kind=build (running) rồi chạy run_build ở thread nền (wait=True: chạy đồng bộ)."""
     busy = running_build(todo_id)
     if busy:
         return {"error": f"{todo_id} đang có lần Làm dispatch:{busy} chạy — chờ xong (wait_worker_result) rồi giao lại",
                 "code": "busy", "task_id": todo_id, "dispatch_id": busy}
-    branch, wt = task_branch(todo_id), task_worktree_dir(todo_id)
+    repo_key = (repo or task.get("repo") or "").strip()
+    branch, wt = task_branch(todo_id), task_worktree_dir(todo_id, repo_key)
     msg = f"[Làm] {body}\n(chế độ Làm: agy sửa code trong worktree {wt}, nhánh {branch}; app tự chạy test + push nhánh)"
     msg_id = db.save_warroom_record(project_id, channel_id, author, msg, "Assignment")
     did = db.start_dispatch_log(sid, kind=KIND, channel_id=channel_id, task_id=todo_id,
@@ -484,10 +798,18 @@ def _run_build(did, project_id):
     sid, task_id, channel_id = row.get("session_id") or "", row.get("task_id") or "", row.get("channel_id") or "war_room"
     t0 = time.time()
     started_at = time.strftime("%Y-%m-%d %H:%M:%S")
-    repo = repo_dir()
+
+    task = db._task_detail(task_id, project_id) or {}
+    repo_key = (task.get("repo") or "").strip()
+    repo_conf = get_repo(repo_key, auto_clone=True)
+    if not repo_conf:
+        repo_conf = get_repo("gen-workplace", auto_clone=False)
+    repo = repo_conf["clone_dir"]
+    repo_base = repo_conf.get("base") or base_branch()
+
     account, primary_dir = _session_profile(sid)
-    wt_info = ensure_task_worktree(task_id)
-    wt, branch = wt_info.get("dir") or task_worktree_dir(task_id), wt_info.get("branch") or task_branch(task_id)
+    wt_info = ensure_task_worktree(task_id, repo_key)
+    wt, branch = wt_info.get("dir") or task_worktree_dir(task_id, repo_key), wt_info.get("branch") or task_branch(task_id)
     _set_row(did, worktree_dir=wt, build_branch=branch, profile_initial=account)
 
     ctx = {"exit_code": -1, "output": "", "sinfo": {}, "cmd": [], "fail": "", "blocked": "", "fb_note": "", "profile_used": "",
@@ -497,11 +819,14 @@ def _run_build(did, project_id):
         ctx["fail"] = f"Không tạo được worktree: {wt_info.get('error')}"
         return _finish(did, row, ctx, wt, branch, wt_info, started_at, t0, project_id, account)
 
-    before_repo = _repo_snapshot(repo)
+    before_repo = _repo_snapshot(repo, base=repo_base)
+    # Repo khác: kiểm thêm HEAD/main của repo app gen-workplace (Issue #57 mục 3)
+    app_repo = repo_dir()
+    extra_snap = [] if os.path.realpath(app_repo) == os.path.realpath(repo) else [(app_repo, _repo_snapshot(app_repo), None)]
     before_head = _out(_git(["rev-parse", "HEAD"], cwd=wt))
     st0 = _git(["status", "--porcelain"], cwd=wt)
     pending = [ln[3:] for ln in (st0.stdout or "").splitlines() if ln.strip()] if st0.returncode == 0 else []
-    prompt = build_prompt(task_id, sid, wt, branch, project_id, pending=pending)
+    prompt = build_prompt(task_id, sid, wt, branch, project_id, pending=pending, base=repo_base)
     hooks = write_guard_hooks(task_id, wt, branch)
     stream = {"ok": not db._env_on("GW_AGY_NO_STREAM")}
     timeout = db.AGY_BUILD_TIMEOUT_SEC
@@ -572,7 +897,7 @@ def _run_build(did, project_id):
         ctx["head"] = _out(_git(["rev-parse", "HEAD"], cwd=wt))
         st = _git(["status", "--porcelain"], cwd=wt)   # không strip: dòng porcelain "XY path" bắt đầu bằng dấu cách (#47)
         ctx["dirty"] = [ln for ln in (st.stdout or "").splitlines() if ln.strip()][:30] if st.returncode == 0 else []
-        ctx["violations"] = detect_violations(repo, before_repo, wt, branch)
+        ctx["violations"] = detect_violations(repo, before_repo, wt, branch, base=repo_base, extra=extra_snap)
     tried_push = [t["command"] for t in (ctx["sinfo"].get("tools") or []) if re.search(r"\bgit\s+(.*\s)?push\b", t.get("command") or "")]
     if tried_push:
         ctx["push_attempts"] = tried_push
@@ -581,20 +906,25 @@ def _run_build(did, project_id):
     elif not ctx["commits"] and not ctx["fail"]:
         ctx["fail"] = f"agy không tạo commit mới trên {branch}" + (f" (còn {len(ctx['dirty'])} file sửa chưa commit)" if ctx["dirty"] else "")
     if ctx["commits"] and not ctx["violations"]:
-        ctx["tests"] = run_tests(wt)
-        ctx["push"] = push_branch(wt, branch)
-        slug = github_repo_slug(repo)
-        ctx["compare"] = compare_url(slug, branch)
-        if ctx["push"]["ok"]:
-            task = db._task_detail(task_id, project_id) or {}
-            url, err = create_draft_pr(slug, branch, f"[agy] {task_id}: {task.get('title') or ''}".strip(),
-                                       f"PR nháp do app gen-workplace tạo cho lần Làm dispatch:{did} ({sid}, agy). "
-                                       f"Claude điều phối review rồi mới merge.\n\nRefs {task.get('viec_ref') or ''} {task_id}")
-            if url:
-                ctx["pr_url"] = url
-                ctx["push"]["pr_url"] = url
-            elif err:
-                ctx["push"]["pr_error"] = err
+        ctx["tests"] = run_tests(wt, repo_conf=repo_conf)
+        diff_blocked = check_push_diff(wt, base=repo_base, protected_paths=repo_conf.get("protected_paths"))
+        if diff_blocked:
+            ctx["fail"] = "Chặn push: " + "; ".join(diff_blocked)
+        else:
+            ctx["push"] = push_branch(wt, branch)
+            slug = repo_conf.get("slug") or github_repo_slug(repo)
+            ctx["compare"] = compare_url(slug, branch, base=repo_base)
+            if ctx["push"]["ok"]:
+                task_detail = db._task_detail(task_id, project_id) or {}
+                url, err = create_draft_pr(slug, branch, f"[agy] {task_id}: {task_detail.get('title') or ''}".strip(),
+                                           f"PR nháp do app gen-workplace tạo cho lần Làm dispatch:{did} ({sid}, agy). "
+                                           f"Claude điều phối review rồi mới merge.\n\nRefs {task_detail.get('viec_ref') or ''} {task_id}",
+                                           base=repo_base)
+                if url:
+                    ctx["pr_url"] = url
+                    ctx["push"]["pr_url"] = url
+                elif err:
+                    ctx["push"]["pr_error"] = err
     return _finish(did, row, ctx, wt, branch, wt_info, started_at, t0, project_id, account)
 
 

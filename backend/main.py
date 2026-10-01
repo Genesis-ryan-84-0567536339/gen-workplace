@@ -327,6 +327,17 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             self._send_json(200, auto_update.status(BASE_DIR, DATA_DIR))
             return
 
+        # Danh sách repo cho chế độ Làm (Issue #57): chỉ trả key, slug, kind (không trả đường dẫn)
+        if path == "/api/build/repos":
+            try:
+                from backend import agy_build as _build
+            except ImportError:
+                import agy_build as _build
+            repos = _build.build_repos(auto_clone=False)
+            res = [{"key": r["key"], "slug": r.get("slug", ""), "kind": r.get("kind", "python")} for r in repos]
+            self._send_json(200, res)
+            return
+
         # 2. API Full State (Từ SQLite Core DB)
         if path == "/api/state":
             prj_id = query.get("project", ["PRJ-GEN-WORKPLACE"])[0]
@@ -849,9 +860,10 @@ class SwarmHandler(SimpleHTTPRequestHandler):
             session_id = str(data.get("session_id") or data.get("role") or "").strip()
             # mode (#45): "build" (mặc định, "Làm": agy sửa code trong worktree ../gw-worktrees/TSK-n, app test + push nhánh wt/TSK-n)
             #             | "review" ("Rà soát": như war-room, agy --mode plan chỉ đọc)
+            repo = str(data.get("repo") or "").strip()
             res = db.assign_task_to_role(todo_id, session_id, data.get("project_id", "PRJ-GEN-WORKPLACE"),
                                          author=str(data.get("author") or "Ryan (Owner)"), channel_id=str(data.get("channel_id") or "war_room"),
-                                         mode=str(data.get("mode") or "build"))
+                                         mode=str(data.get("mode") or "build"), repo=repo)
             self._send_json(db.assign_task_http_status(res), res)
             return
 
