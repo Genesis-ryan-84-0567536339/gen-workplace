@@ -642,6 +642,7 @@ def init_db():
         # status: running | done | failed ('' = dòng cũ, suy ra từ exit_code); kind: warroom | tmux; summary: kết quả rút gọn (#9)
         for col, col_type in [("task_id", "TEXT DEFAULT ''"), ("viec_ref", "TEXT DEFAULT ''"), ("channel_id", "TEXT DEFAULT ''"), ("webhook_sent", "INTEGER DEFAULT 0"),
                               ("status", "TEXT DEFAULT ''"), ("kind", "TEXT DEFAULT ''"), ("summary", "TEXT DEFAULT ''"),
+                              ("sop", "TEXT DEFAULT ''"),
                               ("request_msg_id", "INTEGER"), ("reply_msg_id", "INTEGER"),
                               # tự chuyển tài khoản khi hết quota (#22): hồ sơ gán cho vai, hồ sơ chạy thật, lý do, các hồ sơ đã thử (JSON)
                               ("profile_initial", "TEXT DEFAULT ''"), ("profile_used", "TEXT DEFAULT ''"),
@@ -4167,6 +4168,7 @@ def get_dispatch_log(limit=50, task_id="", session_id=""):
         d = dict(r)
         d["status"] = _row_status(d)
         d["fallback"] = bool(d.get("profile_used")) and (d.get("profile_used") or "") != (d.get("profile_initial") or "")
+        d["sop"] = d.get("sop") or ""
         out.append(d)
     return out
 
@@ -4224,13 +4226,13 @@ def _shorten_output(text, limit=DISPATCH_SUMMARY_MAX):
 def _now_iso():
     return datetime.now().astimezone().isoformat(timespec="seconds")
 
-def start_dispatch_log(session_id, kind="warroom", channel_id="", task_id="", command="", report_path="", viec_ref="", request_msg_id=None):
+def start_dispatch_log(session_id, kind="warroom", channel_id="", task_id="", command="", report_path="", viec_ref="", request_msg_id=None, sop=""):
     """Ghi 1 dòng dispatch_log status=running lúc bắt đầu giao việc; trả id (= dispatch_id cho wait_worker_result)."""
     with get_connection() as conn:
         cur = conn.execute("""
-        INSERT INTO dispatch_log (session_id, command, exit_code, report_path, started_at, finished_at, task_id, viec_ref, channel_id, webhook_sent, status, kind, summary, request_msg_id)
-        VALUES (?, ?, NULL, ?, ?, '', ?, ?, ?, 0, 'running', ?, '', ?)
-        """, (session_id, command, report_path, time.strftime("%Y-%m-%d %H:%M:%S"), task_id or "", viec_ref or "", channel_id, kind, request_msg_id))
+        INSERT INTO dispatch_log (session_id, command, exit_code, report_path, started_at, finished_at, task_id, viec_ref, channel_id, webhook_sent, status, kind, summary, request_msg_id, sop)
+        VALUES (?, ?, NULL, ?, ?, '', ?, ?, ?, 0, 'running', ?, '', ?, ?)
+        """, (session_id, command, report_path, time.strftime("%Y-%m-%d %H:%M:%S"), task_id or "", viec_ref or "", channel_id, kind, request_msg_id, sop or ""))
         conn.commit()
         did = cur.lastrowid
     touch_task_lock(task_id)   # heartbeat khóa thẻ Kanban lúc bắt đầu chạy
@@ -4544,6 +4546,7 @@ def wait_worker_result(dispatch_id=None, task_id="", session_id="", timeout_sec=
         "dispatch_id": row["id"],
         "session_id": row["session_id"],
         "kind": row.get("kind") or "warroom",
+        "sop": row.get("sop") or "",
         "exit_code": row.get("exit_code") if status != "running" else None,
         "summary": row.get("summary") or "",
         "report_path": row.get("report_path") or "",
@@ -4584,13 +4587,15 @@ WARROOM_ROLE_SESSIONS = {
     "devops": "gw-devops-agy",
     "qa": "gw-qa-agy",
     "lead": "gw-lead-agy",
+    "build": "gw-backend-agy",
+    "review": "gw-qa-agy",
 }
-WARROOM_MENTION_RE = re.compile(r"@(backend|devops|qa|lead)\b", re.IGNORECASE)
+WARROOM_MENTION_RE = re.compile(r"@(backend|devops|qa|lead|build|review)\b", re.IGNORECASE)
 # @Gen / @Toàn Đội / @all: không giao việc (war-room chỉ giao cho vai cụ thể; Gen trả lời ở Bàn làm việc Gen)
 WARROOM_BROADCAST_RE = re.compile(r"@(gen|all|toàn\s*đội)(?![\w-])", re.IGNORECASE)
 TASK_REF_RE = re.compile(r"(?<![\w-])(TSK-\d+)(?![\w-])")
 # Cờ [đọc] ngay sau @vai (không phân biệt hoa thường, có thể có dấu cách): '@backend [đọc] ...' → chế độ Rà soát
-WARROOM_READ_FLAG_RE = re.compile(r"@(backend|devops|qa|lead)\s*\[đọc\]", re.IGNORECASE)
+WARROOM_READ_FLAG_RE = re.compile(r"@(backend|devops|qa|lead|build|review)\s*\[đọc\]", re.IGNORECASE)
 # Mã VIEC-n trong nội dung tin (để tìm task qua viec_ref)
 VIEC_IN_MSG_RE = re.compile(r"(?<![\w-])(VIEC-\d+)(?![\w-])", re.IGNORECASE)
 WARROOM_DISPATCH_TIMEOUT_SEC = 15 * 60
@@ -5079,7 +5084,18 @@ def build_agy_readonly_prompt(message, task_block, session_id):
     """
     Prompt agy --mode plan cho war-room và POST /api/task/assign (lỗi dispatch:9): nói rõ CHỈ ĐỌC, ưu tiên công cụ đọc file
     của agy, chỉ dùng lệnh shell trong danh sách allow-rule, không lệnh ghi; bị chặn thì ghi "CẦN QUYỀN: ..." thay vì dừng im lặng.
+    Nội dung roles/review.md được đưa vào đầu prompt; đọc file mỗi lần, thiếu file thì bỏ qua.
     """
+    sop_txt = ""
+    sop_path = BASE_DIR / "roles" / "review.md"
+    try:
+        if sop_path.exists():
+            with open(sop_path, "r", encoding="utf-8") as f:
+                sop_txt = f.read().strip()
+    except OSError:
+        pass
+    sop_header = f"{sop_txt}\n\n" if sop_txt else ""
+
     rules = (
         "[CHẾ ĐỘ CHỈ ĐỌC — agy --mode plan, không ai duyệt quyền giữa chừng]\n"
         "- Việc này CHỈ ĐỌC: không tạo/sửa/xóa file, không chạy lệnh ghi (không >, >>, tee, sed -i, rm, mv, cp, mkdir, "
@@ -5096,7 +5112,7 @@ def build_agy_readonly_prompt(message, task_block, session_id):
     tail = (f"(Bạn là {session_id}, đang ở worktree của repo gen-workplace. "
             "Hãy tự đọc file cần thiết rồi trả lời ĐẦY ĐỦ ngay trong một lượt bằng tiếng Việt; "
             "không hỏi lại, không chỉ nêu kế hoạch.)")
-    return f"{message}\n\n" + (f"{task_block}\n\n" if task_block else "") + f"{rules}\n\n{tail}"
+    return f"{sop_header}{message}\n\n" + (f"{task_block}\n\n" if task_block else "") + f"{rules}\n\n{tail}"
 
 
 def _agy_tool_command(params):
@@ -5282,8 +5298,17 @@ def dispatch_warroom_to_agent(project_id, channel_id, session_id, message, timeo
     status done/failed + exit_code + summary rồi báo hiệu cho wait_worker_result (#9).
     """
     project_id = normalize_project_id(project_id)
+    sop_val = "build" if build_mode else "review"
     if dispatch_id is None:
-        dispatch_id = start_dispatch_log(session_id, kind="warroom", channel_id=channel_id, task_id=_current_task_of(session_id), request_msg_id=reply_to)
+        dispatch_id = start_dispatch_log(session_id, kind="warroom", channel_id=channel_id, task_id=_current_task_of(session_id), request_msg_id=reply_to, sop=sop_val)
+    else:
+        try:
+            with get_connection() as conn:
+                conn.execute("UPDATE dispatch_log SET sop = ? WHERE id = ? AND (sop IS NULL OR sop = '')",
+                             (sop_val, dispatch_id))
+                conn.commit()
+        except Exception:
+            pass
     # Task của lần giao việc: đã chốt lúc tạo dòng dispatch_log (mã TSK trong tin > current_task_id của worker)
     task_id = ((_get_dispatch_row(dispatch_id) or {}).get("task_id") or "").strip()
     task_block = build_task_prompt_block(task_id, project_id) if task_id else ""
@@ -6087,7 +6112,17 @@ def post_warroom_message(project_id="PRJ-GEN-WORKPLACE", channel_id="war_room", 
         sid = WARROOM_ROLE_SESSIONS[role]
         d_task = ref_task or _current_task_of(sid)
 
-        if effective_mode == "build" and ref_task and _task_detail(ref_task, project_id):
+        # @review = LUÔN mode review (Rà soát chỉ đọc), dù không có [đọc].
+        # @build = tương đương @backend (mặc định Làm, nếu có [đọc] thì Rà soát).
+        # Các vai khác (@backend, @devops, @qa, @lead) giữ nguyên hành vi.
+        if role == "review":
+            role_mode = "review"
+        elif has_read_flag:
+            role_mode = "review"
+        else:
+            role_mode = effective_mode
+
+        if role_mode == "build" and ref_task and _task_detail(ref_task, project_id):
             # Tin có mã TSK-n hoặc VIEC-n của task tồn tại → giao qua assign_task_to_role(mode='build') (chk-2)
             try:
                 from backend import agy_build as _build
@@ -6117,11 +6152,12 @@ def post_warroom_message(project_id="PRJ-GEN-WORKPLACE", channel_id="war_room", 
                 did = bres.get("dispatch_id")
                 dispatched.append(sid)
                 dispatches.append({"session_id": sid, "dispatch_id": did, "task_id": d_task, "mode": "build"})
-        elif effective_mode == "build":
+        elif role_mode == "build":
 
             # Không có task → agy chạy chế độ Làm trong worktree của vai (chk-2)
             did = start_dispatch_log(sid, kind="warroom", channel_id=channel_id, task_id=d_task,
-                                     viec_ref=get_task_viec_ref(d_task, project_id), request_msg_id=user_msg_id)
+                                     viec_ref=get_task_viec_ref(d_task, project_id), request_msg_id=user_msg_id,
+                                     sop="build")
             if wait:
                 dispatch_warroom_to_agent(project_id, channel_id, sid, clean_msg, dispatch_id=did,
                                           reply_to=user_msg_id, build_mode=True)
@@ -6135,7 +6171,8 @@ def post_warroom_message(project_id="PRJ-GEN-WORKPLACE", channel_id="war_room", 
         else:
             # mode='review': hành vi cũ — agy --mode plan, chỉ đọc
             did = start_dispatch_log(sid, kind="warroom", channel_id=channel_id, task_id=d_task,
-                                     viec_ref=get_task_viec_ref(d_task, project_id), request_msg_id=user_msg_id)
+                                     viec_ref=get_task_viec_ref(d_task, project_id), request_msg_id=user_msg_id,
+                                     sop="review")
             if wait:
                 dispatch_warroom_to_agent(project_id, channel_id, sid, clean_msg, dispatch_id=did,
                                           reply_to=user_msg_id, build_mode=False)
@@ -6148,7 +6185,8 @@ def post_warroom_message(project_id="PRJ-GEN-WORKPLACE", channel_id="war_room", 
             dispatches.append({"session_id": sid, "dispatch_id": did, "task_id": d_task, "mode": "review"})
 
     broadcast = bool(WARROOM_BROADCAST_RE.search(clean_msg))
-    mode_note = "chế độ Làm (agy sửa code)" if effective_mode == "build" else "chế độ Đọc (agy --mode plan)"
+    has_build = any(d.get("mode") == "build" for d in dispatches)
+    mode_note = "chế độ Làm (agy sửa code)" if has_build else "chế độ Đọc (agy --mode plan)"
     if dispatched:
         note = (f"Đã chuyển tới {', '.join(dispatched)} ({mode_note}); trả lời thật của agy sẽ xuất hiện trong kênh khi chạy xong (tối đa 15 phút). "
                 f"Chờ kết quả: wait_worker_result(dispatch_id=...) với dispatch_id trong 'dispatches'.")

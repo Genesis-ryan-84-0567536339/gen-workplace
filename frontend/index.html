@@ -12279,11 +12279,12 @@ function renderTaskLinkMeta(t) {
     </div>`;
 }
 
-// Vai giao được: bỏ vai đã retired (không còn trong /api/tmux/sessions) và vai có hồ sơ chưa đăng nhập (is_auth=false) (#34)
+// Vai giao được: bỏ vai lead (Claude điều phối là lead - Issue #38), bỏ vai đã retired (không còn trong /api/tmux/sessions) và vai có hồ sơ chưa đăng nhập (is_auth=false) (#34)
 function hubAssignableRoles() {
   const ss = state.tmuxSessions || [];
-  if (!ss.length) return HUB_ROLE_TEAMS;
-  return HUB_ROLE_TEAMS.filter(r => {
+  const baseRoles = HUB_ROLE_TEAMS.filter(r => r.key !== 'lead');
+  if (!ss.length) return baseRoles;
+  return baseRoles.filter(r => {
     const s = ss.find(x => x.id === r.sid);
     return s && s.status !== 'retired' && s.is_auth !== false;
   });
