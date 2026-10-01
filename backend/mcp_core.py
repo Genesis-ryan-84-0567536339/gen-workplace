@@ -147,7 +147,7 @@ TOOLS = [
     # ---------------- Swarm Workers & War Room ----------------
     {
         "name": "list_swarm_workers",
-        "description": "Liệt kê 6 Agent Swarm chuyên gia (Lead Architect, Product Manager, Fullstack Dev, DevOps, QA, Research/Legal) cùng trạng thái hoạt động, mô hình AI đang gán, tài khoản và thông tin runtime.",
+        "description": "Liệt kê 4 vai chuyên gia agy (Lead Architect, Backend Specialist, DevOps Engineer, QA Tester) cùng trạng thái hoạt động, mô hình AI đang gán, tài khoản và thông tin runtime.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -458,7 +458,7 @@ TOOLS = [
     },
     {
         "name": "assign_task",
-        "description": "Giao 1 task Kanban cho 1 vai agy (cùng hàm với REST POST /api/task/assign): claim task cho worker của vai rồi chạy agy nền, trả ngay dispatch_id để chờ bằng wait_worker_result. mode=\"build\" (mặc định, \"Làm\"): agy SỬA CODE với toàn quyền trên máy Fedora trong worktree riêng ../gw-worktrees/TSK-n (nhánh wt/TSK-n từ origin/main); app tự chạy py_compile + test, push nhánh wt/TSK-n, ghi nhánh / commit / kết quả test / link compare vào dispatch và phiên của task; app KHÔNG merge, điều phối tạo PR, review rồi merge. mode=\"review\" (\"Rà soát\"): như tin @vai trong war-room, agy --mode plan chỉ đọc. Lỗi (isError, kèm code + http_status): 400 thiếu / sai tham số hoặc vai đã bỏ, 404 không có task, 409 task đã done / worker khác đang giữ / đang có lần Làm chạy (code busy).",
+        "description": "Giao 1 task Kanban cho 1 vai agy (cùng hàm với REST POST /api/task/assign): claim task cho worker của vai rồi chạy agy nền, trả ngay dispatch_id để chờ bằng wait_worker_result. mode=\"build\" (mặc định, \"Làm\"): agy SỬA CODE với toàn quyền trên máy Fedora (khi máy có GW_AGY_BIN=~/bin/agy-full và GW_AGY_WRITE_ROLES, allow/deny và hook chỉ là lớp phụ; không có GW_AGY_BIN thì chạy theo allow/deny mặc định) trong worktree riêng ../gw-worktrees/TSK-n (nhánh wt/TSK-n từ origin/main); app tự chạy py_compile + test, push nhánh wt/TSK-n, ghi nhánh / commit / kết quả test / link compare vào dispatch và phiên của task; app KHÔNG merge, điều phối tạo PR, review rồi merge. mode=\"review\" (\"Rà soát\"): như tin @vai [đọc] trong war-room, agy --mode plan chỉ đọc. Lỗi (isError, kèm code + http_status): 400 thiếu / sai tham số hoặc vai đã bỏ, 404 không có task, 409 task đã done / worker khác đang giữ / đang có lần Làm chạy (code busy).",
         "inputSchema": {
             "type": "object",
             "properties": {

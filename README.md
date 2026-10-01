@@ -1,11 +1,11 @@
 # 🏛️ GEN-WORKPLACE · Multi-Agent Swarm Workplace & Autonomous Mission Control OS
 > **gen-workplace là nơi các agent ngoài phát lệnh chỉ huy vào Phòng giao ban để đội agy CLI làm việc.**  
 > **Hệ điều hành và trung tâm chỉ huy đa tác nhân (Multi-Agent Swarm Workbench) chuyên biệt cho quy trình phát triển phần mềm tự động hóa cao cấp.**  
-> **Chủ sở hữu:** Ryan · **Phiên bản:** v1.2-RELEASE · **Kiến trúc:** SQLite WAL + FTS5 + Docker Sandbox + MCP Server (27 Tools)
+> **Chủ sở hữu:** Ryan · **Phiên bản:** v1.2-RELEASE · **Kiến trúc:** SQLite WAL + FTS5 + agy Swarm CLI + MCP Server (31 Tools)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)](docker-compose.yml)
-[![MCP](https://img.shields.io/badge/MCP-27_Tools_Ready-8B5CF6)](backend/mcp_core.py)
+[![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)](backend/main.py)
+[![MCP](https://img.shields.io/badge/MCP-31_Tools_Ready-8B5CF6)](backend/mcp_core.py)
 [![SQLite](https://img.shields.io/badge/SQLite-WAL_%2B_FTS5-003B57?logo=sqlite&logoColor=white)](backend/db.py)
 
 ---
@@ -13,7 +13,7 @@
 ## 🌟 TỔNG QUAN HỆ THỐNG
 **Gen-workplace** cung cấp môi trường tích hợp (Mission Control SPA) giúp Owner quản trị nhiều dự án, tự động phân rã mục tiêu từ Plan & Chat tổng, phân công Role và chỉ định CLI Engine chuyên biệt (`Gemini CLI - agy`, `Claude Code CLI`, `Cursor CLI`), theo dõi tiến trình qua Live Workflow Graph từng node, điều hành qua Swarm Chatroom thuần Việt với @mention/reaction emojis, và quản trị bộ nhớ Single Source of Truth (SSOT).
 
-Đặc biệt, hệ thống tích hợp sẵn **Model Context Protocol (MCP) Server chuẩn quốc tế** với **32 công cụ tự động hóa**, hỗ trợ kết nối 2 chiều cho mọi AI Agent ngoài (Cursor, Claude Desktop, Antigravity, OpenCode).
+Đặc biệt, hệ thống tích hợp sẵn **Model Context Protocol (MCP) Server chuẩn quốc tế** với **31 công cụ tự động hóa**, hỗ trợ kết nối 2 chiều cho mọi AI Agent ngoài (Cursor, Claude Desktop, Antigravity, OpenCode).
 
 Tài liệu đặc tả nguồn gốc chính thức: [`docs/SSOT_ORIGINAL_SPEC.md`](docs/SSOT_ORIGINAL_SPEC.md) & [`docs/STANDARD_SQUAD_AND_WORKFLOW.md`](docs/STANDARD_SQUAD_AND_WORKFLOW.md).
 
@@ -35,8 +35,8 @@ flowchart TD
         Backend["🗄️ gw-backend-agy (Backend Specialist)<br/>• SQLite WAL & FTS5 Catalog Engine<br/>• Task Mutex & REST APIs<br/>• Giao diện frontend/index.html"]
     end
 
-    subgraph TIER3["TẦNG 3: HẠ TẦNG & ĐÓNG GÓI"]
-        DevOps["🚢 gw-devops-agy (DevOps Engineer)<br/>• Dockerfile & docker-compose.yml (:z SELinux)<br/>• One-Command TUI Installer (install.sh)<br/>• Desktop Application Shortcut (.desktop)"]
+    subgraph TIER3["TẦNG 3: HẠ TẦNG & DỊCH VỤ"]
+        DevOps["🚢 gw-devops-agy (DevOps Engineer)<br/>• Systemd service daemon & TUI Installer<br/>• Quản trị runtime agy & Git worktrees<br/>• Desktop Application Shortcut (.desktop)"]
     end
 
     subgraph TIER4["TẦNG 4: KIỂM THỬ"]
@@ -53,34 +53,36 @@ flowchart TD
 
 ---
 
-## 🚀 CÀI ĐẶT 1 LỆNH (ONE-COMMAND ALL-IN-ONE INSTALLER)
+## 🚀 KHỞI CHẠY & VẬN HÀNH
 
-Hỗ trợ tự động trên **Linux**, **macOS** và **Windows (WSL2 / Docker Desktop)**.
+App chạy trực tiếp (native) trên host bằng `python3 backend/main.py` dưới `systemd --user`, không dùng Docker Sandbox.
 
-### Cách 1: Chạy từ mã nguồn repo
+### Cách 1: Chạy trực tiếp từ mã nguồn repo
 ```bash
 git clone https://github.com/Genesis-ryan-84-0567536339/gen-workplace.git
 cd gen-workplace
-./install.sh
+python3 backend/main.py
 ```
 
-### Cách 2: Chạy trực tiếp từ GitHub (1 lệnh qua curl)
+### Cách 2: Chạy nền bằng systemd --user (khuyến nghị trên Linux)
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Genesis-ryan-84-0567536339/gen-workplace/main/install.sh | bash
+mkdir -p ~/.config/systemd/user && cp scripts/gen-workplace.service ~/.config/systemd/user/
+systemctl --user daemon-reload && systemctl --user enable --now gen-workplace
+systemctl --user restart gen-workplace          # khởi động lại sau khi cập nhật backend
+journalctl --user -u gen-workplace -f -n 50     # log runtime của Control Plane
 ```
 
-### ⚡ Các tính năng nổi bật của bộ cài đặt TUI:
-- **Giao diện Terminal User Interface (TUI)** chuyên nghiệp, có **thanh loading % tiến độ cài đặt**.
-- **Chẩn đoán toàn diện (System Doctor)**: Tự động kiểm tra OS, Git, Curl, Docker Engine và Docker Compose.
-- **Môi trường Docker hóa 100%**: Mọi thành phần (Backend, Frontend, Agent Runtimes) chạy an toàn và độc lập trong container Docker với cờ SELinux `:z`.
-- **Hỗ trợ Native Standalone Fallback**: Chạy trực tiếp bằng Python nếu máy chủ chưa cài đặt Docker.
-- **Tự động tạo Desktop Icon Launcher**: Tự sinh shortcut trên màn hình Desktop (`Gen-workplace.desktop` trên Linux, `.command` trên macOS, `.bat` trên Windows).
+### ⚡ Các tính năng nổi bật:
+- **Vận hành Native tin cậy**: App chạy trực tiếp với Python 3 và SQLite WAL, quản lý qua `systemd --user`.
+- **Cơ chế Tự cập nhật (Auto Update)**: Tự động đồng bộ commit mới từ `origin/main` và khởi động lại an toàn khi máy rảnh.
+- **Đội ngũ 4 vai agy Swarm CLI**: Phân lập môi trường làm việc qua từng worktree riêng biệt.
+- **Tự động tạo Desktop Icon Launcher**: Tự sinh shortcut trên màn hình Desktop (`Gen-workplace.desktop` trên Linux, `.command` trên macOS).
 
 ---
 
 ## 🔌 MODEL CONTEXT PROTOCOL (MCP SERVER & GATEWAY)
 
-Gen-workplace tích hợp sẵn **MCP Server v1.0.0** tuân thủ đặc tả giao thức MCP 2024-11-05, cung cấp **32 công cụ (tools)**, **4 tài nguyên (resources)**, và **2 mẫu chỉ thị (prompts)**.
+Gen-workplace tích hợp sẵn **MCP Server v1.0.0** tuân thủ đặc tả giao thức MCP 2024-11-05, cung cấp **31 công cụ (tools)**, **4 tài nguyên (resources)**, và **2 mẫu chỉ thị (prompts)**.
 
 ### Cấu hình kết nối cho AI Agent bên ngoài:
 
@@ -109,14 +111,15 @@ Gen-workplace tích hợp sẵn **MCP Server v1.0.0** tuân thủ đặc tả gi
 
 > Khi bật "Bắt buộc token", `/mcp`, `/sse` và `/api/mcp` từ chối (401) mọi request không có `Authorization: Bearer <token>` hợp lệ. Token đầy đủ chỉ hiện 1 lần lúc tạo (màn MCP & Kết nối → Token). Xem `docs/OPERATIONAL_GUIDE.md` mục 3.12.
 
-#### 3. Bộ 27 MCP Tools Sẵn Sàng:
+#### 3. Bộ 31 MCP Tools Sẵn Sàng:
 | Phân hệ | Danh sách Tools |
 | :--- | :--- |
-| **Quota & Google OAuth** | `get_live_quota`, `list_google_accounts`, `switch_google_account`, `get_oauth_login_url` |
-| **Swarm Workers & War Room** | `list_swarm_workers`, `send_worker_directive`, `manage_worker_lifecycle`, `get_worker_terminal_output`, `post_warroom_message`, `get_warroom_messages` |
-| **Kanban & Governance** | `list_kanban_tasks`, `create_kanban_task`, `claim_task`, `complete_task`, `update_task_checklist` |
-| **Chat & Compaction** | `gen_chat`, `list_conversations`, `create_conversation`, `get_conversation_messages`, `compact_conversation` |
-| **Notes & Files** | `list_notes`, `save_note`, `delete_note`, `read_workspace_file`, `create_workspace_file`, `list_workspace_files`, `get_system_status` |
+| **Quota & Google OAuth** | `get_live_quota`, `list_google_accounts`, `probe_quota`, `switch_google_account`, `get_oauth_login_url` |
+| **Swarm Workers & War Room** | `list_swarm_workers`, `get_worker_terminal_output`, `get_warroom_messages`, `wait_worker_result`, `post_warroom_message`, `send_worker_directive`, `manage_worker_lifecycle` |
+| **Kanban & Governance** | `list_kanban_tasks`, `create_kanban_task`, `claim_task`, `complete_task`, `update_task_checklist`, `assign_task` |
+| **Chat & Compaction** | `list_conversations`, `get_conversation_messages`, `list_notes`, `create_conversation`, `log_session_message`, `gen_chat`, `compact_conversation`, `save_note`, `delete_note` |
+| **Workspace Files** | `list_workspace_files`, `read_workspace_file`, `create_workspace_file` |
+| **Hệ Thống** | `get_system_status` |
 
 ---
 
@@ -128,7 +131,7 @@ gen-workplace/
 ├── backend/
 │   ├── db.py                        # SQLite 3 WAL Core DB & FTS5 Fast Catalog Engine
 │   ├── main.py                      # Control Plane API Daemon & Task Mutex
-│   ├── mcp_core.py                  # MCP Protocol Engine & 27 Tools Registry
+│   ├── mcp_core.py                  # MCP Protocol Engine & 31 Tools Registry
 │   └── mcp_server.py                # MCP Stdio Bridge Process
 ├── frontend/
 │   └── index.html                   # Giao diện SPA chuẩn Nocturne Slate v1.2
