@@ -5275,12 +5275,13 @@ body.resizing-active, body.resizing-active * {
                     </div>
                   </div>
 
-                  <!-- Card 3: Link hồ sơ SOP (bỏ ô ranh giới thư mục: chỉ hiển thị, không ép — VIEC-12) -->
+                  <!-- Card 3: Link hồ sơ SOP (Phạm vi gợi ý, không chặn) -->
                   <div class="wbRibbonCard" style="background:#111620;border:1px solid #1f2a3a;border-radius:8px;padding:8px 12px;display:flex;flex-direction:column;gap:3px">
                     <div style="display:flex;align-items:center;justify-content:space-between">
-                      <span style="font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:0.5px">Hồ sơ vai</span>
+                      <span style="font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:0.5px">Phạm vi gợi ý (không chặn)</span>
                       <button class="btn small" style="font-size:9.5px;padding:1px 6px;height:18px" onclick="switchDeckTab('sop')" title="Xem chi tiết hồ sơ SOP">Xem SOP đầy đủ </button>
                     </div>
+                    <div id="wbAllowedBox" style="font-size:11px;color:var(--text);line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="">Phạm vi gợi ý (không chặn): Đang tải...</div>
                   </div>
                 </div>
 
@@ -5348,7 +5349,13 @@ body.resizing-active, body.resizing-active * {
                         <div><strong style="color:var(--muted)">Bàn giao đầu ra cho:</strong> <div id="sopOutputTo" style="color:var(--text);background:rgba(255,255,255,0.03);padding:6px 10px;border-radius:6px;margin-top:3px;border:1px solid rgba(255,255,255,0.05)">—</div></div>
                       </div>
                     </div>
-
+                    <div class="card" style="padding:12px 14px;background:#111620;border:1px solid #1f2a3a;border-radius:10px;display:flex;flex-direction:column;gap:8px">
+                      <h4 style="margin:0;font-size:11.5px;color:var(--accent);text-transform:uppercase;letter-spacing:0.5px">Phạm vi gợi ý (không chặn)</h4>
+                      <div style="display:flex;flex-direction:column;gap:6px;font-size:11.5px">
+                        <div><strong style="color:var(--muted)">Được sửa:</strong> <div id="sopAllowedPaths" style="color:var(--text);background:rgba(255,255,255,0.03);padding:6px 10px;border-radius:6px;margin-top:3px;border:1px solid rgba(255,255,255,0.05)">—</div></div>
+                        <div><strong style="color:var(--muted)">Cấm sửa:</strong> <div id="sopBlockedPaths" style="color:var(--text);background:rgba(255,255,255,0.03);padding:6px 10px;border-radius:6px;margin-top:3px;border:1px solid rgba(255,255,255,0.05)">—</div></div>
+                      </div>
+                    </div>
                   </div>
 
                   <div class="card" style="padding:12px 14px;background:#111620;border:1px solid #1f2a3a;border-radius:10px;display:flex;flex-direction:column;gap:8px">
@@ -7130,7 +7137,7 @@ function updateCommandDeck() {
   const allowedEl = $('deckAgentAllowed');
   if (allowedEl) {
     const list = current.allowed_paths || [];
-    allowedEl.textContent = list.length > 0 ? list.join(', ') : 'Toàn quyền';
+    allowedEl.textContent = list.length > 0 ? list.join(', ') : 'Không giới hạn';
     allowedEl.title = list.join('\n');
   }
 
@@ -7201,8 +7208,9 @@ function updateCommandDeck() {
     $('wbOutputTo').style.color = sopReal.outputTo ? 'var(--green)' : 'var(--muted2)';
   }
   if ($('wbAllowedBox')) {
-    const al = current.allowed_paths?.join(', ') || 'Toàn quyền trong workspace';
-    $('wbAllowedBox').textContent = `Được sửa: ${al}`;
+    const al = current.allowed_paths?.join(', ') || 'Không giới hạn';
+    $('wbAllowedBox').textContent = `Phạm vi gợi ý (không chặn): ${al}`;
+    $('wbAllowedBox').title = al;
   }
   if ($('wbBlockedBox')) {
     const bl = current.blocked_paths?.join(', ') || 'Không có hạn chế';
@@ -7240,7 +7248,7 @@ function updateCommandDeck() {
   if ($('sopRoleMission')) $('sopRoleMission').textContent = roleInfo.mission;
   if ($('sopInputFrom')) $('sopInputFrom').textContent = sopReal.inputFrom || 'chưa khai báo trong ROLE.md';
   if ($('sopOutputTo')) $('sopOutputTo').textContent = sopReal.outputTo || 'chưa khai báo trong ROLE.md';
-  if ($('sopAllowedPaths')) $('sopAllowedPaths').textContent = current.allowed_paths?.join(', ') || '* (Toàn quyền trong workspace)';
+  if ($('sopAllowedPaths')) $('sopAllowedPaths').textContent = current.allowed_paths?.join(', ') || 'Không giới hạn';
   if ($('sopBlockedPaths')) $('sopBlockedPaths').textContent = current.blocked_paths?.join(', ') || 'Không có hạn chế';
   if ($('sopStatusChip')) {
     $('sopStatusChip').textContent = isHib ? 'Đang ngủ đông' : (isPaused ? 'Tạm dừng' : '● Đang hoạt động');
@@ -7490,7 +7498,7 @@ function updateRibbonSummary() {
   const roleInfo = rolesSopData[current?.id] || ROLE_DETAILS[current?.id] || ROLE_DETAILS['gw-lead-agy'];
   const summaryEl = $('wbRibbonSummaryText');
   if (summaryEl) {
-    summaryEl.innerHTML = `<strong>${escapeHtml(current?.current_task_id || 'Chưa giữ task')}</strong>: ${escapeHtml(((current?.current_task_id ? current.task_title : roleInfo.mission) || '').substring(0, 70))} | <span style="color:var(--green)">${escapeHtml(current?.allowed_paths?.join(', ') || '*')}</span>`;
+    summaryEl.innerHTML = `<strong>${escapeHtml(current?.current_task_id || 'Chưa giữ task')}</strong>: ${escapeHtml(((current?.current_task_id ? current.task_title : roleInfo.mission) || '').substring(0, 70))} | <span style="color:var(--green)">${escapeHtml(current?.allowed_paths?.join(', ') || 'Không giới hạn')}</span>`;
   }
 }
 
