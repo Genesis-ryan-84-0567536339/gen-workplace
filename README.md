@@ -76,6 +76,7 @@ journalctl --user -u gen-workplace -f -n 50     # log runtime của Control Plan
 - **Vận hành Native tin cậy**: App chạy trực tiếp với Python 3 và SQLite WAL, quản lý qua `systemd --user`.
 - **Cơ chế Tự cập nhật (Auto Update)**: Tự động đồng bộ commit mới từ `origin/main` và khởi động lại an toàn khi máy rảnh.
 - **Đội ngũ 4 vai agy Swarm CLI**: Phân lập môi trường làm việc qua từng worktree riêng biệt.
+- **Chế độ Làm đa repo (Multi-Repo Build Mode)**: Hỗ trợ worker agy sửa code trên nhiều repository độc lập (cấu hình qua `build_repos.json` / `GW_BUILD_REPOS`, tự clone vào `gw-repos/<key>`, phân lập worktree `gw-worktrees/<key>/TSK-n`, kèm lớp kiểm tra diff an toàn `check_push_diff` trước khi push).
 - **Tự động tạo Desktop Icon Launcher**: Tự sinh shortcut trên màn hình Desktop (`Gen-workplace.desktop` trên Linux, `.command` trên macOS).
 
 ---

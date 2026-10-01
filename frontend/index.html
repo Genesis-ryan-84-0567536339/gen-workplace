@@ -12167,7 +12167,33 @@ const HUB_SID_ROLE = Object.fromEntries(HUB_ROLE_TEAMS.map(r => [r.sid, r.key]))
 let hubPendingFocus = null;
 const hubAssignChoice = {};   // vai đã chọn ở ô "Giao cho" của từng thẻ (giữ qua các lần vẽ lại)
 const hubAssignMode = {};     // chế độ đã chọn ở từng thẻ: 'build' (Làm, mặc định) | 'review' (Rà soát) (#45)
+const hubAssignRepo = {};     // repo đã chọn ở từng thẻ: key trong /api/build/repos (#57)
+let hubBuildRepos = null;     // cache danh sách repo [{key, slug, kind}] từ GET /api/build/repos (gọi 1 lần)
+let hubBuildReposFetching = false;
 let hubWatching = {};   // dispatch_id → true (đang chờ kết quả để cập nhật thẻ)
+
+async function fetchBuildReposOnce() {
+  if (hubBuildRepos) return hubBuildRepos;
+  if (hubBuildReposFetching) return;
+  hubBuildReposFetching = true;
+  try {
+    const res = await fetch('/api/build/repos');
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length) {
+        hubBuildRepos = data;
+        rerenderHubViews();
+        return hubBuildRepos;
+      }
+    }
+  } catch (e) {
+    console.warn('[BuildRepos] Lỗi lấy danh sách repo từ /api/build/repos:', e);
+  } finally {
+    hubBuildReposFetching = false;
+  }
+  hubBuildRepos = [{ key: 'gen-workplace', slug: 'gen-workplace', kind: 'python' }];
+  return hubBuildRepos;
+}
 
 function hubTasks() { return Array.isArray(state.gen_session_todos) ? state.gen_session_todos : []; }
 function findHubTask(id) {
@@ -12238,10 +12264,15 @@ function renderTaskLinkMeta(t) {
   const holder = t.claimed_by || '';
   const d = t.last_dispatch;
   const di = dispatchStatusInfo(d);
+  const rk = (t.repo || '').trim();
+  const repoChip = (rk && rk !== 'gen-workplace')
+    ? `<span class="chip repoChip" title="Kho mã nguồn: ${escapeHtml(rk)}">repo: ${escapeHtml(rk)}</span>`
+    : '';
   return `
     <div class="taskLinkMeta">
       ${taskLiveBadge(t)}
       ${viecChip(t.viec_ref)}
+      ${repoChip}
       <span class="chip ${holder ? 'live' : 'wait'}" title="Người đang giữ task (claim)">${holder ? 'giữ: ' + escapeHtml(holder) : 'chưa ai giữ'}</span>
       <span class="chip" title="Checklist đã xong / tổng">checklist ${xy.text}</span>
       ${di ? `<span class="chip ${di.cls}" data-dispatch-status="${escapeHtml(d.status || '')}" title="Lần giao gần nhất: dispatch:${d.id} · ${escapeHtml(d.session_id || '')}${d.fallback_reason ? ' · ' + escapeHtml(d.fallback_reason) : ''}">#${d.id} ${di.label}</span>` : '<span class="chip" title="Chưa giao lần nào">chưa giao</span>'}
@@ -12271,11 +12302,19 @@ function renderTaskLinkActions(t, ctx) {
   const opts = roles.map(r => `<option value="${r.key}" ${r.key === roleNow ? 'selected' : ''}>@${r.key}</option>`).join('');
   const modeNow = hubAssignMode[key] || 'build';
   const modeOpts = [['build', 'Làm'], ['review', 'Rà soát']].map(([v, l]) => `<option value="${v}" ${v === modeNow ? 'selected' : ''}>${l}</option>`).join('');
+  if (!hubBuildRepos) fetchBuildReposOnce();
+  const reposList = (hubBuildRepos && hubBuildRepos.length) ? hubBuildRepos : [{ key: 'gen-workplace', slug: 'gen-workplace', kind: 'python' }];
+  let repoNow = hubAssignRepo[key] || t.repo || 'gen-workplace';
+  const hasRepoNow = reposList.some(r => r.key === repoNow);
+  const displayRepos = hasRepoNow ? reposList : [...reposList, { key: repoNow, slug: repoNow, kind: '' }];
+  const repoOpts = displayRepos.map(r => `<option value="${escapeHtml(r.key)}" ${r.key === repoNow ? 'selected' : ''}>${escapeHtml(r.key)}</option>`).join('');
+  const isReview = modeNow === 'review';
   return `
     <div class="taskLinkActions" onclick="event.stopPropagation()">
       ${isDone || roles.length ? '' : '<span class="hint" title="Đăng nhập hồ sơ Google cho vai ở màn Worker & terminal">Chưa vai nào đăng nhập để giao</span>'}
       ${isDone || !roles.length ? '' : `<select class="taskAssignSel" id="assignSel-${escapeHtml(key)}" onchange="hubAssignChoice['${escapeHtml(key)}']=this.value;document.getElementById('assignBtn-${escapeHtml(key)}').textContent='Giao cho @'+this.value" title="Chọn vai">${opts}</select>
-      <select class="taskAssignSel taskModeSel" id="assignMode-${escapeHtml(key)}" onchange="hubAssignMode['${escapeHtml(key)}']=this.value" title="Làm: agy sửa code trong worktree riêng của task (nhánh wt/${escapeHtml(t.id)}), app chạy test + push nhánh. Rà soát: agy chỉ đọc (--mode plan)">${modeOpts}</select>
+      <select class="taskAssignSel taskModeSel" id="assignMode-${escapeHtml(key)}" onchange="hubAssignMode['${escapeHtml(key)}']=this.value; const sel=document.getElementById('assignRepo-${escapeHtml(key)}'); if (sel) { sel.disabled = (this.value==='review'); sel.style.display = (this.value==='review'?'none':''); }" title="Làm: agy sửa code trong worktree riêng của task (nhánh wt/${escapeHtml(t.id)}), app chạy test + push nhánh. Rà soát: agy chỉ đọc (--mode plan)">${modeOpts}</select>
+      <select class="taskAssignSel taskRepoSel" id="assignRepo-${escapeHtml(key)}" onchange="hubAssignRepo['${escapeHtml(key)}']=this.value" title="Kho mã nguồn (repo) cho chế độ Làm" ${isReview ? 'disabled style="display:none"' : ''}>${repoOpts}</select>
       <button class="btn small taskAssignBtn" id="assignBtn-${escapeHtml(key)}" onclick="assignTaskFromCard('${escapeHtml(t.id)}','${escapeHtml(key)}')" title="Claim task cho vai + gửi war-room @vai kèm tiêu đề, checklist, viec_ref">Giao cho @${roleNow}</button>`}
       ${msgId ? `<button class="btn small" onclick="openWarroomMessage(${Number(msgId)}, '${escapeHtml((d && d.channel_id) || 'war_room')}')" title="Mở phòng giao ban tại tin này">Tin #${Number(msgId)}</button>` : ''}
       ${sid ? `<button class="btn small" onclick="openWorkerTerminal('${escapeHtml(sid)}')" title="Mở Worker & Terminal của ${escapeHtml(sid)}">Terminal</button>` : ''}
@@ -12303,6 +12342,7 @@ function renderHubTaskCard(t, ctx) {
 }
 
 async function refreshHubTasks(showNotify = false) {
+  fetchBuildReposOnce();
   try {
     const res = await fetch('/api/tasks');
     if (!res.ok) return;
@@ -12345,16 +12385,29 @@ function buildStripHtml(t) {
 async function assignTaskFromCard(todoId, key) {
   const role = $(`assignSel-${key}`)?.value || 'qa';
   const mode = $(`assignMode-${key}`)?.value || hubAssignMode[key] || 'build';
+  const repo = $(`assignRepo-${key}`)?.value || hubAssignRepo[key] || 'gen-workplace';
   const btn = $(`assignBtn-${key}`);
   if (btn) { btn.disabled = true; btn.textContent = 'Đang giao…'; }
   try {
+    const payload = { todo_id: todoId, session_id: role, mode, author: 'Ryan (Owner)' };
+    if (mode === 'build' && repo) {
+      payload.repo = repo;
+    }
     const res = await fetch('/api/task/assign', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ todo_id: todoId, session_id: role, mode, author: 'Ryan (Owner)' })
+      body: JSON.stringify(payload)
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || data.error) {
+      if (data.code === 'bad_repo') {
+        showToast(`Không giao được ${todoId} (Lỗi repo): ${data.error || 'Kho mã nguồn không hợp lệ hoặc chưa cấu hình'}`, 7000);
+        return;
+      }
+      if (data.code === 'repo_mismatch') {
+        showToast(`Không giao được ${todoId} (Lỗi repo): ${data.error || 'Task đã có worktree ở repo khác, không thể đổi repo'}`, 7000);
+        return;
+      }
       const extra = data.code === 'locked' && data.held_by ? ` (đang do ${data.held_by} giữ)` : '';
       showToast(`Không giao được ${todoId}: ${data.error || res.status}${extra}`, 7000);
       return;
