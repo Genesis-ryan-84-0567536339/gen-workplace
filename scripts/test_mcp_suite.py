@@ -5,6 +5,14 @@ Kiểm thử toàn diện:
 1. Cơ chế xác thực Token Bearer & URL Query chuẩn Gen-hub
 2. Thử nghiệm toàn bộ 27 MCP Tools qua cả HTTP POST và Stdio CLI
 3. Kiểm thử Resources & Prompt Templates
+
+CÁCH CHẠY ĐÚNG (DỰNG APP THỬ Ở CỔNG KHÁC VỚI DATA_DIR TẠM):
+1. Dựng app thử ở cổng khác (ví dụ 8889) với thư mục dữ liệu tạm:
+   DATA_DIR=/tmp/gw_test PORT=8889 python3 backend/main.py
+2. Chạy test suite trỏ vào instance thử nghiệm qua biến môi trường GW_MCP_SUITE_URL:
+   GW_MCP_SUITE_URL=http://localhost:8889 python3 scripts/test_mcp_suite.py
+3. Nếu không đặt GW_MCP_SUITE_URL, hoặc trỏ cổng 8888 mà không có GW_MCP_SUITE_ALLOW_LIVE=1,
+   script sẽ tự động in lý do và bỏ qua (exit 0) để bảo vệ dữ liệu app thật của Boss.
 """
 
 import sys
@@ -13,15 +21,38 @@ import time
 import http.client
 import urllib.request
 import urllib.error
+import urllib.parse
 import subprocess
 import os
 from pathlib import Path
 
-BASE_URL = "http://localhost:8888"
+BASE_URL = os.environ.get("GW_MCP_SUITE_URL", "").strip().rstrip("/")
+ALLOW_LIVE = os.environ.get("GW_MCP_SUITE_ALLOW_LIVE", "").strip() == "1"
 STDIO_BIN = os.path.expanduser("~/.local/bin/gen-workplace-mcp")
 
+def check_guard():
+    """Kiểm tra điều kiện chạy test suite để tránh ảnh hưởng app thật."""
+    if not BASE_URL:
+        print("[BỎ QUA] scripts/test_mcp_suite.py: Chưa đặt biến môi trường GW_MCP_SUITE_URL. Bỏ qua, không gọi mạng.")
+        print("Cách chạy đúng: Dựng app thử ở cổng khác với DATA_DIR tạm:")
+        print("  DATA_DIR=/tmp/gw_test PORT=8889 python3 backend/main.py")
+        print("  GW_MCP_SUITE_URL=http://localhost:8889 python3 scripts/test_mcp_suite.py")
+        sys.exit(0)
+
+    raw_url = BASE_URL if "://" in BASE_URL else f"http://{BASE_URL}"
+    parsed = urllib.parse.urlparse(raw_url)
+    port = parsed.port
+    if port is None:
+        port = 443 if parsed.scheme == "https" else 80
+
+    if port == 8888 and not ALLOW_LIVE:
+        print(f"[BỎ QUA] scripts/test_mcp_suite.py: GW_MCP_SUITE_URL trỏ tới cổng 8888 ({BASE_URL}) nhưng không có GW_MCP_SUITE_ALLOW_LIVE=1. Bỏ qua để bảo vệ app thật của Boss.")
+        print("Nếu thực sự muốn chạy vào cổng 8888, hãy đặt GW_MCP_SUITE_ALLOW_LIVE=1.")
+        sys.exit(0)
+
 def http_req(path, data=None, headers=None, method=None, timeout=15):
-    url = f"{BASE_URL}{path}"
+    raw_base = BASE_URL if "://" in BASE_URL else f"http://{BASE_URL}"
+    url = f"{raw_base}{path}"
     headers = headers or {}
     if data is not None and isinstance(data, (dict, list)):
         payload = json.dumps(data).encode("utf-8")
@@ -54,7 +85,11 @@ def http_req(path, data=None, headers=None, method=None, timeout=15):
 def test_sse_stream(token):
     """Kiểm tra SSE stream chuẩn: Kết nối qua HTTPConnection, đọc dòng event & endpoint rồi đóng socket"""
     try:
-        conn = http.client.HTTPConnection("localhost", 8888, timeout=4)
+        raw_url = BASE_URL if "://" in BASE_URL else f"http://{BASE_URL}"
+        parsed = urllib.parse.urlparse(raw_url)
+        host = parsed.hostname or "localhost"
+        port = parsed.port or (443 if parsed.scheme == "https" else 80)
+        conn = http.client.HTTPConnection(host, port, timeout=4)
         conn.request("GET", f"/sse?token={token}")
         resp = conn.getresponse()
         status = resp.status
@@ -66,6 +101,7 @@ def test_sse_stream(token):
         return 0, str(e)
 
 def run_tests():
+    check_guard()
     print("=" * 70)
     print("🚀 GENESIS MCP SERVER: COMPREHENSIVE AUTH & 27 TOOLS TEST SUITE")
     print("=" * 70)
@@ -320,5 +356,6 @@ def run_tests():
     return passed_count == total_count
 
 if __name__ == "__main__":
+    check_guard()
     success = run_tests()
     sys.exit(0 if success else 1)

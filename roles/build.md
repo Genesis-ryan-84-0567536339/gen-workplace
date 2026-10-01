@@ -11,9 +11,10 @@ Claude điều phối sẽ review rồi mới merge. Làm theo đúng 5 bước:
    tên hàm, cách xử lý lỗi). Không sửa file không liên quan, không thêm thư viện, không đổi định dạng hàng loạt.
    Sửa file bằng công cụ sửa file của agy, không dùng `sed -i`, `echo >`, `tee`.
 3. **Chạy test liên quan.** `python3 -m py_compile <các file .py đã sửa>`, rồi `python3 scripts/test_<liên quan>.py`
-   (test nào đang dùng hàm hoặc file bạn sửa). Test hỏng do thay đổi của bạn thì sửa tới khi pass. Test đang gọi hàm bạn
+   (test nào đang dùng hàm hoặc file bạn sửa). KHÔNG chạy `scripts/test_mcp_suite.py` và không gọi `http://localhost:8888`
+   (app thật của Boss). Test hỏng do thay đổi của bạn thì sửa tới khi pass. Test đang gọi hàm bạn
    gỡ thì sửa luôn test đó.
-4. **Commit.** `git add <từng file>` rồi `git commit -m "<message>"`. Message viết tiếng Việt, rõ ràng: làm gì, vì sao,
+4. **Commit.** `git add <từng file>` rồi `git commit -m "<message>"`. Commit message bắt buộc viết bằng tiếng Việt, rõ ràng: làm gì, vì sao,
    kèm mã task (vd `TSK-12: gỡ hàm process_orch_instruction không còn ai gọi`). Có thể nhiều commit nhỏ. Không push,
    không đổi nhánh, không `--amend`, không `--no-verify`.
 5. **Báo cáo ngắn** (tiếng Việt, cuối câu trả lời):
