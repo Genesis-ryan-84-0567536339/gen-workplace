@@ -476,6 +476,11 @@ TOOLS = [
                     "description": "'build' (mặc định) = Làm: agy sửa code toàn quyền trong worktree của task; 'review' = Rà soát, chỉ đọc.",
                     "default": "build"
                 },
+                "repo": {
+                    "type": "string",
+                    "description": "Kho mã nguồn thực hiện task: key trong /api/build/repos, bỏ trống = gen-workplace.",
+                    "default": ""
+                },
                 "author": {
                     "type": "string",
                     "description": "Người giao (ghi vào tin giao việc trong war-room).",
@@ -1116,7 +1121,8 @@ def execute_tool(name: str, args: dict) -> dict:
                                              str(args.get("session_id") or args.get("role") or "").strip(),
                                              args.get("project_id") or "PRJ-GEN-WORKPLACE",
                                              author=str(args.get("author") or "AI Agent"), channel_id="war_room",
-                                             mode=str(args.get("mode") or "build"))
+                                             mode=str(args.get("mode") or "build"),
+                                             repo=str(args.get("repo") or "").strip())
             res = dict(res, http_status=db.assign_task_http_status(res))
             if "error" not in res and res.get("dispatch_id"):
                 res["next"] = f"wait_worker_result(dispatch_id={res['dispatch_id']}) để chờ kết quả"

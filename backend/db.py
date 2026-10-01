@@ -498,6 +498,7 @@ def init_db():
             assigned_agent TEXT DEFAULT 'Gen Core',
             checklist_json TEXT DEFAULT '[]', -- JSON array of {"id": "chk-1", "text": "...", "done": true/false}
             evidence_ref TEXT DEFAULT '',
+            repo TEXT DEFAULT '',
             order_idx INTEGER DEFAULT 0,
             owner_id TEXT DEFAULT 'owner-ryan',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -508,6 +509,11 @@ def init_db():
         # Mã việc trong Kho Ryan (VIEC-n) gắn với task (Issue #12)
         try:
             cursor.execute("ALTER TABLE gen_session_todos ADD COLUMN viec_ref TEXT DEFAULT '';")
+        except Exception:
+            pass
+        # Cột repo cho task gen_session_todos (Issue #57)
+        try:
+            cursor.execute("ALTER TABLE gen_session_todos ADD COLUMN repo TEXT DEFAULT '';")
         except Exception:
             pass
         # Khóa claim cho task Kanban phiên: ai đang giữ + lúc khóa (Issue #16)
@@ -3810,14 +3816,31 @@ def complete_task(session_id, todo_id, evidence_ref, verified_by="Lead Architect
     return res
 
 
-def cleanup_task_worktree(task_id):
+def get_task_repo(task_id):
+    """Repo key của task trong gen_session_todos ('' nếu không có hoặc là gen-workplace)."""
+    try:
+        with get_connection() as conn:
+            r = conn.execute("SELECT repo FROM gen_session_todos WHERE id = ? LIMIT 1", (task_id,)).fetchone()
+            if r:
+                try:
+                    return str(r["repo"] or "").strip()
+                except (IndexError, KeyError):
+                    pass
+    except Exception:
+        pass
+    return ""
+
+
+def cleanup_task_worktree(task_id, repo_key=""):
     """Gỡ worktree chế độ Làm của task (agy_build.cleanup_task_worktree). Không có / lỗi → {"removed": False, ...}, không ném."""
     try:
         try:
             from backend import agy_build as _build
         except ImportError:
             import agy_build as _build
-        return _build.cleanup_task_worktree(task_id)
+        if not repo_key:
+            repo_key = get_task_repo(task_id)
+        return _build.cleanup_task_worktree(task_id, repo_key=repo_key)
     except Exception as e:
         print(f"[build] Không dọn được worktree của {task_id}: {e}")
         return {"removed": False, "error": str(e)}
@@ -5581,13 +5604,19 @@ def _task_detail(task_id, project_id="PRJ-GEN-WORKPLACE"):
                     chk = json.loads(r["checklist_json"] or "[]")
                 except Exception:
                     chk = []
+                repo_val = ""
+                try:
+                    repo_val = r["repo"] or ""
+                except (IndexError, KeyError):
+                    pass
                 return {"id": r["id"], "table": "gen_session_todos", "title": r["title"] or "", "description": r["description"] or "",
                         "status": r["status"] or "", "viec_ref": r["viec_ref"] or "", "checklist": chk if isinstance(chk, list) else [],
-                        "conversation_id": r["conversation_id"] or "", "holder": r["claimed_by"] or ""}
+                        "conversation_id": r["conversation_id"] or "", "holder": r["claimed_by"] or "", "repo": repo_val}
             r = conn.execute("SELECT * FROM todos WHERE id = ? AND project_id = ?", (task_id, project_id)).fetchone()
             if r:
                 return {"id": r["id"], "table": "todos", "title": r["title"] or "", "description": "", "status": r["status"] or "",
-                        "viec_ref": r["viec_ref"] or "", "checklist": [], "conversation_id": "", "holder": r["assigned_session_id"] or ""}
+                        "viec_ref": r["viec_ref"] or "", "checklist": [], "conversation_id": "", "holder": r["assigned_session_id"] or "",
+                        "repo": ""}
     except Exception:
         pass
     return None
@@ -5772,14 +5801,14 @@ def save_warroom_record(project_id, channel_id, author, body, tag="Assignment", 
 
 
 def assign_task_to_role(todo_id, session_id, project_id="PRJ-GEN-WORKPLACE", author="Ryan (Owner)", channel_id="war_room", wait=False,
-                        mode="build"):
+                        mode="build", repo=""):
     """
     Giao 1 task cho 1 vai (POST /api/task/assign): claim task cho worker rồi chạy agy, trả dispatch_id để theo dõi / chờ
     (wait_worker_result). mode (#45):
     - "build" (mặc định, "Làm"): agy -p chế độ mặc định sửa code trong worktree riêng của task (../gw-worktrees/TSK-n,
       nhánh wt/TSK-n từ origin/main); app kiểm commit, chạy py_compile + test, push nhánh, ghi link compare (agy_build.py).
     - "review" ("Rà soát"): như war-room — tin "@vai Thực hiện TSK-n …", agy --mode plan chỉ đọc trong worktree của vai.
-    Lỗi: {"error", "code"}: bad_request (thiếu / sai vai / sai mode), not_found, already_done, locked (người khác đang giữ).
+    Lỗi: {"error", "code"}: bad_request (thiếu / sai vai / sai mode), bad_repo (key lạ/đường dẫn), not_found, already_done, locked, repo_mismatch.
     """
     project_id = normalize_project_id(project_id)
     todo_id = (todo_id or "").strip() if isinstance(todo_id, str) else ""
@@ -5797,15 +5826,67 @@ def assign_task_to_role(todo_id, session_id, project_id="PRJ-GEN-WORKPLACE", aut
     if not sid:
         return {"error": f"Vai không hợp lệ '{session_id}' ({', '.join(WARROOM_ROLE_SESSIONS)} hoặc gw-<vai>-agy)",
                 "code": "bad_request"}
+
+    # Kiểm tra tính hợp lệ của tham số repo (Issue #57)
+    repo = (repo or "").strip() if isinstance(repo, str) else ""
+    if repo:
+        if "/" in repo or "\\" in repo or ".." in repo:
+            return {"error": f"Mã repo không hợp lệ (không được chứa đường dẫn): '{repo}'", "code": "bad_repo"}
+        try:
+            from backend import agy_build as _build
+        except ImportError:
+            import agy_build as _build
+        if not _build.REPO_KEY_RE.match(repo):
+            return {"error": f"Mã repo không hợp lệ: '{repo}'", "code": "bad_repo"}
+        valid_repos = _build.build_repos(auto_clone=False)
+        valid_keys = {r["key"] for r in valid_repos}
+        if repo not in valid_keys:
+            return {"error": f"Repo '{repo}' không tồn tại trong cấu hình", "code": "bad_repo"}
+
     task = _task_detail(todo_id, project_id)
     if not task:
         return {"error": "Task not found", "code": "not_found", "task_id": todo_id}
     if task["status"] == "done":
         return {"error": f"Task {todo_id} đã done — không giao lại", "code": "already_done", "task_id": todo_id}
+
+    # Kiểm tra repo_mismatch (Task đã có worktree ở repo khác)
+    target_repo = repo if repo else "gen-workplace"
+    try:
+        from backend import agy_build as _build
+    except ImportError:
+        import agy_build as _build
+
+    task_repo = (task.get("repo") or "").strip() or "gen-workplace"
+    if task.get("repo") and task_repo != target_repo:
+        old_wt = _build.task_worktree_dir(todo_id, task_repo)
+        if os.path.exists(os.path.join(old_wt, ".git")):
+            return {"error": f"Task {todo_id} đã có worktree ở repo khác ({task_repo})", "code": "repo_mismatch", "task_id": todo_id}
+
+    try:
+        repos_list = _build.build_repos(auto_clone=False)
+        for r in repos_list:
+            rk = r["key"]
+            if rk != target_repo:
+                other_wt = _build.task_worktree_dir(todo_id, rk)
+                if os.path.exists(os.path.join(other_wt, ".git")):
+                    return {"error": f"Task {todo_id} đã có worktree ở repo khác ({rk})", "code": "repo_mismatch", "task_id": todo_id}
+    except Exception:
+        pass
+
     claim = claim_task(sid, todo_id, project_id)
     if "error" in claim:
         claim.setdefault("code", "locked")
         return claim
+
+    # Lưu repo vào task khi giao
+    try:
+        with get_connection() as conn:
+            conn.execute("UPDATE gen_session_todos SET repo = ? WHERE id = ?", (repo, todo_id))
+            conn.commit()
+    except Exception:
+        pass
+    task["repo"] = repo
+
     role = next(k for k, v in WARROOM_ROLE_SESSIONS.items() if v == sid)
     head = f"@{role} Thực hiện {todo_id}" + (f" ({task['viec_ref']})" if task["viec_ref"] else "") + f": {task['title']}"
     chk = [c for c in task["checklist"] if isinstance(c, dict)]
@@ -5817,7 +5898,7 @@ def assign_task_to_role(todo_id, session_id, project_id="PRJ-GEN-WORKPLACE", aut
         except ImportError:
             import agy_build as _build
         return _build.assign_build(todo_id, sid, role, task, body, claim, project_id=project_id, author=author,
-                                   channel_id=channel_id, wait=wait)
+                                   channel_id=channel_id, wait=wait, repo=repo)
     res = post_warroom_message(project_id, channel_id, author, body, "Assignment", wait=wait, task_id=todo_id, mode=mode)
     if "error" in res:
         return res
@@ -5829,7 +5910,7 @@ def assign_task_to_role(todo_id, session_id, project_id="PRJ-GEN-WORKPLACE", aut
 
 # Mã HTTP cho kết quả assign_task_to_role: REST POST /api/task/assign trả đúng mã này; tool MCP assign_task (#61) ghi vào
 # http_status (lỗi → isError). Mã lỗi lạ (retired_role, ...) → 400.
-ASSIGN_ERROR_HTTP = {"bad_request": 400, "not_found": 404, "already_done": 409, "locked": 409, "retry": 409, "busy": 409}
+ASSIGN_ERROR_HTTP = {"bad_request": 400, "bad_repo": 400, "not_found": 404, "already_done": 409, "locked": 409, "retry": 409, "busy": 409, "repo_mismatch": 409}
 
 
 def assign_task_http_status(res):
