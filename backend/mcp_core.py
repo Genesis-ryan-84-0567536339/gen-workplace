@@ -18,9 +18,11 @@ sys.path.insert(0, str(BASE_DIR))
 try:
     from backend import db
     from backend import directive_guard
+    from backend import auto_update
 except ImportError:
     import db
     import directive_guard
+    import auto_update
 
 MCP_SERVER_INFO = {
     "name": "gen-workplace",
@@ -1049,7 +1051,9 @@ def execute_tool(name: str, args: dict) -> dict:
 
         # 11. list_kanban_tasks
         if name == "list_kanban_tasks":
-            conv_id = args.get("conv_id") or db.default_conv_id()
+            conv_id = (args.get("conv_id") or "").strip()
+            if not conv_id:
+                conv_id = db.default_conv_id_with_tasks() or db.default_conv_id()
             if not conv_id:
                 return {"content": [{"type": "text", "text": json.dumps({"error": "Chưa có phiên chat nào; truyền conv_id hoặc tạo phiên bằng create_conversation"}, ensure_ascii=False)}], "isError": True}
             todos = db.get_gen_session_todos(conv_id)
@@ -1226,7 +1230,9 @@ def execute_tool(name: str, args: dict) -> dict:
                 "mcp_tools_count": len(TOOLS),
                 "active_agents": len(state.get("roles", [])),
                 "runtimes_count": db.count_active_tmux_sessions(),
-                "active_project": state.get("project", {}).get("name", "gen-workplace")
+                "active_project": state.get("project", {}).get("name", "gen-workplace"),
+                "running_dispatches": db.running_dispatches_for_update(),
+                "auto_update": auto_update.enabled()
             }
             return {"content": [{"type": "text", "text": json.dumps(status, ensure_ascii=False, indent=2)}], "isError": False}
 

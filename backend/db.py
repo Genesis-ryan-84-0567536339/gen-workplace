@@ -1829,7 +1829,7 @@ SWARM_DEFAULT_CONFIG = [
         "conv_id": "conv-lead-architect",
         "gemini_model": "Gemini 3.8 Flash (High)",
         "anthropic_model": "Claude Sonnet 4.6 (Thinking)",
-        "allowed_paths": ["docs/**", "workspace/roles/**", "AGENTS.md", "README.md", "ROADMAP.md"],
+        "allowed_paths": ["docs/**", "roles/**", "README.md", "AGENTS.md"],
         "blocked_paths": [],
         "current_task_id": "",
         "scope": "Quản trị SSOT, điều phối toàn bộ tiến trình gen-workplace",
@@ -1843,7 +1843,7 @@ SWARM_DEFAULT_CONFIG = [
         "conv_id": "conv-backend-db",
         "gemini_model": "Gemini 3.8 Flash (Low)",
         "anthropic_model": "Claude Sonnet 4.6 (Thinking)",
-        "allowed_paths": ["backend/**", "frontend/**", "data/**", "migrations/**"],
+        "allowed_paths": ["backend/**", "frontend/**", "scripts/**", "docs/**", "roles/**", "README.md"],
         "blocked_paths": ["Dockerfile", "docker-compose.yml"],
         "current_task_id": "",
         "scope": "Python daemon, SQLite WAL, FTS5 catalog và runner",
@@ -1857,7 +1857,7 @@ SWARM_DEFAULT_CONFIG = [
         "conv_id": "conv-devops-docker",
         "gemini_model": "Gemini 3.8 Flash (High)",
         "anthropic_model": "Claude Sonnet 4.6 (Thinking)",
-        "allowed_paths": ["Dockerfile", "docker-compose.yml", "install.sh", "installer_tui.py", "*.desktop", "scripts/**"],
+        "allowed_paths": ["scripts/**", "docs/**", "roles/**", "*.service", "README.md"],
         "blocked_paths": ["backend/main.py", "frontend/**"],
         "current_task_id": "",
         "scope": "Docker, SELinux bind mounts, TUI installer, desktop shortcut",
@@ -1871,7 +1871,7 @@ SWARM_DEFAULT_CONFIG = [
         "conv_id": "conv-qa-testing",
         "gemini_model": "Gemini 3.8 Flash (Low)",
         "anthropic_model": "Claude Sonnet 4.6 (Thinking)",
-        "allowed_paths": ["tests/**", "qa_reports/**", "fixtures/**"],
+        "allowed_paths": ["scripts/test_*.py", "docs/**"],
         "blocked_paths": ["backend/**", "frontend/**", "Dockerfile"],
         "current_task_id": "",
         "scope": "Kiểm thử cross-platform, test API /api/status, xác thực installer",
@@ -1919,6 +1919,18 @@ def retire_roles(project_id="PRJ-GEN-WORKPLACE"):
             pass
         print(f"[migrate] Vai {sid} → retired (giữ lịch sử, đã tắt tmux)")
     return changed
+
+def migrate_allowed_paths():
+    """
+    Migration idempotent (chỉ UPDATE): đồng bộ allowed_paths_json trong tmux_sessions
+    theo cấu hình thư mục thật trong repo (Issue #68 mục 6 / TSK-32).
+    """
+    with get_connection() as conn:
+        for cfg in SWARM_DEFAULT_CONFIG:
+            allowed_p = json.dumps(cfg.get("allowed_paths", []))
+            conn.execute("UPDATE tmux_sessions SET allowed_paths_json = ? WHERE id = ?",
+                         (allowed_p, cfg["id"]))
+        conn.commit()
 
 def generate_role_spec_file(sid, role_name, scope="", mission="", conv_id="", allowed_paths=None, blocked_paths=None):
     """
@@ -4206,7 +4218,7 @@ AUTO_UPDATE_IGNORE_KINDS = ()
 
 def running_dispatches_for_update():
     """Dispatch đang running chạy TRÊN MÁY này (agy build, review/war-room, tmux) — tự cập nhật (restart) lúc này làm mất
-    việc, nên auto_update hoãn. Trả [{id, kind, session_id, task_id, started_at}]."""
+    việc, nên auto_update hoãn. Trả [{id, kind, session_id, task_id, started_at, elapsed_sec}]."""
     with get_connection() as conn:
         rows = conn.execute("SELECT id, kind, engine, session_id, task_id, started_at FROM dispatch_log WHERE status = 'running' "
                             "ORDER BY id").fetchall()
@@ -4216,8 +4228,12 @@ def running_dispatches_for_update():
         if kind in AUTO_UPDATE_IGNORE_KINDS or (r["engine"] or "").strip() in AUTO_UPDATE_IGNORE_KINDS:
             continue
         out.append({"id": r["id"], "kind": kind or "warroom", "session_id": r["session_id"] or "", "task_id": r["task_id"] or "",
-                    "started_at": r["started_at"] or ""})
+                    "started_at": r["started_at"] or "", "elapsed_sec": _dispatch_elapsed_sec(r["started_at"])})
     return out
+
+def running_dispatches_for_status():
+    """Danh sách dispatch đang chạy phục vụ get_system_status và auto_update."""
+    return running_dispatches_for_update()
 
 def _get_dispatch_row(dispatch_id):
     with get_connection() as conn:
@@ -6581,6 +6597,22 @@ def default_conv_id(project_id="PRJ-GEN-WORKPLACE"):
             (normalize_project_id(project_id),)).fetchone()
         return row["id"] if row else ""
 
+def default_conv_id_with_tasks(project_id="PRJ-GEN-WORKPLACE"):
+    """ID phiên gần nhất có thẻ Kanban (gen_session_todos); nếu không có thì trả về default_conv_id()."""
+    with get_connection() as conn:
+        pid = normalize_project_id(project_id)
+        row = conn.execute(
+            """SELECT t.conversation_id
+               FROM gen_session_todos t
+               LEFT JOIN gen_conversations c ON c.id = t.conversation_id
+               WHERE t.project_id = ?
+               ORDER BY t.updated_at DESC, t.created_at DESC, c.updated_at DESC
+               LIMIT 1""",
+            (pid,)).fetchone()
+        if row and row["conversation_id"]:
+            return row["conversation_id"]
+        return default_conv_id(project_id)
+
 def get_gen_conversations(project_id="PRJ-GEN-WORKPLACE", owner_id="owner-ryan"):
     with get_connection() as conn:
         cursor = conn.cursor()
@@ -7939,5 +7971,6 @@ init_db()
 seed_real_project()
 seed_tmux_sessions()
 retire_roles()
+migrate_allowed_paths()
 
 
