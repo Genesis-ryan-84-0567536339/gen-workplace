@@ -5851,6 +5851,10 @@ def assign_task_to_role(todo_id, session_id, project_id="PRJ-GEN-WORKPLACE", aut
 
     # Kiểm tra repo_mismatch (Task đã có worktree ở repo khác)
     target_repo = repo if repo else "gen-workplace"
+    if target_repo != "gen-workplace" and task.get("table") != "gen_session_todos":
+        # Cột repo chỉ có ở gen_session_todos: task bảng todos cũ sẽ bị chạy nhầm ở gen-workplace
+        return {"error": f"Task {todo_id} (bảng todos cũ) không lưu được repo — chỉ chạy ở gen-workplace", "code": "bad_repo",
+                "task_id": todo_id}
     try:
         from backend import agy_build as _build
     except ImportError:

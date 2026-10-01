@@ -19,6 +19,7 @@ Luồng 1 lần giao (POST /api/task/assign mode="build", mặc định của n�
   5. Task done (complete_task) hoặc bị xóa → `git worktree remove` worktree của task; nhánh (local + remote) giữ nguyên.
 """
 
+import fnmatch
 import json
 import os
 import re
@@ -64,13 +65,52 @@ def gw_repos_dir():
     return os.environ.get("GW_REPOS_ROOT") or os.path.abspath(os.path.join(str(db.BASE_DIR), "..", "gw-repos"))
 
 
-def build_repos(auto_clone=True):
+SLUG_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9-]*/(?!\.\.?$)[A-Za-z0-9._-]+$")
+BASE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]{0,99}$")
+
+
+def _valid_base(b):
+    return bool(BASE_RE.match(b or "")) and ".." not in b and not b.endswith("/") and not b.endswith(".lock")
+
+
+def clone_url_for(slug):
+    """URL clone dựng CHỈ từ slug trong cấu hình (GW_BUILD_CLONE_BASE ghi đè gốc, mặc định https://github.com — test / mirror)."""
+    if not SLUG_RE.match(slug or ""):
+        return ""
+    root = (os.environ.get("GW_BUILD_CLONE_BASE") or "https://github.com").rstrip("/")
+    return f"{root}/{slug}.git"
+
+
+def _ensure_clone(entry):
+    """Chưa có clone_dir/.git thì app tự `git clone -- <url từ slug> <clone_dir>`; lỗi ghi vào entry['clone_error']."""
+    clone_dir = entry["clone_dir"]
+    if os.path.exists(os.path.join(clone_dir, ".git")):
+        return entry
+    url = clone_url_for(entry.get("slug") or "")
+    if not url:
+        entry["clone_error"] = f"slug không hợp lệ: '{entry.get('slug')}'"
+        return entry
+    try:
+        os.makedirs(os.path.dirname(clone_dir), exist_ok=True)
+    except OSError as e:
+        entry["clone_error"] = f"Không tạo được thư mục gw-repos: {e}"
+        return entry
+    r = _git(["clone", "--", url, clone_dir], cwd=os.path.dirname(clone_dir),
+             timeout=_env_int("GW_BUILD_CLONE_TIMEOUT_SEC", 120))
+    if r.returncode != 0:
+        entry["clone_error"] = _err(r) or f"git clone thoát {r.returncode}"
+        print(f"[build] Lỗi khi git clone repo {entry['key']} ({url}): {entry['clone_error']}")
+    return entry
+
+
+def build_repos(auto_clone=False):
     """
     Danh sách repo cho chế độ Làm (Issue #57):
     Đọc env GW_BUILD_REPOS (JSON list) hoặc <DATA_DIR>/config/build_repos.json.
     Luôn có mục mặc định key 'gen-workplace' = repo hiện tại (repo_dir cũ, slug từ origin, base main, kind python).
-    Key phải khớp ^[a-z0-9-]{2,32}$, clone_dir phải nằm dưới gw-repos/ (trừ gen-workplace).
-    Chưa có clone thì app tự git clone https://github.com/<slug>.git <clone_dir>.
+    Key phải khớp ^[a-z0-9-]{2,32}$, slug khớp SLUG_RE, base là tên nhánh hợp lệ, clone_dir phải nằm hẳn dưới gw-repos/
+    (trừ gen-workplace). auto_clone=True: chưa có clone thì app tự git clone https://github.com/<slug>.git <clone_dir>
+    (get_repo chỉ clone đúng repo được hỏi).
     """
     default_entry = {
         "key": "gen-workplace",
@@ -101,7 +141,6 @@ def build_repos(auto_clone=True):
 
     if isinstance(raw_data, list):
         repos_root = gw_repos_dir()
-        os.makedirs(repos_root, exist_ok=True)
         real_repos_root = os.path.realpath(repos_root)
 
         for item in raw_data:
@@ -111,32 +150,40 @@ def build_repos(auto_clone=True):
             if not REPO_KEY_RE.match(key):
                 print(f"[build] Bỏ qua repo cấu hình sai key: '{key}' (phải khớp ^[a-z0-9-]{{2,32}}$)")
                 continue
+            slug = str(item.get("slug") or "").strip()
+            base = str(item.get("base") or "").strip()
+            if (slug and not SLUG_RE.match(slug)) or (base and not _valid_base(base)):
+                print(f"[build] Bỏ qua repo '{key}': slug '{slug}' hoặc base '{base}' không hợp lệ")
+                continue
+            protected = item.get("protected_paths") or []
+            if not isinstance(protected, list):
+                protected = []
+            protected = [str(x) for x in protected if isinstance(x, str) and x.strip()]
 
             if key == "gen-workplace":
-                if item.get("slug"):
-                    default_entry["slug"] = str(item["slug"]).strip()
-                if item.get("base"):
-                    default_entry["base"] = str(item["base"]).strip()
+                if slug:
+                    default_entry["slug"] = slug
+                if base:
+                    default_entry["base"] = base
                 if item.get("kind"):
                     default_entry["kind"] = str(item["kind"]).strip()
                 if "test_cmd" in item:
                     default_entry["test_cmd"] = str(item.get("test_cmd") or "").strip()
-                if "protected_paths" in item and isinstance(item["protected_paths"], list):
-                    default_entry["protected_paths"] = item["protected_paths"]
+                if "protected_paths" in item:
+                    default_entry["protected_paths"] = protected
                 continue
 
-            slug = str(item.get("slug") or "").strip()
-            base = str(item.get("base") or "main").strip() or "main"
+            if not slug:
+                print(f"[build] Bỏ qua repo '{key}': thiếu slug")
+                continue
+            base = base or "main"
             kind = str(item.get("kind") or "python").strip() or "python"
             test_cmd = str(item.get("test_cmd") or "").strip()
-            protected = item.get("protected_paths") or []
-            if not isinstance(protected, list):
-                protected = []
 
-            specified_clone = item.get("clone_dir")
-            clone_dir = os.path.abspath(specified_clone) if specified_clone else os.path.join(repos_root, key)
+            specified_clone = str(item.get("clone_dir") or "").strip()
+            clone_dir = os.path.abspath(os.path.join(repos_root, specified_clone or key))
             real_clone = os.path.realpath(clone_dir)
-            if not (real_clone == real_repos_root or real_clone.startswith(real_repos_root + os.sep)):
+            if not real_clone.startswith(real_repos_root + os.sep):
                 print(f"[build] Bỏ qua repo '{key}': clone_dir '{clone_dir}' không nằm dưới gw-repos/ ({repos_root})")
                 continue
 
@@ -149,19 +196,8 @@ def build_repos(auto_clone=True):
                 "test_cmd": test_cmd,
                 "protected_paths": protected
             }
-            if item.get("clone_url"):
-                entry["clone_url"] = str(item["clone_url"]).strip()
-
-            if auto_clone and not os.path.exists(os.path.join(clone_dir, ".git")):
-                clone_url = entry.get("clone_url") or (f"https://github.com/{slug}.git" if slug else "")
-                if clone_url:
-                    timeout = _env_int("GW_BUILD_CLONE_TIMEOUT_SEC", 120)
-                    os.makedirs(os.path.dirname(clone_dir), exist_ok=True)
-                    r = _git(["clone", clone_url, clone_dir], cwd=repos_root, timeout=timeout)
-                    if r.returncode != 0:
-                        err_msg = _err(r)
-                        print(f"[build] Lỗi khi git clone repo {key} ({clone_url}): {err_msg}")
-                        entry["clone_error"] = err_msg
+            if auto_clone:
+                _ensure_clone(entry)
 
             repos_map[key] = entry
             if key not in order:
@@ -171,15 +207,29 @@ def build_repos(auto_clone=True):
 
 
 def get_repo(key="", auto_clone=True):
-    """Lấy thông tin cấu hình repo theo key. Rỗng hoặc 'gen-workplace' -> repo mặc định."""
+    """Lấy thông tin cấu hình repo theo key. Rỗng hoặc 'gen-workplace' -> repo mặc định. Chỉ clone đúng repo này."""
     k = (key or "").strip()
     if not k:
         k = "gen-workplace"
-    repos = build_repos(auto_clone=auto_clone)
-    for r in repos:
+    for r in build_repos(auto_clone=False):
         if r["key"] == k:
+            if auto_clone and k != "gen-workplace":
+                _ensure_clone(r)
             return r
     return None
+
+
+def _wt_confined(wt, repo_key=""):
+    """realpath của worktree phải nằm hẳn dưới gw-worktrees/ (repo khác: dưới gw-worktrees/<key>/), chặn symlink thoát ra ngoài."""
+    k = (repo_key or "").strip()
+    root = os.path.realpath(db._worktree_root())
+    if k and k != "gen-workplace":
+        if not REPO_KEY_RE.match(k):
+            return False
+        root = os.path.join(root, k)
+        if os.path.realpath(root) != root:
+            return False
+    return os.path.realpath(wt).startswith(root + os.sep)
 
 
 def task_worktree_dir(task_id, repo_key=""):
@@ -257,6 +307,8 @@ def ensure_task_worktree(task_id, repo_key=""):
     base = repo_conf.get("base") or base_branch()
     wt = task_worktree_dir(task_id, k)
     branch = task_branch(task_id)
+    if not _wt_confined(wt, k):
+        return {"ok": False, "error": f"Đường dẫn worktree thoát khỏi gw-worktrees/: {wt}"}
     out = {"ok": False, "dir": wt, "branch": branch, "base_ref": "", "base_sha": "", "reused": False, "note": "", "error": ""}
     if os.path.exists(os.path.join(wt, ".git")):
         cur = _out(_git(["symbolic-ref", "--short", "-q", "HEAD"], cwd=wt))
@@ -321,6 +373,8 @@ def cleanup_task_worktree(task_id, repo_key=""):
             k = db.get_task_repo(task_id)
         except Exception:
             pass
+    if k and not REPO_KEY_RE.match(k):
+        return {"removed": False, "dir": "", "error": f"repo không hợp lệ: '{k}'"}
     repo_conf = get_repo(k, auto_clone=False)
     repo = repo_conf["clone_dir"] if repo_conf else repo_dir()
     wt = task_worktree_dir(task_id, k)
@@ -398,19 +452,20 @@ def _repo_snapshot(repo, base=None):
             "head": _out(_git(["rev-parse", "HEAD"], cwd=repo))}
 
 
-def detect_violations(repo, before, worktree, branch, base=None):
+def detect_violations(repo, before, worktree, branch, base=None, extra=None):
     """
     Sau khi agy chạy: nhánh main local / HEAD của repo app đổi sang commit KHÔNG có trên origin/<base> (auto-update kéo main
     về thì hợp lệ) → vi phạm; worktree không còn ở wt/TSK-n → vi phạm. Trả list mô tả.
     """
     v = []
-    b = (base or base_branch()).strip()
-    after = _repo_snapshot(repo, base=b)
-    base_ref = f"{REMOTE}/{b}"
-    for key, label in (("main", f"nhánh {b} local"), ("head", f"HEAD của repo {os.path.basename(repo)}")):
-        old, new = before.get(key) or "", after.get(key) or ""
-        if new and new != old and _git(["merge-base", "--is-ancestor", new, base_ref], cwd=repo).returncode != 0:
-            v.append(f"{label} đổi {old[:10] or '(trống)'} → {new[:10]} (commit không có trên {base_ref})")
+    for rp, bf, bs in [(repo, before, base)] + list(extra or []):
+        b = (bs or base_branch()).strip()
+        after = _repo_snapshot(rp, base=b)
+        base_ref = f"{REMOTE}/{b}"
+        for key, label in (("main", f"nhánh {b} local"), ("head", f"HEAD của repo {os.path.basename(rp)}")):
+            old, new = bf.get(key) or "", after.get(key) or ""
+            if new and new != old and _git(["merge-base", "--is-ancestor", new, base_ref], cwd=rp).returncode != 0:
+                v.append(f"{label} đổi {old[:10] or '(trống)'} → {new[:10]} (commit không có trên {base_ref})")
     cur = _out(_git(["symbolic-ref", "--short", "-q", "HEAD"], cwd=worktree))
     if cur != branch:
         v.append(f"worktree không còn ở {branch} (đang ở '{cur or 'detached'}')")
@@ -571,110 +626,96 @@ def create_draft_pr(slug, branch, title, body, base=None):
         return "", f"{type(e).__name__}: {e}".replace(token, "***")
 
 
-def check_push_diff(worktree, base="main", protected_paths=None):
+BLOCKED_DIRS = (".github", ".gitea", "deploy")
+BLOCKED_FILES = ("dockerfile", "docker-compose.yml", "install.sh")
+
+
+def _push_diff_reasons(path, prot):
+    """Lý do chặn cho 1 đường dẫn trong diff (so khớp không phân biệt hoa thường cho đường cấm cố định)."""
+    norm = path.replace("\\", "/").lstrip("/")
+    parts = [x for x in norm.split("/") if x and x != "."]
+    norm = "/".join(parts)
+    low = norm.lower()
+    lparts = low.split("/") if low else []
+    bname = parts[-1] if parts else ""
+    lb = bname.lower()
+    if lparts and lparts[0] in BLOCKED_DIRS:
+        return f"thư mục '{parts[0]}/' ({norm})"
+    if lb in BLOCKED_FILES:
+        return f"file '{bname}' ({norm})"
+    if lb.startswith(".env"):
+        return f"file nhạy cảm '{bname}' ({norm})"
+    for pat in prot:
+        pc = pat.replace("\\", "/").strip().lstrip("/")
+        if pc.startswith("./"):
+            pc = pc[2:]
+        if not pc:
+            continue
+        pr = pc.rstrip("/")
+        if norm == pr or norm.startswith(pr + "/") or fnmatch.fnmatchcase(norm, pc) or fnmatch.fnmatchcase(bname, pc):
+            return f"protected_paths '{pat}' ({norm})"
+    return ""
+
+
+def check_push_diff(worktree, base="main", protected_paths=None, fetch=True):
     """
-    Kiểm diff trước khi push (Issue #57 mục 4):
-    Chạy git diff --name-status --no-renames origin/<base>...HEAD và git diff --raw origin/<base>...HEAD.
-    Chặn nếu có file:
-    - dưới .github/, .gitea/, deploy/
+    Kiểm diff trước khi push (Issue #57 mục 4) — lớp chặn chính, áp cho mọi repo kể cả gen-workplace:
+    so HEAD với merge-base của origin/<base> (git diff --no-renames -z origin/<base>...HEAD, cả --name-status và --raw).
+    Chặn nếu có file (thêm / sửa / xoá, kể cả 2 đầu của rename):
+    - dưới .github/, .gitea/, deploy/ ở gốc repo
     - tên Dockerfile, docker-compose.yml, install.sh, .env*
     - khớp protected_paths
-    - mode 120000 (symlink) / 160000 (submodule)
-    Trả về danh sách lý do chặn (list[str]). Rỗng nếu không vi phạm.
+    - mode mới 120000 (symlink) / 160000 (submodule)
+    Không kiểm được (thiếu ref, git lỗi) → chặn (fail closed). Trả list lý do chặn; rỗng = cho push.
     """
     violations = []
+
+    def add(msg):
+        if msg and msg not in violations:
+            violations.append(msg)
+
     b = (base or "main").strip() or "main"
-    ref = f"{REMOTE}/{b}"
+    if not _valid_base(b):
+        return [f"base không hợp lệ: '{b}'"]
+    if fetch:
+        _git(["fetch", "--quiet", REMOTE, f"+refs/heads/{b}:refs/remotes/{REMOTE}/{b}"], cwd=worktree,
+             timeout=_env_int("GW_BUILD_FETCH_TIMEOUT_SEC", 60))
+    ref = f"refs/remotes/{REMOTE}/{b}"
     if _git(["rev-parse", "--verify", "--quiet", ref], cwd=worktree).returncode != 0:
         if _git(["rev-parse", "--verify", "--quiet", f"refs/heads/{b}"], cwd=worktree).returncode == 0:
-            ref = b
-
+            ref = f"refs/heads/{b}"
+        else:
+            return [f"không kiểm được diff: không có {REMOTE}/{b}"]
     diff_range = f"{ref}...HEAD"
+    prot = [str(x) for x in (protected_paths or []) if isinstance(x, str)]
 
-    # 1. git diff --name-status --no-renames
-    r_name = _git(["diff", "--name-status", "--no-renames", diff_range], cwd=worktree)
-    names = []
-    for line in (r_name.stdout or "").splitlines():
-        line = line.strip()
-        if not line:
+    # 1. Tên file (-z: không bị quote đường dẫn có ký tự lạ)
+    r_name = _git(["diff", "--name-only", "--no-renames", "-z", diff_range], cwd=worktree)
+    if r_name.returncode != 0:
+        return [f"không kiểm được diff ({_err(r_name)[:200]})"]
+    for p in (r_name.stdout or "").split("\0"):
+        if p:
+            add(_push_diff_reasons(p, prot))
+
+    # 2. Mode (symlink / submodule)
+    r_raw = _git(["diff", "--raw", "--no-renames", "-z", "--no-abbrev", diff_range], cwd=worktree)
+    if r_raw.returncode != 0:
+        return violations + [f"không kiểm được diff --raw ({_err(r_raw)[:200]})"]
+    toks = (r_raw.stdout or "").split("\0")
+    i = 0
+    while i < len(toks):
+        meta = toks[i]
+        if not meta.startswith(":"):
+            i += 1
             continue
-        parts = line.split(None, 1)
-        if len(parts) >= 2:
-            names.append(parts[1])
-        elif len(parts) == 1:
-            names.append(parts[0])
-
-    prot = list(protected_paths or [])
-
-    import fnmatch
-
-    for p in names:
-        norm = os.path.normpath(p).replace("\\", "/")
-        if norm.startswith("./"):
-            norm = norm[2:]
-        parts = [x for x in norm.split("/") if x]
-        bname = os.path.basename(norm)
-
-        # File dưới .github/, .gitea/, deploy/
-        if parts and parts[0] in (".github", ".gitea", "deploy"):
-            reason = f"thư mục '{parts[0]}/' ({norm})"
-            if reason not in violations:
-                violations.append(reason)
-            continue
-
-        # Tên Dockerfile, docker-compose.yml, install.sh, .env*
-        if bname in ("Dockerfile", "docker-compose.yml", "install.sh"):
-            reason = f"file '{bname}' ({norm})"
-            if reason not in violations:
-                violations.append(reason)
-            continue
-        if bname.startswith(".env"):
-            reason = f"file nhạy cảm '{bname}' ({norm})"
-            if reason not in violations:
-                violations.append(reason)
-            continue
-
-        # Khớp protected_paths
-        matched_prot = False
-        for pat in prot:
-            pat_clean = os.path.normpath(pat).replace("\\", "/")
-            if pat_clean.startswith("./"):
-                pat_clean = pat_clean[2:]
-            if norm == pat_clean or norm.startswith(pat_clean.rstrip("/") + "/"):
-                matched_prot = True
-            elif fnmatch.fnmatch(norm, pat_clean) or fnmatch.fnmatch(bname, pat_clean):
-                matched_prot = True
-            if matched_prot:
-                reason = f"protected_paths '{pat}' ({norm})"
-                if reason not in violations:
-                    violations.append(reason)
-                break
-
-    # 2. git diff --raw
-    r_raw = _git(["diff", "--raw", diff_range], cwd=worktree)
-    for line in (r_raw.stdout or "").splitlines():
-        line = line.strip()
-        if not line.startswith(":"):
-            continue
-        try:
-            if "\t" in line:
-                meta, path = line.split("\t", 1)
-            else:
-                sp = line.split()
-                meta, path = " ".join(sp[:-1]), sp[-1]
-            parts = meta.lstrip(":").split()
-            if len(parts) >= 2:
-                src_mode, dst_mode = parts[0], parts[1]
-                if dst_mode == "120000" or src_mode == "120000":
-                    msg = f"symlink mode 120000 ({path})"
-                    if msg not in violations:
-                        violations.append(msg)
-                elif dst_mode == "160000" or src_mode == "160000":
-                    msg = f"submodule mode 160000 ({path})"
-                    if msg not in violations:
-                        violations.append(msg)
-        except Exception:
-            pass
+        path = toks[i + 1] if i + 1 < len(toks) else ""
+        i += 2
+        parts = meta[1:].split()
+        dst_mode = parts[1] if len(parts) >= 2 else ""
+        if dst_mode == "120000":
+            add(f"symlink mode 120000 ({path})")
+        elif dst_mode == "160000":
+            add(f"submodule mode 160000 ({path})")
 
     return violations
 
@@ -779,6 +820,9 @@ def _run_build(did, project_id):
         return _finish(did, row, ctx, wt, branch, wt_info, started_at, t0, project_id, account)
 
     before_repo = _repo_snapshot(repo, base=repo_base)
+    # Repo khác: kiểm thêm HEAD/main của repo app gen-workplace (Issue #57 mục 3)
+    app_repo = repo_dir()
+    extra_snap = [] if os.path.realpath(app_repo) == os.path.realpath(repo) else [(app_repo, _repo_snapshot(app_repo), None)]
     before_head = _out(_git(["rev-parse", "HEAD"], cwd=wt))
     st0 = _git(["status", "--porcelain"], cwd=wt)
     pending = [ln[3:] for ln in (st0.stdout or "").splitlines() if ln.strip()] if st0.returncode == 0 else []
@@ -853,7 +897,7 @@ def _run_build(did, project_id):
         ctx["head"] = _out(_git(["rev-parse", "HEAD"], cwd=wt))
         st = _git(["status", "--porcelain"], cwd=wt)   # không strip: dòng porcelain "XY path" bắt đầu bằng dấu cách (#47)
         ctx["dirty"] = [ln for ln in (st.stdout or "").splitlines() if ln.strip()][:30] if st.returncode == 0 else []
-        ctx["violations"] = detect_violations(repo, before_repo, wt, branch, base=repo_base)
+        ctx["violations"] = detect_violations(repo, before_repo, wt, branch, base=repo_base, extra=extra_snap)
     tried_push = [t["command"] for t in (ctx["sinfo"].get("tools") or []) if re.search(r"\bgit\s+(.*\s)?push\b", t.get("command") or "")]
     if tried_push:
         ctx["push_attempts"] = tried_push

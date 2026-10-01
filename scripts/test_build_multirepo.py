@@ -93,7 +93,10 @@ subprocess.run(["git", "remote", "add", "origin", GW_MAIN_REMOTE], cwd=GW_MAIN_R
 subprocess.run(["git", "push", "-q", "origin", "main"], cwd=GW_MAIN_REPO, check=True)
 
 # Cấu hình repo ngoài giả lập: kho-ryan
-RYAN_REMOTE = os.path.join(TMP, "ryan_remote.git")
+# URL clone dựng từ slug: <GW_BUILD_CLONE_BASE>/<slug>.git → remote local theo đúng slug (không cần mạng)
+CLONE_BASE = os.path.join(TMP, "remotes")
+RYAN_REMOTE = os.path.join(CLONE_BASE, "genesis-corp", "kho-ryan.git")
+os.makedirs(os.path.dirname(RYAN_REMOTE), exist_ok=True)
 subprocess.run(["git", "init", "-q", "--bare", "-b", "develop", RYAN_REMOTE], check=True)
 RYAN_INIT = os.path.join(TMP, "ryan_init")
 os.makedirs(RYAN_INIT, exist_ok=True)
@@ -143,17 +146,16 @@ os.environ["GW_WORKTREE_ROOT"] = GW_WORKTREE_ROOT
 os.environ["GW_BUILD_GITHUB_REPO"] = "chu-so-huu/gen-workplace"
 os.environ["GW_GITHUB_API_URL"] = f"http://127.0.0.1:{mock_port}"
 os.environ["GITHUB_TOKEN"] = "fake-github-token-12345"
+os.environ["GW_BUILD_CLONE_BASE"] = CLONE_BASE
 os.environ["PATH"] = FAKEBIN + os.pathsep + os.environ.get("PATH", "")
 
 # Cấu hình multirepo qua GW_BUILD_REPOS
-# Lưu ý: clone_url trỏ tới RYAN_REMOTE local để git clone không cần mạng
 REPOS_CONFIG = [
     {
         "key": "kho-ryan",
         "slug": "genesis-corp/kho-ryan",
         "base": "develop",
         "kind": "python",
-        "clone_url": RYAN_REMOTE,
         "protected_paths": ["secrets/*", "locked.json"]
     }
 ]
@@ -391,11 +393,161 @@ def main_test():
         check("PR base đúng base của kho-ryan ('develop')", last_pr["data"].get("base") == "develop")
         check("PR draft là True", last_pr["data"].get("draft") is True)
 
+    extra_tests(cid)
+
     # Dọn dẹp
     shutil.rmtree(TMP, ignore_errors=True)
     print(f"\n{total - failed}/{total} test pass\n")
     if failed > 0:
         sys.exit(1)
+
+
+def _git_t(args, cwd):
+    return subprocess.run(["git", "-c", "user.name=test", "-c", "user.email=t@test.com"] + args, cwd=cwd,
+                          capture_output=True, text=True, check=True)
+
+
+def _fresh_clone(name):
+    d = os.path.join(TMP, name)
+    subprocess.run(["git", "clone", "-q", "-b", "develop", RYAN_REMOTE, d], check=True)
+    return d
+
+
+def _commit_file(wt, rel, content="x"):
+    full = os.path.join(wt, rel)
+    os.makedirs(os.path.dirname(full) or wt, exist_ok=True)
+    with open(full, "w") as f:
+        f.write(content)
+    _git_t(["add", "--", rel], wt)
+    _git_t(["commit", "-q", "-m", f"add {rel}"], wt)
+
+
+def extra_tests(cid):
+    print("\n[7] Review TSK-33: validate cấu hình (slug/base/clone_dir), không nhận clone_url")
+    saved = os.environ["GW_BUILD_REPOS"]
+    os.environ["GW_BUILD_REPOS"] = json.dumps([
+        {"key": "bad-slug", "slug": "--upload-pack=touch /tmp/x/y"},
+        {"key": "bad-slug2", "slug": "a/b; rm -rf /"},
+        {"key": "no-slug"},
+        {"key": "bad-base", "slug": "o/r", "base": "--output=/tmp/x"},
+        {"key": "bad-base2", "slug": "o/r", "base": "a..b"},
+        {"key": "out-dir", "slug": "o/r", "clone_dir": "/tmp"},
+        {"key": "up-dir", "slug": "o/r", "clone_dir": "../escape"},
+        {"key": "root-dir", "slug": "o/r", "clone_dir": "."},
+        {"key": "url-ignored", "slug": "o/r", "clone_url": "--upload-pack=evil"},
+        {"key": "gen-workplace", "slug": "../../evil", "base": "-x"},
+    ])
+    keys = {r["key"]: r for r in agy_build.build_repos(auto_clone=False)}
+    for k in ["bad-slug", "bad-slug2", "no-slug", "bad-base", "bad-base2", "out-dir", "up-dir", "root-dir"]:
+        check(f"cấu hình '{k}' bị bỏ qua", k not in keys)
+    check("clone_url trong cấu hình bị bỏ qua (URL chỉ dựng từ slug)",
+          "url-ignored" in keys and "clone_url" not in keys["url-ignored"])
+    check("clone URL dựng từ slug", agy_build.clone_url_for("o/r") == f"{CLONE_BASE}/o/r.git")
+    check("slug lạ không dựng URL", agy_build.clone_url_for("-x/y") == "" and agy_build.clone_url_for("a/b/c") == "")
+    check("gen-workplace bỏ qua slug/base sai", keys["gen-workplace"]["slug"] != "../../evil"
+          and keys["gen-workplace"]["base"] != "-x")
+
+    # get_repo chỉ clone đúng repo được hỏi
+    other_remote = os.path.join(CLONE_BASE, "o", "other.git")
+    subprocess.run(["git", "clone", "-q", "--bare", RYAN_REMOTE, other_remote], check=True)
+    os.environ["GW_BUILD_REPOS"] = json.dumps([{"key": "other-a", "slug": "o/other", "base": "develop"},
+                                               {"key": "other-b", "slug": "o/other", "base": "develop"}])
+    ra = agy_build.get_repo("other-a", auto_clone=True)
+    check("get_repo clone repo được hỏi", ra and os.path.isdir(os.path.join(GW_REPOS_ROOT, "other-a", ".git")))
+    check("get_repo KHÔNG clone repo khác", not os.path.exists(os.path.join(GW_REPOS_ROOT, "other-b")))
+    os.environ["GW_BUILD_REPOS"] = saved
+
+    print("\n[8] Review TSK-33: check_push_diff — rename, xoá, quote path, hoa thường, lồng, submodule, fail closed")
+    wt = _fresh_clone("d_rename_src")
+    _commit_file(wt, ".github/workflows/a.yml")
+    _git_t(["push", "-q", "origin", "HEAD:refs/heads/develop"], wt)   # base đã có .github
+    wt2 = _fresh_clone("d_rename")
+    _git_t(["mv", ".github/workflows/a.yml", "moved.yml"], wt2)
+    _git_t(["commit", "-q", "-m", "mv"], wt2)
+    check("rename ra khỏi .github bị chặn", any(".github" in d for d in agy_build.check_push_diff(wt2, base="develop")))
+    wt3 = _fresh_clone("d_delete")
+    _git_t(["rm", "-q", ".github/workflows/a.yml"], wt3)
+    _git_t(["commit", "-q", "-m", "rm"], wt3)
+    check("xoá file .github bị chặn", any(".github" in d for d in agy_build.check_push_diff(wt3, base="develop")))
+
+    wt4 = _fresh_clone("d_quote")
+    _commit_file(wt4, ".github/workflows/ế x.yml")
+    check("đường dẫn có ký tự lạ (git quote) dưới .github bị chặn",
+          any(".github" in d for d in agy_build.check_push_diff(wt4, base="develop")))
+    wt5 = _fresh_clone("d_case")
+    _commit_file(wt5, ".GitHub/workflows/x.yml")
+    _commit_file(wt5, "DockerFile")
+    d5 = agy_build.check_push_diff(wt5, base="develop")
+    check(".GitHub/ (hoa thường) bị chặn", any(".GitHub" in d for d in d5))
+    check("DockerFile (hoa thường) bị chặn", any("DockerFile" in d for d in d5))
+    wt6 = _fresh_clone("d_nested")
+    _commit_file(wt6, "docs/.github/notes.md")
+    _commit_file(wt6, "src/deploy/helper.py")
+    check("sub/.github/ và src/deploy/ (không ở gốc) KHÔNG bị chặn",
+          agy_build.check_push_diff(wt6, base="develop") == [])
+    wt7 = _fresh_clone("d_submodule")
+    sha = _git_t(["rev-parse", "HEAD"], wt7).stdout.strip()
+    _git_t(["update-index", "--add", "--cacheinfo", f"160000,{sha},vendor/sub"], wt7)
+    _git_t(["commit", "-q", "-m", "submodule"], wt7)
+    check("submodule mode 160000 bị chặn", any("160000" in d for d in agy_build.check_push_diff(wt7, base="develop")))
+    wt8 = _fresh_clone("d_symdel")
+    os.symlink("README.md", os.path.join(wt8, "lnk"))
+    _git_t(["add", "lnk"], wt8)
+    _git_t(["commit", "-q", "-m", "lnk"], wt8)
+    _git_t(["push", "-q", "origin", "HEAD:refs/heads/develop"], wt8)
+    _git_t(["rm", "-q", "lnk"], wt8)
+    _git_t(["commit", "-q", "-m", "rm lnk"], wt8)
+    check("xoá symlink sẵn có không bị chặn (chỉ chặn thêm/sửa symlink)",
+          agy_build.check_push_diff(wt8, base="develop") == [])
+    wt9 = _fresh_clone("d_noref")
+    _commit_file(wt9, "ok.py")
+    d9 = agy_build.check_push_diff(wt9, base="khong-co-nhanh")
+    check("không có origin/<base> → chặn (fail closed)", len(d9) == 1 and "không kiểm được" in d9[0])
+    check("base dạng option bị chặn", agy_build.check_push_diff(wt9, base="--output=/tmp/x") != [])
+    wt10 = _fresh_clone("d_prot")
+    _commit_file(wt10, "config/locked/a.json")
+    check("protected_paths dạng thư mục bị chặn",
+          any("protected" in d for d in agy_build.check_push_diff(wt10, base="develop", protected_paths=["config/locked/"])))
+    wt11 = _fresh_clone("d_stale")
+    _commit_file(wt11, "normal2.py")
+    other = _fresh_clone("d_stale_other")
+    _commit_file(other, ".gitea/x.yml")
+    _git_t(["push", "-q", "origin", "HEAD:refs/heads/develop"], other)   # origin/develop tiến lên sau khi tạo nhánh
+    _git_t(["fetch", "-q", "origin"], wt11)
+    _git_t(["merge", "-q", "--no-edit", "origin/develop"], wt11)
+    check("merge base mới vào nhánh không bị chặn nhầm (diff theo merge-base)",
+          agy_build.check_push_diff(wt11, base="develop") == [])
+
+    print("\n[9] Review TSK-33: realpath chặn worktree thoát gw-worktrees/<key>/, task bảng todos cũ không nhận repo")
+    evil = os.path.join(TMP, "evil-target")
+    os.makedirs(evil, exist_ok=True)
+    link = os.path.join(GW_WORKTREE_ROOT, "kho-ryan")
+    shutil.rmtree(link, ignore_errors=True)
+    os.symlink(evil, link)
+    r = agy_build.ensure_task_worktree("TSK-99901", "kho-ryan")
+    check("gw-worktrees/<key> là symlink ra ngoài → từ chối", not r.get("ok") and "thoát" in (r.get("error") or ""))
+    check("không tạo gì ở đích symlink", os.listdir(evil) == [])
+    os.unlink(link)
+    check("cleanup từ chối repo key sai", agy_build.cleanup_task_worktree("TSK-99901", "../x").get("removed") is False)
+
+    with db.get_connection() as conn:
+        conn.execute("INSERT OR IGNORE INTO roadmaps (id, project_id, title) VALUES (?, ?, ?)",
+                     ("RM-TEST-33", "PRJ-GEN-WORKPLACE", "roadmap test"))
+        conn.execute("INSERT INTO todos (id, roadmap_id, project_id, title, assigned_role, status) VALUES (?, ?, ?, ?, ?, ?)",
+                     ("TSK-99902", "RM-TEST-33", "PRJ-GEN-WORKPLACE", "todo cũ", "backend", "pending"))
+        conn.commit()
+    rr = db.assign_task_to_role("TSK-99902", "gw-backend-agy", repo="kho-ryan")
+    check("task bảng todos cũ + repo khác → bad_repo (không chạy nhầm gen-workplace)", rr.get("code") == "bad_repo", rr)
+
+    print("\n[10] Review TSK-33: detect_violations kiểm thêm repo app khi Làm ở repo khác")
+    app_snap = agy_build._repo_snapshot(GW_MAIN_REPO)
+    _git_t(["commit", "-q", "--allow-empty", "-m", "lén sửa main app"], GW_MAIN_REPO)
+    wt_r = _fresh_clone("d_viol")
+    _git_t(["checkout", "-q", "-b", "wt/TSK-99903"], wt_r)
+    v = agy_build.detect_violations(wt_r, agy_build._repo_snapshot(wt_r, base="develop"), wt_r, "wt/TSK-99903",
+                                    base="develop", extra=[(GW_MAIN_REPO, app_snap, "main")])
+    check("main của repo app đổi bị phát hiện", any("gw_main_repo" in x for x in v), v)
+    _git_t(["reset", "-q", "--hard", "HEAD~1"], GW_MAIN_REPO)
 
 
 if __name__ == "__main__":
