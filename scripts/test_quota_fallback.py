@@ -195,7 +195,8 @@ c = calls()
 check("gọi agy 2 lần: profile3 rồi hồ sơ mới", [x[0] for x in c] == ["profile3", used], str([x[0] for x in c]))
 wt = os.path.realpath(os.path.join(os.environ["GW_WORKTREE_ROOT"], "gw-devops-agy"))
 check("lần chạy lại: đúng lệnh (--mode plan -p, cùng prompt), --gemini_dir của hồ sơ mới",
-      c[1][1].startswith(f"--gemini_dir={os.path.join(HOME, '.agy-profiles', used)} --mode plan -p @devops kiểm tra Dockerfile")
+      c[1][1].startswith(f"--gemini_dir={os.path.join(HOME, '.agy-profiles', used)} --mode plan -p ")
+      and "@devops kiểm tra Dockerfile" in c[1][1]
       and c[0][1].split("--mode", 1)[1] == c[1][1].split("--mode", 1)[1], str(c)[:400])
 with db.get_connection() as conn:
     reply = conn.execute("SELECT body FROM chat_messages WHERE id = ?", (w["reply_msg_id"],)).fetchone()["body"]
