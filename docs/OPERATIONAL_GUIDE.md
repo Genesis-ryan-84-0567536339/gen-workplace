@@ -112,6 +112,7 @@ google-chrome --headless=new --virtual-time-budget=3000 --dump-dom http://localh
 | `GW_TMUX_WATCH_MAX_SEC` | `7200` | Thời gian tối đa thread nền theo dõi 1 lệnh giao qua tmux chờ dòng `=== XONG exit=N ===`. |
 | `GW_AGY_BUILD_TIMEOUT_SEC` | `1800` | Chế độ Làm (3.6c): thời gian tối đa 1 lần agy sửa code. Dòng `dispatch_log` build còn `running` quá mức này + 20 phút (ngân sách test/push) thì bị coi là mất thread. |
 | `GW_BUILD_BASE` | `main` | Chế độ Làm: nhánh gốc, worktree tạo từ `origin/<GW_BUILD_BASE>`, link compare `compare/<GW_BUILD_BASE>...wt/TSK-n`. |
+| `GW_BUILD_REPOS` | (rỗng) | Chế độ Làm đa repo (3.6d): JSON list cấu hình repo (hoặc đọc file `<DATA_DIR>/config/build_repos.json`), hỗ trợ auto clone vào `../gw-repos/<key>` và worktree `../gw-worktrees/<key>/TSK-n`. |
 | `GW_BUILD_TEST_EXCLUDE` | `test_mcp_suite.py` | Chế độ Làm: file `scripts/test_*.py` app KHÔNG chạy sau khi agy xong (phân cách bằng dấu phẩy). |
 | `GW_BUILD_TEST_TIMEOUT_SEC` / `GW_BUILD_PUSH_TIMEOUT_SEC` | `300` / `120` | Chế độ Làm: giới hạn 1 file test / lệnh `git push` của app. |
 | `GW_BUILD_GITHUB_REPO` | (suy từ `git remote get-url origin`) | Chế độ Làm: `owner/repo` cho link compare / PR nháp khi remote không phải GitHub. |
@@ -217,6 +218,36 @@ Boss chốt 29/09 (VIEC-12): agy được code thật, nhưng chỉ trong worktr
   giữ nguyên. Task đang có lần Làm chạy thì không gỡ.
 - Rủi ro còn lại: `python3 scripts/test_*.py` chạy mã trong worktree (agy có thể viết file test rồi chạy nó); chuyển hướng ghi
   (`cat a > /x`) vẫn khớp tiền tố lệnh đọc — prompt cấm, hook + kiểm sau chạy bắt commit/push sai chỗ nhưng không bắt được ghi file ngoài worktree bằng shell.
+
+### 3.6d. Chế độ Làm đa repo (Issue #57)
+Chế độ Làm hỗ trợ mở rộng sửa code thật cho nhiều repo khác ngoài `gen-workplace` (vd `Gen-hub`, `kho-ryan`):
+- **Cấu hình**: Đọc từ file `<DATA_DIR>/config/build_repos.json` hoặc biến môi trường `GW_BUILD_REPOS` (dạng JSON list). Luôn có repo mặc định key `gen-workplace` = repo hiện tại.
+  Ví dụ cấu hình JSON cho Gen-hub:
+  ```json
+  [
+    {
+      "key": "gen-hub",
+      "slug": "Genesis-ryan-84-0567536339/Gen-hub",
+      "base": "main",
+      "kind": "node",
+      "test_cmd": "npm test",
+      "protected_paths": ["secrets/*"]
+    }
+  ]
+  ```
+  Các trường: `key` (mã định danh duy nhất, khớp `^[a-z0-9-]{2,32}$`), `slug` (`<owner>/<repo>` trên GitHub), `base` (nhánh cơ sở tạo worktree và so sánh diff, mặc định `main`), `kind` (`python`, `node`...), `test_cmd` (lệnh kiểm thử tùy chọn), `protected_paths` (danh sách đường dẫn chặn sửa).
+- **Tự động clone**: App tự động git clone từ `https://github.com/<slug>.git` vào thư mục `../gw-repos/<key>` (nằm dưới `gw-repos/`). URL clone chỉ dựng từ `slug`, không nhận `clone_url` từ bên ngoài để đảm bảo an toàn.
+- **Worktree**: Được tạo riêng theo task tại `../gw-worktrees/<key>/TSK-n` (với repo mặc định `gen-workplace` là `../gw-worktrees/TSK-n`), nhánh `wt/TSK-n` tạo từ `origin/<base>`. Cơ chế realpath chặn worktree thoát khỏi `gw-worktrees/<key>/` (chặn tấn công symlink ra ngoài).
+- **Lớp kiểm tra diff trước khi push (`check_push_diff`)**: Lớp phòng vệ áp dụng cho mọi repo kể cả `gen-workplace`. So sánh HEAD với merge-base của `origin/<base>` (`git diff --no-renames -z origin/<base>...HEAD`). Chặn push (fail-closed) nếu có file (thêm, sửa, xoá, rename):
+  - Dưới `.github/`, `.gitea/`, `deploy/` ở gốc repo.
+  - Tên file `Dockerfile`, `docker-compose.yml`, `install.sh`, `.env*`.
+  - Khớp bất kỳ pattern nào trong `protected_paths`.
+  - File mode chuyển sang symlink (`120000`) hoặc submodule (`160000`).
+  - Không thể kiểm tra ref git hợp lệ.
+- **Giao diện & API / MCP**:
+  - `GET /api/build/repos`: trả danh sách `[{key, slug, kind}]` (không lộ đường dẫn vật lý trên server).
+  - UI thẻ task: thêm ô chọn repo lấy từ API (cache biến, fallback `gen-workplace`), hiển thị chip nhỏ `repo: <key>` khi khác `gen-workplace`. Ô chọn repo tự động ẩn/disabled khi ở chế độ Rà soát (review) vì review chạy chỉ đọc trên worktree của vai.
+  - `POST /api/task/assign` & MCP `assign_task`: nhận thêm tham số `repo` (key repo). Trả 400 `bad_repo` nếu mã repo lạ / chứa ký tự đường dẫn, 409 `repo_mismatch` nếu task đã có worktree ở repo khác.
 
 ### 3.6b. Phiên tmux của vai (Issue #7)
 - `ensure_real_tmux_sessions` / `wake_tmux_session` mở phiên `gw-<vai>-agy` trong worktree riêng `<GW_WORKTREE_ROOT>/<session_id>`
@@ -332,8 +363,9 @@ Task thật nằm ở bảng `gen_session_todos` (MCP `create_kanban_task`, `cla
 | API / tool | Hợp đồng |
 |---|---|
 | `GET /api/tasks?project=` | `{tasks: [...], count}`: mọi task của dự án, checklist đã parse, `total_items`/`done_items`, `holder` (= `claimed_by`), `conversation_title`, `dispatch_count`, `last_dispatch: {id, session_id, status, request_msg_id, reply_msg_id, report_path, profile_initial, profile_used, fallback, fallback_reason, channel_id, task_msg_id, ...}` (lần giao gần nhất). `/api/state` có cùng danh sách ở khóa `gen_session_todos`; `GET /api/gen/session/todos` cũng kèm `last_dispatch`. |
-| `POST /api/task/assign {todo_id, session_id, mode?, author?, channel_id?}` | `mode` = `build` (mặc định, chế độ Làm — xem 3.6c) hoặc `review`; mô tả dưới đây là `review`. `session_id` nhận `qa`, `@qa` hoặc `gw-qa-agy`. Claim task cho worker (như `claim_task`), gửi war-room `@qa Thực hiện TSK-n (VIEC-m): <tiêu đề>` + checklist; prompt agy kèm khối `[THÔNG TIN VIỆC TSK-n]` (tiêu đề, `viec_ref`, mô tả, checklist có id mục). Trả `{status: "assigned", task_id, session_id, role, viec_ref, dispatch_id, request_msg_id, channel_id, claim, message}`. 400 thiếu/sai vai · 404 không có task · 409 task đã done (`already_done`) hoặc người khác đang giữ (`locked`, kèm `held_by`). |
-| MCP `assign_task {task_id, session_id, mode?, author?}` (#61) | Cùng hàm với `POST /api/task/assign` (`db.assign_task_to_role`), dành cho agent chỉ có connector MCP (vd Claude điều phối trên cloud). `mode` mặc định `build` (agy sửa code **với toàn quyền trên máy Fedora** trong worktree của task khi có `GW_AGY_BIN=~/bin/agy-full` và `GW_AGY_WRITE_ROLES`, allow/deny và hook chỉ là lớp phụ; không có `GW_AGY_BIN` thì theo allow/deny mặc định; 3.6c), `review` = chỉ đọc. Không nhận `engine` (truyền vào → lỗi `bad_request`). Không chờ agy chạy: trả ngay `{status, mode, task_id, session_id, role, viec_ref, dispatch_id, branch?, worktree_dir?, ..., http_status: 200, next}`; chờ kết quả bằng `wait_worker_result(dispatch_id)`. Lỗi → `isError: true`, `error` + `code` + `http_status` như REST: 400 (`bad_request`, `retired_role`), 404 (`not_found`), 409 (`already_done`, `locked` kèm `held_by`, `busy` kèm `dispatch_id` đang chạy). Nhóm Việc & Kanban, scope token `kanban` (token `all` cũng gọi được; token chỉ có `swarm` / `chat` / `files` / `quota` → 401 "không có quyền thực thi công cụ 'assign_task'"). |
+| `GET /api/build/repos` (#57) | Trả `[{key, slug, kind}]`: danh sách kho mã nguồn cho chế độ Làm từ cấu hình `build_repos.json` / `GW_BUILD_REPOS`. Luôn có `gen-workplace`. Tuyệt đối không lộ đường dẫn thư mục thật trên server. |
+| `POST /api/task/assign {todo_id, session_id, mode?, repo?, author?, channel_id?}` | `mode` = `build` (mặc định, chế độ Làm — xem 3.6c, 3.6d) hoặc `review`; mô tả dưới đây là `review`. `session_id` nhận `qa`, `@qa` hoặc `gw-qa-agy`. `repo` (mặc định rỗng = `gen-workplace`): key repo cho chế độ Làm (3.6d). Claim task cho worker (như `claim_task`), gửi war-room `@qa Thực hiện TSK-n (VIEC-m): <tiêu đề>` + checklist; prompt agy kèm khối `[THÔNG TIN VIỆC TSK-n]` (tiêu đề, `viec_ref`, mô tả, checklist có id mục). Trả `{status: "assigned", task_id, session_id, role, viec_ref, dispatch_id, request_msg_id, channel_id, claim, message}`. 400 thiếu/sai vai hoặc sai/lạ repo (`bad_repo`) · 404 không có task · 409 task đã done (`already_done`), người khác đang giữ (`locked`, kèm `held_by`) hoặc task đã có worktree ở repo khác (`repo_mismatch`). |
+| MCP `assign_task {task_id, session_id, mode?, repo?, author?}` (#61, #57) | Cùng hàm với `POST /api/task/assign` (`db.assign_task_to_role`), dành cho agent chỉ có connector MCP (vd Claude điều phối trên cloud). `mode` mặc định `build` (agy sửa code **với toàn quyền trên máy Fedora** trong worktree của task khi có `GW_AGY_BIN=~/bin/agy-full` và `GW_AGY_WRITE_ROLES`, allow/deny và hook chỉ là lớp phụ; không có `GW_AGY_BIN` thì theo allow/deny mặc định; 3.6c), `review` = chỉ đọc. `repo` (chuỗi key từ `/api/build/repos`, mặc định rỗng = `gen-workplace`): chỉ định kho mã nguồn cho chế độ Làm (3.6d). Không nhận `engine` (truyền vào → lỗi `bad_request`). Không chờ agy chạy: trả ngay `{status, mode, task_id, session_id, role, viec_ref, dispatch_id, branch?, worktree_dir?, ..., http_status: 200, next}`; chờ kết quả bằng `wait_worker_result(dispatch_id)`. Lỗi → `isError: true`, `error` + `code` + `http_status` như REST: 400 (`bad_request`, `retired_role`, `bad_repo`), 404 (`not_found`), 409 (`already_done`, `locked` kèm `held_by`, `busy` kèm `dispatch_id` đang chạy, `repo_mismatch`). Nhóm Việc & Kanban, scope token `kanban` (token `all` cũng gọi được; token chỉ có `swarm` / `chat` / `files` / `quota` → 401 "không có quyền thực thi công cụ 'assign_task'"). |
 | `GET /api/dispatch/log?limit=&task_id=&session_id=` | Lọc đúng giá trị (bỏ trống = không lọc, 2 tham số cùng lúc = AND). `status` luôn đã chuẩn hóa (`running\|done\|failed`), thêm `fallback` (bool). `limit` sai → 50. |
 | `post_warroom_message` / `POST /api/warroom/send {..., task_id?}` | Task của lần giao việc: `task_id` truyền vào > mã `TSK-n` đầu tiên **có thật** trong nội dung tin > `current_task_id` của worker. `dispatches[]` thêm `task_id`; response thêm `task_id`. `@Gen`, `@Toàn Đội`, `@all` không giao việc (chỉ lưu, `note` nói rõ). |
 | Kết quả giao việc ghi về task | Dispatch gắn task kết thúc (war-room hoặc tmux) → 1 tin `log_gen_message` trong phiên (`conversation_id`) của task, tác giả `<worker> (agy)`: trạng thái XONG/LỖI + exit, "đã chuyển hồ sơ" nếu fallback, tóm tắt, `Báo cáo: <report_path>`, `Tin war-room: #<id>`, `Link: dispatch:<id>`, và `Bằng chứng nghiệm thu gợi ý: dispatch:<id>` khi done. Ghi đúng 1 lần (`dispatch_log.task_msg_id`), trước khi `wait_worker_result` trả về. Worker ghi `[KANBAN_UPDATE: TSK-n \| CHECK: <id mục>]` trong output → mục checklist đó được tick (chỉ task của lần giao đó). |
@@ -345,7 +377,7 @@ Task thật nằm ở bảng `gen_session_todos` (MCP `create_kanban_task`, `cla
 
 **Biến môi trường mới:** `GW_TMUX_INIT_DIR` (thư mục script khởi tạo tmux của vai, mặc định `$DATA_DIR/tmux-init`; trước đây ghi chung `/tmp/tmux_init_*.sh` nên các tiến trình ghi đè nhau), `GW_PUBLIC_ORIGIN` (gốc URL in trong link MCP khi request không có Host).
 
-**UI:** thẻ task (màn Việc & tiến độ, Kanban phiên, Kanban của worker) có người giữ, lần giao gần nhất (đang chạy / xong / lỗi / đã chuyển hồ sơ), chip VIEC, checklist x/y và các nút "Giao cho @vai", "Tin #n", "Terminal", "Phiên", "Nghiệm thu" (hộp bằng chứng gợi ý `dispatch:<id>` của lần giao đã xong). War-room: `TSK-n`/`VIEC-n` là chip mở thẻ task, tin trả lời nối với tin hỏi (`reply_to`), trạng thái dispatch dưới tin, `dispatches[]` hiện ngay sau khi gửi. Worker & Terminal: task đang làm (chip TSK/VIEC, checklist x/y), quota thật hoặc lý do chưa có số, cờ hết quota, hồ sơ đang dùng, 5 lần giao gần nhất, nút Claim chọn task từ danh sách. Màn MCP: modal dùng class `show`; Test chỉ gọi ngay tool chỉ đọc, tool có tác dụng phụ phải nhập tham số + xác nhận; token bị che (`••••`) với nút Hiện/Copy.
+**UI:** thẻ task (màn Việc & tiến độ, Kanban phiên, Kanban của worker) có người giữ, lần giao gần nhất (đang chạy / xong / lỗi / đã chuyển hồ sơ), chip VIEC, chip repo (khi khác `gen-workplace`), checklist x/y, ô chọn chế độ Làm/Rà soát, ô chọn repo (ẩn/disabled khi Rà soát) và các nút "Giao cho @vai", "Tin #n", "Terminal", "Phiên", "Nghiệm thu" (hộp bằng chứng gợi ý `dispatch:<id>` của lần giao đã xong). War-room: `TSK-n`/`VIEC-n` là chip mở thẻ task, tin trả lời nối với tin hỏi (`reply_to`), trạng thái dispatch dưới tin, `dispatches[]` hiện ngay sau khi gửi. Worker & Terminal: task đang làm (chip TSK/VIEC, checklist x/y), quota thật hoặc lý do chưa có số, cờ hết quota, hồ sơ đang dùng, 5 lần giao gần nhất, nút Claim chọn task từ danh sách. Màn MCP: modal dùng class `show`; Test chỉ gọi ngay tool chỉ đọc, tool có tác dụng phụ phải nhập tham số + xác nhận; token bị che (`••••`) với nút Hiện/Copy.
 
 ```bash
 python3 scripts/test_task_hub.py   # #24: /api/task/assign, lọc dispatch log, TSK trong tin, ghi kết quả về phiên, switch_google_account, quota None
